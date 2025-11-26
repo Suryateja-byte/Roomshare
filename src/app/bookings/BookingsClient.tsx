@@ -1,0 +1,414 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import {
+    Calendar,
+    CalendarDays,
+    MapPin,
+    Clock,
+    CheckCircle2,
+    XCircle,
+    AlertCircle,
+    ChevronRight,
+    User,
+    Home,
+    DollarSign,
+    List
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { updateBookingStatus, BookingStatus } from '@/app/actions/manage-booking';
+import UserAvatar from '@/components/UserAvatar';
+import BookingCalendar from '@/components/BookingCalendar';
+
+type Booking = {
+    id: string;
+    startDate: Date;
+    endDate: Date;
+    status: BookingStatus;
+    totalPrice: number;
+    createdAt: Date;
+    listing: {
+        id: string;
+        title: string;
+        price: number;
+        location: {
+            city: string;
+            state: string;
+        } | null;
+        owner?: {
+            id: string;
+            name: string | null;
+            image: string | null;
+        };
+    };
+    tenant?: {
+        id: string;
+        name: string | null;
+        image: string | null;
+        email: string | null;
+    };
+};
+
+interface BookingsClientProps {
+    sentBookings: Booking[];
+    receivedBookings: Booking[];
+}
+
+const statusConfig = {
+    PENDING: {
+        color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+        icon: Clock,
+        label: 'Pending'
+    },
+    ACCEPTED: {
+        color: 'bg-green-100 text-green-700 border-green-200',
+        icon: CheckCircle2,
+        label: 'Accepted'
+    },
+    REJECTED: {
+        color: 'bg-red-100 text-red-700 border-red-200',
+        icon: XCircle,
+        label: 'Rejected'
+    },
+    CANCELLED: {
+        color: 'bg-zinc-100 text-zinc-600 border-zinc-200',
+        icon: AlertCircle,
+        label: 'Cancelled'
+    }
+};
+
+function StatusBadge({ status }: { status: BookingStatus }) {
+    const config = statusConfig[status];
+    const Icon = config.icon;
+
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold uppercase tracking-wider ${config.color}`}>
+            <Icon className="w-3 h-3" />
+            {config.label}
+        </span>
+    );
+}
+
+function formatDate(date: Date) {
+    return new Date(date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+}
+
+function BookingCard({
+    booking,
+    type,
+    onStatusUpdate
+}: {
+    booking: Booking;
+    type: 'sent' | 'received';
+    onStatusUpdate: (bookingId: string, status: BookingStatus) => Promise<void>;
+}) {
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    const handleStatusUpdate = async (status: BookingStatus) => {
+        setIsUpdating(true);
+        await onStatusUpdate(booking.id, status);
+        setIsUpdating(false);
+    };
+
+    const locationText = booking.listing.location
+        ? `${booking.listing.location.city}, ${booking.listing.location.state}`
+        : 'Location not specified';
+
+    const showActions = type === 'received' && booking.status === 'PENDING';
+    const showCancelButton = type === 'sent' && (booking.status === 'PENDING' || booking.status === 'ACCEPTED');
+
+    return (
+        <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+            <div className="p-6">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex-1">
+                        <Link
+                            href={`/listings/${booking.listing.id}`}
+                            className="text-lg font-bold text-zinc-900 hover:text-zinc-700 transition-colors"
+                        >
+                            {booking.listing.title}
+                        </Link>
+                        <p className="text-sm text-zinc-500 flex items-center gap-1 mt-1">
+                            <MapPin className="w-3.5 h-3.5" />
+                            {locationText}
+                        </p>
+                    </div>
+                    <StatusBadge status={booking.status} />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-y border-zinc-100">
+                    <div>
+                        <p className="text-xs text-zinc-500 uppercase font-medium mb-1">Check-in</p>
+                        <p className="text-sm font-semibold text-zinc-900 flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                            {formatDate(booking.startDate)}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-zinc-500 uppercase font-medium mb-1">Check-out</p>
+                        <p className="text-sm font-semibold text-zinc-900 flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                            {formatDate(booking.endDate)}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-zinc-500 uppercase font-medium mb-1">Total Price</p>
+                        <p className="text-sm font-semibold text-zinc-900 flex items-center gap-1">
+                            <DollarSign className="w-3.5 h-3.5 text-zinc-400" />
+                            ${booking.totalPrice.toFixed(2)}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-zinc-500 uppercase font-medium mb-1">
+                            {type === 'sent' ? 'Host' : 'Tenant'}
+                        </p>
+                        {type === 'sent' && booking.listing.owner ? (
+                            <Link
+                                href={`/users/${booking.listing.owner.id}`}
+                                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                            >
+                                <UserAvatar
+                                    image={booking.listing.owner.image}
+                                    name={booking.listing.owner.name}
+                                    className="w-6 h-6"
+                                />
+                                <span className="text-sm font-medium text-zinc-900">
+                                    {booking.listing.owner.name || 'Host'}
+                                </span>
+                            </Link>
+                        ) : type === 'received' && booking.tenant ? (
+                            <Link
+                                href={`/users/${booking.tenant.id}`}
+                                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                            >
+                                <UserAvatar
+                                    image={booking.tenant.image}
+                                    name={booking.tenant.name}
+                                    className="w-6 h-6"
+                                />
+                                <span className="text-sm font-medium text-zinc-900">
+                                    {booking.tenant.name || 'Tenant'}
+                                </span>
+                            </Link>
+                        ) : (
+                            <span className="text-sm text-zinc-400">N/A</span>
+                        )}
+                    </div>
+                </div>
+
+                {(showActions || showCancelButton) && (
+                    <div className="flex gap-3 mt-4">
+                        {showActions && (
+                            <>
+                                <Button
+                                    onClick={() => handleStatusUpdate('ACCEPTED')}
+                                    disabled={isUpdating}
+                                    className="flex-1"
+                                >
+                                    {isUpdating ? 'Updating...' : 'Accept'}
+                                </Button>
+                                <Button
+                                    onClick={() => handleStatusUpdate('REJECTED')}
+                                    disabled={isUpdating}
+                                    variant="outline"
+                                    className="flex-1"
+                                >
+                                    {isUpdating ? 'Updating...' : 'Reject'}
+                                </Button>
+                            </>
+                        )}
+                        {showCancelButton && (
+                            <Button
+                                onClick={() => handleStatusUpdate('CANCELLED')}
+                                disabled={isUpdating}
+                                variant="destructive"
+                                className="flex-1"
+                            >
+                                {isUpdating ? 'Cancelling...' : 'Cancel Booking'}
+                            </Button>
+                        )}
+                    </div>
+                )}
+
+                <p className="text-xs text-zinc-400 mt-4">
+                    Requested on {formatDate(booking.createdAt)}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+export default function BookingsClient({ sentBookings, receivedBookings }: BookingsClientProps) {
+    const [activeTab, setActiveTab] = useState<'sent' | 'received'>('received');
+    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+    const [bookings, setBookings] = useState({ sent: sentBookings, received: receivedBookings });
+
+    const handleStatusUpdate = async (bookingId: string, status: BookingStatus) => {
+        const result = await updateBookingStatus(bookingId, status);
+
+        if (result.error) {
+            alert(result.error);
+            return;
+        }
+
+        // Update local state
+        setBookings(prev => ({
+            sent: prev.sent.map(b =>
+                b.id === bookingId ? { ...b, status } : b
+            ),
+            received: prev.received.map(b =>
+                b.id === bookingId ? { ...b, status } : b
+            )
+        }));
+    };
+
+    const currentBookings = activeTab === 'sent' ? bookings.sent : bookings.received;
+    const pendingReceivedCount = bookings.received.filter(b => b.status === 'PENDING').length;
+
+    return (
+        <div className="min-h-screen bg-zinc-50/50 pt-24 pb-20">
+            <div className="container mx-auto max-w-4xl px-6 py-10">
+                {/* Header */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">My Bookings</h1>
+                    <p className="text-zinc-500 mt-2">Manage your booking requests and reservations</p>
+                </div>
+
+                {/* Tabs and View Toggle */}
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex gap-2 bg-white p-1.5 rounded-xl border border-zinc-100 shadow-sm">
+                        <button
+                            onClick={() => setActiveTab('received')}
+                            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                                activeTab === 'received'
+                                    ? 'bg-zinc-900 text-white'
+                                    : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'
+                            }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <Home className="w-4 h-4" />
+                                Received
+                                {pendingReceivedCount > 0 && (
+                                    <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                        {pendingReceivedCount}
+                                    </span>
+                                )}
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('sent')}
+                            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                                activeTab === 'sent'
+                                    ? 'bg-zinc-900 text-white'
+                                    : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'
+                            }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <User className="w-4 h-4" />
+                                Sent
+                            </span>
+                        </button>
+                    </div>
+
+                    {/* View Mode Toggle */}
+                    {activeTab === 'received' && (
+                        <div className="flex gap-1 bg-white p-1 rounded-lg border border-zinc-100 shadow-sm">
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`p-2 rounded-md transition-all ${
+                                    viewMode === 'list'
+                                        ? 'bg-zinc-900 text-white'
+                                        : 'text-zinc-500 hover:bg-zinc-50'
+                                }`}
+                                title="List view"
+                            >
+                                <List className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('calendar')}
+                                className={`p-2 rounded-md transition-all ${
+                                    viewMode === 'calendar'
+                                        ? 'bg-zinc-900 text-white'
+                                        : 'text-zinc-500 hover:bg-zinc-50'
+                                }`}
+                                title="Calendar view"
+                            >
+                                <CalendarDays className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Calendar View for Received Bookings */}
+                {activeTab === 'received' && viewMode === 'calendar' && (
+                    <BookingCalendar
+                        bookings={bookings.received.map(b => ({
+                            id: b.id,
+                            startDate: new Date(b.startDate),
+                            endDate: new Date(b.endDate),
+                            status: b.status,
+                            tenant: {
+                                id: b.tenant?.id || '',
+                                name: b.tenant?.name || null,
+                                image: b.tenant?.image || null
+                            },
+                            listing: {
+                                id: b.listing.id,
+                                title: b.listing.title
+                            }
+                        }))}
+                    />
+                )}
+
+                {/* List View */}
+                {(activeTab === 'sent' || viewMode === 'list') && (
+                    <>
+                        {currentBookings.length === 0 ? (
+                            <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-12 text-center">
+                                <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    {activeTab === 'received' ? (
+                                        <Home className="w-8 h-8 text-zinc-400" />
+                                    ) : (
+                                        <Calendar className="w-8 h-8 text-zinc-400" />
+                                    )}
+                                </div>
+                                <h3 className="text-lg font-semibold text-zinc-900 mb-2">
+                                    {activeTab === 'received'
+                                        ? 'No booking requests yet'
+                                        : 'No bookings made yet'}
+                                </h3>
+                                <p className="text-zinc-500 mb-6">
+                                    {activeTab === 'received'
+                                        ? 'When tenants request to book your listings, they will appear here.'
+                                        : 'When you request to book a room, it will appear here.'}
+                                </p>
+                                <Link href="/search">
+                                    <Button>
+                                        {activeTab === 'received' ? 'List a Room' : 'Find a Room'}
+                                        <ChevronRight className="w-4 h-4 ml-1" />
+                                    </Button>
+                                </Link>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {currentBookings.map(booking => (
+                                    <BookingCard
+                                        key={booking.id}
+                                        booking={booking}
+                                        type={activeTab}
+                                        onStatusUpdate={handleStatusUpdate}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}

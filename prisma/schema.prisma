@@ -1,0 +1,302 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                    String                @id @default(cuid())
+  name                  String?
+  email                 String?               @unique
+  emailVerified         DateTime?
+  image                 String?
+  password              String?
+  bio                   String?
+  countryOfOrigin       String?
+  languages             String[]
+  isVerified            Boolean               @default(false)
+  isAdmin               Boolean               @default(false)
+  accounts              Account[]
+  listings              Listing[]
+  messages              Message[]
+  sessions              Session[]
+  conversations         Conversation[]        @relation("ConversationParticipants")
+  savedListings         SavedListing[]
+  reviewsWritten        Review[]              @relation("ReviewAuthor")
+  reviewsReceived       Review[]              @relation("ReviewTarget")
+  bookings              Booking[]
+  reports               Report[]
+  recentlyViewed        RecentlyViewed[]
+  notifications         Notification[]
+  verificationRequests  VerificationRequest[]
+  savedSearches         SavedSearch[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([email, token])
+}
+
+model Listing {
+  id             String           @id @default(cuid())
+  ownerId        String
+  title          String
+  description    String
+  price          Float
+  images         String[]         @default([])
+  amenities      String[]
+  houseRules     String[]
+  leaseDuration  String?
+  roomType       String?
+  totalSlots     Int
+  availableSlots Int
+  moveInDate     DateTime?
+  status         ListingStatus    @default(ACTIVE)
+  viewCount      Int              @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  location       Location?
+  conversations  Conversation[]
+  savedBy        SavedListing[]
+  reviews        Review[]
+  bookings       Booking[]
+  reports        Report[]
+  recentlyViewed RecentlyViewed[]
+}
+
+model SavedListing {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+}
+
+model Review {
+  id            String   @id @default(cuid())
+  authorId      String
+  listingId     String?
+  targetUserId  String?
+  rating        Int
+  comment       String
+  createdAt     DateTime        @default(now())
+
+  author        User            @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  listing       Listing?        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  targetUser    User?           @relation("ReviewTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  response      ReviewResponse?
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum ListingStatus {
+  ACTIVE
+  PAUSED
+  RENTED
+}
+
+model Booking {
+  id        String        @id @default(cuid())
+  listingId String
+  tenantId  String
+  startDate DateTime
+  endDate   DateTime
+  status    BookingStatus @default(PENDING)
+  totalPrice Float
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  listing   Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  tenant    User          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  listingId String
+  reporterId String
+  reason    String
+  details   String?
+  createdAt DateTime @default(now())
+  
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporter  User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+}
+
+model Location {
+  id        String                   @id @default(cuid())
+  listingId String                   @unique
+  address   String
+  city      String
+  state     String
+  zip       String
+  coords    Unsupported("geometry")?
+  listing   Listing                  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([coords], map: "location_idx", type: Gist)
+}
+
+model Conversation {
+  id           String   @id @default(cuid())
+  listingId    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  listing      Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  messages     Message[]
+  participants User[]   @relation("ConversationParticipants")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  senderId       String
+  conversationId String
+  content        String
+  read           Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model RecentlyViewed {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  viewedAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId, viewedAt])
+}
+
+enum NotificationType {
+  BOOKING_REQUEST
+  BOOKING_ACCEPTED
+  BOOKING_REJECTED
+  BOOKING_CANCELLED
+  NEW_MESSAGE
+  NEW_REVIEW
+  LISTING_SAVED
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model VerificationRequest {
+  id            String             @id @default(cuid())
+  userId        String
+  documentType  String             // "passport", "driver_license", "national_id"
+  documentUrl   String             // URL to uploaded document image
+  selfieUrl     String?            // URL to selfie for matching
+  status        VerificationStatus @default(PENDING)
+  adminNotes    String?            // Notes from admin on rejection
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  reviewedAt    DateTime?
+  reviewedBy    String?            // Admin user ID who reviewed
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model SavedSearch {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  query         String?
+  filters       Json     // Store all filter params as JSON
+  alertEnabled  Boolean  @default(true)
+  lastAlertAt   DateTime?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ReviewResponse {
+  id        String   @id @default(cuid())
+  reviewId  String   @unique
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
+}

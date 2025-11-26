@@ -1,0 +1,94 @@
+import NextAuth from "next-auth"
+import Credentials from "next-auth/providers/credentials"
+import Google from "next-auth/providers/google"
+import { PrismaAdapter } from "@auth/prisma-adapter"
+import { prisma } from "@/lib/prisma"
+import bcrypt from "bcryptjs"
+import { z } from "zod"
+
+async function getUser(email: string) {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { email },
+        })
+        return user
+    } catch (error) {
+        console.error("Failed to fetch user:", error)
+        throw new Error("Failed to fetch user.")
+    }
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+    adapter: PrismaAdapter(prisma),
+    pages: {
+        signIn: '/login',
+    },
+    session: {
+        strategy: "jwt", // Use JWT strategy for both OAuth and Credentials
+    },
+    callbacks: {
+        async session({ session, token }) {
+            if (token.sub && session.user) {
+                session.user.id = token.sub
+            }
+            return session
+        },
+        async jwt({ token, user, account }) {
+            // Persist the OAuth access_token to the JWT token right after signin
+            if (user) {
+                token.sub = user.id
+            }
+            return token
+        },
+        async signIn({ user, account, profile }) {
+            // Allow OAuth sign in
+            if (account?.provider === "google") {
+                return true
+            }
+            // For credentials, handled by authorize
+            return true
+        },
+        authorized({ auth, request: { nextUrl } }) {
+            const isLoggedIn = !!auth?.user;
+            const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
+            const isOnAuth = nextUrl.pathname.startsWith('/login') || nextUrl.pathname.startsWith('/signup');
+
+            if (isOnDashboard) {
+                if (isLoggedIn) return true;
+                return false; // Redirect unauthenticated users to login page
+            } else if (isLoggedIn && isOnAuth) {
+                return Response.redirect(new URL('/', nextUrl));
+            }
+
+            return true;
+        },
+    },
+    providers: [
+        Google({
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        }),
+        Credentials({
+            async authorize(credentials) {
+                const parsedCredentials = z
+                    .object({ email: z.string().email(), password: z.string().min(6) })
+                    .safeParse(credentials)
+
+                if (parsedCredentials.success) {
+                    const { email, password } = parsedCredentials.data
+                    const user = await getUser(email)
+                    if (!user) return null
+
+                    // If user has no password (e.g. OAuth), return null
+                    if (!user.password) return null
+
+                    const passwordsMatch = await bcrypt.compare(password, user.password)
+                    if (passwordsMatch) return user
+                }
+
+                console.log("Invalid credentials")
+                return null
+            },
+        }),
+    ],
+})
