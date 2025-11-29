@@ -57,13 +57,21 @@ function LoginForm() {
                     <h2 className="text-2xl xl:text-3xl font-medium leading-tight">
                         "The verification process made me feel so much safer finding a roommate."
                     </h2>
-                    <p className="mt-4 text-zinc-400">- Sarah J., San Francisco</p>
+                    <div className="mt-8 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+                            <span className="font-medium text-sm">SJ</span>
+                        </div>
+                        <div>
+                            <p className="font-medium text-white">Sarah J.</p>
+                            <p className="text-sm text-zinc-400">San Francisco</p>
+                        </div>
+                    </div>
                 </div>
                 <p className="relative z-10 text-sm text-zinc-500">© {new Date().getFullYear()} RoomShare Inc.</p>
             </div>
 
             {/* Right Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6">
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 pb-20">
                 <div className="w-full max-w-sm space-y-6 sm:space-y-8">
                     <div className="text-center lg:text-left">
                         <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 tracking-tight">Welcome back</h1>
@@ -85,7 +93,7 @@ function LoginForm() {
                     {/* Google Sign In */}
                     <button
                         onClick={() => signIn('google', { callbackUrl: '/' })}
-                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors font-medium text-zinc-700 "
+                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors font-medium text-zinc-700 shadow-sm"
                     >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
                             <path
@@ -112,32 +120,34 @@ function LoginForm() {
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-zinc-200 "></div>
                         </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-white px-4 text-zinc-500 ">or continue with email</span>
+                        <div className="relative flex justify-center text-[11px] uppercase tracking-wider font-medium">
+                            <span className="bg-white px-4 text-zinc-400">or continue with email</span>
                         </div>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
-                        <div className="space-y-1.5">
-                            <label htmlFor="email" className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ">
+                        <div className="space-y-1">
+                            <label htmlFor="email" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
                                 Email
                             </label>
                             <div className="relative">
-                                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Mail className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
+                                </div>
                                 <input
                                     id="email"
                                     type="email"
                                     name="email"
                                     required
                                     autoComplete="email"
-                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl py-3 pl-10 sm:pl-11 pr-4 text-zinc-900 placeholder:text-zinc-400 outline-none focus:bg-white focus:border-zinc-900 focus-visible:ring-2 focus-visible:ring-zinc-900/10 transition-colors"
-                                    placeholder="name@example.com"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                                    placeholder="you@example.com"
                                 />
                             </div>
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-1">
                             <div className="flex justify-between items-baseline">
-                                <label htmlFor="password" className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ">
+                                <label htmlFor="password" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
                                     Password
                                 </label>
                                 <Link href="/forgot-password" className="text-xs text-zinc-500 hover:text-zinc-900 transition-colors">
@@ -145,14 +155,16 @@ function LoginForm() {
                                 </Link>
                             </div>
                             <div className="relative">
-                                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Lock className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
+                                </div>
                                 <input
                                     id="password"
                                     type="password"
                                     name="password"
                                     required
                                     autoComplete="current-password"
-                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl py-3 pl-10 sm:pl-11 pr-4 text-zinc-900 placeholder:text-zinc-400 outline-none focus:bg-white focus:border-zinc-900 focus-visible:ring-2 focus-visible:ring-zinc-900/10 transition-colors"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                                     placeholder="••••••••"
                                 />
                             </div>
@@ -160,7 +172,7 @@ function LoginForm() {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-11 sm:h-12 rounded-xl"
+                            className="w-full h-11 sm:h-12 rounded-lg shadow-sm hover:shadow-md transition-all"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Sign in <ArrowRight className="w-4 h-4 ml-2" /></>}
                         </Button>

@@ -14,7 +14,7 @@ interface Listing {
     description: string;
     price: number;
     amenities: string[];
-    houseRules: string;
+    houseRules: string[];
     totalSlots: number;
     moveInDate: Date | null;
     location: {
@@ -251,7 +251,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder:text-zinc-400 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
                             placeholder="No smoking, quiet hours after 10pm, no pets..."
                             disabled={loading}
-                            defaultValue={listing.houseRules}
+                            defaultValue={listing.houseRules.join(', ')}
                         />
                     </div>
                 </div>

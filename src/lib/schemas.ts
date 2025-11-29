@@ -5,7 +5,7 @@ export const createListingSchema = z.object({
     description: z.string().min(10, "Description must be at least 10 characters"),
     price: z.coerce.number().positive("Price must be a positive number"),
     amenities: z.string().transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)),
-    houseRules: z.string().optional().default(""),
+    houseRules: z.string().optional().default("").transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)),
     totalSlots: z.coerce.number().int().positive("Total slots must be a positive integer"),
     address: z.string().min(1, "Address is required"),
     city: z.string().min(1, "City is required"),

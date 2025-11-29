@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 
@@ -104,6 +105,18 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    // Handle body scroll locking
+    useEffect(() => {
+        if (isMobileMenuOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isMobileMenuOpen]);
+
     // Poll for unread count updates and listen for custom events
     useEffect(() => {
         if (!user) return;
@@ -127,52 +140,58 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
     }, [user]);
 
     const isSearchPage = pathname === '/search';
+    const isCompact = isScrolled || isSearchPage;
+    // Pages where search bar should be hidden (show center nav links instead)
+    const hideSearchBarPaths = ['/', '/listings/create', '/profile', '/bookings', '/saved', '/recently-viewed', '/settings'];
+    const showSearchBar = !isSearchPage && !hideSearchBarPaths.includes(pathname) && !pathname.startsWith('/messages');
 
     return (
         <nav
-            className={`fixed top-0 left-0 right-0 z-[1000] transition-all duration-300 border-b ${isScrolled
-                ? 'bg-white/80 backdrop-blur-xl border-zinc-200/50 py-3 shadow-sm'
-                : 'bg-white/0 border-transparent py-5'
+            className={`fixed top-0 left-0 right-0 z-[1000] transition-all duration-300 border-b ${isCompact
+                ? 'bg-white/95 backdrop-blur-xl border-zinc-200 shadow-sm'
+                : 'bg-white border-zinc-100'
                 }`}
         >
-            <div className="container mx-auto px-6 flex items-center justify-between h-16 gap-4">
+            <div className="container mx-auto px-6 flex items-center justify-between h-16 gap-4 relative">
 
-                {/* Logo - Text Based, Minimal */}
-                <a href="/" className="flex items-center gap-2 group shrink-0">
-                    <span className="font-semibold text-xl tracking-tighter text-zinc-900">
+                {/* Logo - Text Based, Minimal - Vertically centered */}
+                <a href="/" className="flex items-center shrink-0">
+                    <span className="font-semibold text-xl tracking-tight text-zinc-900 leading-none">
                         RoomShare<span className="text-zinc-400">.</span>
                     </span>
                 </a>
 
                 {/* Search Bar (Desktop) - Hidden on Home Page */}
-                {!isSearchPage && pathname !== '/' && (
+                {showSearchBar && (
                     <div className="hidden md:block flex-1 max-w-2xl mx-4">
                         <SearchForm variant="compact" />
                     </div>
                 )}
 
-                {/* Desktop Center Links - Show on lg screens if search bar is present, or md if not */}
-                <div className={`hidden ${(!isSearchPage && pathname !== '/') ? 'lg:flex' : 'md:flex'} items-center gap-8`}>
+                {/* Desktop Center Links - Only show when search bar is NOT visible */}
+                {!showSearchBar && (
+                <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-8">
                     <a
                         href="/search"
-                        className="text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+                        className="text-[13px] font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
                     >
                         Find a Room
                     </a>
                     <a
                         href="/listings/create"
-                        className="text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+                        className="text-[13px] font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
                     >
                         List a Room
                     </a>
                 </div>
+                )}
 
-                {/* Right Actions */}
-                <div className="flex items-center gap-3 md:gap-4 shrink-0">
+                {/* Right Actions - All items vertically centered */}
+                <div className="flex items-center gap-2 md:gap-3 shrink-0">
                     {/* Search Icon (Mobile Only) */}
                     <a
                         href="/search"
-                        className="md:hidden p-2 text-zinc-600 hover:text-zinc-900 transition-colors rounded-full hover:bg-zinc-100"
+                        className="md:hidden flex items-center justify-center w-9 h-9 text-zinc-600 hover:text-zinc-900 transition-colors rounded-full hover:bg-zinc-100"
                         aria-label="Search for rooms"
                     >
                         <Search className="w-5 h-5" />
@@ -181,13 +200,13 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                     {user ? (
                         <>
                             {/* Notification Center */}
-                            <div className="hidden md:block">
+                            <div className="hidden md:flex items-center">
                                 <NotificationCenter />
                             </div>
 
                             <a
                                 href="/messages"
-                                className="hidden md:flex p-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-all relative"
+                                className="hidden md:flex items-center justify-center w-9 h-9 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-all relative"
                                 aria-label={currentUnreadCount > 0 ? `Messages, ${currentUnreadCount} unread` : 'Messages'}
                             >
                                 <MessageSquare className="w-5 h-5" />
@@ -203,25 +222,25 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                             <UserMenu user={user} />
                         </>
                     ) : (
-                        <div className="hidden md:flex items-center gap-4">
+                        <div className="hidden md:flex items-center gap-3">
                             <a
                                 href="/login"
-                                className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+                                className="text-[13px] font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-2"
                             >
                                 Log in
                             </a>
                             <a href="/signup">
-                                <Button className="rounded-full bg-zinc-900 text-white hover:bg-zinc-800 h-9 px-5 text-sm font-medium shadow-lg shadow-zinc-900/10">
+                                <Button className="rounded-full bg-zinc-900 text-white hover:bg-zinc-800 h-9 px-5 text-[13px] font-medium shadow-sm">
                                     Sign up
                                 </Button>
                             </a>
                         </div>
                     )}
 
-                    {/* Post Ad Button (Desktop) */}
-                    <a href="/listings/create" className="hidden md:block">
-                        <Button variant="outline" className="rounded-full border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 text-zinc-900 h-9 px-4 text-sm font-medium transition-all">
-                            <Plus className="w-4 h-4 mr-2" />
+                    {/* Post Ad Button (Desktop) - Same height as avatar for alignment */}
+                    <a href="/listings/create" className="hidden md:flex items-center">
+                        <Button className="rounded-full bg-zinc-900 hover:bg-zinc-800 text-white h-9 px-4 text-[13px] font-medium shadow-sm transition-all">
+                            <Plus className="w-4 h-4 mr-1.5" strokeWidth={2.5} />
                             Post Ad
                         </Button>
                     </a>
@@ -243,20 +262,29 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                 </div>
             </div>
 
-            {/* Mobile Menu Overlay */}
-            {isMobileMenuOpen && (
+            {/* Mobile Menu Portal */}
+            {isMobileMenuOpen && typeof document !== 'undefined' && createPortal(
                 <div
                     id="mobile-menu"
                     role="dialog"
                     aria-modal="true"
                     aria-label="Navigation menu"
-                    className="fixed inset-0 bg-white z-[999] flex flex-col justify-center items-center gap-6 sm:gap-8 animate-in fade-in slide-in-from-bottom-5 duration-300 px-6"
+                    className="fixed inset-0 bg-white z-[9999] flex flex-col justify-center items-center gap-6 sm:gap-8 animate-in fade-in slide-in-from-bottom-5 duration-300 px-6"
                     onKeyDown={(e) => {
                         if (e.key === 'Escape') {
                             setIsMobileMenuOpen(false);
                         }
                     }}
                 >
+                    {/* Close Button */}
+                    <button
+                        className="absolute top-5 right-6 p-2 rounded-lg hover:bg-zinc-100 transition-colors touch-target"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        aria-label="Close menu"
+                    >
+                        <X className="w-6 h-6 text-zinc-900" />
+                    </button>
+
                     <a
                         href="/search"
                         className="text-2xl sm:text-3xl font-light text-zinc-900 tracking-tight py-2 hover:text-indigo-600 transition-colors"
@@ -285,7 +313,7 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                             </a>
                             <a
                                 href="/signup"
-                                className="text-lg sm:text-xl font-medium text-zinc-900 dark:text-zinc-100 py-2 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                className="text-lg sm:text-xl font-medium text-zinc-900 py-2 hover:text-indigo-600 transition-colors"
                                 onClick={() => setIsMobileMenuOpen(false)}
                             >
                                 Sign up
@@ -295,37 +323,36 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                         <>
                             <a
                                 href="/profile"
-                                className="text-lg sm:text-xl font-medium text-zinc-900 dark:text-zinc-100 py-2 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                className="text-lg sm:text-xl font-medium text-zinc-900 py-2 hover:text-indigo-600 transition-colors"
                                 onClick={() => setIsMobileMenuOpen(false)}
                             >
                                 Profile
                             </a>
                             <a
                                 href="/bookings"
-                                className="text-lg sm:text-xl font-medium text-zinc-500 dark:text-zinc-400 py-2 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                                className="text-lg sm:text-xl font-medium text-zinc-500 py-2 hover:text-zinc-900 transition-colors"
                                 onClick={() => setIsMobileMenuOpen(false)}
                             >
                                 Bookings
                             </a>
                             <a
                                 href="/notifications"
-                                className="text-lg sm:text-xl font-medium text-zinc-500 dark:text-zinc-400 py-2 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                                className="text-lg sm:text-xl font-medium text-zinc-500 py-2 hover:text-zinc-900 transition-colors"
                                 onClick={() => setIsMobileMenuOpen(false)}
                             >
                                 Notifications
                             </a>
                             <a
                                 href="/messages"
-                                className="text-lg sm:text-xl font-medium text-zinc-500 dark:text-zinc-400 py-2 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                                className="text-lg sm:text-xl font-medium text-zinc-500 py-2 hover:text-zinc-900 transition-colors"
                                 onClick={() => setIsMobileMenuOpen(false)}
                             >
                                 Messages
                             </a>
                         </>
                     )}
-
-
-                </div>
+                </div>,
+                document.body
             )}
         </nav>
     );

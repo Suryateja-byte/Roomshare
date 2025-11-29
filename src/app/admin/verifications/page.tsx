@@ -22,7 +22,7 @@ export default async function VerificationsPage() {
         redirect('/');
     }
 
-    // Get all verification requests
+    // Get all verification requests with user data
     const requests = await prisma.verificationRequest.findMany({
         include: {
             user: {
@@ -30,8 +30,7 @@ export default async function VerificationsPage() {
                     id: true,
                     name: true,
                     email: true,
-                    image: true,
-                    createdAt: true
+                    image: true
                 }
             }
         },

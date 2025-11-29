@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import type { SearchFilters } from '@/lib/search-utils';
+import type { Prisma } from '@prisma/client';
 
 interface SaveSearchInput {
     name: string;
@@ -32,7 +33,7 @@ export async function saveSearch(input: SaveSearchInput) {
                 userId: session.user.id,
                 name: input.name,
                 query: input.filters.query,
-                filters: input.filters,
+                filters: input.filters as Prisma.InputJsonValue,
                 alertEnabled: input.alertEnabled ?? true
             }
         });

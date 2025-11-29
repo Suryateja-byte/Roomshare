@@ -136,13 +136,15 @@ export async function getMessages(conversationId: string) {
     const session = await auth();
     if (!session?.user?.id) return [];
 
+    const userId = session.user.id;
+
     // Verify participant
     const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
         include: { participants: { select: { id: true } } },
     });
 
-    if (!conversation || !conversation.participants.some(p => p.id === session.user.id)) {
+    if (!conversation || !conversation.participants.some(p => p.id === userId)) {
         throw new Error('Unauthorized');
     }
 
@@ -150,13 +152,13 @@ export async function getMessages(conversationId: string) {
     const updateResult = await prisma.message.updateMany({
         where: {
             conversationId,
-            senderId: { not: session.user.id },
+            senderId: { not: userId },
             read: false,
         },
         data: { read: true },
     });
 
-    console.log(`[Mark as Read] User ${session.user.id} in conversation ${conversationId.substring(0, 8)}... - Marked ${updateResult.count} messages as read`);
+    console.log(`[Mark as Read] User ${userId} in conversation ${conversationId.substring(0, 8)}... - Marked ${updateResult.count} messages as read`);
 
     return await prisma.message.findMany({
         where: { conversationId },

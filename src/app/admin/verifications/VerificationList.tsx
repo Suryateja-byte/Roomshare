@@ -26,13 +26,14 @@ interface VerificationRequest {
     status: 'PENDING' | 'APPROVED' | 'REJECTED';
     adminNotes: string | null;
     createdAt: Date;
+    updatedAt: Date;
     reviewedAt: Date | null;
+    reviewedBy: string | null;
     user: {
         id: string;
         name: string | null;
         email: string | null;
         image: string | null;
-        createdAt: Date;
     };
 }
 
@@ -163,9 +164,6 @@ export default function VerificationList({ initialRequests }: VerificationListPr
                                                 {request.user.name || 'Unknown User'}
                                             </h3>
                                             <p className="text-sm text-zinc-500">{request.user.email}</p>
-                                            <p className="text-xs text-zinc-400 mt-1">
-                                                Member since {new Date(request.user.createdAt).toLocaleDateString()}
-                                            </p>
                                         </div>
                                     </div>
 

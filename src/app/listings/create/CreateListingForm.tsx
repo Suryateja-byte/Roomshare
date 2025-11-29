@@ -83,7 +83,7 @@ export default function CreateListingForm() {
             <form onSubmit={handleSubmit} className="space-y-12">
                 {/* Section 1: The Basics */}
                 <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
                         <Home className="w-4 h-4 flex-shrink-0" /> The Basics
                     </h3>
 
@@ -105,7 +105,7 @@ export default function CreateListingForm() {
                             name="description"
                             required
                             rows={5}
-                            className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder:text-zinc-400 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 resize-none leading-relaxed"
+                            className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3 sm:py-3.5 text-zinc-900 placeholder:text-zinc-400 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 resize-none leading-relaxed"
                             placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
                             disabled={loading}
                         />
@@ -142,7 +142,7 @@ export default function CreateListingForm() {
 
                 {/* Section 2: Location */}
                 <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
                         <MapPin className="w-4 h-4 flex-shrink-0" /> Location
                     </h3>
 
@@ -156,7 +156,7 @@ export default function CreateListingForm() {
                             disabled={loading}
                         />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-4">
                         <div>
                             <Label htmlFor="city">City</Label>
                             <Input
@@ -194,12 +194,12 @@ export default function CreateListingForm() {
 
                 {/* Section 2.5: Photos */}
                 <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
                         <Camera className="w-4 h-4 flex-shrink-0" /> Photos
                     </h3>
                     <div>
                         <Label>Upload Photos</Label>
-                        <p className="text-xs text-zinc-400 mb-4 pl-1">
+                        <p className="text-xs text-zinc-400 mt-1 mb-4">
                             Add photos to showcase your space (optional but recommended)
                         </p>
                         <ImageUploader onImagesChange={setUploadedImages} />
@@ -210,7 +210,7 @@ export default function CreateListingForm() {
 
                 {/* Section 3: Details */}
                 <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
                         <List className="w-4 h-4 flex-shrink-0" /> Finer Details
                     </h3>
 
@@ -222,7 +222,7 @@ export default function CreateListingForm() {
                             placeholder="Wifi, Gym, Washer/Dryer, Roof Deck..."
                             disabled={loading}
                         />
-                        <p className="text-xs text-zinc-400 mt-2 pl-1">Separate amenities with commas</p>
+                        <p className="text-xs text-zinc-400 mt-2">Separate amenities with commas</p>
                     </div>
 
                     <div>
@@ -233,7 +233,7 @@ export default function CreateListingForm() {
                             type="date"
                             disabled={loading}
                         />
-                        <p className="text-xs text-zinc-400 mt-2 pl-1">When can tenants move in? (Optional)</p>
+                        <p className="text-xs text-zinc-400 mt-2">When can tenants move in? (Optional)</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -242,7 +242,7 @@ export default function CreateListingForm() {
                             <select
                                 id="leaseDuration"
                                 name="leaseDuration"
-                                className="w-full h-12 bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3 sm:py-3.5 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
                                 disabled={loading}
                             >
                                 <option value="">Select duration...</option>
@@ -257,7 +257,7 @@ export default function CreateListingForm() {
                             <select
                                 id="roomType"
                                 name="roomType"
-                                className="w-full h-12 bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3 sm:py-3.5 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
                                 disabled={loading}
                             >
                                 <option value="">Select type...</option>
@@ -276,7 +276,7 @@ export default function CreateListingForm() {
                             placeholder="No smoking, quiet hours after 10pm, no pets..."
                             disabled={loading}
                         />
-                        <p className="text-xs text-zinc-400 mt-2 pl-1">Separate rules with commas</p>
+                        <p className="text-xs text-zinc-400 mt-2">Separate rules with commas</p>
                     </div>
                 </div>
 

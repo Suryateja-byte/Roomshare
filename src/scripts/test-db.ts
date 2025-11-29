@@ -37,7 +37,7 @@ async function main() {
                     description: 'Test Description',
                     price: 100,
                     amenities: ['Wifi'],
-                    houseRules: 'No smoking',
+                    houseRules: ['No smoking'],
                     totalSlots: 1,
                     availableSlots: 1,
                     ownerId: user.id,

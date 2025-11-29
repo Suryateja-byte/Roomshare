@@ -1,5 +1,5 @@
 import { auth } from '@/auth';
-import { getListingsPaginated, getListings, getSavedListingIds, SortOption } from '@/lib/data';
+import { getListingsPaginated, getListings, getSavedListingIds, analyzeFilterImpact, SortOption } from '@/lib/data';
 import { Suspense } from 'react';
 import SearchForm from '@/components/SearchForm';
 import MapComponent from '@/components/Map';
@@ -7,6 +7,7 @@ import ListingCard from '@/components/ListingCard';
 import Pagination from '@/components/Pagination';
 import SortSelect from '@/components/SortSelect';
 import SaveSearchButton from '@/components/SaveSearchButton';
+import ZeroResultsSuggestions from '@/components/ZeroResultsSuggestions';
 import Link from 'next/link';
 import { Search, Map, List } from 'lucide-react';
 import SearchViewToggle from '@/components/SearchViewToggle';
@@ -20,7 +21,6 @@ export default async function SearchPage({
         q?: string;
         minPrice?: string;
         maxPrice?: string;
-        language?: string;
         amenities?: string | string[];
         moveInDate?: string;
         leaseDuration?: string;
@@ -36,10 +36,64 @@ export default async function SearchPage({
         sort?: string;
     }>;
 }) {
-    const { q, minPrice, maxPrice, language, amenities, moveInDate, leaseDuration, houseRules, roomType, minLat, maxLat, minLng, maxLng, lat, lng, page, sort } = await searchParams;
+    const { q, minPrice, maxPrice, amenities, moveInDate, leaseDuration, houseRules, roomType, minLat, maxLat, minLng, maxLng, lat, lng, page, sort } = await searchParams;
     const session = await auth();
     const userId = session?.user?.id;
-    const currentPage = page ? parseInt(page) : 1;
+
+    // === URL Parameter Validation ===
+    // Helper function to safely parse numeric values with validation
+    const safeParseFloat = (value: string | undefined, min?: number, max?: number): number | undefined => {
+        if (!value) return undefined;
+        const parsed = parseFloat(value);
+        if (isNaN(parsed)) return undefined;
+        if (min !== undefined && parsed < min) return min;
+        if (max !== undefined && parsed > max) return max;
+        return parsed;
+    };
+
+    const safeParseInt = (value: string | undefined, min?: number, max?: number, defaultVal?: number): number => {
+        if (!value) return defaultVal ?? 1;
+        const parsed = parseInt(value, 10);
+        if (isNaN(parsed)) return defaultVal ?? 1;
+        if (min !== undefined && parsed < min) return min;
+        if (max !== undefined && parsed > max) return max;
+        return parsed;
+    };
+
+    // Validate date format (YYYY-MM-DD) and ensure it's a valid date
+    const safeParseDate = (value: string | undefined): string | undefined => {
+        if (!value) return undefined;
+        // Check format matches YYYY-MM-DD
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+        // Check if it's a valid date
+        const date = new Date(value);
+        if (isNaN(date.getTime())) return undefined;
+        // Don't allow dates more than 2 years in the future
+        const maxDate = new Date();
+        maxDate.setFullYear(maxDate.getFullYear() + 2);
+        if (date > maxDate) return undefined;
+        return value;
+    };
+
+    // Validate page number (will be clamped after we know totalPages)
+    const requestedPage = safeParseInt(page, 1, undefined, 1);
+
+    // Validate price range (non-negative, auto-swap if needed)
+    let validMinPrice = safeParseFloat(minPrice, 0);
+    let validMaxPrice = safeParseFloat(maxPrice, 0);
+
+    // Auto-swap if min > max
+    if (validMinPrice !== undefined && validMaxPrice !== undefined && validMinPrice > validMaxPrice) {
+        [validMinPrice, validMaxPrice] = [validMaxPrice, validMinPrice];
+    }
+
+    // Validate coordinates (latitude: -90 to 90, longitude: -180 to 180)
+    const validLat = safeParseFloat(lat, -90, 90);
+    const validLng = safeParseFloat(lng, -180, 180);
+    const validMinLat = safeParseFloat(minLat, -90, 90);
+    const validMaxLat = safeParseFloat(maxLat, -90, 90);
+    const validMinLng = safeParseFloat(minLng, -180, 180);
+    const validMaxLng = safeParseFloat(maxLng, -180, 180);
 
     const amenitiesList = typeof amenities === 'string' ? [amenities] : amenities;
     const houseRulesList = typeof houseRules === 'string' ? [houseRules] : houseRules;
@@ -47,20 +101,24 @@ export default async function SearchPage({
     // Calculate bounds from either explicit bounds or from center coordinates
     let bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number } | undefined;
 
-    if (minLat && maxLat && minLng && maxLng) {
+    if (validMinLat !== undefined && validMaxLat !== undefined && validMinLng !== undefined && validMaxLng !== undefined) {
         // Use explicit bounds from map movement
         bounds = {
-            minLat: parseFloat(minLat),
-            maxLat: parseFloat(maxLat),
-            minLng: parseFloat(minLng),
-            maxLng: parseFloat(maxLng)
+            minLat: validMinLat,
+            maxLat: validMaxLat,
+            minLng: validMinLng,
+            maxLng: validMaxLng
         };
-    } else if (lat && lng) {
+    } else if (validLat !== undefined && validLng !== undefined) {
         // Create bounds around the selected location (approximately 10km radius)
-        const centerLat = parseFloat(lat);
-        const centerLng = parseFloat(lng);
+        const centerLat = validLat;
+        const centerLng = validLng;
         const latOffset = 0.09; // ~10km in latitude
-        const lngOffset = 0.12; // ~10km in longitude (varies by latitude)
+
+        // Adjust longitude offset based on latitude (corrects for Earth's curvature)
+        // At equator, 1° longitude = ~111km. At higher latitudes, it gets shorter.
+        // lngOffset = latOffset / cos(latitude)
+        const lngOffset = 0.09 / Math.cos(centerLat * Math.PI / 180);
 
         bounds = {
             minLat: centerLat - latOffset,
@@ -74,13 +132,15 @@ export default async function SearchPage({
     const validSortOptions: SortOption[] = ['recommended', 'price_asc', 'price_desc', 'newest', 'rating'];
     const sortOption: SortOption = validSortOptions.includes(sort as SortOption) ? (sort as SortOption) : 'recommended';
 
+    // Validate moveInDate format
+    const validMoveInDate = safeParseDate(moveInDate);
+
     const filterParams = {
         query: q,
-        minPrice: minPrice ? parseFloat(minPrice) : undefined,
-        maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
-        language,
+        minPrice: validMinPrice,
+        maxPrice: validMaxPrice,
         amenities: amenitiesList,
-        moveInDate,
+        moveInDate: validMoveInDate,
         leaseDuration,
         houseRules: houseRulesList,
         roomType,
@@ -89,18 +149,37 @@ export default async function SearchPage({
     };
 
     const [paginatedResult, allListings, savedListingIds] = await Promise.all([
-        getListingsPaginated({ ...filterParams, page: currentPage, limit: ITEMS_PER_PAGE }),
+        getListingsPaginated({ ...filterParams, page: requestedPage, limit: ITEMS_PER_PAGE }),
         getListings(filterParams), // For the map to show all listings
         userId ? getSavedListingIds(userId) : Promise.resolve([])
     ]);
 
     const { items: listings, total, totalPages } = paginatedResult;
 
+    // Clamp current page to valid range (after we know totalPages)
+    const currentPage = Math.max(1, Math.min(requestedPage, totalPages || 1));
+
+    // Analyze filter impact when there are no results
+    const filterSuggestions = total === 0 ? await analyzeFilterImpact(filterParams) : [];
+
     const listContent = (
         <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-[840px] mx-auto pb-24 md:pb-6">
+            {/* Screen reader announcement for search results */}
+            <div aria-live="polite" aria-atomic="true" className="sr-only">
+                {total === 0
+                    ? `No listings found${q ? ` for "${q}"` : ''}`
+                    : `Found ${total} ${total === 1 ? 'listing' : 'listings'}${q ? ` for "${q}"` : ''}`
+                }
+            </div>
+
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-lg sm:text-xl font-semibold text-zinc-900 tracking-tight">
+                    {/* tabIndex -1 allows programmatic focus for screen readers */}
+                    <h1
+                        id="search-results-heading"
+                        tabIndex={-1}
+                        className="text-lg sm:text-xl font-semibold text-zinc-900 tracking-tight outline-none"
+                    >
                         {total} {total === 1 ? 'place' : 'places'} {q ? `in "${q}"` : 'available'}
                     </h1>
                     <p className="text-sm text-zinc-500 mt-1">
@@ -120,15 +199,25 @@ export default async function SearchPage({
                         <Search className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-400" />
                     </div>
                     <h3 className="text-base sm:text-lg font-semibold text-zinc-900 mb-2">No matches found</h3>
-                    <p className="text-zinc-500 text-sm max-w-xs text-center mb-6 px-4">
-                        We couldn't find any listings {q ? `for "${q}"` : ''}. Try changing your search area or removing filters.
+                    <p className="text-zinc-500 text-sm max-w-xs text-center px-4">
+                        We couldn't find any listings {q ? `for "${q}"` : ''}.
                     </p>
-                    <Link
-                        href="/search"
-                        className="px-4 py-2.5 rounded-full border border-zinc-200 bg-transparent hover:bg-zinc-50 text-zinc-900 text-sm font-medium transition-colors touch-target"
-                    >
-                        Clear all filters
-                    </Link>
+
+                    {/* Smart filter suggestions */}
+                    {filterSuggestions.length > 0 ? (
+                        <div className="w-full max-w-sm px-4 mt-4">
+                            <Suspense fallback={null}>
+                                <ZeroResultsSuggestions suggestions={filterSuggestions} query={q} />
+                            </Suspense>
+                        </div>
+                    ) : (
+                        <Link
+                            href="/search"
+                            className="mt-6 px-4 py-2.5 rounded-full border border-zinc-200 bg-transparent hover:bg-zinc-50 text-zinc-900 text-sm font-medium transition-colors touch-target"
+                        >
+                            Clear all filters
+                        </Link>
+                    )}
                 </div>
             ) : (
                 <>
@@ -159,9 +248,9 @@ export default async function SearchPage({
     const mapContent = <MapComponent listings={allListings} />;
 
     return (
-        <div className="h-screen-safe flex flex-col bg-white overflow-hidden">
-            {/* Sticky Search Header */}
-            <header className="sticky top-0 z-[900] w-full bg-white/80 backdrop-blur-xl border-b border-zinc-100 ">
+        <div className="h-screen-safe flex flex-col bg-white overflow-hidden pt-20">
+            {/* Search Header */}
+            <header className="w-full bg-white/80 backdrop-blur-xl border-b border-zinc-100 relative z-50">
                 <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
                     <Suspense fallback={<div className="h-14 sm:h-16 w-full bg-zinc-100 animate-pulse rounded-full" />}>
                         <SearchForm />

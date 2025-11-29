@@ -24,7 +24,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         signIn: '/login',
     },
     session: {
-        strategy: "jwt", // Use JWT strategy for both OAuth and Credentials
+        strategy: "jwt",
     },
     callbacks: {
         async session({ session, token }) {
@@ -34,18 +34,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return session
         },
         async jwt({ token, user, account }) {
-            // Persist the OAuth access_token to the JWT token right after signin
             if (user) {
                 token.sub = user.id
             }
             return token
         },
         async signIn({ user, account, profile }) {
-            // Allow OAuth sign in
             if (account?.provider === "google") {
                 return true
             }
-            // For credentials, handled by authorize
             return true
         },
         authorized({ auth, request: { nextUrl } }) {
@@ -78,8 +75,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     const { email, password } = parsedCredentials.data
                     const user = await getUser(email)
                     if (!user) return null
-
-                    // If user has no password (e.g. OAuth), return null
                     if (!user.password) return null
 
                     const passwordsMatch = await bcrypt.compare(password, user.password)

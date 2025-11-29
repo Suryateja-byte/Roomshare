@@ -173,7 +173,7 @@ export default function LocationSearchInput({
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
-                    className="w-full bg-transparent border-none p-0 text-zinc-900 placeholder:text-zinc-300 focus:ring-0 focus:outline-none text-base font-medium truncate pr-8"
+                    className="w-full bg-transparent border-none p-0 text-zinc-900 placeholder:text-zinc-500 focus:ring-0 focus:outline-none text-sm truncate pr-8"
                     autoComplete="off"
                 />
 

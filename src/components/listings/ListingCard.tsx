@@ -1,5 +1,8 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
-import { Users, Wifi, Bed, MapPin } from 'lucide-react';
+import { Users, Wifi, Bed, Home } from 'lucide-react';
 
 interface ListingCardProps {
     listing: {
@@ -9,70 +12,96 @@ interface ListingCardProps {
         availableSlots: number;
         images?: string[];
         amenities?: string[];
-        // Add other fields if needed, but make them optional if not always present in MapListing
     };
     className?: string;
 }
 
+// Placeholder images
+const PLACEHOLDER_IMAGES = [
+    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1484154218962-a1c002085d2f?auto=format&fit=crop&w=800&q=80",
+];
+
 export default function ListingCard({ listing, className = '' }: ListingCardProps) {
+    const [imageError, setImageError] = useState(false);
+
     // Use actual listing images or placeholder
-    const hasImage = listing.images && listing.images.length > 0;
-    const imageUrl = hasImage
-        ? listing.images[0]
-        : `https://source.unsplash.com/random/800x600/?apartment,room&sig=${listing.id}`;
+    const hasImage = listing.images && listing.images.length > 0 && listing.images[0];
+    const placeholderIndex = listing.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % PLACEHOLDER_IMAGES.length;
+    const imageUrl = hasImage && !imageError ? listing.images![0] : PLACEHOLDER_IMAGES[placeholderIndex];
+    const showPlaceholder = !hasImage || imageError;
+
+    const isAvailable = listing.availableSlots > 0;
 
     return (
-        <Link href={`/listings/${listing.id}`} className={`block group ${className}`}>
-            <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border border-border/50 h-full flex flex-col">
+        <Link href={`/listings/${listing.id}`} className={`block group focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 rounded-xl ${className}`}>
+            <div className="bg-white rounded-xl overflow-hidden border border-zinc-200/60 h-full flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] hover:border-zinc-300">
                 {/* Image Container */}
-                <div className="relative aspect-[4/3] overflow-hidden bg-muted ">
+                <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
                     <img
                         src={imageUrl}
                         alt={listing.title}
-                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500 ease-out"
                         loading="lazy"
+                        onError={() => setImageError(true)}
                     />
-                    {!hasImage && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-100/80 backdrop-blur-sm">
-                            <span className="text-slate-400 text-sm font-medium">No photos yet</span>
+                    {/* Empty state overlay - Intentional waiting state */}
+                    {showPlaceholder && (
+                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-150 flex flex-col items-center justify-center">
+                            <div className="w-14 h-14 rounded-2xl bg-zinc-200/80 flex items-center justify-center mb-2">
+                                <Home className="w-7 h-7 text-zinc-400" strokeWidth={1.5} fill="currentColor" fillOpacity={0.1} />
+                            </div>
+                            <span className="text-[11px] text-zinc-400 font-medium uppercase tracking-wider">No Photos</span>
                         </div>
                     )}
-                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-semibold text-foreground shadow-sm">
-                        {listing.availableSlots} spots left
+                    {/* Availability Badge - Solid style for contrast */}
+                    <div className="absolute top-3 left-3 z-10">
+                        <span className={`
+                            inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold uppercase tracking-wide
+                            shadow-sm
+                            ${isAvailable
+                                ? 'bg-white text-zinc-900 shadow-black/5'
+                                : 'bg-zinc-900 text-white'
+                            }
+                        `}>
+                            {listing.availableSlots} {listing.availableSlots === 1 ? 'spot' : 'spots'} left
+                        </span>
                     </div>
                 </div>
 
                 {/* Content */}
                 <div className="p-4 flex flex-col flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-lg leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                    <div className="flex justify-between items-start gap-3 mb-3">
+                        <h3 className="font-semibold text-[15px] leading-snug text-zinc-900 line-clamp-1">
                             {listing.title}
                         </h3>
-                        <div className="text-lg font-bold text-primary whitespace-nowrap ml-2">
-                            ${listing.price}
+                        <div className="flex items-baseline gap-0.5 flex-shrink-0">
+                            <span className="text-xl font-bold text-zinc-900 tracking-tight">${listing.price}</span>
+                            <span className="text-zinc-400 text-sm">/mo</span>
                         </div>
                     </div>
 
                     {/* Amenities / Info */}
-                    <div className="mt-auto space-y-3">
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground ">
-                            {/* Mocking some icons based on amenities or defaults */}
-                            <div className="flex items-center gap-1">
-                                <Users className="w-4 h-4" />
+                    <div className="mt-auto">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1 text-zinc-500 text-[12px]">
+                                <Users className="w-3.5 h-3.5" />
                                 <span>Shared</span>
                             </div>
                             {listing.amenities && listing.amenities.length > 0 && (
                                 <>
                                     {listing.amenities.slice(0, 2).map((amenity, i) => (
-                                        <div key={i} className="flex items-center gap-1 capitalize">
-                                            {amenity.toLowerCase().includes('wifi') ? <Wifi className="w-4 h-4" /> :
-                                                amenity.toLowerCase().includes('bed') ? <Bed className="w-4 h-4" /> :
-                                                    <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mx-1"></span>}
+                                        <div key={i} className="flex items-center gap-1 text-zinc-500 text-[12px]">
+                                            {amenity.toLowerCase().includes('wifi') ? <Wifi className="w-3.5 h-3.5" /> :
+                                                amenity.toLowerCase().includes('bed') ? <Bed className="w-3.5 h-3.5" /> :
+                                                    <span className="w-1 h-1 rounded-full bg-zinc-300 mx-0.5"></span>}
                                             <span className="truncate max-w-[60px]">{amenity}</span>
                                         </div>
                                     ))}
                                     {listing.amenities.length > 2 && (
-                                        <span className="text-xs bg-muted px-1.5 py-0.5 rounded-full">+{listing.amenities.length - 2}</span>
+                                        <span className="text-[11px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-medium">+{listing.amenities.length - 2}</span>
                                     )}
                                 </>
                             )}

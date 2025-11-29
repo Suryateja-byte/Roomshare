@@ -141,8 +141,7 @@ export async function getPendingVerifications() {
                         id: true,
                         name: true,
                         email: true,
-                        image: true,
-                        createdAt: true
+                        image: true
                     }
                 }
             },

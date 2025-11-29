@@ -1,18 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Nunito } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import NavbarWrapper from "@/components/NavbarWrapper";
 import Footer from "@/components/Footer";
+import FooterWrapper from "@/components/FooterWrapper";
 import Providers from "@/components/Providers";
 import { SkipLink } from "@/components/ui/SkipLink";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
-const nunito = Nunito({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["300", "400", "600", "700", "800"],
   display: "swap",
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -33,6 +34,10 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
+import MainLayout from "@/components/MainLayout";
+
+// ... existing imports
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,17 +46,19 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head />
-      <body className={nunito.className}>
+      <body className={inter.className}>
         <Providers>
           <SkipLink />
           <div className="flex flex-col min-h-screen">
             <NavbarWrapper>
               <Navbar />
             </NavbarWrapper>
-            <main id="main-content" className="flex-grow pt-16 md:pt-20" role="main">
+            <MainLayout>
               {children}
-            </main>
-            <Footer />
+            </MainLayout>
+            <FooterWrapper>
+              <Footer />
+            </FooterWrapper>
           </div>
           <OfflineIndicator />
           <ServiceWorkerRegistration />

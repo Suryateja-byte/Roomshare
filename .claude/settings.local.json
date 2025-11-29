@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(npx prisma:*)",
+      "Bash(pkill:*)",
+      "Bash(npx tsc:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(npx jest:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

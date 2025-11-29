@@ -4,6 +4,7 @@ import { getMySavedSearches } from '@/app/actions/saved-search';
 import SavedSearchList from './SavedSearchList';
 import { Bookmark } from 'lucide-react';
 import Link from 'next/link';
+import type { SearchFilters } from '@/lib/search-utils';
 
 export default async function SavedSearchesPage() {
     const session = await auth();
@@ -49,7 +50,10 @@ export default async function SavedSearchesPage() {
                         </Link>
                     </div>
                 ) : (
-                    <SavedSearchList initialSearches={savedSearches} />
+                    <SavedSearchList initialSearches={savedSearches.map(s => ({
+                        ...s,
+                        filters: s.filters as SearchFilters
+                    }))} />
                 )}
             </div>
         </div>

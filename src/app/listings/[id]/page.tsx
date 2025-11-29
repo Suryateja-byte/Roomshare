@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
 
     // Use listing's first image if available, otherwise use default
-    const ogImage = (listing.images && listing.images.length > 0)
+    const ogImage: string = (listing.images && listing.images.length > 0)
         ? listing.images[0]
         : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80';
 
@@ -85,7 +85,7 @@ export default async function ListingPage({ params }: PageProps) {
                 {hasImages ? (
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[400px] md:h-[500px] rounded-3xl overflow-hidden">
                         <div className="md:col-span-2 h-full relative group">
-                            <img src={mainImage} alt={listing.title} className="w-full h-full object-cover" />
+                            <img src={mainImage ?? undefined} alt={listing.title} className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
                         </div>
                         {galleryImages.length > 0 && (

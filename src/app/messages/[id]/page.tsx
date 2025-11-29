@@ -22,7 +22,9 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
         }
     });
 
-    if (!conversation || !conversation.participants.some(p => p.id === session.user.id)) {
+    const userId = session.user.id;
+
+    if (!conversation || !conversation.participants.some(p => p.id === userId)) {
         // Handle unauthorized or not found
         return (
             <div className="flex items-center justify-center h-full">
@@ -31,15 +33,15 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
         );
     }
 
-    const otherParticipant = conversation.participants.find(p => p.id !== session.user.id);
-    const currentParticipant = conversation.participants.find(p => p.id === session.user.id);
+    const otherParticipant = conversation.participants.find(p => p.id !== userId);
+    const currentParticipant = conversation.participants.find(p => p.id === userId);
     const messages = await getMessages(id);
 
     return (
         <ChatWindow
             initialMessages={messages}
             conversationId={id}
-            currentUserId={session.user.id}
+            currentUserId={userId}
             currentUserName={currentParticipant?.name || session.user.name || 'User'}
             otherUserName={otherParticipant?.name || 'User'}
             otherUserImage={otherParticipant?.image}

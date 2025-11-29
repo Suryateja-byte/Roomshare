@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mail, Lock, User, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Loader2, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { signIn } from 'next-auth/react';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function SignupPage() {
+function SignUpForm() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -33,46 +33,52 @@ export default function SignupPage() {
             }
 
             router.push('/login?registered=true');
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex bg-white font-sans selection:bg-zinc-900 selection:text-white ">
-            {/* Left Visual */}
-            <div className="hidden lg:flex w-1/2 bg-zinc-100 relative flex-col justify-between p-8 xl:p-12 text-zinc-900 ">
-                <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <div className="min-h-screen flex bg-white font-sans selection:bg-zinc-900 selection:text-white">
+
+            {/* Left Visual (Dark Theme) */}
+            <div className="hidden lg:flex w-1/2 bg-zinc-900 relative flex-col justify-between p-8 xl:p-12 text-white">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-zinc-800 to-black opacity-50"></div>
+
+                {/* Logo */}
                 <div className="relative z-10">
                     <span className="text-xl font-semibold tracking-tighter">
                         RoomShare<span className="text-indigo-500">.</span>
                     </span>
                 </div>
-                <div className="relative z-10">
-                    <h2 className="text-3xl xl:text-4xl font-bold mb-6">Join the community redefining modern living.</h2>
-                    <ul className="space-y-4 text-zinc-600 ">
-                        <li className="flex items-center gap-3">
-                            <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-green-600 " />
-                            <span>Verified profiles only</span>
-                        </li>
-                        <li className="flex items-center gap-3">
-                            <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-green-600 " />
-                            <span>Secure messaging & payments</span>
-                        </li>
-                        <li className="flex items-center gap-3">
-                            <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-green-600 " />
-                            <span>Smart compatibility matching</span>
-                        </li>
-                    </ul>
+
+                {/* Testimonial / Value Prop */}
+                <div className="relative z-10 max-w-md">
+                    <h2 className="text-2xl xl:text-3xl font-medium leading-tight">
+                        &ldquo;I found a roommate who actually respects my space. The verification badge makes all the difference.&rdquo;
+                    </h2>
+                    <div className="mt-8 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+                            <span className="font-medium text-sm">NK</span>
+                        </div>
+                        <div>
+                            <p className="font-medium text-white">Nina K.</p>
+                            <p className="text-sm text-zinc-400">New York City</p>
+                        </div>
+                    </div>
                 </div>
-                <p className="relative z-10 text-sm text-zinc-500">Join 50,000+ members today.</p>
+
+                {/* Copyright */}
+                <p className="relative z-10 text-sm text-zinc-500">© {new Date().getFullYear()} RoomShare Inc.</p>
             </div>
 
             {/* Right Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6">
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 pb-20">
                 <div className="w-full max-w-sm space-y-6 sm:space-y-8">
+
+                    {/* Header */}
                     <div className="text-center lg:text-left">
                         <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 tracking-tight">Create an account</h1>
                         <p className="text-zinc-500 mt-2 text-sm sm:text-base">Enter your details to get started.</p>
@@ -86,8 +92,9 @@ export default function SignupPage() {
 
                     {/* Google Sign Up */}
                     <button
+                        type="button"
                         onClick={() => signIn('google', { callbackUrl: '/' })}
-                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors font-medium text-zinc-700 "
+                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors font-medium text-zinc-700 shadow-sm"
                     >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
                             <path
@@ -110,77 +117,94 @@ export default function SignupPage() {
                         Continue with Google
                     </button>
 
+                    {/* Divider */}
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-zinc-200 "></div>
+                            <div className="w-full border-t border-zinc-200"></div>
                         </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-white px-4 text-zinc-500 ">or continue with email</span>
+                        <div className="relative flex justify-center text-[11px] uppercase tracking-wider font-medium">
+                            <span className="bg-white px-4 text-zinc-400">or continue with email</span>
                         </div>
                     </div>
 
+                    {/* Form */}
                     <form onSubmit={handleSubmit} className="space-y-5">
-                        <div className="space-y-1.5">
-                            <label htmlFor="name" className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ">
+
+                        {/* Name Field */}
+                        <div className="space-y-1">
+                            <label htmlFor="name" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
                                 Full Name
                             </label>
                             <div className="relative">
-                                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <User className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
+                                </div>
                                 <input
                                     id="name"
                                     type="text"
                                     name="name"
                                     required
                                     autoComplete="name"
-                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl py-3 pl-10 sm:pl-11 pr-4 text-zinc-900 placeholder:text-zinc-400 outline-none focus:bg-white focus:border-zinc-900 focus-visible:ring-2 focus-visible:ring-zinc-900/10 transition-colors"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                                     placeholder="John Doe"
                                 />
                             </div>
                         </div>
-                        <div className="space-y-1.5">
-                            <label htmlFor="email" className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ">
+
+                        {/* Email Field */}
+                        <div className="space-y-1">
+                            <label htmlFor="email" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
                                 Email
                             </label>
                             <div className="relative">
-                                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Mail className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
+                                </div>
                                 <input
                                     id="email"
                                     type="email"
                                     name="email"
                                     required
                                     autoComplete="email"
-                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl py-3 pl-10 sm:pl-11 pr-4 text-zinc-900 placeholder:text-zinc-400 outline-none focus:bg-white focus:border-zinc-900 focus-visible:ring-2 focus-visible:ring-zinc-900/10 transition-colors"
-                                    placeholder="name@example.com"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                                    placeholder="you@example.com"
                                 />
                             </div>
                         </div>
-                        <div className="space-y-1.5">
-                            <label htmlFor="password" className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ">
+
+                        {/* Password Field */}
+                        <div className="space-y-1">
+                            <label htmlFor="password" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
                                 Password
                             </label>
                             <div className="relative">
-                                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Lock className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
+                                </div>
                                 <input
                                     id="password"
                                     type="password"
                                     name="password"
                                     required
                                     autoComplete="new-password"
-                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl py-3 pl-10 sm:pl-11 pr-4 text-zinc-900 placeholder:text-zinc-400 outline-none focus:bg-white focus:border-zinc-900 focus-visible:ring-2 focus-visible:ring-zinc-900/10 transition-colors"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                                     placeholder="••••••••"
                                 />
                             </div>
+                            <p className="text-[11px] text-zinc-500 ml-0.5">Must be at least 8 characters</p>
                         </div>
+
+                        {/* Submit Button */}
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-11 sm:h-12 rounded-xl"
+                            className="w-full h-11 sm:h-12 rounded-lg shadow-sm hover:shadow-md transition-all"
                         >
-                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Create Account <ArrowRight className="w-4 h-4 ml-2" /></>}
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Create account <ArrowRight className="w-4 h-4 ml-2" /></>}
                         </Button>
                     </form>
 
-                    <p className="text-center text-sm text-zinc-500 ">
+                    <p className="text-center text-sm text-zinc-500">
                         Already have an account?{' '}
                         <Link href="/login" className="font-semibold text-zinc-900 hover:underline">
                             Sign in
@@ -189,5 +213,13 @@ export default function SignupPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function SignUpPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-zinc-900" /></div>}>
+            <SignUpForm />
+        </Suspense>
     );
 }
