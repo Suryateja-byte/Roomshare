@@ -1,0 +1,405 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
+import { Bell, Lock, Trash2, Loader2, Check, AlertTriangle, ShieldOff, Ban } from 'lucide-react';
+import {
+    NotificationPreferences,
+    updateNotificationPreferences,
+    changePassword,
+    deleteAccount
+} from '@/app/actions/settings';
+import { unblockUser } from '@/app/actions/block';
+
+interface BlockedUserInfo {
+    id: string;
+    user: {
+        id: string;
+        name: string | null;
+        image: string | null;
+        email: string | null;
+    };
+    blockedAt: Date;
+}
+
+interface SettingsClientProps {
+    initialPreferences: NotificationPreferences;
+    hasPassword: boolean;
+    userEmail: string;
+    blockedUsers?: BlockedUserInfo[];
+}
+
+export default function SettingsClient({
+    initialPreferences,
+    hasPassword,
+    userEmail,
+    blockedUsers: initialBlockedUsers = []
+}: SettingsClientProps) {
+    const router = useRouter();
+    const [preferences, setPreferences] = useState<NotificationPreferences>(initialPreferences);
+    const [saving, setSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    // Blocked users state
+    const [blockedUsers, setBlockedUsers] = useState<BlockedUserInfo[]>(initialBlockedUsers);
+    const [unblockingId, setUnblockingId] = useState<string | null>(null);
+
+    // Password change state
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordSuccess, setPasswordSuccess] = useState(false);
+    const [changingPassword, setChangingPassword] = useState(false);
+
+    // Delete account state
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [deleting, setDeleting] = useState(false);
+
+    const handleToggle = (key: keyof NotificationPreferences) => {
+        setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
+        setSaveSuccess(false);
+    };
+
+    const handleSavePreferences = async () => {
+        setSaving(true);
+        const result = await updateNotificationPreferences(preferences);
+        setSaving(false);
+        if (result.success) {
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        }
+    };
+
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordError('');
+        setPasswordSuccess(false);
+
+        if (newPassword !== confirmPassword) {
+            setPasswordError('New passwords do not match');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            setPasswordError('Password must be at least 6 characters');
+            return;
+        }
+
+        setChangingPassword(true);
+        const result = await changePassword(currentPassword, newPassword);
+        setChangingPassword(false);
+
+        if (result.success) {
+            setPasswordSuccess(true);
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setTimeout(() => setPasswordSuccess(false), 3000);
+        } else {
+            setPasswordError(result.error || 'Failed to change password');
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (deleteConfirmText !== 'DELETE') return;
+
+        setDeleting(true);
+        const result = await deleteAccount();
+
+        if (result.success) {
+            await signOut({ callbackUrl: '/' });
+        } else {
+            setDeleting(false);
+            alert(result.error || 'Failed to delete account');
+        }
+    };
+
+    const handleUnblock = async (userId: string) => {
+        setUnblockingId(userId);
+        try {
+            const result = await unblockUser(userId);
+            if (result.success) {
+                setBlockedUsers(prev => prev.filter(b => b.user.id !== userId));
+            }
+        } catch (error) {
+            console.error('Failed to unblock user:', error);
+        } finally {
+            setUnblockingId(null);
+        }
+    };
+
+    const notificationOptions = [
+        { key: 'emailBookingRequests' as const, label: 'Booking Requests', description: 'When someone requests to book your listing' },
+        { key: 'emailBookingUpdates' as const, label: 'Booking Updates', description: 'When your booking is accepted, rejected, or cancelled' },
+        { key: 'emailMessages' as const, label: 'New Messages', description: 'When you receive a new message' },
+        { key: 'emailReviews' as const, label: 'Reviews', description: 'When someone leaves you a review' },
+        { key: 'emailSearchAlerts' as const, label: 'Search Alerts', description: 'When new listings match your saved searches' },
+        { key: 'emailMarketing' as const, label: 'Marketing', description: 'Tips, updates, and promotional content' },
+    ];
+
+    return (
+        <div className="space-y-8">
+            {/* Notification Preferences */}
+            <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+                <div className="p-6 border-b border-zinc-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-50 rounded-lg">
+                            <Bell className="w-5 h-5 text-indigo-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-zinc-900">Email Notifications</h2>
+                            <p className="text-sm text-zinc-500">Choose what emails you want to receive</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="divide-y divide-zinc-100">
+                    {notificationOptions.map(option => (
+                        <div key={option.key} className="p-4 flex items-center justify-between hover:bg-zinc-50">
+                            <div>
+                                <p className="font-medium text-zinc-900">{option.label}</p>
+                                <p className="text-sm text-zinc-500">{option.description}</p>
+                            </div>
+                            <button
+                                onClick={() => handleToggle(option.key)}
+                                className={`relative w-11 h-6 rounded-full transition-colors ${
+                                    preferences[option.key] ? 'bg-indigo-600' : 'bg-zinc-300'
+                                }`}
+                            >
+                                <span
+                                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                                        preferences[option.key] ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+                <div className="p-4 bg-zinc-50 border-t border-zinc-100">
+                    <button
+                        onClick={handleSavePreferences}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                    >
+                        {saving ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : saveSuccess ? (
+                            <Check className="w-4 h-4" />
+                        ) : null}
+                        {saveSuccess ? 'Saved!' : 'Save Preferences'}
+                    </button>
+                </div>
+            </section>
+
+            {/* Change Password */}
+            {hasPassword && (
+                <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+                    <div className="p-6 border-b border-zinc-100">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-50 rounded-lg">
+                                <Lock className="w-5 h-5 text-amber-600" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-semibold text-zinc-900">Change Password</h2>
+                                <p className="text-sm text-zinc-500">Update your account password</p>
+                            </div>
+                        </div>
+                    </div>
+                    <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-700 mb-1">
+                                Current Password
+                            </label>
+                            <input
+                                type="password"
+                                value={currentPassword}
+                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-700 mb-1">
+                                New Password
+                            </label>
+                            <input
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                required
+                                minLength={6}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-700 mb-1">
+                                Confirm New Password
+                            </label>
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                required
+                            />
+                        </div>
+                        {passwordError && (
+                            <p className="text-sm text-red-600">{passwordError}</p>
+                        )}
+                        {passwordSuccess && (
+                            <p className="text-sm text-green-600">Password changed successfully!</p>
+                        )}
+                        <button
+                            type="submit"
+                            disabled={changingPassword}
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                        >
+                            {changingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
+                            Change Password
+                        </button>
+                    </form>
+                </section>
+            )}
+
+            {/* Blocked Users */}
+            <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+                <div className="p-6 border-b border-zinc-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-zinc-100 rounded-lg">
+                            <Ban className="w-5 h-5 text-zinc-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-zinc-900">Blocked Users</h2>
+                            <p className="text-sm text-zinc-500">Manage users you have blocked</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="p-6">
+                    {blockedUsers.length === 0 ? (
+                        <p className="text-sm text-zinc-500 text-center py-4">
+                            You haven't blocked anyone
+                        </p>
+                    ) : (
+                        <ul className="divide-y divide-zinc-100">
+                            {blockedUsers.map((blocked) => (
+                                <li key={blocked.id} className="py-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        {blocked.user.image ? (
+                                            <img
+                                                src={blocked.user.image}
+                                                alt={blocked.user.name || 'User'}
+                                                className="w-10 h-10 rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-10 h-10 bg-zinc-200 rounded-full flex items-center justify-center">
+                                                <span className="text-zinc-500 text-sm font-medium">
+                                                    {(blocked.user.name || 'U')[0].toUpperCase()}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-medium text-zinc-900">
+                                                {blocked.user.name || 'Unknown User'}
+                                            </p>
+                                            <p className="text-sm text-zinc-500">
+                                                Blocked {new Date(blocked.blockedAt).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleUnblock(blocked.user.id)}
+                                        disabled={unblockingId === blocked.user.id}
+                                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        {unblockingId === blocked.user.id ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <ShieldOff className="w-4 h-4" />
+                                        )}
+                                        Unblock
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </section>
+
+            {/* Delete Account */}
+            <section className="bg-white rounded-xl border border-red-200 overflow-hidden">
+                <div className="p-6 border-b border-red-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-red-50 rounded-lg">
+                            <Trash2 className="w-5 h-5 text-red-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-zinc-900">Delete Account</h2>
+                            <p className="text-sm text-zinc-500">Permanently delete your account and all data</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="p-6">
+                    {!showDeleteConfirm ? (
+                        <div>
+                            <p className="text-sm text-zinc-600 mb-4">
+                                Once you delete your account, there is no going back. All your listings,
+                                messages, bookings, and reviews will be permanently removed.
+                            </p>
+                            <button
+                                onClick={() => setShowDeleteConfirm(true)}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                                Delete My Account
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="p-4 bg-red-50 rounded-lg flex gap-3">
+                                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-red-900">This action cannot be undone</p>
+                                    <p className="text-sm text-red-700 mt-1">
+                                        This will permanently delete your account ({userEmail}) and all associated data.
+                                    </p>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                                    Type DELETE to confirm
+                                </label>
+                                <input
+                                    type="text"
+                                    value={deleteConfirmText}
+                                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                    className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                    placeholder="DELETE"
+                                />
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowDeleteConfirm(false);
+                                        setDeleteConfirmText('');
+                                    }}
+                                    className="px-4 py-2 border border-zinc-300 text-zinc-700 rounded-lg hover:bg-zinc-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDeleteAccount}
+                                    disabled={deleteConfirmText !== 'DELETE' || deleting}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Delete Forever
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </section>
+        </div>
+    );
+}

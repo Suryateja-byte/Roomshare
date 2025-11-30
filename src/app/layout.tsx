@@ -9,6 +9,7 @@ import Providers from "@/components/Providers";
 import { SkipLink } from "@/components/ui/SkipLink";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import EmailVerificationWrapper from "@/components/EmailVerificationWrapper";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -50,6 +51,7 @@ export default function RootLayout({
         <Providers>
           <SkipLink />
           <div className="flex flex-col min-h-screen">
+            <EmailVerificationWrapper />
             <NavbarWrapper>
               <Navbar />
             </NavbarWrapper>

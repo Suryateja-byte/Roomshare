@@ -23,7 +23,7 @@ export async function POST(request: Request) {
         console.log('=== CREATE LISTING START ===');
         const body = await request.json();
         console.log('Request body:', JSON.stringify(body, null, 2));
-        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, images } = body;
+        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, images, languages, genderPreference, householdGender } = body;
 
         // Basic validation
         if (!title || !price || !address || !city || !state || !zip) {
@@ -81,6 +81,9 @@ export async function POST(request: Request) {
                     images: images || [],
                     amenities: amenities ? amenities.split(',').map((s: string) => s.trim()) : [],
                     houseRules: houseRules ? houseRules.split(',').map((s: string) => s.trim()) : [],
+                    languages: Array.isArray(languages) ? languages : [],
+                    genderPreference: genderPreference || null,
+                    householdGender: householdGender || null,
                     leaseDuration,
                     roomType,
                     totalSlots: totalSlotsNum,

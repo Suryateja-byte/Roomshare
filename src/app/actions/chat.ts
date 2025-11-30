@@ -16,6 +16,13 @@ export async function startConversation(listingId: string) {
     if (!listing) return { error: 'Listing not found' };
     if (listing.ownerId === userId) return { error: 'Cannot chat with yourself' };
 
+    // Check if either user has blocked the other
+    const { checkBlockBeforeAction } = await import('./block');
+    const blockCheck = await checkBlockBeforeAction(listing.ownerId);
+    if (!blockCheck.allowed) {
+        return { error: blockCheck.message };
+    }
+
     // Check existing conversation
     const existing = await prisma.conversation.findFirst({
         where: {
@@ -45,6 +52,16 @@ export async function sendMessage(conversationId: string, content: string) {
     const session = await auth();
     if (!session?.user?.id) throw new Error('Unauthorized');
 
+    // Check if email is verified (soft enforcement - only block unverified users)
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { emailVerified: true }
+    });
+
+    if (!user?.emailVerified) {
+        throw new Error('Please verify your email to send messages');
+    }
+
     // Get conversation with participants for notification
     const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
@@ -56,6 +73,16 @@ export async function sendMessage(conversationId: string, content: string) {
     });
 
     if (!conversation) throw new Error('Conversation not found');
+
+    // Check for blocks between participants
+    const { checkBlockBeforeAction } = await import('./block');
+    const otherParticipant = conversation.participants.find(p => p.id !== session.user.id);
+    if (otherParticipant) {
+        const blockCheck = await checkBlockBeforeAction(otherParticipant.id);
+        if (!blockCheck.allowed) {
+            throw new Error(blockCheck.message);
+        }
+    }
 
     const message = await prisma.message.create({
         data: {

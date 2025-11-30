@@ -201,6 +201,49 @@ export default async function ListingPage({ params }: PageProps) {
                             </div>
                         </div>
 
+                        {/* Languages & Household Info */}
+                        {(listing.languages.length > 0 || listing.genderPreference || listing.householdGender) && (
+                            <div className="mb-10">
+                                <h2 className="text-2xl font-bold mb-6">Household Details</h2>
+                                <div className="space-y-6">
+                                    {listing.languages.length > 0 && (
+                                        <div>
+                                            <h3 className="font-semibold text-foreground mb-3">Languages Spoken</h3>
+                                            <div className="flex flex-wrap gap-2">
+                                                {listing.languages.map((lang, i) => (
+                                                    <span key={i} className="px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                                                        {lang}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {listing.genderPreference && (
+                                            <div className="p-4 rounded-xl border border-border/50">
+                                                <p className="text-sm text-muted-foreground mb-1">Open to</p>
+                                                <p className="font-semibold">
+                                                    {listing.genderPreference === 'MALE_ONLY' && 'Male Identifying Only'}
+                                                    {listing.genderPreference === 'FEMALE_ONLY' && 'Female Identifying Only'}
+                                                    {listing.genderPreference === 'NO_PREFERENCE' && 'Any Gender / All Welcome'}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {listing.householdGender && (
+                                            <div className="p-4 rounded-xl border border-border/50">
+                                                <p className="text-sm text-muted-foreground mb-1">Current Household</p>
+                                                <p className="font-semibold">
+                                                    {listing.householdGender === 'ALL_MALE' && 'All Male'}
+                                                    {listing.householdGender === 'ALL_FEMALE' && 'All Female'}
+                                                    {listing.householdGender === 'MIXED' && 'Mixed (Co-ed)'}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Host Info */}
                         <div className="mb-10 p-6 bg-muted/30 rounded-2xl border border-border/50">
                             <div className="flex items-center gap-4 mb-4">

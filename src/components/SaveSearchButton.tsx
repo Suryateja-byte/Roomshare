@@ -10,10 +10,13 @@ interface SaveSearchButtonProps {
     className?: string;
 }
 
+type AlertFrequency = 'INSTANT' | 'DAILY' | 'WEEKLY';
+
 export default function SaveSearchButton({ className = '' }: SaveSearchButtonProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [name, setName] = useState('');
     const [alertEnabled, setAlertEnabled] = useState(true);
+    const [alertFrequency, setAlertFrequency] = useState<AlertFrequency>('DAILY');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const searchParams = useSearchParams();
@@ -81,7 +84,8 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
             const result = await saveSearch({
                 name: name.trim(),
                 filters: getCurrentFilters(),
-                alertEnabled
+                alertEnabled,
+                alertFrequency
             });
 
             if (result.error) {
@@ -143,31 +147,58 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                             </div>
 
                             {/* Alert Toggle */}
-                            <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-xl">
-                                <div className="flex items-center gap-3">
-                                    {alertEnabled ? (
-                                        <Bell className="w-5 h-5 text-zinc-600" />
-                                    ) : (
-                                        <BellOff className="w-5 h-5 text-zinc-400" />
-                                    )}
-                                    <div>
-                                        <p className="font-medium text-zinc-900">Email Alerts</p>
-                                        <p className="text-xs text-zinc-500">
-                                            Get notified when new listings match
-                                        </p>
+                            <div className="p-4 bg-zinc-50 rounded-xl space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        {alertEnabled ? (
+                                            <Bell className="w-5 h-5 text-zinc-600" />
+                                        ) : (
+                                            <BellOff className="w-5 h-5 text-zinc-400" />
+                                        )}
+                                        <div>
+                                            <p className="font-medium text-zinc-900">Email Alerts</p>
+                                            <p className="text-xs text-zinc-500">
+                                                Get notified when new listings match
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setAlertEnabled(!alertEnabled)}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${alertEnabled ? 'bg-zinc-900' : 'bg-zinc-200'
-                                        }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertEnabled ? 'translate-x-6' : 'translate-x-1'
+                                    <button
+                                        type="button"
+                                        onClick={() => setAlertEnabled(!alertEnabled)}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${alertEnabled ? 'bg-zinc-900' : 'bg-zinc-200'
                                             }`}
-                                    />
-                                </button>
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertEnabled ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
+
+                                {/* Alert Frequency */}
+                                {alertEnabled && (
+                                    <div className="pt-3 border-t border-zinc-200">
+                                        <label className="block text-sm font-medium text-zinc-700 mb-2">
+                                            Alert Frequency
+                                        </label>
+                                        <div className="flex gap-2">
+                                            {(['DAILY', 'WEEKLY'] as const).map((freq) => (
+                                                <button
+                                                    key={freq}
+                                                    type="button"
+                                                    onClick={() => setAlertFrequency(freq)}
+                                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                                        alertFrequency === freq
+                                                            ? 'bg-zinc-900 text-white'
+                                                            : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                                                    }`}
+                                                >
+                                                    {freq === 'DAILY' ? 'Daily' : 'Weekly'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Error */}

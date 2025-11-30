@@ -15,6 +15,11 @@ interface Listing {
     price: number;
     amenities: string[];
     houseRules: string[];
+    languages: string[];
+    genderPreference: string | null;
+    householdGender: string | null;
+    leaseDuration: string | null;
+    roomType: string | null;
     totalSlots: number;
     moveInDate: Date | null;
     location: {
@@ -33,6 +38,20 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [selectedLanguages, setSelectedLanguages] = useState<string[]>(listing.languages || []);
+
+    const LANGUAGES = [
+        'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
+        'Arabic', 'Portuguese', 'Russian', 'Japanese', 'German'
+    ];
+
+    const toggleLanguage = (lang: string) => {
+        setSelectedLanguages(prev =>
+            prev.includes(lang)
+                ? prev.filter(l => l !== lang)
+                : [...prev, lang]
+        );
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -48,7 +67,10 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(data),
+                body: JSON.stringify({
+                    ...data,
+                    languages: selectedLanguages,
+                }),
             });
 
             if (!res.ok) {
@@ -240,6 +262,97 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             disabled={loading}
                         />
                         <p className="text-xs text-zinc-400 mt-2 pl-1">When can tenants move in? (Optional)</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="leaseDuration">Lease Duration</Label>
+                            <select
+                                id="leaseDuration"
+                                name="leaseDuration"
+                                defaultValue={listing.leaseDuration || ''}
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={loading}
+                            >
+                                <option value="">Select duration...</option>
+                                <option value="Month-to-month">Month-to-month</option>
+                                <option value="6 months">6 months</option>
+                                <option value="1 year">1 year</option>
+                                <option value="1 year+">1 year+</option>
+                            </select>
+                        </div>
+                        <div>
+                            <Label htmlFor="roomType">Room Type</Label>
+                            <select
+                                id="roomType"
+                                name="roomType"
+                                defaultValue={listing.roomType || ''}
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={loading}
+                            >
+                                <option value="">Select type...</option>
+                                <option value="Private Room">Private Room</option>
+                                <option value="Shared Room">Shared Room</option>
+                                <option value="Entire Place">Entire Place</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label>Languages Spoken</Label>
+                        <p className="text-xs text-zinc-400 mt-1 mb-3">Select languages spoken in the household</p>
+                        <div className="flex flex-wrap gap-2">
+                            {LANGUAGES.map((lang) => (
+                                <button
+                                    key={lang}
+                                    type="button"
+                                    onClick={() => toggleLanguage(lang)}
+                                    disabled={loading}
+                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                                        selectedLanguages.includes(lang)
+                                            ? 'bg-zinc-900 text-white'
+                                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                                >
+                                    {lang}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="genderPreference">Gender Preference</Label>
+                            <p className="text-xs text-zinc-400 mt-1 mb-2">Who can apply for this room?</p>
+                            <select
+                                id="genderPreference"
+                                name="genderPreference"
+                                defaultValue={listing.genderPreference || ''}
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={loading}
+                            >
+                                <option value="">Select preference...</option>
+                                <option value="MALE_ONLY">Male Identifying Only</option>
+                                <option value="FEMALE_ONLY">Female Identifying Only</option>
+                                <option value="NO_PREFERENCE">Any Gender / All Welcome</option>
+                            </select>
+                        </div>
+                        <div>
+                            <Label htmlFor="householdGender">Household Gender</Label>
+                            <p className="text-xs text-zinc-400 mt-1 mb-2">Current household composition</p>
+                            <select
+                                id="householdGender"
+                                name="householdGender"
+                                defaultValue={listing.householdGender || ''}
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={loading}
+                            >
+                                <option value="">Select composition...</option>
+                                <option value="ALL_MALE">All Male</option>
+                                <option value="ALL_FEMALE">All Female</option>
+                                <option value="MIXED">Mixed (Co-ed)</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div>

@@ -233,7 +233,7 @@ export const emailTemplates = {
         `),
     }),
 
-    welcomeEmail: (data: { userName: string }) => ({
+    welcomeEmail: (data: { userName: string; verificationUrl?: string }) => ({
         subject: `Welcome to RoomShare, ${data.userName}!`,
         html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Welcome to RoomShare!</h2>
@@ -243,6 +243,17 @@ export const emailTemplates = {
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 We're thrilled to have you join our community of roommates and hosts. RoomShare makes it easy to find the perfect shared living space.
             </p>
+            ${data.verificationUrl ? `
+            <div style="background-color: #fef3c7; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #fcd34d;">
+                <p style="margin: 0 0 12px; color: #92400e; font-size: 14px; font-weight: 600;">Please verify your email address</p>
+                <p style="margin: 0 0 16px; color: #78350f; font-size: 14px;">
+                    Click the button below to verify your email and unlock all features.
+                </p>
+                <a href="${data.verificationUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                    Verify Email Address
+                </a>
+            </div>
+            ` : ''}
             <div style="background-color: #f4f4f5; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
                 <h3 style="margin: 0 0 16px; color: #18181b; font-size: 16px;">Get Started:</h3>
                 <ul style="margin: 0; padding: 0 0 0 20px; color: #52525b; font-size: 14px; line-height: 1.8;">
@@ -255,6 +266,25 @@ export const emailTemplates = {
             <a href="${APP_URL}/profile/edit" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 Complete Your Profile
             </a>
+        `),
+    }),
+
+    emailVerification: (data: { userName: string; verificationUrl: string }) => ({
+        subject: 'Verify your RoomShare email address',
+        html: baseTemplate(`
+            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Verify Your Email Address</h2>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Hi ${data.userName},
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Please verify your email address to unlock all RoomShare features, including creating listings and sending messages.
+            </p>
+            <a href="${data.verificationUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                Verify Email Address
+            </a>
+            <p style="margin: 24px 0 0; color: #71717a; font-size: 14px;">
+                This link will expire in 24 hours. If you didn't create a RoomShare account, you can safely ignore this email.
+            </p>
         `),
     }),
 

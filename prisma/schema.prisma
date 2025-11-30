@@ -37,31 +37,36 @@ model Session {
 }
 
 model User {
-  id                    String                @id @default(cuid())
-  name                  String?
-  email                 String?               @unique
-  emailVerified         DateTime?
-  image                 String?
-  password              String?
-  bio                   String?
-  countryOfOrigin       String?
-  languages             String[]
-  isVerified            Boolean               @default(false)
-  isAdmin               Boolean               @default(false)
-  accounts              Account[]
-  listings              Listing[]
-  messages              Message[]
-  sessions              Session[]
-  conversations         Conversation[]        @relation("ConversationParticipants")
-  savedListings         SavedListing[]
-  reviewsWritten        Review[]              @relation("ReviewAuthor")
-  reviewsReceived       Review[]              @relation("ReviewTarget")
-  bookings              Booking[]
-  reports               Report[]
-  recentlyViewed        RecentlyViewed[]
-  notifications         Notification[]
-  verificationRequests  VerificationRequest[]
-  savedSearches         SavedSearch[]
+  id                      String                @id @default(cuid())
+  name                    String?
+  email                   String?               @unique
+  emailVerified           DateTime?
+  image                   String?
+  password                String?
+  bio                     String?
+  countryOfOrigin         String?
+  languages               String[]
+  isVerified              Boolean               @default(false)
+  isAdmin                 Boolean               @default(false)
+  isSuspended             Boolean               @default(false)
+  notificationPreferences Json?
+  accounts                Account[]
+  listings                Listing[]
+  messages                Message[]
+  sessions                Session[]
+  conversations           Conversation[]        @relation("ConversationParticipants")
+  savedListings           SavedListing[]
+  reviewsWritten          Review[]              @relation("ReviewAuthor")
+  reviewsReceived         Review[]              @relation("ReviewTarget")
+  bookings                Booking[]
+  reportsMade             Report[]              @relation("ReportsMade")
+  reportsReviewed         Report[]              @relation("ReportsReviewed")
+  recentlyViewed          RecentlyViewed[]
+  notifications           Notification[]
+  verificationRequests    VerificationRequest[]
+  savedSearches           SavedSearch[]
+  blockedUsers            BlockedUser[]         @relation("BlocksMade")
+  blockedByUsers          BlockedUser[]         @relation("BlocksReceived")
 }
 
 model VerificationToken {
@@ -91,9 +96,12 @@ model Listing {
   images         String[]         @default([])
   amenities      String[]
   houseRules     String[]
-  leaseDuration  String?
-  roomType       String?
-  totalSlots     Int
+  leaseDuration    String?
+  roomType         String?
+  languages        String[]  @default([])
+  genderPreference String?
+  householdGender  String?
+  totalSlots       Int
   availableSlots Int
   moveInDate     DateTime?
   status         ListingStatus    @default(ACTIVE)
@@ -164,16 +172,27 @@ model Booking {
   tenant    User          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 model Report {
-  id        String   @id @default(cuid())
-  listingId String
+  id         String       @id @default(cuid())
+  listingId  String
   reporterId String
-  reason    String
-  details   String?
-  createdAt DateTime @default(now())
-  
-  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  reporter  User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reason     String
+  details    String?
+  status     ReportStatus @default(OPEN)
+  adminNotes String?
+  reviewedBy String?
+  resolvedAt DateTime?
+  createdAt  DateTime     @default(now())
+
+  listing    Listing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporter   User         @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reviewer   User?        @relation("ReportsReviewed", fields: [reviewedBy], references: [id])
 }
 
 model Location {
@@ -230,6 +249,7 @@ enum NotificationType {
   NEW_MESSAGE
   NEW_REVIEW
   LISTING_SAVED
+  SEARCH_ALERT
 }
 
 model Notification {
@@ -270,18 +290,26 @@ model VerificationRequest {
   @@index([status])
 }
 
+enum AlertFrequency {
+  INSTANT
+  DAILY
+  WEEKLY
+}
+
 model SavedSearch {
-  id            String   @id @default(cuid())
-  userId        String
-  name          String
-  query         String?
-  filters       Json     // Store all filter params as JSON
-  alertEnabled  Boolean  @default(true)
-  lastAlertAt   DateTime?
-  createdAt     DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String         @id @default(cuid())
+  userId         String
+  name           String
+  query          String?
+  filters        Json           // Store all filter params as JSON
+  alertEnabled   Boolean        @default(true)
+  alertFrequency AlertFrequency @default(DAILY)
+  lastAlertAt    DateTime?
+  createdAt      DateTime       @default(now())
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([alertEnabled, lastAlertAt])
 }
 
 model ReviewResponse {
@@ -300,4 +328,32 @@ model spatial_ref_sys {
   auth_srid Int?
   srtext    String? @db.VarChar(2048)
   proj4text String? @db.VarChar(2048)
+}
+
+// Rate Limiting (Database-backed for Vercel serverless)
+model RateLimitEntry {
+  id          String   @id @default(cuid())
+  identifier  String   // IP or userId:endpoint
+  endpoint    String
+  count       Int      @default(1)
+  windowStart DateTime @default(now())
+  expiresAt   DateTime
+
+  @@unique([identifier, endpoint])
+  @@index([expiresAt])
+}
+
+// User Blocking
+model BlockedUser {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
 }

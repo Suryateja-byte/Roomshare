@@ -44,6 +44,14 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const [roomType, setRoomType] = useState(searchParams.get('roomType') || '');
     const [amenities, setAmenities] = useState<string[]>(searchParams.getAll('amenities') || []);
     const [houseRules, setHouseRules] = useState<string[]>(searchParams.getAll('houseRules') || []);
+    const [languages, setLanguages] = useState<string[]>(searchParams.getAll('languages') || []);
+    const [genderPreference, setGenderPreference] = useState(searchParams.get('genderPreference') || '');
+    const [householdGender, setHouseholdGender] = useState(searchParams.get('householdGender') || '');
+
+    const LANGUAGES = [
+        'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
+        'Arabic', 'Portuguese', 'Russian', 'Japanese', 'German'
+    ];
 
     // Debounce and submission state to prevent race conditions
     const [isSearching, setIsSearching] = useState(false);
@@ -70,6 +78,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setRoomType(searchParams.get('roomType') || '');
         setAmenities(searchParams.getAll('amenities') || []);
         setHouseRules(searchParams.getAll('houseRules') || []);
+        setLanguages(searchParams.getAll('languages') || []);
+        setGenderPreference(searchParams.get('genderPreference') || '');
+        setHouseholdGender(searchParams.get('householdGender') || '');
     }, [searchParams]);
 
     const router = useRouter();
@@ -137,6 +148,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         if (roomType) params.set('roomType', roomType);
         amenities.forEach(a => params.append('amenities', a));
         houseRules.forEach(r => params.append('houseRules', r));
+        languages.forEach(l => params.append('languages', l));
+        if (genderPreference) params.set('genderPreference', genderPreference);
+        if (householdGender) params.set('householdGender', householdGender);
 
         const searchUrl = `/search?${params.toString()}`;
 
@@ -154,7 +168,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             // Reset searching state after navigation starts
             setTimeout(() => setIsSearching(false), 500);
         }, SEARCH_DEBOUNCE_MS);
-    }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, router, isSearching]);
+    }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching]);
 
     // Cleanup timeout on unmount
     useEffect(() => {
@@ -177,6 +191,12 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         );
     };
 
+    const toggleLanguage = (lang: string) => {
+        setLanguages(prev =>
+            prev.includes(lang) ? prev.filter(l => l !== lang) : [...prev, lang]
+        );
+    };
+
     // Clear all filters and reset to defaults
     const handleClearAllFilters = () => {
         setLocation('');
@@ -188,13 +208,17 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setRoomType('');
         setAmenities([]);
         setHouseRules([]);
+        setLanguages([]);
+        setGenderPreference('');
+        setHouseholdGender('');
         // Navigate to clean search page
         router.push('/search');
     };
 
     // Check if any filters are active
     const hasActiveFilters = location || minPrice || maxPrice || moveInDate ||
-        leaseDuration || roomType || amenities.length > 0 || houseRules.length > 0;
+        leaseDuration || roomType || amenities.length > 0 || houseRules.length > 0 ||
+        languages.length > 0 || genderPreference || householdGender;
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;
@@ -433,6 +457,59 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             ))}
                         </div>
                     </fieldset>
+
+                    {/* Languages */}
+                    <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
+                        <legend className="text-sm font-semibold text-zinc-900">Languages Spoken</legend>
+                        <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
+                            {LANGUAGES.map(lang => (
+                                <button
+                                    key={lang}
+                                    type="button"
+                                    onClick={() => toggleLanguage(lang)}
+                                    aria-pressed={languages.includes(lang)}
+                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 ${languages.includes(lang)
+                                        ? 'bg-zinc-900 text-white border-zinc-900 '
+                                        : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400 '
+                                        }`}
+                                >
+                                    {lang}
+                                </button>
+                            ))}
+                        </div>
+                    </fieldset>
+
+                    {/* Gender Preferences */}
+                    <div className="space-y-2">
+                        <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900">Gender Preference</label>
+                        <select
+                            id="filter-gender-pref"
+                            value={genderPreference}
+                            onChange={(e) => setGenderPreference(e.target.value)}
+                            className="w-full p-2.5 sm:p-3 rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-sm touch-target"
+                        >
+                            <option value="">Any</option>
+                            <option value="MALE_ONLY">Male Identifying Only</option>
+                            <option value="FEMALE_ONLY">Female Identifying Only</option>
+                            <option value="NO_PREFERENCE">Any Gender / All Welcome</option>
+                        </select>
+                    </div>
+
+                    {/* Household Gender */}
+                    <div className="space-y-2">
+                        <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900">Household Gender</label>
+                        <select
+                            id="filter-household-gender"
+                            value={householdGender}
+                            onChange={(e) => setHouseholdGender(e.target.value)}
+                            className="w-full p-2.5 sm:p-3 rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-sm touch-target"
+                        >
+                            <option value="">Any</option>
+                            <option value="ALL_MALE">All Male</option>
+                            <option value="ALL_FEMALE">All Female</option>
+                            <option value="MIXED">Mixed (Co-ed)</option>
+                        </select>
+                    </div>
                     </div>
                 </div>
             )}

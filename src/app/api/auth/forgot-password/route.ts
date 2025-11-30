@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
+import { sendNotificationEmail } from '@/lib/email';
+import { withRateLimit } from '@/lib/with-rate-limit';
 
 export async function POST(request: NextRequest) {
+    // Rate limit: 3 password reset requests per hour per IP
+    const rateLimitResponse = await withRateLimit(request, { type: 'forgotPassword' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const { email } = await request.json();
 
@@ -54,8 +60,11 @@ export async function POST(request: NextRequest) {
             console.log('Password reset link:', resetUrl);
         }
 
-        // TODO: Send email with reset link
-        // await sendPasswordResetEmail(email, resetUrl);
+        // Send password reset email
+        await sendNotificationEmail('passwordReset', email.toLowerCase(), {
+            userName: user.name || 'User',
+            resetLink: resetUrl
+        });
 
         return NextResponse.json({
             message: 'If an account with that email exists, a password reset link has been sent.',

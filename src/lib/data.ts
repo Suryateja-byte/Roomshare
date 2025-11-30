@@ -10,6 +10,9 @@ export interface ListingData {
     totalSlots: number;
     amenities: string[];
     houseRules: string[];
+    languages: string[];
+    genderPreference?: string;
+    householdGender?: string;
     leaseDuration?: string;
     roomType?: string;
     moveInDate?: Date;
@@ -35,6 +38,9 @@ export interface FilterParams {
     leaseDuration?: string;
     houseRules?: string[];
     roomType?: string;
+    languages?: string[];
+    genderPreference?: string;
+    householdGender?: string;
     bounds?: {
         minLat: number;
         maxLat: number;
@@ -111,7 +117,7 @@ function hasValidCoordinates(lat: number | null | undefined, lng: number | null 
 const MAX_RESULTS_CAP = 500;
 
 export async function getListings(params: FilterParams = {}): Promise<ListingData[]> {
-    const { query, minPrice, maxPrice, amenities, moveInDate, leaseDuration, houseRules, roomType, bounds, sort = 'recommended' } = params;
+    const { query, minPrice, maxPrice, amenities, moveInDate, leaseDuration, houseRules, roomType, languages, genderPreference, householdGender, bounds, sort = 'recommended' } = params;
 
     // Fetch all active listings with location data
     const listings = await prisma.$queryRaw`
@@ -125,6 +131,9 @@ export async function getListings(params: FilterParams = {}): Promise<ListingDat
           l."totalSlots",
           l.amenities,
           l."houseRules",
+          l.languages,
+          l."genderPreference",
+          l."householdGender",
           l."leaseDuration",
           l."roomType",
           l."moveInDate",
@@ -163,6 +172,9 @@ export async function getListings(params: FilterParams = {}): Promise<ListingDat
         totalSlots: l.totalSlots,
         amenities: l.amenities || [],
         houseRules: l.houseRules || [],
+        languages: l.languages || [],
+        genderPreference: l.genderPreference,
+        householdGender: l.householdGender,
         leaseDuration: l.leaseDuration,
         roomType: l.roomType,
         moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
@@ -254,6 +266,32 @@ export async function getListings(params: FilterParams = {}): Promise<ListingDat
         );
     }
 
+    // Apply languages filter (OR logic - show listings where household speaks ANY selected language)
+    if (languages && languages.length > 0) {
+        const languagesLower = languages.map(l => l.toLowerCase());
+        results = results.filter(listing =>
+            languagesLower.some(lang =>
+                listing.languages.some((ll: string) => ll.toLowerCase() === lang)
+            )
+        );
+    }
+
+    // Apply gender preference filter (case-insensitive)
+    if (genderPreference) {
+        const prefLower = genderPreference.toLowerCase();
+        results = results.filter(l =>
+            l.genderPreference && l.genderPreference.toLowerCase() === prefLower
+        );
+    }
+
+    // Apply household gender filter (case-insensitive)
+    if (householdGender) {
+        const householdLower = householdGender.toLowerCase();
+        results = results.filter(l =>
+            l.householdGender && l.householdGender.toLowerCase() === householdLower
+        );
+    }
+
     // Apply sorting with stable secondary sort by createdAt
     // This ensures deterministic ordering when primary sort values are equal
     switch (sort) {
@@ -310,7 +348,7 @@ export async function getListings(params: FilterParams = {}): Promise<ListingDat
 }
 
 export async function getListingsPaginated(params: FilterParams = {}): Promise<PaginatedResult<ListingData>> {
-    const { query, minPrice, maxPrice, amenities, moveInDate, leaseDuration, houseRules, roomType, bounds, sort = 'recommended', page = 1, limit = 12 } = params;
+    const { query, minPrice, maxPrice, amenities, moveInDate, leaseDuration, houseRules, roomType, languages, genderPreference, householdGender, bounds, sort = 'recommended', page = 1, limit = 12 } = params;
     const offset = (page - 1) * limit;
 
     // Build dynamic WHERE conditions for SQL
@@ -384,6 +422,18 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
         queryParams.push(new Date(moveInDate));
     }
 
+    // Gender preference filter (SQL level, case-insensitive)
+    if (genderPreference) {
+        conditions.push(`LOWER(l."genderPreference") = LOWER($${paramIndex++})`);
+        queryParams.push(genderPreference);
+    }
+
+    // Household gender filter (SQL level, case-insensitive)
+    if (householdGender) {
+        conditions.push(`LOWER(l."householdGender") = LOWER($${paramIndex++})`);
+        queryParams.push(householdGender);
+    }
+
     const whereClause = conditions.join(' AND ');
 
     // Build ORDER BY clause based on sort option
@@ -427,6 +477,9 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
             l."totalSlots",
             l.amenities,
             l."houseRules",
+            l.languages,
+            l."genderPreference",
+            l."householdGender",
             l."leaseDuration",
             l."roomType",
             l."moveInDate",
@@ -461,7 +514,7 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
 
     const total = Number(countResult[0]?.total || 0);
 
-    // Map results and apply JS-level filters for amenities/house rules
+    // Map results and apply JS-level filters for amenities/house rules/languages
     let results = listings.map(l => ({
         id: l.id,
         title: l.title,
@@ -472,6 +525,9 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
         totalSlots: l.totalSlots,
         amenities: l.amenities || [],
         houseRules: l.houseRules || [],
+        languages: l.languages || [],
+        genderPreference: l.genderPreference,
+        householdGender: l.householdGender,
         leaseDuration: l.leaseDuration,
         roomType: l.roomType,
         moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
@@ -506,11 +562,21 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
         );
     }
 
-    // Note: When amenities/houseRules filters are applied, the total count may be inaccurate
+    // Apply languages filter in JS (OR logic - show listings where household speaks ANY selected language)
+    if (languages && languages.length > 0) {
+        const languagesLower = languages.map(l => l.toLowerCase());
+        results = results.filter(listing =>
+            languagesLower.some(lang =>
+                listing.languages.some((ll: string) => ll.toLowerCase() === lang)
+            )
+        );
+    }
+
+    // Note: When amenities/houseRules/languages filters are applied, the total count may be inaccurate
     // This is a trade-off for performance. For accurate count with array filters,
     // we'd need to fetch all and count in JS, which defeats the purpose.
-    // In practice, amenities filtering rarely removes many results.
-    const filteredTotal = (amenities?.length || houseRules?.length)
+    // In practice, these filters rarely remove many results.
+    const filteredTotal = (amenities?.length || houseRules?.length || languages?.length)
         ? Math.min(total, results.length + offset) // Approximate
         : total;
 

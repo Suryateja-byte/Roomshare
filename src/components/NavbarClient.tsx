@@ -1,71 +1,120 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
+import Link from 'next/link';
 
-import { Plus, MessageSquare, Menu, X, Search, User, LogOut, Settings, Calendar, Bell, Heart, Clock } from 'lucide-react';
+import {
+    Plus,
+    MessageSquare,
+    Menu,
+    X,
+    Search,
+    User,
+    LogOut,
+    Settings,
+    Calendar,
+    Heart,
+    Clock,
+    ChevronDown
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UserAvatar from '@/components/UserAvatar';
 import NotificationCenter from '@/components/NotificationCenter';
-import SearchForm from '@/components/SearchForm';
+import ThemeToggle from '@/components/ThemeToggle';
 
-// --- Inline UserMenu Component ---
-const UserMenu = ({ user }: { user: any }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
+// --- Helper Components ---
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+const IconButton = ({
+    icon,
+    count,
+    onClick,
+    href,
+    ariaLabel
+}: {
+    icon: React.ReactNode;
+    count?: number;
+    onClick?: () => void;
+    href?: string;
+    ariaLabel?: string;
+}) => {
+    const buttonContent = (
+        <>
+            {icon}
+            {count !== undefined && count > 0 && (
+                <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-white"></span>
+                </span>
+            )}
+        </>
+    );
+
+    const className = "p-2.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 rounded-full transition-all relative";
+
+    if (href) {
+        return (
+            <a href={href} className={className} aria-label={ariaLabel}>
+                {buttonContent}
+            </a>
+        );
+    }
 
     return (
-        <div className="relative" ref={menuRef}>
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="rounded-full border border-zinc-200 hover:bg-zinc-200 transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-            >
-                <UserAvatar image={user.image} name={user.name} size="sm" />
-            </button>
+        <button onClick={onClick} className={className} aria-label={ariaLabel}>
+            {buttonContent}
+        </button>
+    );
+};
 
-            {isOpen && (
-                <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-xl shadow-zinc-900/10 border border-zinc-100 py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right z-[1100]">
-                    <div className="px-4 py-2 border-b border-zinc-50 mb-1">
-                        <p className="text-sm font-semibold text-zinc-900">{user.name}</p>
-                        <p className="text-xs text-zinc-500 truncate">{user.email}</p>
-                    </div>
-                    <a href="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                        <User className="w-4 h-4" /> Profile
-                    </a>
-                    <a href="/bookings" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                        <Calendar className="w-4 h-4" /> Bookings
-                    </a>
-                    <a href="/saved" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                        <Heart className="w-4 h-4" /> Saved Listings
-                    </a>
-                    <a href="/recently-viewed" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                        <Clock className="w-4 h-4" /> Recently Viewed
-                    </a>
-                    <a href="/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                        <Settings className="w-4 h-4" /> Settings
-                    </a>
-                    <div className="h-px bg-zinc-50 my-1"></div>
-                    <button
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                        onClick={() => signOut()}
-                    >
-                        <LogOut className="w-4 h-4" /> Log out
-                    </button>
-                </div>
+const MenuItem = ({
+    icon,
+    text,
+    badge,
+    danger,
+    onClick,
+    href
+}: {
+    icon: React.ReactNode;
+    text: string;
+    badge?: string;
+    danger?: boolean;
+    onClick?: () => void;
+    href?: string;
+}) => {
+    const className = `w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+        danger
+            ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30'
+            : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
+    }`;
+
+    const content = (
+        <>
+            <div className="flex items-center gap-3">
+                <span className={danger ? 'text-red-500' : 'text-zinc-400 dark:text-zinc-500'}>{icon}</span>
+                {text}
+            </div>
+            {badge && (
+                <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-md text-xs font-bold">
+                    {badge}
+                </span>
             )}
-        </div>
+        </>
+    );
+
+    if (href) {
+        return (
+            <a href={href} className={className}>
+                {content}
+            </a>
+        );
+    }
+
+    return (
+        <button onClick={onClick} className={className}>
+            {content}
+        </button>
     );
 };
 
@@ -78,8 +127,10 @@ interface NavbarClientProps {
 
 export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProps) {
     const [isScrolled, setIsScrolled] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [currentUnreadCount, setCurrentUnreadCount] = useState(unreadCount);
+    const profileRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
 
     // Fetch unread count from API
@@ -96,16 +147,25 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
         }
     };
 
-    // Add scroll listener to change navbar appearance
+    // Handle scroll effect for glassmorphism
     useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 20);
-        };
+        const handleScroll = () => setIsScrolled(window.scrollY > 20);
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Handle body scroll locking
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+                setIsProfileOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Handle body scroll locking for mobile menu
     useEffect(() => {
         if (isMobileMenuOpen) {
             document.body.style.overflow = 'hidden';
@@ -139,220 +199,265 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
         };
     }, [user]);
 
-    const isSearchPage = pathname === '/search';
-    const isCompact = isScrolled || isSearchPage;
-    // Pages where search bar should be hidden (show center nav links instead)
-    const hideSearchBarPaths = ['/', '/listings/create', '/profile', '/bookings', '/saved', '/recently-viewed', '/settings'];
-    const showSearchBar = !isSearchPage && !hideSearchBarPaths.includes(pathname) && !pathname.startsWith('/messages');
-
     return (
         <nav
-            className={`fixed top-0 left-0 right-0 z-[1000] transition-all duration-300 border-b ${isCompact
-                ? 'bg-white/95 backdrop-blur-xl border-zinc-200 shadow-sm'
-                : 'bg-white border-zinc-100'
-                }`}
+            className={`fixed top-0 left-0 right-0 z-[1000] transition-all duration-300 ease-in-out border-b ${
+                isScrolled
+                    ? 'bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-zinc-200 dark:border-zinc-800 py-3 shadow-sm'
+                    : 'bg-white dark:bg-zinc-900 border-transparent py-4'
+            }`}
         >
-            <div className="container mx-auto px-6 flex items-center justify-between h-16 gap-4 relative">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between items-center h-12">
 
-                {/* Logo - Text Based, Minimal - Vertically centered */}
-                <a href="/" className="flex items-center shrink-0">
-                    <span className="font-semibold text-xl tracking-tight text-zinc-900 leading-none">
-                        RoomShare<span className="text-zinc-400">.</span>
-                    </span>
-                </a>
-
-                {/* Search Bar (Desktop) - Hidden on Home Page */}
-                {showSearchBar && (
-                    <div className="hidden md:block flex-1 max-w-2xl mx-4">
-                        <SearchForm variant="compact" />
-                    </div>
-                )}
-
-                {/* Desktop Center Links - Only show when search bar is NOT visible */}
-                {!showSearchBar && (
-                <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-8">
-                    <a
-                        href="/search"
-                        className="text-[13px] font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
-                    >
-                        Find a Room
-                    </a>
-                    <a
-                        href="/listings/create"
-                        className="text-[13px] font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
-                    >
-                        List a Room
-                    </a>
-                </div>
-                )}
-
-                {/* Right Actions - All items vertically centered */}
-                <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                    {/* Search Icon (Mobile Only) */}
-                    <a
-                        href="/search"
-                        className="md:hidden flex items-center justify-center w-9 h-9 text-zinc-600 hover:text-zinc-900 transition-colors rounded-full hover:bg-zinc-100"
-                        aria-label="Search for rooms"
-                    >
-                        <Search className="w-5 h-5" />
-                    </a>
-
-                    {user ? (
-                        <>
-                            {/* Notification Center */}
-                            <div className="hidden md:flex items-center">
-                                <NotificationCenter />
-                            </div>
-
-                            <a
-                                href="/messages"
-                                className="hidden md:flex items-center justify-center w-9 h-9 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-all relative"
-                                aria-label={currentUnreadCount > 0 ? `Messages, ${currentUnreadCount} unread` : 'Messages'}
-                            >
-                                <MessageSquare className="w-5 h-5" />
-                                {currentUnreadCount > 0 && (
-                                    <span
-                                        className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full px-1"
-                                        aria-hidden="true"
-                                    >
-                                        {currentUnreadCount > 9 ? '9+' : currentUnreadCount}
-                                    </span>
-                                )}
-                            </a>
-                            <UserMenu user={user} />
-                        </>
-                    ) : (
-                        <div className="hidden md:flex items-center gap-3">
-                            <a
-                                href="/login"
-                                className="text-[13px] font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-2"
-                            >
-                                Log in
-                            </a>
-                            <a href="/signup">
-                                <Button className="rounded-full bg-zinc-900 text-white hover:bg-zinc-800 h-9 px-5 text-[13px] font-medium shadow-sm">
-                                    Sign up
-                                </Button>
-                            </a>
+                    {/* --- LEFT: Logo --- */}
+                    <a href="/" className="flex items-center gap-1 cursor-pointer group flex-shrink-0">
+                        <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center text-white font-bold text-lg group-hover:rotate-3 transition-transform shadow-lg shadow-zinc-900/20">
+                            R
                         </div>
-                    )}
-
-                    {/* Post Ad Button (Desktop) - Same height as avatar for alignment */}
-                    <a href="/listings/create" className="hidden md:flex items-center">
-                        <Button className="rounded-full bg-zinc-900 hover:bg-zinc-800 text-white h-9 px-4 text-[13px] font-medium shadow-sm transition-all">
-                            <Plus className="w-4 h-4 mr-1.5" strokeWidth={2.5} />
-                            Post Ad
-                        </Button>
+                        <span className="text-xl font-bold tracking-tight text-zinc-900 hidden sm:block">
+                            RoomShare<span className="text-indigo-600">.</span>
+                        </span>
                     </a>
+
+                    {/* --- CENTER: Empty Spacer --- */}
+                    <div className="flex-1"></div>
+
+                    {/* --- RIGHT: All Actions --- */}
+                    <div className="hidden md:flex items-center gap-4 flex-shrink-0">
+
+                        {/* Navigation Link */}
+                        <a
+                            href="/search"
+                            className="text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors mr-2"
+                        >
+                            Find a Room
+                        </a>
+
+                        {/* Icons Section */}
+                        <div className="flex items-center gap-1 border-l border-zinc-200 pl-4">
+                            <NotificationCenter />
+                            <IconButton
+                                icon={<MessageSquare size={20} />}
+                                count={currentUnreadCount}
+                                href="/messages"
+                                ariaLabel={currentUnreadCount > 0 ? `Messages, ${currentUnreadCount} unread` : 'Messages'}
+                            />
+                        </div>
+
+                        {/* CTA Button */}
+                        <a href="/listings/create">
+                            <Button className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white px-5 py-2.5 rounded-full font-medium transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-zinc-900/20 h-auto">
+                                <Plus size={18} />
+                                <span>List a Room</span>
+                            </Button>
+                        </a>
+
+                        {/* Profile Dropdown / Auth Buttons */}
+                        {user ? (
+                            <div className="relative" ref={profileRef}>
+                                <button
+                                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                    className={`flex items-center gap-2 p-1 pl-2 pr-1 rounded-full border transition-all ${
+                                        isProfileOpen
+                                            ? 'border-indigo-500 ring-2 ring-indigo-100'
+                                            : 'border-zinc-200 hover:border-zinc-300'
+                                    }`}
+                                    aria-expanded={isProfileOpen}
+                                    aria-haspopup="true"
+                                >
+                                    {user.image ? (
+                                        <img
+                                            src={user.image}
+                                            alt={user.name || 'User'}
+                                            className="w-8 h-8 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
+                                            {user.name?.charAt(0) || 'U'}
+                                        </div>
+                                    )}
+                                    <ChevronDown
+                                        size={14}
+                                        className={`text-zinc-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                {isProfileOpen && (
+                                    <div className="absolute right-0 mt-3 w-72 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden origin-top-right animate-in fade-in slide-in-from-top-2 duration-200 ring-1 ring-black/5 z-[1100]">
+                                        <div className="p-5 border-b border-zinc-50 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50">
+                                            <p className="font-semibold text-zinc-900 dark:text-white">{user.name}</p>
+                                            <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">{user.email}</p>
+                                        </div>
+                                        <div className="p-2 space-y-1">
+                                            <MenuItem icon={<User size={18} />} text="Profile" href="/profile" />
+                                            <MenuItem icon={<Calendar size={18} />} text="Bookings" href="/bookings" />
+                                            <MenuItem icon={<Heart size={18} />} text="Saved Listings" href="/saved" />
+                                            <MenuItem icon={<Clock size={18} />} text="Recently Viewed" href="/recently-viewed" />
+                                            <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
+                                            <MenuItem icon={<Settings size={18} />} text="Settings" href="/settings" />
+                                            <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
+                                            <ThemeToggle variant="menu-item" />
+                                            <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
+                                            <MenuItem
+                                                icon={<LogOut size={18} />}
+                                                text="Log out"
+                                                danger
+                                                onClick={() => {
+                                                    signOut();
+                                                    setIsProfileOpen(false);
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 ml-2">
+                                <a
+                                    href="/login"
+                                    className="text-zinc-600 font-medium hover:text-zinc-900 px-3 py-2 transition-colors"
+                                >
+                                    Log in
+                                </a>
+                                <a href="/signup">
+                                    <Button className="bg-zinc-100 text-zinc-900 font-medium px-4 py-2 rounded-full hover:bg-zinc-200">
+                                        Sign up
+                                    </Button>
+                                </a>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Mobile Menu Toggle */}
-                    <button
-                        className="md:hidden p-2 z-50 relative rounded-lg hover:bg-zinc-100 transition-colors touch-target"
-                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        aria-expanded={isMobileMenuOpen}
-                        aria-controls="mobile-menu"
-                    >
-                        {isMobileMenuOpen ? (
-                            <X className="w-6 h-6 text-zinc-900" />
-                        ) : (
-                            <Menu className="w-6 h-6 text-zinc-900" />
-                        )}
-                    </button>
+                    <div className="md:hidden flex items-center gap-4">
+                        <button
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            className="text-zinc-900 p-2"
+                            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+                            aria-expanded={isMobileMenuOpen}
+                        >
+                            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Mobile Menu Portal */}
-            {isMobileMenuOpen && typeof document !== 'undefined' && createPortal(
+            {/* Mobile Menu */}
+            {isMobileMenuOpen && (
                 <div
-                    id="mobile-menu"
+                    className="md:hidden bg-white border-t border-zinc-100 absolute w-full shadow-lg h-screen animate-in slide-in-from-top-5"
                     role="dialog"
                     aria-modal="true"
                     aria-label="Navigation menu"
-                    className="fixed inset-0 bg-white z-[9999] flex flex-col justify-center items-center gap-6 sm:gap-8 animate-in fade-in slide-in-from-bottom-5 duration-300 px-6"
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                            setIsMobileMenuOpen(false);
-                        }
-                    }}
                 >
-                    {/* Close Button */}
-                    <button
-                        className="absolute top-5 right-6 p-2 rounded-lg hover:bg-zinc-100 transition-colors touch-target"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        aria-label="Close menu"
-                    >
-                        <X className="w-6 h-6 text-zinc-900" />
-                    </button>
+                    <div className="p-4 space-y-4">
+                        {user ? (
+                            <div className="flex items-center gap-3 pb-4 border-b border-zinc-100">
+                                {user.image ? (
+                                    <img
+                                        src={user.image}
+                                        alt={user.name || 'User'}
+                                        className="w-10 h-10 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
+                                        {user.name?.charAt(0) || 'U'}
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="font-semibold text-zinc-900">{user.name}</p>
+                                    <a href="/profile" className="text-xs text-zinc-500 hover:text-zinc-700">
+                                        View Profile
+                                    </a>
+                                </div>
+                            </div>
+                        ) : null}
 
-                    <a
-                        href="/search"
-                        className="text-2xl sm:text-3xl font-light text-zinc-900 tracking-tight py-2 hover:text-indigo-600 transition-colors"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                        Find a Room
-                    </a>
-                    <a
-                        href="/listings/create"
-                        className="text-2xl sm:text-3xl font-light text-zinc-900 tracking-tight py-2 hover:text-indigo-600 transition-colors"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                        List a Room
-                    </a>
+                        <a
+                            href="/search"
+                            className="flex items-center gap-3 py-3 text-lg font-medium text-zinc-900 hover:bg-zinc-50 rounded-lg px-2"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            <Search size={20} className="text-zinc-400"/> Find a Room
+                        </a>
 
-                    <div className="w-12 h-[1px] bg-zinc-200 my-2" aria-hidden="true"></div>
+                        {user && (
+                            <>
+                                <a
+                                    href="/messages"
+                                    className="flex items-center gap-3 py-3 text-lg font-medium text-zinc-900 hover:bg-zinc-50 rounded-lg px-2"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <MessageSquare size={20} className="text-zinc-400"/>
+                                    Messages
+                                    {currentUnreadCount > 0 && (
+                                        <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                            {currentUnreadCount > 9 ? '9+' : currentUnreadCount}
+                                        </span>
+                                    )}
+                                </a>
+                                <a
+                                    href="/bookings"
+                                    className="flex items-center gap-3 py-3 text-lg font-medium text-zinc-900 hover:bg-zinc-50 rounded-lg px-2"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <Calendar size={20} className="text-zinc-400"/> Bookings
+                                </a>
+                                <a
+                                    href="/saved"
+                                    className="flex items-center gap-3 py-3 text-lg font-medium text-zinc-900 hover:bg-zinc-50 rounded-lg px-2"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <Heart size={20} className="text-zinc-400"/> Saved Listings
+                                </a>
+                            </>
+                        )}
 
-                    {!user ? (
-                        <>
-                            <a
-                                href="/login"
-                                className="text-lg sm:text-xl font-medium text-zinc-500 py-2 hover:text-zinc-900 transition-colors"
-                                onClick={() => setIsMobileMenuOpen(false)}
+                        <hr className="border-zinc-100"/>
+
+                        <a href="/listings/create" onClick={() => setIsMobileMenuOpen(false)}>
+                            <Button className="w-full flex items-center justify-center gap-2 bg-zinc-900 text-white px-5 py-3 rounded-xl font-medium shadow-lg shadow-zinc-900/10 h-auto">
+                                <Plus size={18} />
+                                List a Room
+                            </Button>
+                        </a>
+
+                        {!user && (
+                            <div className="flex flex-col gap-2 pt-2">
+                                <a
+                                    href="/login"
+                                    className="w-full text-center text-zinc-600 py-3 font-medium hover:text-zinc-900"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    Log In
+                                </a>
+                                <a
+                                    href="/signup"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <Button className="w-full bg-zinc-100 text-zinc-900 py-3 font-medium hover:bg-zinc-200 rounded-xl h-auto">
+                                        Sign Up
+                                    </Button>
+                                </a>
+                            </div>
+                        )}
+
+                        {user && (
+                            <button
+                                onClick={() => {
+                                    signOut();
+                                    setIsMobileMenuOpen(false);
+                                }}
+                                className="w-full flex items-center justify-center gap-2 text-red-600 py-3 font-medium hover:bg-red-50 rounded-xl mt-4"
                             >
-                                Log in
-                            </a>
-                            <a
-                                href="/signup"
-                                className="text-lg sm:text-xl font-medium text-zinc-900 py-2 hover:text-indigo-600 transition-colors"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                Sign up
-                            </a>
-                        </>
-                    ) : (
-                        <>
-                            <a
-                                href="/profile"
-                                className="text-lg sm:text-xl font-medium text-zinc-900 py-2 hover:text-indigo-600 transition-colors"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                Profile
-                            </a>
-                            <a
-                                href="/bookings"
-                                className="text-lg sm:text-xl font-medium text-zinc-500 py-2 hover:text-zinc-900 transition-colors"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                Bookings
-                            </a>
-                            <a
-                                href="/notifications"
-                                className="text-lg sm:text-xl font-medium text-zinc-500 py-2 hover:text-zinc-900 transition-colors"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                Notifications
-                            </a>
-                            <a
-                                href="/messages"
-                                className="text-lg sm:text-xl font-medium text-zinc-500 py-2 hover:text-zinc-900 transition-colors"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                Messages
-                            </a>
-                        </>
-                    )}
-                </div>,
-                document.body
+                                <LogOut size={18} />
+                                Log out
+                            </button>
+                        )}
+                    </div>
+                </div>
             )}
         </nav>
     );

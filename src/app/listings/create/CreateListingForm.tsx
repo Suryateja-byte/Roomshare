@@ -21,6 +21,20 @@ export default function CreateListingForm() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [uploadedImages, setUploadedImages] = useState<ImageObject[]>([]);
+    const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+
+    const LANGUAGES = [
+        'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
+        'Arabic', 'Portuguese', 'Russian', 'Japanese', 'German'
+    ];
+
+    const toggleLanguage = (lang: string) => {
+        setSelectedLanguages(prev =>
+            prev.includes(lang)
+                ? prev.filter(l => l !== lang)
+                : [...prev, lang]
+        );
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -52,6 +66,7 @@ export default function CreateListingForm() {
                 body: JSON.stringify({
                     ...data,
                     images: imageUrls,
+                    languages: selectedLanguages,
                 }),
             });
 
@@ -264,6 +279,61 @@ export default function CreateListingForm() {
                                 <option value="Private Room">Private Room</option>
                                 <option value="Shared Room">Shared Room</option>
                                 <option value="Entire Place">Entire Place</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label>Languages Spoken</Label>
+                        <p className="text-xs text-zinc-400 mt-1 mb-3">Select languages spoken in the household</p>
+                        <div className="flex flex-wrap gap-2">
+                            {LANGUAGES.map((lang) => (
+                                <button
+                                    key={lang}
+                                    type="button"
+                                    onClick={() => toggleLanguage(lang)}
+                                    disabled={loading}
+                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                                        selectedLanguages.includes(lang)
+                                            ? 'bg-zinc-900 text-white'
+                                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                                >
+                                    {lang}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="genderPreference">Gender Preference</Label>
+                            <p className="text-xs text-zinc-400 mt-1 mb-2">Who can apply for this room?</p>
+                            <select
+                                id="genderPreference"
+                                name="genderPreference"
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3 sm:py-3.5 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={loading}
+                            >
+                                <option value="">Select preference...</option>
+                                <option value="MALE_ONLY">Male Identifying Only</option>
+                                <option value="FEMALE_ONLY">Female Identifying Only</option>
+                                <option value="NO_PREFERENCE">Any Gender / All Welcome</option>
+                            </select>
+                        </div>
+                        <div>
+                            <Label htmlFor="householdGender">Household Gender</Label>
+                            <p className="text-xs text-zinc-400 mt-1 mb-2">Current household composition</p>
+                            <select
+                                id="householdGender"
+                                name="householdGender"
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border border-zinc-200 rounded-xl px-4 py-3 sm:py-3.5 text-zinc-900 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={loading}
+                            >
+                                <option value="">Select composition...</option>
+                                <option value="ALL_MALE">All Male</option>
+                                <option value="ALL_FEMALE">All Female</option>
+                                <option value="MIXED">Mixed (Co-ed)</option>
                             </select>
                         </div>
                     </div>

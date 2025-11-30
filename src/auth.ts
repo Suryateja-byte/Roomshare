@@ -30,12 +30,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         async session({ session, token }) {
             if (token.sub && session.user) {
                 session.user.id = token.sub
+                session.user.emailVerified = token.emailVerified as Date | null
+                session.user.isAdmin = token.isAdmin as boolean
             }
             return session
         },
-        async jwt({ token, user, account }) {
+        async jwt({ token, user, account, trigger }) {
             if (user) {
                 token.sub = user.id
+                token.emailVerified = user.emailVerified
+                token.isAdmin = user.isAdmin
+            }
+            // Refresh emailVerified status on update
+            if (trigger === 'update' && token.sub) {
+                const dbUser = await prisma.user.findUnique({
+                    where: { id: token.sub },
+                    select: { emailVerified: true, isAdmin: true }
+                })
+                if (dbUser) {
+                    token.emailVerified = dbUser.emailVerified
+                    token.isAdmin = dbUser.isAdmin
+                }
             }
             return token
         },

@@ -6,10 +6,13 @@ import { revalidatePath } from 'next/cache';
 import type { SearchFilters } from '@/lib/search-utils';
 import type { Prisma } from '@prisma/client';
 
+type AlertFrequency = 'INSTANT' | 'DAILY' | 'WEEKLY';
+
 interface SaveSearchInput {
     name: string;
     filters: SearchFilters;
     alertEnabled?: boolean;
+    alertFrequency?: AlertFrequency;
 }
 
 export async function saveSearch(input: SaveSearchInput) {
@@ -34,7 +37,8 @@ export async function saveSearch(input: SaveSearchInput) {
                 name: input.name,
                 query: input.filters.query,
                 filters: input.filters as Prisma.InputJsonValue,
-                alertEnabled: input.alertEnabled ?? true
+                alertEnabled: input.alertEnabled ?? true,
+                alertFrequency: input.alertFrequency ?? 'DAILY'
             }
         });
 
