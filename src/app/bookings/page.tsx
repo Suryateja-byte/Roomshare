@@ -19,7 +19,7 @@ export default async function BookingsPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-zinc-50/50 pt-24 pb-20">
+            <div className="min-h-screen bg-zinc-50/50 pt-20 pb-20">
                 <div className="container mx-auto max-w-5xl px-6 py-10">
                     <p className="text-red-500">{error}</p>
                 </div>

@@ -161,8 +161,8 @@ export default function ImageUploader({
             {canAddMore && (
                 <div
                     className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${isDragging
-                            ? 'border-zinc-900 bg-zinc-50 scale-[1.01]'
-                            : 'border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 bg-white'
+                            ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800 scale-[1.01]'
+                            : 'border-zinc-300 dark:border-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900'
                         }`}
                     onDragOver={onDragOver}
                     onDragLeave={onDragLeave}
@@ -179,14 +179,14 @@ export default function ImageUploader({
                     />
 
                     <div className="flex flex-col items-center justify-center space-y-3 pointer-events-none">
-                        <div className={`p-4 rounded-full transition-colors ${isDragging ? 'bg-zinc-200' : 'bg-zinc-100 group-hover:bg-zinc-200'}`}>
-                            <Upload size={32} className={`transition-colors ${isDragging ? 'text-zinc-600' : 'text-zinc-400 group-hover:text-zinc-500'}`} />
+                        <div className={`p-4 rounded-full transition-colors ${isDragging ? 'bg-zinc-200 dark:bg-zinc-700' : 'bg-zinc-100 dark:bg-zinc-800 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700'}`}>
+                            <Upload size={32} className={`transition-colors ${isDragging ? 'text-zinc-600 dark:text-zinc-300' : 'text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-500 dark:group-hover:text-zinc-400'}`} />
                         </div>
                         <div className="space-y-1">
-                            <p className="text-sm font-semibold text-zinc-700">
-                                <span className="text-zinc-900">Click to upload</span> or drag and drop
+                            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                                <span className="text-zinc-900 dark:text-white">Click to upload</span> or drag and drop
                             </p>
-                            <p className="text-xs text-zinc-500">
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
                                 JPEG, PNG, WebP or GIF (max 5MB each)
                             </p>
                         </div>
@@ -198,7 +198,7 @@ export default function ImageUploader({
             {images.length > 0 && (
                 <div className={`${canAddMore ? 'mt-6' : ''} grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 animate-in fade-in duration-300`}>
                     {images.map((image, index) => (
-                        <div key={image.id} className="group relative aspect-square rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100 shadow-sm">
+                        <div key={image.id} className="group relative aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-sm">
                             <img
                                 src={image.previewUrl}
                                 alt={`Preview ${index + 1}`}
@@ -251,7 +251,7 @@ export default function ImageUploader({
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="flex flex-col items-center justify-center aspect-square rounded-xl border border-dashed border-zinc-300 bg-zinc-50 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-500 hover:border-zinc-400 transition-all"
+                            className="flex flex-col items-center justify-center aspect-square rounded-xl border border-dashed border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-all"
                         >
                             <Plus size={24} />
                             <span className="text-xs mt-1 font-medium">Add more</span>
@@ -262,7 +262,7 @@ export default function ImageUploader({
 
             {/* Image count */}
             {images.length > 0 && (
-                <p className="text-xs text-zinc-500 mt-3">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-3">
                     {images.length} of {maxImages} images
                     {isAnyUploading && ' (uploading...)'}
                 </p>

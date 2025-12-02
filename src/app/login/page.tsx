@@ -44,7 +44,7 @@ function LoginForm() {
     };
 
     return (
-        <div className="min-h-screen flex bg-white font-sans selection:bg-zinc-900 selection:text-white ">
+        <div className="min-h-screen flex bg-white dark:bg-zinc-950 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black">
             {/* Left Visual */}
             <div className="hidden lg:flex w-1/2 bg-zinc-900 relative flex-col justify-between p-8 xl:p-12 text-white">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-zinc-800 to-black opacity-50"></div>
@@ -74,18 +74,18 @@ function LoginForm() {
             <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 pb-20">
                 <div className="w-full max-w-sm space-y-6 sm:space-y-8">
                     <div className="text-center lg:text-left">
-                        <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 tracking-tight">Welcome back</h1>
-                        <p className="text-zinc-500 mt-2 text-sm sm:text-base">Enter your email to access your account.</p>
+                        <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 dark:text-white tracking-tight">Welcome back</h1>
+                        <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm sm:text-base">Enter your email to access your account.</p>
                     </div>
 
                     {registered && (
-                        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm text-center">
+                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-xl text-sm text-center">
                             Account created successfully! Please sign in.
                         </div>
                     )}
 
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm text-center">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl text-sm text-center">
                             {error}
                         </div>
                     )}
@@ -93,7 +93,7 @@ function LoginForm() {
                     {/* Google Sign In */}
                     <button
                         onClick={() => signIn('google', { callbackUrl: '/' })}
-                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors font-medium text-zinc-700 shadow-sm"
+                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors font-medium text-zinc-700 dark:text-white shadow-sm"
                     >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
                             <path
@@ -118,16 +118,16 @@ function LoginForm() {
 
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-zinc-200 "></div>
+                            <div className="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
                         </div>
                         <div className="relative flex justify-center text-[11px] uppercase tracking-wider font-medium">
-                            <span className="bg-white px-4 text-zinc-400">or continue with email</span>
+                            <span className="bg-white dark:bg-zinc-950 px-4 text-zinc-400">or continue with email</span>
                         </div>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="space-y-1">
-                            <label htmlFor="email" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
+                            <label htmlFor="email" className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide ml-0.5">
                                 Email
                             </label>
                             <div className="relative">
@@ -140,17 +140,17 @@ function LoginForm() {
                                     name="email"
                                     required
                                     autoComplete="email"
-                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-400 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                                     placeholder="you@example.com"
                                 />
                             </div>
                         </div>
                         <div className="space-y-1">
                             <div className="flex justify-between items-baseline">
-                                <label htmlFor="password" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
+                                <label htmlFor="password" className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide ml-0.5">
                                     Password
                                 </label>
-                                <Link href="/forgot-password" className="text-xs text-zinc-500 hover:text-zinc-900 transition-colors">
+                                <Link href="/forgot-password" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
                                     Forgot password?
                                 </Link>
                             </div>
@@ -164,7 +164,7 @@ function LoginForm() {
                                     name="password"
                                     required
                                     autoComplete="current-password"
-                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-400 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                                     placeholder="••••••••"
                                 />
                             </div>
@@ -178,9 +178,9 @@ function LoginForm() {
                         </Button>
                     </form>
 
-                    <p className="text-center text-sm text-zinc-500 ">
+                    <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
                         Don't have an account?{' '}
-                        <Link href="/signup" className="font-semibold text-zinc-900 hover:underline">
+                        <Link href="/signup" className="font-semibold text-zinc-900 dark:text-white hover:underline">
                             Sign up
                         </Link>
                     </p>
@@ -192,7 +192,7 @@ function LoginForm() {
 
 export default function LoginPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-zinc-900" /></div>}>
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950"><Loader2 className="w-8 h-8 animate-spin text-zinc-900 dark:text-white" /></div>}>
             <LoginForm />
         </Suspense>
     );

@@ -72,7 +72,7 @@ export default function VerificationForm() {
         <form onSubmit={handleSubmit} className="space-y-6">
             {/* Document Type Selection */}
             <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-3">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
                     Select Document Type
                 </label>
                 <div className="grid grid-cols-3 gap-3">
@@ -82,14 +82,14 @@ export default function VerificationForm() {
                             type="button"
                             onClick={() => setDocumentType(type.value)}
                             className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${documentType === type.value
-                                    ? 'border-zinc-900 bg-zinc-50'
-                                    : 'border-zinc-200 hover:border-zinc-300'
+                                    ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800'
+                                    : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
                                 }`}
                         >
-                            <span className={documentType === type.value ? 'text-zinc-900' : 'text-zinc-400'}>
+                            <span className={documentType === type.value ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-500'}>
                                 {type.icon}
                             </span>
-                            <span className={`text-xs font-medium ${documentType === type.value ? 'text-zinc-900' : 'text-zinc-500'
+                            <span className={`text-xs font-medium ${documentType === type.value ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400'
                                 }`}>
                                 {type.label}
                             </span>
@@ -100,7 +100,7 @@ export default function VerificationForm() {
 
             {/* Document Upload */}
             <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-3">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
                     Upload {documentTypes.find(t => t.value === documentType)?.label}
                 </label>
                 <div className="relative">
@@ -114,23 +114,23 @@ export default function VerificationForm() {
                     <label
                         htmlFor="document-upload"
                         className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all ${documentUrl
-                                ? 'border-green-500 bg-green-50'
-                                : 'border-zinc-300 hover:border-zinc-400 bg-zinc-50'
+                                ? 'border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/30'
+                                : 'border-zinc-300 dark:border-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 bg-zinc-50 dark:bg-zinc-800'
                             }`}
                     >
                         {documentUrl ? (
                             <>
-                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-2">
-                                    <FileText className="w-6 h-6 text-green-600" />
+                                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center mb-2">
+                                    <FileText className="w-6 h-6 text-green-600 dark:text-green-400" />
                                 </div>
-                                <span className="text-sm font-medium text-green-600">Document uploaded</span>
-                                <span className="text-xs text-zinc-500 mt-1">Click to replace</span>
+                                <span className="text-sm font-medium text-green-600 dark:text-green-400">Document uploaded</span>
+                                <span className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Click to replace</span>
                             </>
                         ) : (
                             <>
-                                <Upload className="w-8 h-8 text-zinc-400 mb-2" />
-                                <span className="text-sm text-zinc-600">Click to upload</span>
-                                <span className="text-xs text-zinc-400 mt-1">PNG, JPG or PDF up to 10MB</span>
+                                <Upload className="w-8 h-8 text-zinc-400 dark:text-zinc-500 mb-2" />
+                                <span className="text-sm text-zinc-600 dark:text-zinc-400">Click to upload</span>
+                                <span className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">PNG, JPG or PDF up to 10MB</span>
                             </>
                         )}
                     </label>
@@ -139,10 +139,10 @@ export default function VerificationForm() {
 
             {/* Selfie Upload (Optional) */}
             <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">
-                    Upload Selfie <span className="text-zinc-400 font-normal">(Optional)</span>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Upload Selfie <span className="text-zinc-400 dark:text-zinc-500 font-normal">(Optional)</span>
                 </label>
-                <p className="text-xs text-zinc-500 mb-3">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
                     A selfie helps us verify that you match the document
                 </p>
                 <div className="relative">
@@ -156,19 +156,19 @@ export default function VerificationForm() {
                     <label
                         htmlFor="selfie-upload"
                         className={`flex items-center gap-4 w-full p-4 border-2 border-dashed rounded-xl cursor-pointer transition-all ${selfieUrl
-                                ? 'border-green-500 bg-green-50'
-                                : 'border-zinc-300 hover:border-zinc-400 bg-zinc-50'
+                                ? 'border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/30'
+                                : 'border-zinc-300 dark:border-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 bg-zinc-50 dark:bg-zinc-800'
                             }`}
                     >
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${selfieUrl ? 'bg-green-100' : 'bg-zinc-100'
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${selfieUrl ? 'bg-green-100 dark:bg-green-900/50' : 'bg-zinc-100 dark:bg-zinc-700'
                             }`}>
-                            <Camera className={`w-6 h-6 ${selfieUrl ? 'text-green-600' : 'text-zinc-400'}`} />
+                            <Camera className={`w-6 h-6 ${selfieUrl ? 'text-green-600 dark:text-green-400' : 'text-zinc-400 dark:text-zinc-500'}`} />
                         </div>
                         <div>
-                            <span className={`text-sm font-medium ${selfieUrl ? 'text-green-600' : 'text-zinc-600'}`}>
+                            <span className={`text-sm font-medium ${selfieUrl ? 'text-green-600 dark:text-green-400' : 'text-zinc-600 dark:text-zinc-400'}`}>
                                 {selfieUrl ? 'Selfie uploaded' : 'Upload a selfie'}
                             </span>
-                            <span className="text-xs text-zinc-400 block">
+                            <span className="text-xs text-zinc-400 dark:text-zinc-500 block">
                                 {selfieUrl ? 'Click to replace' : 'Clear photo of your face'}
                             </span>
                         </div>
@@ -178,14 +178,14 @@ export default function VerificationForm() {
 
             {/* Error Message */}
             {error && (
-                <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-                    <p className="text-sm text-red-600">{error}</p>
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl p-4">
+                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                 </div>
             )}
 
             {/* Privacy Notice */}
-            <div className="bg-zinc-50 rounded-xl p-4">
-                <p className="text-xs text-zinc-500">
+            <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-4">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Your documents are securely stored and will only be used for identity verification purposes.
                     We follow strict privacy guidelines and will never share your documents with third parties.
                 </p>
@@ -195,7 +195,7 @@ export default function VerificationForm() {
             <button
                 type="submit"
                 disabled={isSubmitting || !documentUrl}
-                className="w-full bg-zinc-900 text-white py-3 px-6 rounded-xl font-medium hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                className="w-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 py-3 px-6 rounded-xl font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
                 {isSubmitting ? (
                     <>

@@ -22,10 +22,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 className={cn(
                     "inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]",
                     {
-                        "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm hover:shadow-md focus-visible:ring-zinc-900 ": variant === "primary",
-                        "border border-zinc-200 bg-transparent hover:bg-zinc-50 text-zinc-900 focus-visible:ring-zinc-900 ": variant === "outline",
-                        "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 focus-visible:ring-zinc-900 ": variant === "ghost",
-                        "bg-white text-zinc-900 hover:bg-zinc-50 shadow-sm border border-zinc-100 focus-visible:ring-zinc-900 ": variant === "white",
+                        "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm hover:shadow-md focus-visible:ring-zinc-900 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 dark:focus-visible:ring-white": variant === "primary",
+                        "border border-zinc-200 bg-transparent hover:bg-zinc-50 text-zinc-900 focus-visible:ring-zinc-900 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800 dark:focus-visible:ring-zinc-400": variant === "outline",
+                        "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 focus-visible:ring-zinc-900 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800": variant === "ghost",
+                        "bg-white text-zinc-900 hover:bg-zinc-50 shadow-sm border border-zinc-100 focus-visible:ring-zinc-900 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700 dark:border-zinc-700": variant === "white",
                         "bg-red-600 text-white hover:bg-red-700 shadow-sm focus-visible:ring-red-600": variant === "destructive",
                         "h-10 px-4 py-2 text-sm": size === "default",
                         "h-9 px-3 text-xs": size === "sm",

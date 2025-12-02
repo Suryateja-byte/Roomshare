@@ -55,7 +55,7 @@ export async function updateNotificationPreferences(
     try {
         await prisma.user.update({
             where: { id: session.user.id },
-            data: { notificationPreferences: preferences }
+            data: { notificationPreferences: preferences as any }
         });
 
         revalidatePath('/settings');

@@ -17,5 +17,5 @@ export default async function NotificationsPage() {
 
     const { notifications } = await getNotifications(50);
 
-    return <NotificationsClient initialNotifications={notifications} />;
+    return <NotificationsClient initialNotifications={notifications as any} />;
 }

@@ -149,11 +149,11 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                     >
                         <div className="relative cursor-pointer group">
                             {/* Pin body with price */}
-                            <div className="bg-white text-foreground px-3 py-1.5 rounded-lg shadow-lg hover:scale-110 transition-all duration-200 border border-border/50 font-bold text-sm whitespace-nowrap group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary">
+                            <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-3 py-1.5 rounded-lg shadow-lg hover:scale-110 transition-all duration-200 border border-zinc-800 dark:border-zinc-200 font-bold text-sm whitespace-nowrap group-hover:bg-zinc-800 dark:group-hover:bg-zinc-200">
                                 ${position.listing.price}
                             </div>
                             {/* Pin point */}
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-white group-hover:border-t-primary"></div>
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-zinc-900 dark:border-t-white group-hover:border-t-zinc-800 dark:group-hover:border-t-zinc-200"></div>
                         </div>
                     </Marker>
                 ))}

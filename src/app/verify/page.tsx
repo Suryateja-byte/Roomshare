@@ -15,9 +15,9 @@ export default async function VerifyPage() {
     const status = await getMyVerificationStatus();
 
     return (
-        <div className="min-h-screen bg-zinc-50 py-12">
+        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-12">
             <div className="max-w-2xl mx-auto px-4">
-                <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-800 overflow-hidden">
                     {/* Header */}
                     <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 px-8 py-10 text-white">
                         <div className="flex items-center gap-4">
@@ -37,18 +37,18 @@ export default async function VerifyPage() {
                     <div className="p-8">
                         {status.status === 'verified' && (
                             <div className="text-center py-8">
-                                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <CheckCircle2 className="w-10 h-10 text-green-600" />
+                                <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <CheckCircle2 className="w-10 h-10 text-green-600 dark:text-green-400" />
                                 </div>
-                                <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+                                <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
                                     You're Verified!
                                 </h2>
-                                <p className="text-zinc-600 mb-6">
+                                <p className="text-zinc-600 dark:text-zinc-400 mb-6">
                                     Your identity has been verified. You now have a verified badge on your profile.
                                 </p>
                                 <Link
                                     href="/profile"
-                                    className="inline-flex items-center gap-2 bg-zinc-900 text-white px-6 py-3 rounded-xl font-medium hover:bg-zinc-800 transition-colors"
+                                    className="inline-flex items-center gap-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-3 rounded-xl font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
                                 >
                                     View Your Profile
                                 </Link>
@@ -57,19 +57,19 @@ export default async function VerifyPage() {
 
                         {status.status === 'pending' && (
                             <div className="text-center py-8">
-                                <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <Clock className="w-10 h-10 text-amber-600" />
+                                <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <Clock className="w-10 h-10 text-amber-600 dark:text-amber-400" />
                                 </div>
-                                <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+                                <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
                                     Verification Pending
                                 </h2>
-                                <p className="text-zinc-600 mb-6">
+                                <p className="text-zinc-600 dark:text-zinc-400 mb-6">
                                     We're reviewing your documents. This usually takes 1-2 business days.
                                     We'll notify you once your verification is complete.
                                 </p>
-                                <div className="bg-zinc-50 rounded-xl p-4 inline-block">
-                                    <p className="text-sm text-zinc-500">
-                                        Request ID: <code className="text-zinc-700">{status.requestId}</code>
+                                <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-4 inline-block">
+                                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                                        Request ID: <code className="text-zinc-700 dark:text-zinc-300">{status.requestId}</code>
                                     </p>
                                 </div>
                             </div>
@@ -78,26 +78,26 @@ export default async function VerifyPage() {
                         {status.status === 'rejected' && (
                             <div className="py-8">
                                 <div className="text-center mb-8">
-                                    <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                        <XCircle className="w-10 h-10 text-red-600" />
+                                    <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <XCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
                                     </div>
-                                    <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+                                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
                                         Verification Not Approved
                                     </h2>
-                                    <p className="text-zinc-600 mb-4">
+                                    <p className="text-zinc-600 dark:text-zinc-400 mb-4">
                                         Unfortunately, we couldn't verify your identity.
                                     </p>
                                     {status.reason && (
-                                        <div className="bg-red-50 border border-red-100 rounded-xl p-4 max-w-md mx-auto">
-                                            <p className="text-sm text-red-700">
+                                        <div className="bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl p-4 max-w-md mx-auto">
+                                            <p className="text-sm text-red-700 dark:text-red-400">
                                                 <strong>Reason:</strong> {status.reason}
                                             </p>
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="border-t border-zinc-100 pt-8">
-                                    <h3 className="text-lg font-semibold text-zinc-900 mb-4 text-center">
+                                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-8">
+                                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 text-center">
                                         Try Again
                                     </h3>
                                     <VerificationForm />
@@ -109,39 +109,39 @@ export default async function VerifyPage() {
                             <div>
                                 {/* Benefits */}
                                 <div className="mb-8">
-                                    <h2 className="text-lg font-semibold text-zinc-900 mb-4">
+                                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
                                         Why Get Verified?
                                     </h2>
                                     <div className="grid gap-4">
                                         <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                            <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-zinc-900">Build Trust</p>
-                                                <p className="text-sm text-zinc-500">
+                                                <p className="font-medium text-zinc-900 dark:text-white">Build Trust</p>
+                                                <p className="text-sm text-zinc-500 dark:text-zinc-400">
                                                     Verified users get 3x more responses from hosts
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                            <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-zinc-900">Stand Out</p>
-                                                <p className="text-sm text-zinc-500">
+                                                <p className="font-medium text-zinc-900 dark:text-white">Stand Out</p>
+                                                <p className="text-sm text-zinc-500 dark:text-zinc-400">
                                                     Get a verification badge on your profile
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                            <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-zinc-900">Safer Community</p>
-                                                <p className="text-sm text-zinc-500">
+                                                <p className="font-medium text-zinc-900 dark:text-white">Safer Community</p>
+                                                <p className="text-sm text-zinc-500 dark:text-zinc-400">
                                                     Help make RoomShare a trusted platform for everyone
                                                 </p>
                                             </div>
@@ -149,8 +149,8 @@ export default async function VerifyPage() {
                                     </div>
                                 </div>
 
-                                <div className="border-t border-zinc-100 pt-8">
-                                    <h2 className="text-lg font-semibold text-zinc-900 mb-4">
+                                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-8">
+                                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
                                         Submit Your Documents
                                     </h2>
                                     <VerificationForm />

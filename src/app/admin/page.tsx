@@ -84,12 +84,12 @@ export default async function AdminDashboard() {
     ];
 
     return (
-        <div className="min-h-screen bg-zinc-50">
+        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
             <div className="max-w-7xl mx-auto px-4 py-8">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-zinc-900">Admin Dashboard</h1>
-                    <p className="text-zinc-500 mt-1">Manage your RoomShare platform</p>
+                    <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">Admin Dashboard</h1>
+                    <p className="text-zinc-500 dark:text-zinc-400 mt-1">Manage your RoomShare platform</p>
                 </div>
 
                 {/* Stats Grid */}
@@ -97,15 +97,15 @@ export default async function AdminDashboard() {
                     {statCards.map((stat) => (
                         <div
                             key={stat.label}
-                            className={`bg-white rounded-xl p-6 border border-zinc-100 relative overflow-hidden ${stat.alert ? 'ring-2 ring-amber-400' : ''
+                            className={`bg-white dark:bg-zinc-900 rounded-xl p-6 border border-zinc-100 dark:border-zinc-800 relative overflow-hidden ${stat.alert ? 'ring-2 ring-amber-400' : ''
                                 }`}
                         >
                             <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 ${stat.color} opacity-10 rounded-full`} />
                             <div className={`w-10 h-10 ${stat.color} rounded-lg flex items-center justify-center mb-3`}>
                                 <stat.icon className="w-5 h-5 text-white" />
                             </div>
-                            <p className="text-2xl font-bold text-zinc-900">{stat.value.toLocaleString()}</p>
-                            <p className="text-sm text-zinc-500">{stat.label}</p>
+                            <p className="text-2xl font-bold text-zinc-900 dark:text-white">{stat.value.toLocaleString()}</p>
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400">{stat.label}</p>
                             {stat.alert && (
                                 <span className="absolute top-3 right-3 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
                             )}
@@ -114,25 +114,25 @@ export default async function AdminDashboard() {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="bg-white rounded-xl border border-zinc-100 overflow-hidden mb-8">
-                    <div className="px-6 py-4 border-b border-zinc-100">
-                        <h2 className="text-lg font-semibold text-zinc-900">Quick Actions</h2>
+                <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden mb-8">
+                    <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Quick Actions</h2>
                     </div>
-                    <div className="divide-y divide-zinc-100">
+                    <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                         {adminLinks.map((link) => (
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className="flex items-center justify-between px-6 py-4 hover:bg-zinc-50 transition-colors"
+                                className="flex items-center justify-between px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
-                                        <link.icon className="w-5 h-5 text-zinc-600" />
+                                    <div className="w-10 h-10 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center">
+                                        <link.icon className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                                     </div>
-                                    <span className="font-medium text-zinc-900">{link.label}</span>
+                                    <span className="font-medium text-zinc-900 dark:text-white">{link.label}</span>
                                 </div>
                                 {link.count !== undefined && link.count > 0 && (
-                                    <span className="bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full text-sm font-medium">
+                                    <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2.5 py-0.5 rounded-full text-sm font-medium">
                                         {link.count} pending
                                     </span>
                                 )}
@@ -142,11 +142,11 @@ export default async function AdminDashboard() {
                 </div>
 
                 {/* Recent Activity - Placeholder */}
-                <div className="bg-white rounded-xl border border-zinc-100 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-zinc-100">
-                        <h2 className="text-lg font-semibold text-zinc-900">Recent Activity</h2>
+                <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Recent Activity</h2>
                     </div>
-                    <div className="p-6 text-center text-zinc-500">
+                    <div className="p-6 text-center text-zinc-500 dark:text-zinc-400">
                         <p>Activity log coming soon</p>
                     </div>
                 </div>

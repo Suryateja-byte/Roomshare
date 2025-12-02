@@ -41,7 +41,7 @@ function SignUpForm() {
     };
 
     return (
-        <div className="min-h-screen flex bg-white font-sans selection:bg-zinc-900 selection:text-white">
+        <div className="min-h-screen flex bg-white dark:bg-zinc-950 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black">
 
             {/* Left Visual (Dark Theme) */}
             <div className="hidden lg:flex w-1/2 bg-zinc-900 relative flex-col justify-between p-8 xl:p-12 text-white">
@@ -80,12 +80,12 @@ function SignUpForm() {
 
                     {/* Header */}
                     <div className="text-center lg:text-left">
-                        <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 tracking-tight">Create an account</h1>
-                        <p className="text-zinc-500 mt-2 text-sm sm:text-base">Enter your details to get started.</p>
+                        <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 dark:text-white tracking-tight">Create an account</h1>
+                        <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm sm:text-base">Enter your details to get started.</p>
                     </div>
 
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm text-center">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl text-sm text-center">
                             {error}
                         </div>
                     )}
@@ -94,7 +94,7 @@ function SignUpForm() {
                     <button
                         type="button"
                         onClick={() => signIn('google', { callbackUrl: '/' })}
-                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors font-medium text-zinc-700 shadow-sm"
+                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors font-medium text-zinc-700 dark:text-white shadow-sm"
                     >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
                             <path
@@ -120,10 +120,10 @@ function SignUpForm() {
                     {/* Divider */}
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-zinc-200"></div>
+                            <div className="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
                         </div>
                         <div className="relative flex justify-center text-[11px] uppercase tracking-wider font-medium">
-                            <span className="bg-white px-4 text-zinc-400">or continue with email</span>
+                            <span className="bg-white dark:bg-zinc-950 px-4 text-zinc-400">or continue with email</span>
                         </div>
                     </div>
 
@@ -132,7 +132,7 @@ function SignUpForm() {
 
                         {/* Name Field */}
                         <div className="space-y-1">
-                            <label htmlFor="name" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
+                            <label htmlFor="name" className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide ml-0.5">
                                 Full Name
                             </label>
                             <div className="relative">
@@ -145,7 +145,7 @@ function SignUpForm() {
                                     name="name"
                                     required
                                     autoComplete="name"
-                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-400 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                                     placeholder="John Doe"
                                 />
                             </div>
@@ -153,7 +153,7 @@ function SignUpForm() {
 
                         {/* Email Field */}
                         <div className="space-y-1">
-                            <label htmlFor="email" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
+                            <label htmlFor="email" className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide ml-0.5">
                                 Email
                             </label>
                             <div className="relative">
@@ -166,7 +166,7 @@ function SignUpForm() {
                                     name="email"
                                     required
                                     autoComplete="email"
-                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-400 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                                     placeholder="you@example.com"
                                 />
                             </div>
@@ -174,7 +174,7 @@ function SignUpForm() {
 
                         {/* Password Field */}
                         <div className="space-y-1">
-                            <label htmlFor="password" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5">
+                            <label htmlFor="password" className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide ml-0.5">
                                 Password
                             </label>
                             <div className="relative">
@@ -187,11 +187,11 @@ function SignUpForm() {
                                     name="password"
                                     required
                                     autoComplete="new-password"
-                                    className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-400 focus:border-transparent text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                                     placeholder="••••••••"
                                 />
                             </div>
-                            <p className="text-[11px] text-zinc-500 ml-0.5">Must be at least 8 characters</p>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 ml-0.5">Must be at least 8 characters</p>
                         </div>
 
                         {/* Submit Button */}
@@ -204,9 +204,9 @@ function SignUpForm() {
                         </Button>
                     </form>
 
-                    <p className="text-center text-sm text-zinc-500">
+                    <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
                         Already have an account?{' '}
-                        <Link href="/login" className="font-semibold text-zinc-900 hover:underline">
+                        <Link href="/login" className="font-semibold text-zinc-900 dark:text-white hover:underline">
                             Sign in
                         </Link>
                     </p>
@@ -218,7 +218,7 @@ function SignUpForm() {
 
 export default function SignUpPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-zinc-900" /></div>}>
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950"><Loader2 className="w-8 h-8 animate-spin text-zinc-900 dark:text-white" /></div>}>
             <SignUpForm />
         </Suspense>
     );

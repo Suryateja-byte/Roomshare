@@ -100,25 +100,25 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
     };
 
     return (
-        <div className="min-h-screen bg-zinc-50/50 pt-24 pb-20">
+        <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 pt-20 pb-20">
             <div className="container mx-auto max-w-2xl px-6 py-10">
                 {/* Header */}
                 <div className="mb-8">
                     <Link
                         href="/profile"
-                        className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-4"
+                        className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors mb-4"
                     >
                         <ArrowLeft className="w-4 h-4" />
                         Back to Profile
                     </Link>
-                    <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Edit Profile</h1>
-                    <p className="text-zinc-500 mt-2">Update your personal information</p>
+                    <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">Edit Profile</h1>
+                    <p className="text-zinc-500 dark:text-zinc-400 mt-2">Update your personal information</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-8">
                     {/* Profile Photo */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-100">
-                        <h2 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-100 dark:border-zinc-800">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                             <Camera className="w-5 h-5" />
                             Profile Photo
                         </h2>
@@ -137,7 +137,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                                     type="profile"
                                     multiple={false}
                                 />
-                                <div className="mt-4 pt-4 border-t border-zinc-100">
+                                <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                                     <Label htmlFor="imageUrl" className="text-sm text-zinc-500 mb-2 block">
                                         Or enter image URL directly
                                     </Label>
@@ -155,8 +155,8 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     </div>
 
                     {/* Basic Info */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-100">
-                        <h2 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-100 dark:border-zinc-800">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                             <User className="w-5 h-5" />
                             Basic Information
                         </h2>
@@ -180,7 +180,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                                     type="email"
                                     value={user.email || ''}
                                     disabled
-                                    className="mt-1 bg-zinc-50"
+                                    className="mt-1 bg-zinc-50 dark:bg-zinc-800"
                                 />
                                 <p className="text-xs text-zinc-400 mt-1">
                                     Email cannot be changed
@@ -190,8 +190,8 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     </div>
 
                     {/* About */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-100">
-                        <h2 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-100 dark:border-zinc-800">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                             <FileText className="w-5 h-5" />
                             About You
                         </h2>
@@ -213,8 +213,8 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     </div>
 
                     {/* Location */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-100">
-                        <h2 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-100 dark:border-zinc-800">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                             <MapPin className="w-5 h-5" />
                             Location
                         </h2>
@@ -232,8 +232,8 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     </div>
 
                     {/* Languages */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-100">
-                        <h2 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-100 dark:border-zinc-800">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                             <Languages className="w-5 h-5" />
                             Languages
                         </h2>
@@ -244,13 +244,13 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                                 {languages.map((lang) => (
                                     <span
                                         key={lang}
-                                        className="inline-flex items-center gap-1 px-3 py-1 bg-zinc-100 rounded-full text-sm"
+                                        className="inline-flex items-center gap-1 px-3 py-1 bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-200 rounded-full text-sm"
                                     >
                                         {lang}
                                         <button
                                             type="button"
                                             onClick={() => handleRemoveLanguage(lang)}
-                                            className="p-0.5 hover:bg-zinc-200 rounded-full"
+                                            className="p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full"
                                         >
                                             <X className="w-3 h-3" />
                                         </button>
@@ -284,14 +284,14 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
 
                         {/* Common Languages */}
                         <div>
-                            <p className="text-xs text-zinc-500 mb-2">Common languages:</p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">Common languages:</p>
                             <div className="flex flex-wrap gap-2">
                                 {COMMON_LANGUAGES.filter(l => !languages.includes(l)).slice(0, 8).map((lang) => (
                                     <button
                                         key={lang}
                                         type="button"
                                         onClick={() => handleAddLanguage(lang)}
-                                        className="px-3 py-1 text-sm border border-zinc-200 rounded-full hover:bg-zinc-50 transition-colors"
+                                        className="px-3 py-1 text-sm border border-zinc-200 dark:border-zinc-700 dark:text-zinc-300 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                                     >
                                         {lang}
                                     </button>
@@ -302,12 +302,12 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
 
                     {/* Error/Success Messages */}
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl">
                             {error}
                         </div>
                     )}
                     {success && (
-                        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl">
+                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-xl">
                             Profile updated successfully! Redirecting...
                         </div>
                     )}

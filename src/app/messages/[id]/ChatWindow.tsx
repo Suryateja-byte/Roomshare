@@ -313,9 +313,9 @@ export default function ChatWindow({
     };
 
     return (
-        <div className="flex flex-col h-full bg-zinc-50">
+        <div className="flex flex-col h-full bg-zinc-50 dark:bg-zinc-950">
             {/* Header */}
-            <div className="px-6 py-4 bg-white border-b border-zinc-100 flex items-center gap-3">
+            <div className="px-6 py-4 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
                 <div className="relative">
                     <UserAvatar
                         image={otherUserImage}
@@ -323,12 +323,12 @@ export default function ChatWindow({
                         className="w-10 h-10"
                     />
                     {connectionStatus === 'connected' && isOnline && (
-                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-zinc-900" />
                     )}
                 </div>
                 <div>
-                    <h3 className="font-semibold text-zinc-900">{otherUserName || 'Chat'}</h3>
-                    <p className={`text-xs ${otherUserTyping ? 'text-green-600 font-medium' : 'text-zinc-500'}`}>
+                    <h3 className="font-semibold text-zinc-900 dark:text-white">{otherUserName || 'Chat'}</h3>
+                    <p className={`text-xs ${otherUserTyping ? 'text-green-600 dark:text-green-400 font-medium' : 'text-zinc-500 dark:text-zinc-400'}`}>
                         {getStatusText()}
                     </p>
                 </div>
@@ -340,7 +340,7 @@ export default function ChatWindow({
                     <div key={date}>
                         {/* Date separator */}
                         <div className="flex items-center justify-center my-4">
-                            <div className="px-3 py-1 bg-zinc-200 rounded-full text-xs text-zinc-600">
+                            <div className="px-3 py-1 bg-zinc-200 dark:bg-zinc-700 rounded-full text-xs text-zinc-600 dark:text-zinc-300">
                                 {date}
                             </div>
                         </div>
@@ -372,20 +372,20 @@ export default function ChatWindow({
 
                                         <div
                                             className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${isMe
-                                                ? 'bg-zinc-900 text-white rounded-br-md'
-                                                : 'bg-white text-zinc-900 border border-zinc-200 rounded-bl-md'
+                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-br-md'
+                                                : 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 rounded-bl-md'
                                                 } ${isOptimistic ? 'opacity-70' : ''}`}
                                         >
                                             <p className="text-sm leading-relaxed">{msg.content}</p>
                                             <div className={`flex items-center gap-1 mt-1 ${isMe ? 'justify-end' : ''}`}>
-                                                <span className={`text-[10px] ${isMe ? 'text-zinc-400' : 'text-zinc-400'}`}>
+                                                <span className={`text-[10px] ${isMe ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-400 dark:text-zinc-500'}`}>
                                                     {new Date(msg.createdAt).toLocaleTimeString([], {
                                                         hour: '2-digit',
                                                         minute: '2-digit'
                                                     })}
                                                 </span>
                                                 {isMe && (
-                                                    <span className="text-zinc-400">
+                                                    <span className="text-zinc-400 dark:text-zinc-500">
                                                         {isOptimistic ? (
                                                             <Loader2 className="w-3 h-3 animate-spin" />
                                                         ) : msg.read ? (
@@ -412,11 +412,11 @@ export default function ChatWindow({
                             name={otherUserName}
                             className="w-8 h-8"
                         />
-                        <div className="bg-white border border-zinc-200 rounded-2xl rounded-bl-md px-4 py-3">
+                        <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl rounded-bl-md px-4 py-3">
                             <div className="flex gap-1">
-                                <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                             </div>
                         </div>
                     </div>
@@ -426,7 +426,7 @@ export default function ChatWindow({
             </div>
 
             {/* Input */}
-            <div className="px-6 py-4 bg-white border-t border-zinc-100">
+            <div className="px-6 py-4 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
                 <form onSubmit={handleSend} className="flex items-center gap-3">
                     <input
                         ref={inputRef}
@@ -434,13 +434,13 @@ export default function ChatWindow({
                         value={input}
                         onChange={handleInputChange}
                         placeholder="Type a message..."
-                        className="flex-1 bg-zinc-100 border-0 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-all"
+                        className="flex-1 bg-zinc-100 dark:bg-zinc-800 border-0 rounded-full px-5 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 transition-all"
                         disabled={isSending}
                     />
                     <button
                         type="submit"
                         disabled={!input.trim() || isSending}
-                        className="w-11 h-11 bg-zinc-900 text-white rounded-full flex items-center justify-center hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                        className="w-11 h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
                     >
                         {isSending ? (
                             <Loader2 className="w-5 h-5 animate-spin" />
