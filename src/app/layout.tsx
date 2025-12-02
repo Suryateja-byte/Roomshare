@@ -10,6 +10,7 @@ import { SkipLink } from "@/components/ui/SkipLink";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import EmailVerificationWrapper from "@/components/EmailVerificationWrapper";
+import CustomScrollContainer from "@/components/ui/CustomScrollContainer";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -50,18 +51,20 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>
           <SkipLink />
-          <div className="flex flex-col min-h-screen">
-            <EmailVerificationWrapper />
-            <NavbarWrapper>
-              <Navbar />
-            </NavbarWrapper>
-            <MainLayout>
-              {children}
-            </MainLayout>
-            <FooterWrapper>
-              <Footer />
-            </FooterWrapper>
-          </div>
+          <CustomScrollContainer>
+            <div className="flex flex-col min-h-screen">
+              <EmailVerificationWrapper />
+              <NavbarWrapper>
+                <Navbar />
+              </NavbarWrapper>
+              <MainLayout>
+                {children}
+              </MainLayout>
+              <FooterWrapper>
+                <Footer />
+              </FooterWrapper>
+            </div>
+          </CustomScrollContainer>
           <OfflineIndicator />
           <ServiceWorkerRegistration />
         </Providers>

@@ -57,10 +57,10 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
     if (suggestions.length === 0) {
         return (
             <div className="text-center py-4">
-                <p className="text-zinc-500 text-sm">
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm">
                     No listings match your criteria{query ? ` for "${query}"` : ''}.
                 </p>
-                <p className="text-zinc-400 text-sm mt-1">
+                <p className="text-zinc-400 dark:text-zinc-500 text-sm mt-1">
                     Try a different location or remove all filters.
                 </p>
             </div>
@@ -68,8 +68,8 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
     }
 
     return (
-        <div className="mt-4 p-4 bg-zinc-50 rounded-xl border border-zinc-100">
-            <p className="text-sm font-medium text-zinc-700 mb-3">
+        <div className="mt-4 p-4 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800">
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
                 Try adjusting your filters:
             </p>
             <ul className="space-y-2">
@@ -77,12 +77,12 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
                     <li key={item.filter}>
                         <button
                             onClick={() => handleRemoveFilter(item.filter)}
-                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-white border border-transparent hover:border-zinc-200 transition-all group"
+                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-white dark:hover:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-all group"
                         >
-                            <span className="text-sm text-zinc-600 group-hover:text-zinc-900">
+                            <span className="text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white">
                                 {item.suggestion}
                             </span>
-                            <span className="block text-xs text-zinc-400 mt-0.5">
+                            <span className="block text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
                                 Remove: {item.label}
                             </span>
                         </button>
@@ -90,14 +90,14 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
                 ))}
             </ul>
             {suggestions.length > 3 && (
-                <p className="text-xs text-zinc-400 mt-3 text-center">
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-3 text-center">
                     +{suggestions.length - 3} more suggestion{suggestions.length - 3 > 1 ? 's' : ''}
                 </p>
             )}
-            <div className="mt-4 pt-3 border-t border-zinc-200">
+            <div className="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-700">
                 <button
                     onClick={handleClearAll}
-                    className="w-full text-center text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+                    className="w-full text-center text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
                     Clear all filters
                 </button>

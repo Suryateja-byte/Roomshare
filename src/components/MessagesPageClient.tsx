@@ -124,17 +124,17 @@ export default function MessagesPageClient({ currentUserId, initialConversations
     const otherParticipant = activeConversation?.participants.find(p => p.id !== currentUserId);
 
     return (
-        <div className="fixed inset-0 z-40 bg-white flex overflow-hidden font-sans selection:bg-zinc-900 selection:text-white pt-[80px]">
+        <div className="fixed inset-0 z-40 bg-white dark:bg-zinc-950 flex overflow-hidden font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black pt-[80px]">
             {/* Sidebar */}
-            <div className={`w-full md:w-[400px] flex flex-col border-r border-zinc-100 bg-white ${activeId ? 'hidden md:flex' : 'flex'}`}>
-                <div className="p-6 border-b border-zinc-50">
+            <div className={`w-full md:w-[400px] flex flex-col border-r border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 ${activeId ? 'hidden md:flex' : 'flex'}`}>
+                <div className="p-6 border-b border-zinc-50 dark:border-zinc-800">
                     <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-2xl font-bold tracking-tight">Messages</h1>
-                        <button className="p-2 hover:bg-zinc-50 rounded-full"><MoreVertical className="w-5 h-5 text-zinc-400" /></button>
+                        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Messages</h1>
+                        <button className="p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-full"><MoreVertical className="w-5 h-5 text-zinc-400 dark:text-zinc-500" /></button>
                     </div>
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                        <input placeholder="Search" className="w-full bg-zinc-50 h-10 pl-10 rounded-xl text-sm outline-none focus:bg-zinc-100 transition-colors" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+                        <input placeholder="Search" className="w-full bg-zinc-50 dark:bg-zinc-900 h-10 pl-10 rounded-xl text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:bg-zinc-100 dark:focus:bg-zinc-800 transition-colors" />
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
@@ -142,42 +142,42 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                         const other = c.participants.find(p => p.id !== currentUserId);
                         const lastMsg = c.messages[0];
                         return (
-                            <div key={c.id} onClick={() => setActiveId(c.id)} className={`px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? 'bg-zinc-50 border-zinc-900' : 'bg-white border-transparent hover:bg-zinc-50'}`}>
+                            <div key={c.id} onClick={() => setActiveId(c.id)} className={`px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-900 dark:border-white' : 'bg-white dark:bg-zinc-950 border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900'}`}>
                                 <UserAvatar image={other?.image} name={other?.name} size="lg" />
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-1">
-                                        <h3 className={`font-semibold text-sm truncate ${activeId === c.id ? 'text-zinc-900' : 'text-zinc-700'}`}>{other?.name || 'Unknown User'}</h3>
-                                        <span className="text-[10px] text-zinc-400">
+                                        <h3 className={`font-semibold text-sm truncate ${activeId === c.id ? 'text-zinc-900 dark:text-white' : 'text-zinc-700 dark:text-zinc-300'}`}>{other?.name || 'Unknown User'}</h3>
+                                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
                                             {lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                         </span>
                                     </div>
-                                    <p className="text-sm truncate text-zinc-500">
+                                    <p className="text-sm truncate text-zinc-500 dark:text-zinc-400">
                                         {lastMsg ? (lastMsg.senderId === currentUserId ? `You: ${lastMsg.content}` : lastMsg.content) : 'No messages yet'}
                                     </p>
-                                    <p className="text-xs text-zinc-400 mt-1">{c.listing.title}</p>
+                                    <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">{c.listing.title}</p>
                                 </div>
                             </div>
                         );
                     })}
                     {conversations.length === 0 && (
-                        <div className="p-6 text-center text-zinc-500">No conversations yet</div>
+                        <div className="p-6 text-center text-zinc-500 dark:text-zinc-400">No conversations yet</div>
                     )}
                 </div>
             </div>
 
             {/* Chat Area */}
-            <div className={`flex-1 flex flex-col bg-white ${!activeId ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`flex-1 flex flex-col bg-white dark:bg-zinc-950 ${!activeId ? 'hidden md:flex' : 'flex'}`}>
                 {activeId && activeConversation ? (
                     <>
                         {/* Header */}
-                        <header className="h-[72px] px-6 flex items-center justify-between border-b border-zinc-100">
+                        <header className="h-[72px] px-6 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800">
                             <div className="flex items-center gap-3">
-                                <button onClick={() => setActiveId(null)} className="md:hidden p-2 -ml-2 text-zinc-500"><ArrowLeft className="w-5 h-5" /></button>
+                                <button onClick={() => setActiveId(null)} className="md:hidden p-2 -ml-2 text-zinc-500 dark:text-zinc-400"><ArrowLeft className="w-5 h-5" /></button>
                                 <div className="flex items-center gap-3">
                                     <UserAvatar image={otherParticipant?.image} name={otherParticipant?.name} size="sm" />
                                     <div>
-                                        <span className="font-bold text-zinc-900 block">{otherParticipant?.name || 'Unknown User'}</span>
-                                        <span className="text-xs text-zinc-500">{activeConversation.listing.title}</span>
+                                        <span className="font-bold text-zinc-900 dark:text-white block">{otherParticipant?.name || 'Unknown User'}</span>
+                                        <span className="text-xs text-zinc-500 dark:text-zinc-400">{activeConversation.listing.title}</span>
                                     </div>
                                 </div>
                             </div>
@@ -186,11 +186,11 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                         {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
                             {loadingMessages ? (
-                                <div className="flex justify-center p-4"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-zinc-900"></div></div>
+                                <div className="flex justify-center p-4"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-zinc-900 dark:border-white"></div></div>
                             ) : (
                                 msgs.map(m => (
                                     <div key={m.id} className={`flex ${m.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[70%] px-5 py-2.5 text-[15px] leading-relaxed shadow-sm ${m.senderId === currentUserId ? 'bg-zinc-900 text-white rounded-2xl rounded-tr-sm' : 'bg-zinc-100 text-zinc-900 rounded-2xl rounded-tl-sm'}`}>
+                                        <div className={`max-w-[70%] px-5 py-2.5 text-[15px] leading-relaxed shadow-sm ${m.senderId === currentUserId ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl rounded-tr-sm' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-2xl rounded-tl-sm'}`}>
                                             {m.content}
                                         </div>
                                     </div>
@@ -201,15 +201,15 @@ export default function MessagesPageClient({ currentUserId, initialConversations
 
                         {/* Input */}
                         <div className="p-4 md:p-6">
-                            <form onSubmit={handleSend} className="flex items-end gap-2 bg-zinc-50 p-2 rounded-[2rem] border border-zinc-100 focus-within:bg-white focus-within:shadow-lg transition-all">
-                                <button type="button" className="p-2 text-zinc-400 hover:text-zinc-600"><Paperclip className="w-5 h-5" /></button>
-                                <input value={input} onChange={e => setInput(e.target.value)} placeholder="Type a message..." className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-zinc-900 placeholder:text-zinc-400" />
-                                <button type="submit" disabled={!input.trim()} className="w-10 h-10 bg-zinc-900 text-white rounded-full flex items-center justify-center hover:bg-zinc-800 disabled:opacity-50 transition-all"><Send className="w-4 h-4 ml-0.5" /></button>
+                            <form onSubmit={handleSend} className="flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 focus-within:bg-white dark:focus-within:bg-zinc-800 focus-within:shadow-lg transition-all">
+                                <button type="button" className="p-2 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"><Paperclip className="w-5 h-5" /></button>
+                                <input value={input} onChange={e => setInput(e.target.value)} placeholder="Type a message..." className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500" />
+                                <button type="submit" disabled={!input.trim()} className="w-10 h-10 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-all"><Send className="w-4 h-4 ml-0.5" /></button>
                             </form>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex items-center justify-center text-zinc-400">Select a conversation</div>
+                    <div className="flex-1 flex items-center justify-center text-zinc-400 dark:text-zinc-500">Select a conversation</div>
                 )}
             </div>
         </div>

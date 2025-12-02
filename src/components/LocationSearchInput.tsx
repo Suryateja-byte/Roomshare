@@ -173,7 +173,7 @@ export default function LocationSearchInput({
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
-                    className="w-full bg-transparent border-none p-0 text-zinc-900 placeholder:text-zinc-500 focus:ring-0 focus:outline-none text-sm truncate pr-8"
+                    className="w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none text-sm truncate pr-8"
                     autoComplete="off"
                 />
 
@@ -185,7 +185,7 @@ export default function LocationSearchInput({
                         <button
                             type="button"
                             onClick={handleClear}
-                            className="p-1 hover:bg-zinc-100 rounded-full transition-colors"
+                            className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-full transition-colors"
                         >
                             <X className="w-3 h-3 text-zinc-400" />
                         </button>
@@ -197,24 +197,26 @@ export default function LocationSearchInput({
             {showSuggestions && suggestions.length > 0 && (
                 <div
                     ref={suggestionsRef}
-                    className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-zinc-100 overflow-hidden z-[1000] min-w-[300px]"
+                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-[1000] min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
                 >
-                    <ul className="py-2">
+                    <ul className="p-2">
                         {suggestions.map((suggestion, index) => (
                             <li key={suggestion.id}>
                                 <button
                                     type="button"
                                     onClick={() => handleSelectSuggestion(suggestion)}
-                                    className={`w-full px-4 py-3 flex items-start gap-3 hover:bg-zinc-50 transition-colors text-left ${
-                                        index === selectedIndex ? 'bg-zinc-50' : ''
+                                    className={`w-full px-3 py-2.5 flex items-start gap-3 rounded-xl transition-colors duration-150 text-left ${
+                                        index === selectedIndex
+                                            ? 'bg-zinc-100 dark:bg-zinc-800'
+                                            : 'hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80'
                                     }`}
                                 >
                                     <MapPin className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getPlaceTypeIcon(suggestion.place_type)}`} />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-zinc-900 truncate">
+                                        <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">
                                             {suggestion.place_name.split(',')[0]}
                                         </p>
-                                        <p className="text-xs text-zinc-500 truncate">
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
                                             {suggestion.place_name.split(',').slice(1).join(',').trim()}
                                         </p>
                                     </div>

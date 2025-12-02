@@ -211,7 +211,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
     if (!token) {
         return (
-            <div className="w-full h-full rounded-xl overflow-hidden border shadow-lg relative bg-zinc-100 flex items-center justify-center">
+            <div className="w-full h-full rounded-xl overflow-hidden border shadow-lg relative bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
                 <div className="bg-destructive/10 text-destructive p-4 rounded-lg text-center">
                     <p className="font-bold">Mapbox Token Missing</p>
                     <p className="text-sm">Please add NEXT_PUBLIC_MAPBOX_TOKEN to your .env file</p>
@@ -244,13 +244,13 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     >
                         <div className="relative cursor-pointer group/marker">
                             {/* Pin body with price - Softer corners to match card aesthetic */}
-                            <div className="bg-zinc-900 text-white px-3 py-1.5 rounded-xl shadow-lg group-hover/marker:bg-zinc-800 group-hover/marker:scale-105 transition-all duration-200 font-semibold text-sm whitespace-nowrap relative">
+                            <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-3 py-1.5 rounded-xl shadow-lg group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200 group-hover/marker:scale-105 transition-all duration-200 font-semibold text-sm whitespace-nowrap relative">
                                 ${position.listing.price}
                             </div>
                             {/* Pin tail/pointer - Properly styled triangle */}
-                            <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] border-t-zinc-900 group-hover/marker:border-t-zinc-800 transition-colors"></div>
+                            <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200 transition-colors"></div>
                             {/* Shadow under the pin for depth */}
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-black/20 rounded-full blur-[2px]"></div>
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-black/20 dark:bg-black/40 rounded-full blur-[2px]"></div>
                         </div>
                     </Marker>
                 ))}
@@ -262,20 +262,20 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         anchor="top"
                         onClose={() => setSelectedListing(null)}
                         closeOnClick={false}
-                        className="z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:shadow-lg [&_.mapboxgl-popup-content]:border [&_.mapboxgl-popup-content]:border-zinc-100 [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-tip]:border-t-white"
+                        className="z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:shadow-lg [&_.mapboxgl-popup-content]:border [&_.mapboxgl-popup-content]:border-zinc-100 dark:[&_.mapboxgl-popup-content]:border-zinc-700 [&_.mapboxgl-popup-content]:bg-white dark:[&_.mapboxgl-popup-content]:bg-zinc-900 [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-tip]:border-t-white dark:[&_.mapboxgl-popup-tip]:border-t-zinc-900"
                     >
                         <div className="p-3 min-w-[220px]">
-                            <h3 className="font-semibold text-[15px] text-zinc-900 mb-0.5 line-clamp-1">{selectedListing.title}</h3>
-                            <p className="text-zinc-500 text-[13px] mb-3">
-                                <span className="font-semibold text-zinc-900">${selectedListing.price}</span>/month
+                            <h3 className="font-semibold text-[15px] text-zinc-900 dark:text-white mb-0.5 line-clamp-1">{selectedListing.title}</h3>
+                            <p className="text-zinc-500 dark:text-zinc-400 text-[13px] mb-3">
+                                <span className="font-semibold text-zinc-900 dark:text-white">${selectedListing.price}</span>/month
                             </p>
                             <div className="flex gap-2">
                                 <Link href={`/listings/${selectedListing.id}`} className="flex-1">
-                                    <Button size="sm" className="w-full h-8 text-[13px] rounded-lg bg-zinc-900 hover:bg-zinc-800">View</Button>
+                                    <Button size="sm" className="w-full h-8 text-[13px] rounded-lg">View</Button>
                                 </Link>
                                 {selectedListing.ownerId && (
                                     <Link href={`/messages?userId=${selectedListing.ownerId}`} className="flex-1">
-                                        <Button size="sm" variant="outline" className="w-full h-8 text-[13px] rounded-lg border-zinc-200 hover:bg-zinc-50">Message</Button>
+                                        <Button size="sm" variant="outline" className="w-full h-8 text-[13px] rounded-lg">Message</Button>
                                     </Link>
                                 )}
                             </div>
@@ -285,15 +285,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             </Map>
 
             {/* Search as I move toggle - Consistent rounded-xl radius with soft shadow */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white px-4 py-2.5 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] border border-zinc-100 flex items-center gap-2.5 z-10 transition-opacity duration-200">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white dark:bg-zinc-900 px-4 py-2.5 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] border border-zinc-100 dark:border-zinc-800 flex items-center gap-2.5 z-10 transition-opacity duration-200">
                 <input
                     type="checkbox"
                     id="searchAsMove"
                     checked={searchAsMove}
                     onChange={(e) => setSearchAsMove(e.target.checked)}
-                    className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 focus:ring-offset-0"
+                    className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white bg-white dark:bg-zinc-800 focus:ring-zinc-900 dark:focus:ring-zinc-400 focus:ring-offset-0"
                 />
-                <label htmlFor="searchAsMove" className="text-[13px] font-medium text-zinc-700 cursor-pointer select-none">
+                <label htmlFor="searchAsMove" className="text-[13px] font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
                     Search as I move the map
                 </label>
             </div>

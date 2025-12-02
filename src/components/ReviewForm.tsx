@@ -66,8 +66,8 @@ export default function ReviewForm({ listingId, targetUserId, onSuccess }: Revie
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 bg-zinc-50 p-6 rounded-xl border border-zinc-100">
-            <h3 className="font-semibold text-lg">Write a Review</h3>
+        <form onSubmit={handleSubmit} className="space-y-4 bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
+            <h3 className="font-semibold text-lg text-zinc-900 dark:text-white">Write a Review</h3>
 
             <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -84,7 +84,7 @@ export default function ReviewForm({ listingId, targetUserId, onSuccess }: Revie
                                 "w-6 h-6",
                                 (hoveredRating ? star <= hoveredRating : star <= rating)
                                     ? "fill-yellow-400 text-yellow-400"
-                                    : "text-zinc-300"
+                                    : "text-zinc-300 dark:text-zinc-600"
                             )}
                         />
                     </button>
@@ -95,11 +95,11 @@ export default function ReviewForm({ listingId, targetUserId, onSuccess }: Revie
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Share your experience..."
-                className="w-full min-h-[100px] p-3 rounded-lg border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-zinc-900 resize-y bg-white"
+                className="w-full min-h-[100px] p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white/20 resize-y bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                 disabled={isSubmitting}
             />
 
-            {error && <p className="text-red-500 text-sm">{error}</p>}
+            {error && <p className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
 
             <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Submitting...' : 'Post Review'}

@@ -56,10 +56,10 @@ export default function ReviewResponseForm({
     };
 
     return (
-        <form onSubmit={handleSubmit} className="mt-4 p-4 bg-zinc-50 rounded-xl">
+        <form onSubmit={handleSubmit} className="mt-4 p-4 bg-zinc-50 dark:bg-zinc-800 rounded-xl">
             <div className="flex items-center gap-2 mb-3">
-                <MessageSquare className="w-4 h-4 text-zinc-500" />
-                <span className="text-sm font-medium text-zinc-700">
+                <MessageSquare className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     {isEditing ? 'Edit your response' : 'Respond to this review'}
                 </span>
             </div>
@@ -69,11 +69,11 @@ export default function ReviewResponseForm({
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Write a thoughtful response..."
                 rows={3}
-                className="w-full px-4 py-3 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10 resize-none text-sm"
+                className="w-full px-4 py-3 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 resize-none text-sm bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
             />
 
             {error && (
-                <p className="text-sm text-red-600 mt-2">{error}</p>
+                <p className="text-sm text-red-600 dark:text-red-400 mt-2">{error}</p>
             )}
 
             <div className="flex items-center justify-end gap-2 mt-3">
@@ -81,7 +81,7 @@ export default function ReviewResponseForm({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+                        className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                     >
                         Cancel
                     </button>
@@ -89,7 +89,7 @@ export default function ReviewResponseForm({
                 <button
                     type="submit"
                     disabled={isSubmitting || !content.trim()}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-lg text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                     {isSubmitting ? (
                         <>

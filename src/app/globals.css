@@ -1,103 +1,108 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* Minimal Premium Design System - Inspired by RoomShare Reference */
 
-:root {
-  /* Zinc-based Neutral Palette */
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
+@layer base {
+  :root {
+    /* Zinc-based Neutral Palette */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
 
-  /* Primary - Zinc Dark */
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
+    /* Primary - Zinc Dark */
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
 
-  /* Secondary - Zinc Light */
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
+    /* Secondary - Zinc Light */
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
 
-  /* Muted - Zinc Subtle */
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
+    /* Muted - Zinc Subtle */
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
 
-  /* Accent - Indigo (for highlights) */
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --accent-indigo: 239 84% 67%;
+    /* Accent - Indigo (for highlights) */
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --accent-indigo: 239 84% 67%;
 
-  --destructive: 0 84.2% 60.2%;
-  --ring: 240 5% 64.9%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
+    --destructive: 0 84.2% 60.2%;
+    --ring: 240 5% 64.9%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
 
-  color-scheme: light;
-}
+    /* Design System - Border Radius */
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-full: 9999px;
 
-.dark {
-  /* Dark mode palette */
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 7%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 7%;
-  --popover-foreground: 0 0% 98%;
+    /* Design System - Shadows */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.12);
 
-  /* Primary - Zinc Light for dark mode */
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
+    /* Design System - Transitions */
+    --transition-fast: 150ms ease;
+    --transition-base: 200ms ease;
+    --transition-slow: 300ms ease;
 
-  /* Secondary */
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
+    color-scheme: light;
+  }
 
-  /* Muted */
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
+  .dark {
+    /* Dark mode palette */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 7%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 7%;
+    --popover-foreground: 0 0% 98%;
 
-  /* Accent */
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --accent-indigo: 239 84% 67%;
+    /* Primary - Zinc Light for dark mode */
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
 
-  --destructive: 0 62.8% 30.6%;
-  --ring: 240 4.9% 83.9%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
+    /* Secondary */
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
 
-  color-scheme: dark;
-}
+    /* Muted */
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
 
-:root {
-  /* Design System - Border Radius */
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-full: 9999px;
+    /* Accent */
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --accent-indigo: 239 84% 67%;
 
-  /* Design System - Shadows */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.12);
+    --destructive: 0 62.8% 30.6%;
+    --ring: 240 4.9% 83.9%;
+  }
 
-  /* Design System - Transitions */
-  --transition-fast: 150ms ease;
-  --transition-base: 200ms ease;
-  --transition-slow: 300ms ease;
-}
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
 
-body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-feature-settings: 'rlig' 1, 'calt' 1;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  @apply font-sans;
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    /* Prevent Radix UI scroll lock from shifting content */
+    padding-right: 0 !important;
+  }
 }
 
 /* Keyframe Animations */
@@ -253,36 +258,6 @@ body {
   background-image: radial-gradient(#3f3f46 1px, transparent 1px);
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.15);
-  border-radius: 10px;
-  transition: background 0.2s ease;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.3);
-}
-
-/* Hide Scrollbar Utility */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
 /* Text Balance */
 .text-balance {
   text-wrap: balance;
@@ -294,10 +269,16 @@ body {
   color: hsl(var(--primary-foreground));
 }
 
-/* Focus Visible Styles */
-:focus-visible {
+/* Focus Visible Styles - Only for interactive elements that need visible focus */
+:focus-visible:not(input):not(textarea) {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
+}
+
+/* Custom focus for inputs - handled by component classes */
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
 }
 
 /* Container Utilities - Responsive padding for all screen sizes */
@@ -410,4 +391,16 @@ input:autofill {
 
 .dark input:autofill {
   background-color: hsl(240 10% 7%) !important;
+}
+
+/* Global Scrollbar Hiding */
+/* Hide scrollbar for Chrome, Safari and Opera */
+*::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+* {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }

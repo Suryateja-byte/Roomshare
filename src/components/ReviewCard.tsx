@@ -47,7 +47,7 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
     };
 
     return (
-        <div className="border-b border-zinc-100 last:border-0 py-6 first:pt-0 last:pb-0">
+        <div className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 py-6 first:pt-0 last:pb-0">
             {/* Review Header */}
             <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -57,10 +57,10 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
                         size="md"
                     />
                     <div>
-                        <p className="font-semibold text-zinc-900">
+                        <p className="font-semibold text-zinc-900 dark:text-white">
                             {review.author.name || 'Anonymous'}
                         </p>
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
                             {new Date(review.createdAt).toLocaleDateString('en-US', {
                                 month: 'long',
                                 year: 'numeric'
@@ -76,7 +76,7 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
                             key={star}
                             className={`w-4 h-4 ${star <= review.rating
                                     ? 'text-amber-400 fill-amber-400'
-                                    : 'text-zinc-200'
+                                    : 'text-zinc-200 dark:text-zinc-600'
                                 }`}
                         />
                     ))}
@@ -84,22 +84,22 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
             </div>
 
             {/* Review Content */}
-            <p className="mt-4 text-zinc-600 leading-relaxed">
+            <p className="mt-4 text-zinc-600 dark:text-zinc-300 leading-relaxed">
                 {review.comment}
             </p>
 
             {/* Response Section */}
             {review.response && !isEditingResponse && (
-                <div className="mt-4 pl-4 border-l-2 border-zinc-200">
+                <div className="mt-4 pl-4 border-l-2 border-zinc-200 dark:border-zinc-700">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <p className="text-sm font-semibold text-zinc-700 mb-1">
+                            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                                 Host Response
                             </p>
-                            <p className="text-sm text-zinc-600">
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400">
                                 {review.response.content}
                             </p>
-                            <p className="text-xs text-zinc-400 mt-2">
+                            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
                                 {new Date(review.response.createdAt).toLocaleDateString()}
                             </p>
                         </div>
@@ -108,7 +108,7 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
                             <div className="flex items-center gap-1">
                                 <button
                                     onClick={() => setIsEditingResponse(true)}
-                                    className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+                                    className="p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                                     title="Edit response"
                                 >
                                     <Edit2 className="w-4 h-4" />
@@ -116,7 +116,7 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
                                 <button
                                     onClick={handleDeleteResponse}
                                     disabled={isDeleting}
-                                    className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                    className="p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                                     title="Delete response"
                                 >
                                     <Trash2 className="w-4 h-4" />
@@ -131,7 +131,7 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
             {isOwner && !review.response && !showResponseForm && (
                 <button
                     onClick={() => setShowResponseForm(true)}
-                    className="mt-4 inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-700 transition-colors"
+                    className="mt-4 inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
                 >
                     <MessageSquare className="w-4 h-4" />
                     Respond to this review

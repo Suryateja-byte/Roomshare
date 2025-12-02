@@ -2,6 +2,13 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SortOption } from '@/lib/data';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 const sortOptions: { value: SortOption; label: string }[] = [
     { value: 'recommended', label: 'Recommended' },
@@ -31,20 +38,30 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         router.push(`/search?${params.toString()}`);
     };
 
+    const currentLabel = sortOptions.find(opt => opt.value === currentSort)?.label || 'Recommended';
+
     return (
-        <div className="hidden md:flex items-center gap-2 text-xs font-medium text-zinc-500">
+        <div className="hidden md:flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
             <span>Sort by:</span>
-            <select
-                value={currentSort}
-                onChange={(e) => handleSortChange(e.target.value)}
-                className="bg-transparent border-none outline-none text-zinc-900 font-semibold cursor-pointer hover:text-zinc-700 focus:ring-0"
-            >
-                {sortOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                        {option.label}
-                    </option>
-                ))}
-            </select>
+            {/* FIX APPLIED: modal={false} 
+               This prevents Radix from setting document.body.style.overflow = 'hidden'
+               which causes the layout shift/shake.
+            */}
+            {/* @ts-ignore - modal prop exists on Select but TS might not pick it up correctly */}
+            <Select value={currentSort} onValueChange={handleSortChange} modal={false}>
+                <SelectTrigger className="h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 px-3 py-1.5 text-zinc-900 dark:text-white font-semibold text-xs focus:ring-0">
+                    <SelectValue placeholder="Recommended">
+                        {currentLabel}
+                    </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                    {sortOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
         </div>
     );
 }

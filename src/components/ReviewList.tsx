@@ -16,7 +16,7 @@ interface Review {
 export default function ReviewList({ reviews }: { reviews: Review[] }) {
     if (reviews.length === 0) {
         return (
-            <div className="text-center py-8 text-zinc-500">
+            <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
                 No reviews yet. Be the first to leave one!
             </div>
         );
@@ -25,13 +25,13 @@ export default function ReviewList({ reviews }: { reviews: Review[] }) {
     return (
         <div className="space-y-6">
             {reviews.map((review) => (
-                <div key={review.id} className="border-b border-zinc-100 pb-6 last:border-0">
+                <div key={review.id} className="border-b border-zinc-100 dark:border-zinc-800 pb-6 last:border-0">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
                             <UserAvatar image={review.author.image} name={review.author.name} size="md" />
                             <div>
-                                <h4 className="font-medium text-zinc-900">{review.author.name || 'Anonymous'}</h4>
-                                <p className="text-xs text-zinc-500">
+                                <h4 className="font-medium text-zinc-900 dark:text-white">{review.author.name || 'Anonymous'}</h4>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
                                     {new Date(review.createdAt).toLocaleDateString(undefined, {
                                         year: 'numeric',
                                         month: 'long',
@@ -46,13 +46,13 @@ export default function ReviewList({ reviews }: { reviews: Review[] }) {
                                     key={star}
                                     className={cn(
                                         "w-4 h-4",
-                                        star <= review.rating ? "fill-yellow-400 text-yellow-400" : "text-zinc-200"
+                                        star <= review.rating ? "fill-yellow-400 text-yellow-400" : "text-zinc-200 dark:text-zinc-600"
                                     )}
                                 />
                             ))}
                         </div>
                     </div>
-                    <p className="text-zinc-600 leading-relaxed pl-[52px]">
+                    <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed pl-[52px]">
                         {review.comment}
                     </p>
                 </div>

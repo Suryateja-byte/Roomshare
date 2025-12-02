@@ -31,10 +31,10 @@ const MONTHS = [
 ];
 
 const statusColors = {
-    PENDING: 'bg-amber-100 text-amber-700 border-amber-200',
-    ACCEPTED: 'bg-green-100 text-green-700 border-green-200',
-    REJECTED: 'bg-red-100 text-red-700 border-red-200',
-    CANCELLED: 'bg-zinc-100 text-zinc-500 border-zinc-200',
+    PENDING: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    ACCEPTED: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
+    REJECTED: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
+    CANCELLED: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700',
 };
 
 export default function BookingCalendar({ bookings, onBookingClick }: BookingCalendarProps) {
@@ -104,16 +104,16 @@ export default function BookingCalendar({ bookings, onBookingClick }: BookingCal
         : [];
 
     return (
-        <div className="bg-white rounded-2xl border border-zinc-100 overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-semibold text-zinc-900">
+                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
                         {MONTHS[month]} {year}
                     </h2>
                     <button
                         onClick={goToToday}
-                        className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+                        className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                     >
                         Today
                     </button>
@@ -121,15 +121,15 @@ export default function BookingCalendar({ bookings, onBookingClick }: BookingCal
                 <div className="flex items-center gap-2">
                     <button
                         onClick={goToPreviousMonth}
-                        className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
+                        className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                     >
-                        <ChevronLeft className="w-5 h-5 text-zinc-600" />
+                        <ChevronLeft className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                     </button>
                     <button
                         onClick={goToNextMonth}
-                        className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
+                        className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                     >
-                        <ChevronRight className="w-5 h-5 text-zinc-600" />
+                        <ChevronRight className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                     </button>
                 </div>
             </div>
@@ -142,7 +142,7 @@ export default function BookingCalendar({ bookings, onBookingClick }: BookingCal
                         {DAYS.map(day => (
                             <div
                                 key={day}
-                                className="text-center text-xs font-medium text-zinc-500 py-2"
+                                className="text-center text-xs font-medium text-zinc-500 dark:text-zinc-400 py-2"
                             >
                                 {day}
                             </div>
@@ -168,8 +168,8 @@ export default function BookingCalendar({ bookings, onBookingClick }: BookingCal
                                 <button
                                     key={day}
                                     onClick={() => setSelectedDate(new Date(year, month, day))}
-                                    className={`aspect-square p-1 rounded-lg relative transition-all ${isToday(day) ? 'ring-2 ring-zinc-900' : ''
-                                        } ${isSelected ? 'bg-zinc-900 text-white' : 'hover:bg-zinc-50'
+                                    className={`aspect-square p-1 rounded-lg relative transition-all text-zinc-900 dark:text-white ${isToday(day) ? 'ring-2 ring-zinc-900 dark:ring-white' : ''
+                                        } ${isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
                                         }`}
                                 >
                                     <span className={`text-sm ${isSelected ? 'font-semibold' : ''}`}>
@@ -193,12 +193,12 @@ export default function BookingCalendar({ bookings, onBookingClick }: BookingCal
                     </div>
 
                     {/* Legend */}
-                    <div className="flex items-center gap-4 mt-4 pt-4 border-t border-zinc-100">
-                        <div className="flex items-center gap-2 text-xs text-zinc-500">
+                    <div className="flex items-center gap-4 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                        <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                             <span className="w-2 h-2 rounded-full bg-amber-400" />
                             Pending
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-zinc-500">
+                        <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                             <span className="w-2 h-2 rounded-full bg-green-500" />
                             Accepted
                         </div>
@@ -206,10 +206,10 @@ export default function BookingCalendar({ bookings, onBookingClick }: BookingCal
                 </div>
 
                 {/* Selected Date Details */}
-                <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-zinc-100 p-4">
+                <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-zinc-100 dark:border-zinc-800 p-4">
                     {selectedDate ? (
                         <>
-                            <h3 className="font-semibold text-zinc-900 mb-4">
+                            <h3 className="font-semibold text-zinc-900 dark:text-white mb-4">
                                 {selectedDate.toLocaleDateString('en-US', {
                                     weekday: 'long',
                                     month: 'long',
@@ -218,7 +218,7 @@ export default function BookingCalendar({ bookings, onBookingClick }: BookingCal
                             </h3>
 
                             {selectedDateBookings.length === 0 ? (
-                                <p className="text-sm text-zinc-500">No bookings on this day</p>
+                                <p className="text-sm text-zinc-500 dark:text-zinc-400">No bookings on this day</p>
                             ) : (
                                 <div className="space-y-3">
                                     {selectedDateBookings.map(booking => (
@@ -248,7 +248,7 @@ export default function BookingCalendar({ bookings, onBookingClick }: BookingCal
                         </>
                     ) : (
                         <div className="text-center py-8">
-                            <p className="text-sm text-zinc-500">
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400">
                                 Select a date to view bookings
                             </p>
                         </div>

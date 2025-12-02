@@ -31,23 +31,23 @@ export default function ProfileCompletionModal({
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6">
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-1 text-zinc-400 hover:text-zinc-600 transition-colors"
+                    className="absolute top-4 right-4 p-1 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
                 >
                     <X className="w-5 h-5" />
                 </button>
 
                 <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 bg-amber-100 rounded-full">
-                        <AlertCircle className="w-6 h-6 text-amber-600" />
+                    <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                        <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-semibold text-zinc-900">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
                             Complete Your Profile
                         </h2>
-                        <p className="text-sm text-zinc-500">
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">
                             {action} requires {required}% profile completion
                         </p>
                     </div>
@@ -56,10 +56,10 @@ export default function ProfileCompletionModal({
                 {/* Progress */}
                 <div className="mb-6">
                     <div className="flex justify-between text-sm mb-2">
-                        <span className="text-zinc-600">Current progress</span>
-                        <span className="font-medium text-zinc-900">{percentage}%</span>
+                        <span className="text-zinc-600 dark:text-zinc-400">Current progress</span>
+                        <span className="font-medium text-zinc-900 dark:text-white">{percentage}%</span>
                     </div>
-                    <div className="w-full bg-zinc-200 rounded-full h-2">
+                    <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-2">
                         <div
                             className={`h-2 rounded-full transition-all ${
                                 percentage >= required ? 'bg-green-500' : 'bg-amber-500'
@@ -67,21 +67,21 @@ export default function ProfileCompletionModal({
                             style={{ width: `${percentage}%` }}
                         />
                     </div>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                         You need {required - percentage}% more to {action.toLowerCase()}
                     </p>
                 </div>
 
                 {/* Missing items */}
                 <div className="mb-6">
-                    <h3 className="text-sm font-medium text-zinc-700 mb-3">
+                    <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
                         What's missing:
                     </h3>
                     <ul className="space-y-2">
                         {missing.map((item, index) => (
                             <li
                                 key={index}
-                                className="flex items-center gap-2 text-sm text-zinc-600"
+                                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"
                             >
                                 <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
                                 {item}
@@ -94,13 +94,13 @@ export default function ProfileCompletionModal({
                 <div className="flex gap-3">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-4 py-2.5 border border-zinc-200 text-zinc-700 rounded-lg font-medium hover:bg-zinc-50 transition-colors"
+                        className="flex-1 px-4 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                     >
                         Cancel
                     </button>
                     <Link
                         href="/profile/edit"
-                        className="flex-1 px-4 py-2.5 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 px-4 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2"
                     >
                         Complete Profile
                         <ChevronRight className="w-4 h-4" />

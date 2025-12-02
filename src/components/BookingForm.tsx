@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { createBooking } from '@/app/actions/booking';
 import { useRouter } from 'next/navigation';
-import { Calendar } from 'lucide-react';
 
 interface BookingFormProps {
     listingId: string;
@@ -50,11 +50,11 @@ export default function BookingForm({ listingId, price, ownerId, isOwner }: Book
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg border border-zinc-100 p-6 sticky top-24">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-lg border border-zinc-100 dark:border-zinc-800 p-6 sticky top-24">
             <div className="flex justify-between items-end mb-6">
                 <div>
-                    <span className="text-3xl font-bold text-zinc-900">${price}</span>
-                    <span className="text-zinc-500"> / month</span>
+                    <span className="text-3xl font-bold text-zinc-900 dark:text-white">${price}</span>
+                    <span className="text-zinc-500 dark:text-zinc-400"> / month</span>
                 </div>
                 <div className="flex items-center gap-1 text-sm font-medium text-green-600">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -65,23 +65,23 @@ export default function BookingForm({ listingId, price, ownerId, isOwner }: Book
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-zinc-500 uppercase">Check-in</label>
-                        <input
-                            type="date"
+                        <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase">Check-in</label>
+                        <DatePicker
                             value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full p-2 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-                            min={new Date().toISOString().split('T')[0]}
+                            onChange={setStartDate}
+                            placeholder="Start date"
+                            minDate={new Date().toISOString().split('T')[0]}
+                            className="p-2 text-sm"
                         />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-zinc-500 uppercase">Check-out</label>
-                        <input
-                            type="date"
+                        <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase">Check-out</label>
+                        <DatePicker
                             value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full p-2 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-                            min={startDate || new Date().toISOString().split('T')[0]}
+                            onChange={setEndDate}
+                            placeholder="End date"
+                            minDate={startDate || new Date().toISOString().split('T')[0]}
+                            className="p-2 text-sm"
                         />
                     </div>
                 </div>
@@ -100,21 +100,21 @@ export default function BookingForm({ listingId, price, ownerId, isOwner }: Book
                     </p>
                 )}
 
-                <p className="text-center text-xs text-zinc-500">
+                <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
                     You won't be charged yet
                 </p>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-zinc-100 space-y-3">
-                <div className="flex justify-between text-zinc-500">
+            <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+                <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
                     <span>Monthly rent</span>
                     <span>${price}</span>
                 </div>
-                <div className="flex justify-between text-zinc-500">
+                <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
                     <span>Service fee</span>
                     <span>$0</span>
                 </div>
-                <div className="flex justify-between font-bold text-lg pt-3 border-t border-zinc-100 mt-3">
+                <div className="flex justify-between font-bold text-lg pt-3 border-t border-zinc-100 dark:border-zinc-800 mt-3 text-zinc-900 dark:text-white">
                     <span>Total</span>
                     <span>${price}</span>
                 </div>

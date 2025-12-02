@@ -5,6 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
+import { DatePicker } from '@/components/ui/date-picker';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -229,13 +237,13 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         <div className={`w-full mx-auto ${isCompact ? 'max-w-2xl' : 'max-w-4xl'}`}>
             <form
                 onSubmit={handleSearch}
-                className={`group relative flex flex-col md:flex-row md:items-center bg-white rounded-2xl sm:rounded-[2rem] md:rounded-full shadow-[0_2px_12px_rgb(0,0,0,0.08)] border border-zinc-200 hover:border-zinc-300 hover:shadow-[0_4px_20px_rgb(0,0,0,0.12)] transition-all duration-200 w-full ${isCompact ? 'p-1' : 'p-1.5 md:p-2 md:pr-2'}`}
+                className={`group relative flex flex-col md:flex-row md:items-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] md:rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] border border-zinc-200/80 dark:border-zinc-700/80 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-[0_4px_20px_rgba(0,0,0,0.1),0_16px_48px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.3),0_16px_48px_rgba(0,0,0,0.2)] transition-all duration-300 w-full ${isCompact ? 'p-1' : 'p-1.5 md:p-2 md:pr-2'}`}
                 role="search"
             >
                 {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
                 <div className={`w-full md:flex-1 flex flex-col ${isCompact ? 'px-4 py-2' : 'px-5 sm:px-6 py-3 md:py-2'}`}>
                     {!isCompact && (
-                        <span className="text-[10px] font-bold text-zinc-900 uppercase tracking-wider mb-1">
+                        <span className="text-[10px] font-bold text-[#0f172a] dark:text-white uppercase tracking-wider mb-1">
                             Where
                         </span>
                     )}
@@ -253,18 +261,18 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
                 {/* Divider - Taller for better segmentation */}
                 <div className="hidden md:flex items-center self-stretch" aria-hidden="true">
-                    <div className="w-px h-10 bg-zinc-200"></div>
+                    <div className="w-px h-10 bg-zinc-200 dark:bg-zinc-700"></div>
                 </div>
-                <div className="md:hidden w-[calc(100%-2rem)] mx-auto h-px bg-zinc-100" aria-hidden="true"></div>
+                <div className="md:hidden w-[calc(100%-2rem)] mx-auto h-px bg-zinc-100 dark:bg-zinc-800" aria-hidden="true"></div>
 
                 {/* Price Range Input - Airbnb-style stacked layout */}
                 <div className={`w-full md:flex-1 flex flex-col ${isCompact ? 'px-4 py-2' : 'px-5 sm:px-6 py-3 md:py-2'}`}>
                     {!isCompact && (
-                        <label className="text-[10px] font-bold text-zinc-900 uppercase tracking-wider mb-1">
+                        <label className="text-[10px] font-bold text-[#0f172a] dark:text-white uppercase tracking-wider mb-1">
                             Budget
                         </label>
                     )}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 px-2 py-1 -mx-2 -my-1 rounded-lg transition-colors focus-within:bg-zinc-100/50 dark:focus-within:bg-zinc-800/50">
                         <input
                             id="search-budget-min"
                             type="number"
@@ -273,12 +281,12 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             value={minPrice}
                             onChange={(e) => setMinPrice(e.target.value)}
                             placeholder="Min"
-                            className={`w-full bg-transparent border-none p-0 text-zinc-900 placeholder:text-zinc-500 focus:ring-0 focus:outline-none ${isCompact ? 'text-sm' : 'text-sm'}`}
+                            className={`w-full bg-transparent border-none p-0 text-[#0f172a] dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
                             min="0"
                             step="50"
                             aria-label="Minimum budget"
                         />
-                        <span className="text-zinc-400 text-sm">-</span>
+                        <span className="text-zinc-300 dark:text-zinc-600 text-sm">-</span>
                         <input
                             id="search-budget-max"
                             type="number"
@@ -287,7 +295,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             value={maxPrice}
                             onChange={(e) => setMaxPrice(e.target.value)}
                             placeholder="Max"
-                            className={`w-full bg-transparent border-none p-0 text-zinc-900 placeholder:text-zinc-500 focus:ring-0 focus:outline-none ${isCompact ? 'text-sm' : 'text-sm'}`}
+                            className={`w-full bg-transparent border-none p-0 text-[#0f172a] dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
                             min="0"
                             step="50"
                             aria-label="Maximum budget"
@@ -300,12 +308,12 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 {!isCompact && (
                     <>
                         <div className="hidden md:flex items-center self-stretch" aria-hidden="true">
-                            <div className="w-px h-10 bg-zinc-200"></div>
+                            <div className="w-px h-10 bg-zinc-200 dark:bg-zinc-700"></div>
                         </div>
                         <button
                             type="button"
                             onClick={() => setShowFilters(!showFilters)}
-                            className={`hidden sm:flex items-center px-4 py-2 text-sm font-medium rounded-full border transition-colors touch-target ${showFilters ? 'bg-zinc-100 text-zinc-900 border-zinc-200' : 'text-zinc-600 border-transparent hover:bg-zinc-50 hover:border-zinc-100'}`}
+                            className={`hidden sm:flex items-center px-4 py-2 text-sm font-medium rounded-full border transition-colors touch-target ${showFilters ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-zinc-200 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-100 dark:hover:border-zinc-700'}`}
                             aria-expanded={showFilters}
                             aria-controls="search-filters"
                         >
@@ -340,7 +348,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
             {/* Location warning when user hasn't selected from dropdown */}
             {showLocationWarning && !isCompact && (
-                <div className="mt-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2">
+                <div className="mt-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2">
                     <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
@@ -354,7 +362,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             {showFilters && (
                 <div
                     id="search-filters"
-                    className="mt-3 sm:mt-4 p-4 sm:p-6 bg-white rounded-2xl sm:rounded-3xl shadow-xl border border-zinc-100 animate-in fade-in slide-in-from-top-4"
+                    className="mt-3 sm:mt-4 p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl shadow-xl dark:shadow-2xl border border-zinc-100 dark:border-zinc-800 animate-in fade-in slide-in-from-top-4"
                 >
                     {/* Clear All Button - only show when filters are active */}
                     {hasActiveFilters && (
@@ -362,7 +370,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             <button
                                 type="button"
                                 onClick={handleClearAllFilters}
-                                className="text-sm font-medium text-zinc-500 hover:text-zinc-900 underline underline-offset-2 transition-colors"
+                                className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white underline underline-offset-2 transition-colors"
                             >
                                 Clear all filters
                             </button>
@@ -372,53 +380,52 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                     {/* Move-in Date */}
                     <div className="space-y-2">
-                        <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 ">Move-in Date</label>
-                        <input
+                        <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">Move-in Date</label>
+                        <DatePicker
                             id="filter-move-in"
-                            type="date"
                             value={moveInDate}
-                            onChange={(e) => setMoveInDate(e.target.value)}
-                            min={new Date().toISOString().split('T')[0]} // Prevent past dates
-                            className="w-full p-2.5 sm:p-3 rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-sm touch-target"
+                            onChange={setMoveInDate}
+                            placeholder="Select move-in date"
+                            minDate={new Date().toISOString().split('T')[0]}
                         />
                     </div>
 
                     {/* Lease Duration */}
                     <div className="space-y-2">
-                        <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 ">Lease Duration</label>
-                        <select
-                            id="filter-lease"
-                            value={leaseDuration}
-                            onChange={(e) => setLeaseDuration(e.target.value)}
-                            className="w-full p-2.5 sm:p-3 rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-sm touch-target"
-                        >
-                            <option value="">Any</option>
-                            <option value="Month-to-month">Month-to-month</option>
-                            <option value="6 months">6 months</option>
-                            <option value="1 year">1 year</option>
-                            <option value="1 year+">1 year+</option>
-                        </select>
+                        <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 dark:text-white">Lease Duration</label>
+                        <Select value={leaseDuration} onValueChange={setLeaseDuration}>
+                            <SelectTrigger id="filter-lease">
+                                <SelectValue placeholder="Any" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="any">Any</SelectItem>
+                                <SelectItem value="Month-to-month">Month-to-month</SelectItem>
+                                <SelectItem value="6 months">6 months</SelectItem>
+                                <SelectItem value="1 year">1 year</SelectItem>
+                                <SelectItem value="1 year+">1 year+</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {/* Room Type */}
                     <div className="space-y-2 sm:col-span-2 md:col-span-1">
-                        <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 ">Room Type</label>
-                        <select
-                            id="filter-room-type"
-                            value={roomType}
-                            onChange={(e) => setRoomType(e.target.value)}
-                            className="w-full p-2.5 sm:p-3 rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-sm touch-target"
-                        >
-                            <option value="">Any</option>
-                            <option value="Private Room">Private Room</option>
-                            <option value="Shared Room">Shared Room</option>
-                            <option value="Entire Place">Entire Place</option>
-                        </select>
+                        <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 dark:text-white">Room Type</label>
+                        <Select value={roomType} onValueChange={setRoomType}>
+                            <SelectTrigger id="filter-room-type">
+                                <SelectValue placeholder="Any" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="any">Any</SelectItem>
+                                <SelectItem value="Private Room">Private Room</SelectItem>
+                                <SelectItem value="Shared Room">Shared Room</SelectItem>
+                                <SelectItem value="Entire Place">Entire Place</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {/* Amenities */}
                     <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
-                        <legend className="text-sm font-semibold text-zinc-900 ">Amenities</legend>
+                        <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
                         <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
                             {['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'].map(amenity => (
                                 <button
@@ -426,9 +433,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                     type="button"
                                     onClick={() => toggleAmenity(amenity)}
                                     aria-pressed={amenities.includes(amenity)}
-                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 ${amenities.includes(amenity)
-                                        ? 'bg-zinc-900 text-white border-zinc-900 '
-                                        : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400 '
+                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${amenities.includes(amenity)
+                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
+                                        : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
                                         }`}
                                 >
                                     {amenity}
@@ -439,7 +446,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
                     {/* House Rules */}
                     <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
-                        <legend className="text-sm font-semibold text-zinc-900 ">House Rules</legend>
+                        <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
                         <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
                             {['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'].map(rule => (
                                 <button
@@ -447,9 +454,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                     type="button"
                                     onClick={() => toggleHouseRule(rule)}
                                     aria-pressed={houseRules.includes(rule)}
-                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 ${houseRules.includes(rule)
-                                        ? 'bg-zinc-900 text-white border-zinc-900 '
-                                        : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400 '
+                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${houseRules.includes(rule)
+                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
+                                        : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
                                         }`}
                                 >
                                     {rule}
@@ -460,7 +467,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
                     {/* Languages */}
                     <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
-                        <legend className="text-sm font-semibold text-zinc-900">Languages Spoken</legend>
+                        <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Languages Spoken</legend>
                         <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
                             {LANGUAGES.map(lang => (
                                 <button
@@ -468,9 +475,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                     type="button"
                                     onClick={() => toggleLanguage(lang)}
                                     aria-pressed={languages.includes(lang)}
-                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 ${languages.includes(lang)
-                                        ? 'bg-zinc-900 text-white border-zinc-900 '
-                                        : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400 '
+                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${languages.includes(lang)
+                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
+                                        : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
                                         }`}
                                 >
                                     {lang}
@@ -481,34 +488,34 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
                     {/* Gender Preferences */}
                     <div className="space-y-2">
-                        <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900">Gender Preference</label>
-                        <select
-                            id="filter-gender-pref"
-                            value={genderPreference}
-                            onChange={(e) => setGenderPreference(e.target.value)}
-                            className="w-full p-2.5 sm:p-3 rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-sm touch-target"
-                        >
-                            <option value="">Any</option>
-                            <option value="MALE_ONLY">Male Identifying Only</option>
-                            <option value="FEMALE_ONLY">Female Identifying Only</option>
-                            <option value="NO_PREFERENCE">Any Gender / All Welcome</option>
-                        </select>
+                        <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900 dark:text-white">Gender Preference</label>
+                        <Select value={genderPreference} onValueChange={setGenderPreference}>
+                            <SelectTrigger id="filter-gender-pref">
+                                <SelectValue placeholder="Any" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="any">Any</SelectItem>
+                                <SelectItem value="MALE_ONLY">Male Identifying Only</SelectItem>
+                                <SelectItem value="FEMALE_ONLY">Female Identifying Only</SelectItem>
+                                <SelectItem value="NO_PREFERENCE">Any Gender / All Welcome</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {/* Household Gender */}
                     <div className="space-y-2">
-                        <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900">Household Gender</label>
-                        <select
-                            id="filter-household-gender"
-                            value={householdGender}
-                            onChange={(e) => setHouseholdGender(e.target.value)}
-                            className="w-full p-2.5 sm:p-3 rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-sm touch-target"
-                        >
-                            <option value="">Any</option>
-                            <option value="ALL_MALE">All Male</option>
-                            <option value="ALL_FEMALE">All Female</option>
-                            <option value="MIXED">Mixed (Co-ed)</option>
-                        </select>
+                        <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900 dark:text-white">Household Gender</label>
+                        <Select value={householdGender} onValueChange={setHouseholdGender}>
+                            <SelectTrigger id="filter-household-gender">
+                                <SelectValue placeholder="Any" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="any">Any</SelectItem>
+                                <SelectItem value="ALL_MALE">All Male</SelectItem>
+                                <SelectItem value="ALL_FEMALE">All Female</SelectItem>
+                                <SelectItem value="MIXED">Mixed (Co-ed)</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     </div>
                 </div>
