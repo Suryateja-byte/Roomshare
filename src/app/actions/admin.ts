@@ -4,12 +4,13 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { ListingStatus, ReportStatus } from '@prisma/client';
+import { logAdminAction } from '@/lib/audit';
 
 // Helper to check admin status
 async function requireAdmin() {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized', isAdmin: false, userId: null };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED', isAdmin: false, userId: null };
     }
 
     const user = await prisma.user.findUnique({
@@ -18,10 +19,10 @@ async function requireAdmin() {
     });
 
     if (!user?.isAdmin) {
-        return { error: 'Unauthorized', isAdmin: false, userId: session.user.id };
+        return { error: 'Unauthorized', code: 'NOT_ADMIN', isAdmin: false, userId: session.user.id };
     }
 
-    return { error: null, isAdmin: true, userId: session.user.id };
+    return { error: null, code: null, isAdmin: true, userId: session.user.id };
 }
 
 // ==================== USER MANAGEMENT ====================
@@ -113,7 +114,7 @@ export async function toggleUserAdmin(userId: string) {
     try {
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { isAdmin: true }
+            select: { isAdmin: true, name: true, email: true }
         });
 
         if (!user) {
@@ -123,6 +124,20 @@ export async function toggleUserAdmin(userId: string) {
         await prisma.user.update({
             where: { id: userId },
             data: { isAdmin: !user.isAdmin }
+        });
+
+        // Audit log
+        await logAdminAction({
+            adminId: adminCheck.userId!,
+            action: user.isAdmin ? 'ADMIN_REVOKED' : 'ADMIN_GRANTED',
+            targetType: 'User',
+            targetId: userId,
+            details: {
+                previousState: user.isAdmin,
+                newState: !user.isAdmin,
+                userName: user.name,
+                userEmail: user.email
+            }
         });
 
         revalidatePath('/admin/users');
@@ -145,9 +160,32 @@ export async function suspendUser(userId: string, suspend: boolean) {
     }
 
     try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { isSuspended: true, name: true, email: true }
+        });
+
+        if (!user) {
+            return { error: 'User not found' };
+        }
+
         await prisma.user.update({
             where: { id: userId },
             data: { isSuspended: suspend }
+        });
+
+        // Audit log
+        await logAdminAction({
+            adminId: adminCheck.userId!,
+            action: suspend ? 'USER_SUSPENDED' : 'USER_UNSUSPENDED',
+            targetType: 'User',
+            targetId: userId,
+            details: {
+                previousState: user.isSuspended,
+                newState: suspend,
+                userName: user.name,
+                userEmail: user.email
+            }
         });
 
         revalidatePath('/admin/users');
@@ -246,9 +284,32 @@ export async function updateListingStatus(listingId: string, status: ListingStat
     }
 
     try {
+        const listing = await prisma.listing.findUnique({
+            where: { id: listingId },
+            select: { status: true, title: true, ownerId: true }
+        });
+
+        if (!listing) {
+            return { error: 'Listing not found' };
+        }
+
         await prisma.listing.update({
             where: { id: listingId },
             data: { status }
+        });
+
+        // Audit log
+        await logAdminAction({
+            adminId: adminCheck.userId!,
+            action: status === 'PAUSED' ? 'LISTING_HIDDEN' : 'LISTING_RESTORED',
+            targetType: 'Listing',
+            targetId: listingId,
+            details: {
+                previousStatus: listing.status,
+                newStatus: status,
+                listingTitle: listing.title,
+                ownerId: listing.ownerId
+            }
         });
 
         revalidatePath('/admin/listings');
@@ -266,12 +327,82 @@ export async function deleteListing(listingId: string) {
     }
 
     try {
-        await prisma.listing.delete({
-            where: { id: listingId }
+        // Get listing info before deletion for audit
+        const listing = await prisma.listing.findUnique({
+            where: { id: listingId },
+            select: { title: true, ownerId: true, status: true }
+        });
+
+        if (!listing) {
+            return { error: 'Listing not found' };
+        }
+
+        // Check for active ACCEPTED bookings - block deletion if any exist
+        const activeAcceptedBookings = await prisma.booking.count({
+            where: {
+                listingId,
+                status: 'ACCEPTED',
+                endDate: { gte: new Date() }
+            }
+        });
+
+        if (activeAcceptedBookings > 0) {
+            return {
+                error: 'Cannot delete listing with active bookings',
+                message: `This listing has ${activeAcceptedBookings} active booking(s). The owner must cancel them first.`,
+                activeBookings: activeAcceptedBookings
+            };
+        }
+
+        // Get all pending bookings to notify tenants before deletion
+        const pendingBookings = await prisma.booking.findMany({
+            where: {
+                listingId,
+                status: 'PENDING'
+            },
+            select: {
+                id: true,
+                tenantId: true
+            }
+        });
+
+        // Create notifications for tenants with pending bookings
+        const notificationPromises = pendingBookings.map(booking =>
+            prisma.notification.create({
+                data: {
+                    userId: booking.tenantId,
+                    type: 'BOOKING_CANCELLED',
+                    title: 'Booking Request Cancelled',
+                    message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
+                    link: '/bookings'
+                }
+            })
+        );
+
+        // Delete listing and send notifications in transaction
+        await prisma.$transaction([
+            ...notificationPromises,
+            prisma.listing.delete({
+                where: { id: listingId }
+            })
+        ]);
+
+        // Audit log
+        await logAdminAction({
+            adminId: adminCheck.userId!,
+            action: 'LISTING_DELETED',
+            targetType: 'Listing',
+            targetId: listingId,
+            details: {
+                listingTitle: listing.title,
+                ownerId: listing.ownerId,
+                previousStatus: listing.status,
+                pendingBookingsNotified: pendingBookings.length
+            }
         });
 
         revalidatePath('/admin/listings');
-        return { success: true };
+        return { success: true, notifiedTenants: pendingBookings.length };
     } catch (error) {
         console.error('Error deleting listing:', error);
         return { error: 'Failed to delete listing' };
@@ -358,6 +489,15 @@ export async function resolveReport(
     }
 
     try {
+        const report = await prisma.report.findUnique({
+            where: { id: reportId },
+            select: { status: true, reason: true, listingId: true, reporterId: true }
+        });
+
+        if (!report) {
+            return { error: 'Report not found' };
+        }
+
         await prisma.report.update({
             where: { id: reportId },
             data: {
@@ -365,6 +505,22 @@ export async function resolveReport(
                 adminNotes: notes,
                 reviewedBy: adminCheck.userId,
                 resolvedAt: new Date()
+            }
+        });
+
+        // Audit log
+        await logAdminAction({
+            adminId: adminCheck.userId!,
+            action: action === 'RESOLVED' ? 'REPORT_RESOLVED' : 'REPORT_DISMISSED',
+            targetType: 'Report',
+            targetId: reportId,
+            details: {
+                previousStatus: report.status,
+                newStatus: action,
+                reason: report.reason,
+                listingId: report.listingId,
+                reporterId: report.reporterId,
+                adminNotes: notes
             }
         });
 
@@ -385,14 +541,52 @@ export async function resolveReportAndRemoveListing(reportId: string, notes?: st
     try {
         const report = await prisma.report.findUnique({
             where: { id: reportId },
-            select: { listingId: true }
+            select: {
+                listingId: true,
+                reason: true,
+                reporterId: true,
+                status: true
+            }
         });
 
         if (!report) {
             return { error: 'Report not found' };
         }
 
-        // Update report and delete listing in transaction
+        // Get listing info before deletion
+        const listing = await prisma.listing.findUnique({
+            where: { id: report.listingId },
+            select: { title: true, ownerId: true }
+        });
+
+        // Get affected bookings to notify tenants BEFORE deletion
+        const affectedBookings = await prisma.booking.findMany({
+            where: {
+                listingId: report.listingId,
+                status: { in: ['PENDING', 'ACCEPTED'] },
+                endDate: { gte: new Date() }
+            },
+            select: {
+                id: true,
+                tenantId: true,
+                status: true
+            }
+        });
+
+        // Create notifications for affected tenants
+        const notificationPromises = affectedBookings.map(booking =>
+            prisma.notification.create({
+                data: {
+                    userId: booking.tenantId,
+                    type: 'BOOKING_CANCELLED',
+                    title: 'Booking Cancelled - Listing Removed',
+                    message: `Your booking for "${listing?.title || 'a listing'}" has been cancelled because the listing was removed due to a policy violation.`,
+                    link: '/bookings'
+                }
+            })
+        );
+
+        // Update report, delete listing, and create notifications in transaction
         await prisma.$transaction([
             prisma.report.update({
                 where: { id: reportId },
@@ -405,12 +599,47 @@ export async function resolveReportAndRemoveListing(reportId: string, notes?: st
             }),
             prisma.listing.delete({
                 where: { id: report.listingId }
-            })
+            }),
+            ...notificationPromises
         ]);
+
+
+        // Audit log for report resolution
+        await logAdminAction({
+            adminId: adminCheck.userId!,
+            action: 'REPORT_RESOLVED',
+            targetType: 'Report',
+            targetId: reportId,
+            details: {
+                previousStatus: report.status,
+                newStatus: 'RESOLVED',
+                reason: report.reason,
+                listingId: report.listingId,
+                reporterId: report.reporterId,
+                adminNotes: notes || 'Listing removed due to policy violation',
+                listingRemoved: true,
+                affectedBookings: affectedBookings.length
+            }
+        });
+
+        // Audit log for listing deletion
+        await logAdminAction({
+            adminId: adminCheck.userId!,
+            action: 'LISTING_DELETED',
+            targetType: 'Listing',
+            targetId: report.listingId,
+            details: {
+                listingTitle: listing?.title,
+                ownerId: listing?.ownerId,
+                deletedDueToReport: reportId,
+                adminNotes: notes || 'Listing removed due to policy violation',
+                affectedBookings: affectedBookings.length
+            }
+        });
 
         revalidatePath('/admin/reports');
         revalidatePath('/admin/listings');
-        return { success: true };
+        return { success: true, affectedBookings: affectedBookings.length };
     } catch (error) {
         console.error('Error resolving report with listing removal:', error);
         return { error: 'Failed to resolve report' };

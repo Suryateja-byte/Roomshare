@@ -12,9 +12,11 @@ import BookingForm from '@/components/BookingForm';
 import ReportButton from '@/components/ReportButton';
 import UserAvatar from '@/components/UserAvatar';
 import RoomPlaceholder from '@/components/listings/RoomPlaceholder';
+import ImageGallery from '@/components/ImageGallery';
 import ListingStatusToggle from '@/components/ListingStatusToggle';
 import ShareListingButton from '@/components/ShareListingButton';
 import SaveListingButton from '@/components/SaveListingButton';
+import ListingFreshnessCheck from '@/components/ListingFreshnessCheck';
 import { getReviews } from '@/lib/data';
 import { trackListingView } from '@/app/actions/listing-status';
 import { Metadata } from 'next';
@@ -75,30 +77,16 @@ export default async function ListingPage({ params }: PageProps) {
 
     // Use actual listing images or fallback to placeholder
     const hasImages = listing.images && listing.images.length > 0;
-    const mainImage = hasImages ? listing.images[0] : null;
-    const galleryImages = hasImages && listing.images.length > 1 ? listing.images.slice(1, 5) : [];
 
     return (
         <div className="min-h-screen bg-background pb-20">
+            {/* Real-time freshness check for non-owners */}
+            {!isOwner && <ListingFreshnessCheck listingId={listing.id} />}
+
             {/* Hero Gallery */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
                 {hasImages ? (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[400px] md:h-[500px] rounded-3xl overflow-hidden">
-                        <div className="md:col-span-2 h-full relative group">
-                            <img src={mainImage ?? undefined} alt={listing.title} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-                        </div>
-                        {galleryImages.length > 0 && (
-                            <div className="hidden md:grid grid-cols-2 gap-4 col-span-2 h-full">
-                                {galleryImages.map((img, i) => (
-                                    <div key={i} className="relative group overflow-hidden">
-                                        <img src={img} alt={`Gallery ${i}`} className="w-full h-full object-cover" />
-                                        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <ImageGallery images={listing.images} title={listing.title} />
                 ) : (
                     <RoomPlaceholder />
                 )}
@@ -253,7 +241,7 @@ export default async function ListingPage({ params }: PageProps) {
                                         Hosted by {listing.owner.name || 'User'}
                                         {listing.owner.isVerified && <VerifiedBadge />}
                                     </h3>
-                                    <p className="text-muted-foreground text-sm">Joined {new Date().getFullYear()}</p>
+                                    <p className="text-muted-foreground text-sm">Joined {new Date(listing.owner.createdAt).getFullYear()}</p>
                                 </div>
                             </div>
                             <p className="text-muted-foreground mb-4">{listing.owner.bio || "This host hasn't added a bio yet."}</p>
@@ -285,9 +273,9 @@ export default async function ListingPage({ params }: PageProps) {
                                 <ReviewList reviews={reviews} />
                             </div>
 
-                            {!isOwner && session?.user && (
+                            {!isOwner && (
                                 <div>
-                                    <ReviewForm listingId={listing.id} />
+                                    <ReviewForm listingId={listing.id} isLoggedIn={!!session?.user} />
                                 </div>
                             )}
                         </div>
@@ -301,6 +289,8 @@ export default async function ListingPage({ params }: PageProps) {
                                 price={listing.price}
                                 ownerId={listing.ownerId}
                                 isOwner={isOwner}
+                                isLoggedIn={!!session?.user}
+                                status={listing.status}
                             />
                         </div>
                     </div>

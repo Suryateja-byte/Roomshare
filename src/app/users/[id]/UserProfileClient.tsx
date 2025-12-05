@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
     Star,
     ShieldCheck,
@@ -151,7 +152,7 @@ export default function UserProfileClient({ user, isOwnProfile, averageRating, c
 
         // We need a listing to start a conversation, so use the first listing if available
         if (user.listings.length === 0) {
-            alert('This user has no listings to contact about.');
+            toast.error('This user has no listings to contact about.');
             return;
         }
 
@@ -163,7 +164,7 @@ export default function UserProfileClient({ user, isOwnProfile, averageRating, c
             }
         } catch (error) {
             console.error('Failed to start conversation:', error);
-            alert('Failed to start conversation');
+            toast.error('Failed to start conversation');
         } finally {
             setIsContactLoading(false);
         }

@@ -15,7 +15,7 @@ export default async function NotificationsPage() {
         redirect('/login');
     }
 
-    const { notifications } = await getNotifications(50);
+    const { notifications, hasMore } = await getNotifications(20);
 
-    return <NotificationsClient initialNotifications={notifications as any} />;
+    return <NotificationsClient initialNotifications={notifications as any} initialHasMore={hasMore} />;
 }

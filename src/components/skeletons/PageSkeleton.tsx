@@ -147,3 +147,265 @@ export function ListingSkeleton() {
     </div>
   );
 }
+
+export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading listings">
+      <main className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mb-8">
+          <Skeleton variant="text" width={250} height={32} className="mb-2" />
+          <Skeleton variant="text" width={180} height={18} />
+        </div>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: count }).map((_, i) => (
+            <ListingSkeleton key={i} />
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="h-screen flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-20" aria-busy="true" aria-label="Loading search results">
+      {/* Search Header Skeleton */}
+      <header className="w-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800">
+        <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+          <Skeleton variant="rounded" height={56} className="w-full max-w-2xl mx-auto" />
+        </div>
+      </header>
+
+      {/* Results Skeleton */}
+      <div className="flex-1 overflow-auto">
+        <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-[840px] mx-auto pb-24 md:pb-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+            <div>
+              <Skeleton variant="text" width={180} height={24} className="mb-2" />
+              <Skeleton variant="text" width={220} height={16} />
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Skeleton variant="rounded" width={100} height={36} />
+              <Skeleton variant="rounded" width={120} height={36} />
+            </div>
+          </div>
+
+          {/* Listing Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
+            {Array.from({ length: count }).map((_, i) => (
+              <div key={i} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden">
+                <Skeleton variant="rectangular" className="aspect-[4/3] w-full" />
+                <div className="p-4">
+                  <div className="flex justify-between items-start gap-3 mb-1">
+                    <Skeleton variant="text" width="70%" height={18} />
+                    <Skeleton variant="text" width={40} height={16} />
+                  </div>
+                  <Skeleton variant="text" width="45%" height={14} className="mb-3" />
+                  <div className="flex gap-1.5 mb-4">
+                    <Skeleton variant="rounded" width={60} height={20} />
+                    <Skeleton variant="rounded" width={50} height={20} />
+                    <Skeleton variant="rounded" width={45} height={20} />
+                  </div>
+                  <Skeleton variant="text" width={80} height={24} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function MessageListSkeleton() {
+  return (
+    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading messages">
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-6">
+          <Skeleton variant="text" width={200} height={32} className="mb-2" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 p-4 bg-white rounded-lg border border-zinc-200">
+              <Skeleton variant="circular" width={48} height={48} />
+              <div className="flex-1 space-y-2">
+                <Skeleton variant="text" width="40%" height={18} />
+                <Skeleton variant="text" width="70%" height={14} />
+              </div>
+              <Skeleton variant="text" width={60} height={12} />
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function ChatSkeleton() {
+  return (
+    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading chat">
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden">
+          {/* Chat header */}
+          <div className="flex items-center gap-4 p-4 border-b border-zinc-200">
+            <Skeleton variant="circular" width={40} height={40} />
+            <div className="space-y-1">
+              <Skeleton variant="text" width={150} height={18} />
+              <Skeleton variant="text" width={100} height={12} />
+            </div>
+          </div>
+          {/* Messages */}
+          <div className="p-4 space-y-4 h-96">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+                <Skeleton variant="rounded" width={200 + (i % 3) * 50} height={40} />
+              </div>
+            ))}
+          </div>
+          {/* Input */}
+          <div className="p-4 border-t border-zinc-200">
+            <Skeleton variant="rounded" height={44} />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function AdminTableSkeleton() {
+  return (
+    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading admin data">
+      <main className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mb-6 flex items-center justify-between">
+          <Skeleton variant="text" width={200} height={32} />
+          <Skeleton variant="rounded" width={120} height={40} />
+        </div>
+        <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden">
+          {/* Table header */}
+          <div className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-200 bg-zinc-50">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} variant="text" width="80%" height={14} />
+            ))}
+          </div>
+          {/* Table rows */}
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-100">
+              {Array.from({ length: 5 }).map((_, j) => (
+                <Skeleton key={j} variant="text" width={`${60 + (j * 10)}%`} height={16} />
+              ))}
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function BookingsSkeleton() {
+  return (
+    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading bookings">
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-6">
+          <Skeleton variant="text" width={180} height={32} className="mb-2" />
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex gap-4 p-4 bg-white rounded-lg border border-zinc-200">
+              <Skeleton variant="rounded" width={120} height={80} />
+              <div className="flex-1 space-y-2">
+                <Skeleton variant="text" width="60%" height={20} />
+                <Skeleton variant="text" width="40%" height={14} />
+                <Skeleton variant="text" width="30%" height={14} />
+              </div>
+              <div className="text-right space-y-2">
+                <Skeleton variant="text" width={80} height={20} />
+                <Skeleton variant="rounded" width={100} height={32} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function SettingsSkeleton() {
+  return (
+    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading settings">
+      <main className="mx-auto max-w-2xl px-4 py-8">
+        <div className="mb-8">
+          <Skeleton variant="text" width={150} height={32} />
+        </div>
+        <div className="space-y-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <section key={i} className="bg-white rounded-lg border border-zinc-200 p-6">
+              <Skeleton variant="text" width={140} height={20} className="mb-4" />
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, j) => (
+                  <div key={j} className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Skeleton variant="text" width={120} height={16} />
+                      <Skeleton variant="text" width={200} height={12} />
+                    </div>
+                    <Skeleton variant="rounded" width={44} height={24} />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function SavedSearchesSkeleton() {
+  return (
+    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading saved searches">
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-6">
+          <Skeleton variant="text" width={200} height={32} className="mb-2" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between p-4 bg-white rounded-lg border border-zinc-200">
+              <div className="space-y-2">
+                <Skeleton variant="text" width={180} height={18} />
+                <Skeleton variant="text" width={250} height={14} />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton variant="rounded" width={80} height={32} />
+                <Skeleton variant="circular" width={32} height={32} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function NotificationsSkeleton() {
+  return (
+    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading notifications">
+      <main className="mx-auto max-w-2xl px-4 py-8">
+        <div className="mb-6">
+          <Skeleton variant="text" width={180} height={32} />
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="flex items-start gap-3 p-4 bg-white rounded-lg border border-zinc-200">
+              <Skeleton variant="circular" width={40} height={40} />
+              <div className="flex-1 space-y-2">
+                <Skeleton variant="text" width="80%" height={16} />
+                <Skeleton variant="text" width="60%" height={14} />
+              </div>
+              <Skeleton variant="text" width={50} height={12} />
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}

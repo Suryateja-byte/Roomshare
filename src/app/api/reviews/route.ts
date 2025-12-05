@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { createNotification } from '@/app/actions/notifications';
-import { sendNotificationEmail } from '@/lib/email';
+import { sendNotificationEmailWithPreference } from '@/lib/email';
 
 export async function POST(request: Request) {
     try {
@@ -20,6 +20,48 @@ export async function POST(request: Request) {
 
         if (!listingId && !targetUserId) {
             return NextResponse.json({ error: 'Must specify listingId or targetUserId' }, { status: 400 });
+        }
+
+        // Rating validation: must be integer between 1-5
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+            return NextResponse.json(
+                { error: 'Rating must be an integer between 1 and 5' },
+                { status: 400 }
+            );
+        }
+
+        // Check for existing review (duplicate prevention)
+        if (listingId) {
+            const existingReview = await prisma.review.findFirst({
+                where: {
+                    authorId: session.user.id,
+                    listingId
+                }
+            });
+
+            if (existingReview) {
+                return NextResponse.json(
+                    { error: 'You have already reviewed this listing' },
+                    { status: 409 }
+                );
+            }
+        }
+
+        // Check for existing user review (duplicate prevention)
+        if (targetUserId) {
+            const existingUserReview = await prisma.review.findFirst({
+                where: {
+                    authorId: session.user.id,
+                    targetUserId
+                }
+            });
+
+            if (existingUserReview) {
+                return NextResponse.json(
+                    { error: 'You have already reviewed this user' },
+                    { status: 409 }
+                );
+            }
         }
 
         const review = await prisma.review.create({
@@ -61,9 +103,9 @@ export async function POST(request: Request) {
                     link: `/listings/${listingId}`
                 });
 
-                // Send email
+                // Send email (respecting user preferences)
                 if (listing.owner.email) {
-                    await sendNotificationEmail('newReview', listing.owner.email, {
+                    await sendNotificationEmailWithPreference('newReview', listing.ownerId, listing.owner.email, {
                         hostName: listing.owner.name || 'Host',
                         reviewerName: review.author.name || 'A user',
                         listingTitle: listing.title,

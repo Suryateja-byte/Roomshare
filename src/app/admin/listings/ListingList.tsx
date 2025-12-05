@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { updateListingStatus, deleteListing } from '@/app/actions/admin';
 import {
     Search,
@@ -75,7 +76,7 @@ export default function ListingList({ initialListings, totalListings }: ListingL
                     )
                 );
             } else if (result.error) {
-                alert(result.error);
+                toast.error(result.error);
             }
         } catch (error) {
             console.error('Error updating status:', error);
@@ -92,7 +93,7 @@ export default function ListingList({ initialListings, totalListings }: ListingL
             if (result.success) {
                 setListings(prev => prev.filter(l => l.id !== listingId));
             } else if (result.error) {
-                alert(result.error);
+                toast.error(result.error);
             }
         } catch (error) {
             console.error('Error deleting listing:', error);

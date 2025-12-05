@@ -4,6 +4,17 @@
 // Uses Resend API for sending emails
 
 import { emailTemplates } from './email-templates';
+import { prisma } from '@/lib/prisma';
+
+// Notification preference keys that map to email types
+interface NotificationPreferences {
+    emailBookingRequests?: boolean;
+    emailBookingUpdates?: boolean;
+    emailMessages?: boolean;
+    emailReviews?: boolean;
+    emailSearchAlerts?: boolean;
+    emailMarketing?: boolean;
+}
 
 interface EmailOptions {
     to: string;
@@ -70,6 +81,61 @@ export async function sendNotificationEmail(
         });
     } catch (error) {
         console.error(`Error sending ${type} email:`, error);
+        return { success: false, error: String(error) };
+    }
+}
+
+// Map email types to user preference keys
+const emailTypeToPreferenceKey: Record<string, keyof NotificationPreferences> = {
+    bookingRequest: 'emailBookingRequests',
+    bookingAccepted: 'emailBookingUpdates',
+    bookingRejected: 'emailBookingUpdates',
+    bookingCancelled: 'emailBookingUpdates',
+    newMessage: 'emailMessages',
+    newReview: 'emailReviews',
+    searchAlert: 'emailSearchAlerts',
+    marketing: 'emailMarketing',
+};
+
+/**
+ * Send notification email while respecting user's notification preferences
+ * This wrapper checks if the user has disabled this type of email notification
+ * @param type - The email template type
+ * @param userId - The user's ID to check preferences
+ * @param email - The user's email address
+ * @param data - The template data
+ * @returns { success: boolean; skipped?: boolean; error?: string }
+ */
+export async function sendNotificationEmailWithPreference(
+    type: keyof typeof emailTemplates,
+    userId: string,
+    email: string,
+    data: Parameters<typeof emailTemplates[typeof type]>[0]
+): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
+    try {
+        // Check if this email type has a preference mapping
+        const prefKey = emailTypeToPreferenceKey[type];
+
+        if (prefKey) {
+            // Fetch user's notification preferences
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { notificationPreferences: true }
+            });
+
+            const prefs = user?.notificationPreferences as NotificationPreferences | null;
+
+            // If preference is explicitly set to false, skip sending
+            if (prefs && prefs[prefKey] === false) {
+                console.log(`[EMAIL] Skipped ${type} email to ${userId} - user preference disabled`);
+                return { success: true, skipped: true };
+            }
+        }
+
+        // Send the email
+        return await sendNotificationEmail(type, email, data);
+    } catch (error) {
+        console.error(`Error in sendNotificationEmailWithPreference for ${type}:`, error);
         return { success: false, error: String(error) };
     }
 }

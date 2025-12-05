@@ -1,12 +1,36 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { supabase, createChatChannel, broadcastTyping } from '@/lib/supabase';
 import { sendMessage, getMessages } from '@/app/actions/chat';
+import { blockUser, unblockUser } from '@/app/actions/block';
 import { useRouter } from 'next/navigation';
-import { Send, Loader2, Check, CheckCheck } from 'lucide-react';
+import { Send, Loader2, Check, CheckCheck, MoreVertical, Ban, ShieldOff, WifiOff } from 'lucide-react';
 import UserAvatar from '@/components/UserAvatar';
 import { useDebouncedCallback } from 'use-debounce';
+import { useBlockStatus } from '@/hooks/useBlockStatus';
+import { useRateLimitHandler } from '@/hooks/useRateLimitHandler';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import RateLimitCountdown from '@/components/RateLimitCountdown';
+import CharacterCounter from '@/components/CharacterCounter';
+import BlockedConversationBanner from '@/components/chat/BlockedConversationBanner';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type Message = {
@@ -21,11 +45,14 @@ type Message = {
     };
 };
 
+const MESSAGE_MAX_LENGTH = 500;
+
 interface ChatWindowProps {
     initialMessages: Message[];
     conversationId: string;
     currentUserId: string;
     currentUserName?: string;
+    otherUserId: string;
     otherUserName?: string;
     otherUserImage?: string | null;
 }
@@ -35,6 +62,7 @@ export default function ChatWindow({
     conversationId,
     currentUserId,
     currentUserName,
+    otherUserId,
     otherUserName,
     otherUserImage
 }: ChatWindowProps) {
@@ -46,6 +74,9 @@ export default function ChatWindow({
     const [otherUserTyping, setOtherUserTyping] = useState(false);
     const [isOnline, setIsOnline] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+    const [showBlockDialog, setShowBlockDialog] = useState(false);
+    const [isBlocking, setIsBlocking] = useState(false);
+    const [isUnblocking, setIsUnblocking] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const channelRef = useRef<RealtimeChannel | null>(null);
@@ -55,6 +86,52 @@ export default function ChatWindow({
         initialMessages.length > 0 ? initialMessages[initialMessages.length - 1].id : null
     );
 
+    // Block status tracking
+    const { blockStatus, isBlocked, refetch: refetchBlockStatus } = useBlockStatus(otherUserId, currentUserId);
+
+    // Rate limit handling
+    const { isRateLimited, retryAfter, handleError: handleRateLimitError, reset: resetRateLimit } = useRateLimitHandler();
+
+    // Network status tracking
+    const { isOffline } = useNetworkStatus();
+
+    // Handle blocking a user
+    const handleBlock = async () => {
+        setIsBlocking(true);
+        try {
+            const result = await blockUser(otherUserId);
+            if (result.error) {
+                toast.error(result.error);
+            } else {
+                toast.success(`${otherUserName || 'User'} has been blocked`);
+                refetchBlockStatus();
+            }
+        } catch (error) {
+            toast.error('Failed to block user');
+        } finally {
+            setIsBlocking(false);
+            setShowBlockDialog(false);
+        }
+    };
+
+    // Handle unblocking a user
+    const handleUnblock = async () => {
+        setIsUnblocking(true);
+        try {
+            const result = await unblockUser(otherUserId);
+            if (result.error) {
+                toast.error(result.error);
+            } else {
+                toast.success(`${otherUserName || 'User'} has been unblocked`);
+                refetchBlockStatus();
+            }
+        } catch (error) {
+            toast.error('Failed to unblock user');
+        } finally {
+            setIsUnblocking(false);
+        }
+    };
+
     const scrollToBottom = useCallback(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, []);
@@ -63,10 +140,40 @@ export default function ChatWindow({
         scrollToBottom();
     }, [messages, scrollToBottom]);
 
-    // Focus input on mount
+    // Warn user when navigating away during message send or with unsaved input
     useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            // Warn if sending a message
+            if (isSending) {
+                e.preventDefault();
+                e.returnValue = 'Your message is still being sent. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+
+            // Warn if there's unsent text in the input
+            if (input.trim().length > 0) {
+                e.preventDefault();
+                e.returnValue = 'You have an unsent message. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isSending, input]);
+
+    // Restore draft and focus input on mount
+    useEffect(() => {
+        // Check for saved draft from session expiry
+        const draftKey = `chat_draft_${conversationId}`;
+        const savedDraft = sessionStorage.getItem(draftKey);
+        if (savedDraft) {
+            setInput(savedDraft);
+            sessionStorage.removeItem(draftKey);
+            toast.info('Your message draft was restored');
+        }
         inputRef.current?.focus();
-    }, []);
+    }, [conversationId]);
 
     // Dispatch event when messages are read
     useEffect(() => {
@@ -240,7 +347,14 @@ export default function ChatWindow({
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isSending) return;
+
+        // Block sending when offline
+        if (isOffline) {
+            toast.error('You are offline. Please check your connection.');
+            return;
+        }
+
+        if (!input.trim() || isSending || isRateLimited) return;
 
         const content = input.trim();
         setInput('');
@@ -263,17 +377,43 @@ export default function ChatWindow({
         setMessages(prev => [...prev, optimisticMessage]);
 
         try {
-            const sentMessage = await sendMessage(conversationId, content);
+            const result = await sendMessage(conversationId, content);
+
+            // Check for session expiry or other errors
+            if (result && 'error' in result) {
+                // Remove optimistic message
+                setMessages(prev => prev.filter(m => m.id !== optimisticId));
+
+                if (result.code === 'SESSION_EXPIRED') {
+                    // Save draft before redirect
+                    sessionStorage.setItem(`chat_draft_${conversationId}`, content);
+                    toast.error('Your session has expired. Redirecting to login...');
+                    router.push(`/login?callbackUrl=/messages/${conversationId}`);
+                    return;
+                }
+
+                // Check for rate limit error
+                if (handleRateLimitError(result)) {
+                    // Restore the message to input so user doesn't lose it
+                    setInput(content);
+                    return;
+                }
+
+                // Show other errors
+                toast.error(result.error || 'Failed to send message');
+                return;
+            }
+
             // Replace optimistic message with real one
             setMessages(prev => prev.map(m =>
-                m.id === optimisticId ? { ...sentMessage, sender: m.sender } : m
+                m.id === optimisticId ? { ...result, sender: m.sender } : m
             ));
-            lastMessageIdRef.current = sentMessage.id;
+            lastMessageIdRef.current = result.id;
         } catch (error) {
             console.error('Failed to send message:', error);
             // Remove optimistic message on error
             setMessages(prev => prev.filter(m => m.id !== optimisticId));
-            alert('Failed to send message. Please try again.');
+            toast.error('Failed to send message. Please try again.');
         } finally {
             setIsSending(false);
             inputRef.current?.focus();
@@ -316,23 +456,81 @@ export default function ChatWindow({
         <div className="flex flex-col h-full bg-zinc-50 dark:bg-zinc-950">
             {/* Header */}
             <div className="px-6 py-4 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
-                <div className="relative">
+                <div className={`relative ${isBlocked ? 'opacity-50 grayscale' : ''}`}>
                     <UserAvatar
                         image={otherUserImage}
                         name={otherUserName}
                         className="w-10 h-10"
                     />
-                    {connectionStatus === 'connected' && isOnline && (
+                    {connectionStatus === 'connected' && isOnline && !isBlocked && (
                         <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-zinc-900" />
                     )}
                 </div>
-                <div>
-                    <h3 className="font-semibold text-zinc-900 dark:text-white">{otherUserName || 'Chat'}</h3>
-                    <p className={`text-xs ${otherUserTyping ? 'text-green-600 dark:text-green-400 font-medium' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                        {getStatusText()}
+                <div className="flex-1">
+                    <h3 className={`font-semibold ${isBlocked ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-900 dark:text-white'}`}>
+                        {otherUserName || 'Chat'}
+                    </h3>
+                    <p className={`text-xs ${isBlocked
+                        ? 'text-zinc-400 dark:text-zinc-500'
+                        : otherUserTyping
+                            ? 'text-green-600 dark:text-green-400 font-medium'
+                            : 'text-zinc-500 dark:text-zinc-400'
+                        }`}>
+                        {isBlocked ? (blockStatus === 'blocker' ? 'Blocked' : 'You are blocked') : getStatusText()}
                     </p>
                 </div>
+
+                {/* Block/Unblock Menu */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+                            <MoreVertical className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        {blockStatus === 'blocker' ? (
+                            <DropdownMenuItem
+                                onClick={handleUnblock}
+                                disabled={isUnblocking}
+                                className="text-zinc-700 dark:text-zinc-300"
+                            >
+                                <ShieldOff className="w-4 h-4 mr-2" />
+                                {isUnblocking ? 'Unblocking...' : 'Unblock User'}
+                            </DropdownMenuItem>
+                        ) : blockStatus !== 'blocked' && (
+                            <DropdownMenuItem
+                                onClick={() => setShowBlockDialog(true)}
+                                className="text-red-600 dark:text-red-400"
+                            >
+                                <Ban className="w-4 h-4 mr-2" />
+                                Block User
+                            </DropdownMenuItem>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
+
+            {/* Block Confirmation Dialog */}
+            <AlertDialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Block {otherUserName}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            You won't be able to message each other. They won't be notified that you blocked them.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isBlocking}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleBlock}
+                            disabled={isBlocking}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            {isBlocking ? 'Blocking...' : 'Block'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -425,31 +623,58 @@ export default function ChatWindow({
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="px-6 py-4 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
-                <form onSubmit={handleSend} className="flex items-center gap-3">
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={input}
-                        onChange={handleInputChange}
-                        placeholder="Type a message..."
-                        className="flex-1 bg-zinc-100 dark:bg-zinc-800 border-0 rounded-full px-5 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 transition-all"
-                        disabled={isSending}
-                    />
-                    <button
-                        type="submit"
-                        disabled={!input.trim() || isSending}
-                        className="w-11 h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
-                    >
-                        {isSending ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                            <Send className="w-5 h-5" />
-                        )}
-                    </button>
-                </form>
-            </div>
+            {/* Input or Blocked Banner */}
+            {isBlocked ? (
+                <BlockedConversationBanner
+                    blockStatus={blockStatus}
+                    otherUserName={otherUserName}
+                    onUnblock={blockStatus === 'blocker' ? handleUnblock : undefined}
+                    isUnblocking={isUnblocking}
+                />
+            ) : (
+                <div className="px-6 py-4 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+                    {/* Offline banner */}
+                    {isOffline && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm text-zinc-600 dark:text-zinc-400">
+                            <WifiOff className="w-4 h-4 flex-shrink-0" />
+                            <span>You&apos;re offline. Messages will send when reconnected.</span>
+                        </div>
+                    )}
+                    {/* Rate limit countdown */}
+                    {isRateLimited && (
+                        <RateLimitCountdown
+                            retryAfterSeconds={retryAfter}
+                            onRetryReady={resetRateLimit}
+                        />
+                    )}
+                    <form onSubmit={handleSend} className="flex items-center gap-3">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={input}
+                            onChange={handleInputChange}
+                            placeholder={isOffline ? "You're offline..." : "Type a message..."}
+                            maxLength={MESSAGE_MAX_LENGTH}
+                            className="flex-1 bg-zinc-100 dark:bg-zinc-800 border-0 rounded-full px-5 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 transition-all"
+                            disabled={isSending}
+                        />
+                        <button
+                            type="submit"
+                            disabled={!input.trim() || isSending || isRateLimited || isOffline}
+                            className="w-11 h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                        >
+                            {isSending ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <Send className="w-5 h-5" />
+                            )}
+                        </button>
+                    </form>
+                    {input.length > 0 && (
+                        <CharacterCounter current={input.length} max={MESSAGE_MAX_LENGTH} />
+                    )}
+                </div>
+            )}
         </div>
     );
 }

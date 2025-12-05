@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { resolveReport, resolveReportAndRemoveListing } from '@/app/actions/admin';
 import UserAvatar from '@/components/UserAvatar';
 import {
@@ -105,7 +106,7 @@ export default function ReportList({ initialReports, totalReports }: ReportListP
                 setAdminNotes('');
                 setSelectedAction(null);
             } else if (result.error) {
-                alert(result.error);
+                toast.error(result.error);
             }
         } catch (error) {
             console.error('Error processing report:', error);

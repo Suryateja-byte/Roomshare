@@ -19,13 +19,16 @@ async function getUser(email: string) {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-    adapter: PrismaAdapter(prisma),
+    adapter: PrismaAdapter(prisma) as any,
     pages: {
         signIn: '/login',
+        error: '/login', // Redirect OAuth errors to login page with error params
     },
     session: {
         strategy: "jwt",
     },
+    // Note: In NextAuth v5 (Auth.js), account linking is handled by the adapter
+    // The Prisma adapter will auto-link accounts when email matches
     callbacks: {
         async session({ session, token }) {
             if (token.sub && session.user) {
@@ -56,6 +59,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
         async signIn({ user, account, profile }) {
             if (account?.provider === "google") {
+                // Check if email is verified by Google
+                // This is important for security when allowDangerousEmailAccountLinking is enabled
+                const googleProfile = profile as { email_verified?: boolean }
+                if (!googleProfile?.email_verified) {
+                    return '/login?error=EmailNotVerified'
+                }
                 return true
             }
             return true

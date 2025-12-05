@@ -16,6 +16,23 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing listingId or reason' }, { status: 400 });
         }
 
+        // Check for existing active report (duplicate prevention)
+        // Allow re-report only if previous report was DISMISSED
+        const existingReport = await prisma.report.findFirst({
+            where: {
+                reporterId: session.user.id,
+                listingId,
+                status: { in: ['OPEN', 'RESOLVED'] } // Allow re-report if DISMISSED
+            }
+        });
+
+        if (existingReport) {
+            return NextResponse.json(
+                { error: 'You have already reported this listing. Your report is being reviewed.' },
+                { status: 409 }
+            );
+        }
+
         const report = await prisma.report.create({
             data: {
                 listingId,

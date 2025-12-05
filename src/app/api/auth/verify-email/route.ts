@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
             await prisma.verificationToken.delete({
                 where: { token }
             });
-            return NextResponse.redirect(new URL('/?error=expired_token', request.url));
+            // Redirect to dedicated expired token page for clear UX
+            return NextResponse.redirect(new URL('/verify-expired', request.url));
         }
 
         // Find the user by email (identifier)

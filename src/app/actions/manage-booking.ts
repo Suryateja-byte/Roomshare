@@ -4,14 +4,14 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { createNotification } from './notifications';
-import { sendNotificationEmail } from '@/lib/email';
+import { sendNotificationEmailWithPreference } from '@/lib/email';
 
 export type BookingStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
 
 export async function updateBookingStatus(bookingId: string, status: BookingStatus) {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized' };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
     try {
@@ -52,25 +52,66 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
             return { error: 'Only the listing owner can accept or reject bookings' };
         }
 
-        // If accepting, check if there are available slots
-        if (status === 'ACCEPTED' && booking.listing.availableSlots <= 0) {
-            return { error: 'No available slots for this listing' };
-        }
-
-        // Update booking status
-        await prisma.booking.update({
-            where: { id: bookingId },
-            data: { status }
-        });
-
-        // If accepted, decrement available slots and notify
+        // Handle ACCEPTED status with atomic transaction to prevent double-booking
         if (status === 'ACCEPTED') {
-            await prisma.listing.update({
-                where: { id: booking.listing.id },
-                data: { availableSlots: { decrement: 1 } }
-            });
+            try {
+                await prisma.$transaction(async (tx) => {
+                    // Lock the listing row with FOR UPDATE to prevent concurrent reads
+                    const [listing] = await tx.$queryRaw<Array<{ availableSlots: number; totalSlots: number; id: string }>>`
+                        SELECT "availableSlots", "totalSlots", "id" FROM "Listing"
+                        WHERE "id" = ${booking.listing.id}
+                        FOR UPDATE
+                    `;
 
-            // Notify tenant of acceptance
+                    if (listing.availableSlots <= 0) {
+                        throw new Error('NO_SLOTS_AVAILABLE');
+                    }
+
+                    // Count overlapping ACCEPTED bookings for capacity check
+                    // For multi-slot listings, we allow multiple bookings for same dates up to capacity
+                    const overlappingAcceptedCount = await tx.booking.count({
+                        where: {
+                            listingId: booking.listingId,
+                            id: { not: bookingId },
+                            status: 'ACCEPTED',
+                            AND: [
+                                { startDate: { lte: booking.endDate } },
+                                { endDate: { gte: booking.startDate } }
+                            ]
+                        }
+                    });
+
+                    // Check if accepting this booking would exceed capacity
+                    // overlappingAcceptedCount + 1 (this booking) must not exceed totalSlots
+                    if (overlappingAcceptedCount + 1 > listing.totalSlots) {
+                        throw new Error('CAPACITY_EXCEEDED');
+                    }
+
+                    // Atomically update booking status and decrement slots
+                    await tx.booking.update({
+                        where: { id: bookingId },
+                        data: { status: 'ACCEPTED' }
+                    });
+
+                    await tx.listing.update({
+                        where: { id: booking.listing.id },
+                        data: { availableSlots: { decrement: 1 } }
+                    });
+                });
+                // Transaction succeeded - continue with notifications below
+            } catch (error) {
+                if (error instanceof Error) {
+                    if (error.message === 'NO_SLOTS_AVAILABLE') {
+                        return { error: 'No available slots for this listing' };
+                    }
+                    if (error.message === 'CAPACITY_EXCEEDED') {
+                        return { error: 'Cannot accept: all slots for these dates are already booked' };
+                    }
+                }
+                throw error; // Re-throw unexpected errors
+            }
+
+            // Notify tenant of acceptance (outside transaction for performance)
             await createNotification({
                 userId: booking.tenant.id,
                 type: 'BOOKING_ACCEPTED',
@@ -79,9 +120,9 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
                 link: '/bookings'
             });
 
-            // Send email to tenant
+            // Send email to tenant (respecting preferences)
             if (booking.tenant.email) {
-                await sendNotificationEmail('bookingAccepted', booking.tenant.email, {
+                await sendNotificationEmailWithPreference('bookingAccepted', booking.tenant.id, booking.tenant.email, {
                     tenantName: booking.tenant.name || 'User',
                     listingTitle: booking.listing.title,
                     hostName: booking.listing.owner.name || 'Host',
@@ -91,8 +132,14 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
             }
         }
 
-        // If rejected, notify tenant
+        // Handle REJECTED status
         if (status === 'REJECTED') {
+            await prisma.booking.update({
+                where: { id: bookingId },
+                data: { status }
+            });
+
+            // Notify tenant of rejection
             await createNotification({
                 userId: booking.tenant.id,
                 type: 'BOOKING_REJECTED',
@@ -101,9 +148,9 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
                 link: '/bookings'
             });
 
-            // Send email to tenant
+            // Send email to tenant (respecting preferences)
             if (booking.tenant.email) {
-                await sendNotificationEmail('bookingRejected', booking.tenant.email, {
+                await sendNotificationEmailWithPreference('bookingRejected', booking.tenant.id, booking.tenant.email, {
                     tenantName: booking.tenant.name || 'User',
                     listingTitle: booking.listing.title,
                     hostName: booking.listing.owner.name || 'Host'
@@ -111,12 +158,28 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
             }
         }
 
-        // If a previously accepted booking is cancelled, increment available slots
-        if (status === 'CANCELLED' && booking.status === 'ACCEPTED') {
-            await prisma.listing.update({
-                where: { id: booking.listing.id },
-                data: { availableSlots: { increment: 1 } }
-            });
+        // Handle CANCELLED status - wrap in transaction for data integrity
+        if (status === 'CANCELLED') {
+            if (booking.status === 'ACCEPTED') {
+                // Atomically update booking and increment slots
+                await prisma.$transaction(async (tx) => {
+                    await tx.booking.update({
+                        where: { id: bookingId },
+                        data: { status: 'CANCELLED' }
+                    });
+                    await tx.listing.update({
+                        where: { id: booking.listing.id },
+                        data: { availableSlots: { increment: 1 } }
+                    });
+                });
+            } else {
+                // Just update the booking status for non-accepted bookings
+                await prisma.booking.update({
+                    where: { id: bookingId },
+                    data: { status: 'CANCELLED' }
+                });
+            }
+
 
             // Notify host of cancellation
             await createNotification({
@@ -141,7 +204,7 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
 export async function getMyBookings() {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized', bookings: [] };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED', bookings: [] };
     }
 
     try {

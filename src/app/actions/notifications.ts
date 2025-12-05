@@ -11,7 +11,8 @@ export type NotificationType =
     | 'BOOKING_CANCELLED'
     | 'NEW_MESSAGE'
     | 'NEW_REVIEW'
-    | 'LISTING_SAVED';
+    | 'LISTING_SAVED'
+    | 'SEARCH_ALERT';
 
 interface CreateNotificationInput {
     userId: string;
@@ -42,32 +43,71 @@ export async function createNotification(input: CreateNotificationInput) {
 export async function getNotifications(limit = 20) {
     const session = await auth();
     if (!session?.user?.id) {
-        return { notifications: [], unreadCount: 0 };
+        return { notifications: [], unreadCount: 0, hasMore: false };
     }
 
     try {
-        const [notifications, unreadCount] = await Promise.all([
+        const [notifications, unreadCount, totalCount] = await Promise.all([
             prisma.notification.findMany({
                 where: { userId: session.user.id },
                 orderBy: { createdAt: 'desc' },
-                take: limit
+                take: limit + 1 // Fetch one extra to check if there are more
             }),
             prisma.notification.count({
                 where: { userId: session.user.id, read: false }
+            }),
+            prisma.notification.count({
+                where: { userId: session.user.id }
             })
         ]);
 
-        return { notifications, unreadCount };
+        const hasMore = notifications.length > limit;
+        const paginatedNotifications = hasMore ? notifications.slice(0, limit) : notifications;
+
+        return {
+            notifications: paginatedNotifications,
+            unreadCount,
+            hasMore,
+            totalCount
+        };
     } catch (error) {
         console.error('Error fetching notifications:', error);
-        return { notifications: [], unreadCount: 0 };
+        return { notifications: [], unreadCount: 0, hasMore: false };
+    }
+}
+
+export async function getMoreNotifications(cursor: string, limit = 20) {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return { notifications: [], hasMore: false };
+    }
+
+    try {
+        const notifications = await prisma.notification.findMany({
+            where: { userId: session.user.id },
+            orderBy: { createdAt: 'desc' },
+            take: limit + 1,
+            cursor: { id: cursor },
+            skip: 1 // Skip the cursor item itself
+        });
+
+        const hasMore = notifications.length > limit;
+        const paginatedNotifications = hasMore ? notifications.slice(0, limit) : notifications;
+
+        return {
+            notifications: paginatedNotifications,
+            hasMore
+        };
+    } catch (error) {
+        console.error('Error fetching more notifications:', error);
+        return { notifications: [], hasMore: false };
     }
 }
 
 export async function markNotificationAsRead(notificationId: string) {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized' };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
     try {
@@ -90,7 +130,7 @@ export async function markNotificationAsRead(notificationId: string) {
 export async function markAllNotificationsAsRead() {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized' };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
     try {
@@ -110,7 +150,7 @@ export async function markAllNotificationsAsRead() {
 export async function deleteNotification(notificationId: string) {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized' };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
     try {

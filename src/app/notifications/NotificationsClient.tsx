@@ -11,15 +11,18 @@ import {
     Check,
     X,
     CheckCheck,
-    Trash2
+    Trash2,
+    Search
 } from 'lucide-react';
 import {
     markNotificationAsRead,
     markAllNotificationsAsRead,
     deleteNotification,
+    getMoreNotifications,
     NotificationType
 } from '@/app/actions/notifications';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 
 interface Notification {
     id: string;
@@ -38,7 +41,8 @@ const notificationIcons: Record<NotificationType, typeof Bell> = {
     BOOKING_CANCELLED: X,
     NEW_MESSAGE: MessageSquare,
     NEW_REVIEW: Star,
-    LISTING_SAVED: Heart
+    LISTING_SAVED: Heart,
+    SEARCH_ALERT: Search
 };
 
 const notificationColors: Record<NotificationType, string> = {
@@ -48,7 +52,8 @@ const notificationColors: Record<NotificationType, string> = {
     BOOKING_CANCELLED: 'bg-zinc-100 text-zinc-600',
     NEW_MESSAGE: 'bg-purple-100 text-purple-600',
     NEW_REVIEW: 'bg-yellow-100 text-yellow-600',
-    LISTING_SAVED: 'bg-pink-100 text-pink-600'
+    LISTING_SAVED: 'bg-pink-100 text-pink-600',
+    SEARCH_ALERT: 'bg-orange-100 text-orange-600'
 };
 
 function formatDate(date: Date) {
@@ -70,11 +75,14 @@ function formatDate(date: Date) {
 
 interface NotificationsClientProps {
     initialNotifications: Notification[];
+    initialHasMore: boolean;
 }
 
-export default function NotificationsClient({ initialNotifications }: NotificationsClientProps) {
+export default function NotificationsClient({ initialNotifications, initialHasMore }: NotificationsClientProps) {
     const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
     const [filter, setFilter] = useState<'all' | 'unread'>('all');
+    const [hasMore, setHasMore] = useState(initialHasMore);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
 
     const unreadCount = notifications.filter(n => !n.read).length;
     const filteredNotifications = filter === 'unread'
@@ -96,6 +104,20 @@ export default function NotificationsClient({ initialNotifications }: Notificati
     const handleDelete = async (notificationId: string) => {
         await deleteNotification(notificationId);
         setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    };
+
+    const handleLoadMore = async () => {
+        if (isLoadingMore || !hasMore || notifications.length === 0) return;
+
+        setIsLoadingMore(true);
+        const lastNotification = notifications[notifications.length - 1];
+        const result = await getMoreNotifications(lastNotification.id);
+
+        if (result.notifications.length > 0) {
+            setNotifications(prev => [...prev, ...result.notifications]);
+        }
+        setHasMore(result.hasMore);
+        setIsLoadingMore(false);
     };
 
     return (
@@ -216,6 +238,27 @@ export default function NotificationsClient({ initialNotifications }: Notificati
                         </div>
                     )}
                 </div>
+
+                {/* Load More Button */}
+                {hasMore && filter === 'all' && (
+                    <div className="mt-6 text-center">
+                        <Button
+                            variant="outline"
+                            onClick={handleLoadMore}
+                            disabled={isLoadingMore}
+                            className="min-w-[140px]"
+                        >
+                            {isLoadingMore ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Loading...
+                                </>
+                            ) : (
+                                'Load more'
+                            )}
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );

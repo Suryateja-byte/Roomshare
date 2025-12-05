@@ -14,6 +14,20 @@ interface SearchFilters {
     city?: string;
 }
 
+// Type for new listing data used in instant alerts
+export interface NewListingForAlert {
+    id: string;
+    title: string;
+    description: string;
+    price: number;
+    city: string;
+    state: string;
+    roomType: string | null;
+    leaseDuration: string | null;
+    amenities: string[];
+    houseRules: string[];
+}
+
 interface ProcessResult {
     processed: number;
     alertsSent: number;
@@ -193,4 +207,162 @@ function buildSearchParams(filters: SearchFilters): string {
     if (filters.houseRules) params.set('houseRules', filters.houseRules.join(','));
 
     return params.toString();
+}
+
+/**
+ * Check if a listing matches the saved search filters
+ */
+function matchesFilters(listing: NewListingForAlert, filters: SearchFilters): boolean {
+    // Price filter
+    if (filters.minPrice !== undefined && listing.price < filters.minPrice) {
+        return false;
+    }
+    if (filters.maxPrice !== undefined && listing.price > filters.maxPrice) {
+        return false;
+    }
+
+    // Location filter (city)
+    if (filters.city && !listing.city.toLowerCase().includes(filters.city.toLowerCase())) {
+        return false;
+    }
+
+    // Room type filter
+    if (filters.roomType && listing.roomType !== filters.roomType) {
+        return false;
+    }
+
+    // Lease duration filter
+    if (filters.leaseDuration && listing.leaseDuration !== filters.leaseDuration) {
+        return false;
+    }
+
+    // Amenities filter (all required amenities must be present)
+    if (filters.amenities && filters.amenities.length > 0) {
+        const hasAllAmenities = filters.amenities.every(
+            amenity => listing.amenities.some(
+                listingAmenity => listingAmenity.toLowerCase().includes(amenity.toLowerCase())
+            )
+        );
+        if (!hasAllAmenities) return false;
+    }
+
+    // House rules filter (all required rules must be present)
+    if (filters.houseRules && filters.houseRules.length > 0) {
+        const hasAllRules = filters.houseRules.every(
+            rule => listing.houseRules.some(
+                listingRule => listingRule.toLowerCase().includes(rule.toLowerCase())
+            )
+        );
+        if (!hasAllRules) return false;
+    }
+
+    // Query filter (search in title and description)
+    if (filters.query) {
+        const query = filters.query.toLowerCase();
+        const matchesTitle = listing.title.toLowerCase().includes(query);
+        const matchesDescription = listing.description.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesDescription) return false;
+    }
+
+    return true;
+}
+
+/**
+ * Trigger INSTANT alerts when a new listing is created
+ * This function runs asynchronously in the background (non-blocking)
+ * to improve scalability and user experience
+ */
+export async function triggerInstantAlerts(newListing: NewListingForAlert): Promise<{ sent: number; errors: number }> {
+    let sent = 0;
+    let errors = 0;
+
+    try {
+        // Find all saved searches with INSTANT frequency and alerts enabled
+        const instantSearches = await prisma.savedSearch.findMany({
+            where: {
+                alertEnabled: true,
+                alertFrequency: 'INSTANT'
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        notificationPreferences: true
+                    }
+                }
+            }
+        });
+
+        console.log(`[INSTANT ALERTS] Found ${instantSearches.length} instant alert subscriptions`);
+
+        for (const savedSearch of instantSearches) {
+            try {
+                // Check user notification preferences
+                const prefs = savedSearch.user.notificationPreferences as { emailSearchAlerts?: boolean } | null;
+                if (prefs?.emailSearchAlerts === false) {
+                    continue;
+                }
+
+                if (!savedSearch.user.email) {
+                    continue;
+                }
+
+                const filters = savedSearch.filters as SearchFilters;
+
+                // Check if the new listing matches this saved search
+                if (!matchesFilters(newListing, filters)) {
+                    continue;
+                }
+
+                console.log(`[INSTANT ALERTS] Listing matches search "${savedSearch.name}" for user ${savedSearch.user.id}`);
+
+                // Send email notification
+                const emailResult = await sendNotificationEmail('searchAlert', savedSearch.user.email, {
+                    userName: savedSearch.user.name || 'User',
+                    searchQuery: savedSearch.name,
+                    newListingsCount: 1,
+                    searchId: savedSearch.id
+                });
+
+                if (!emailResult.success) {
+                    console.error(`[INSTANT ALERTS] Email failed for ${savedSearch.id}: ${emailResult.error}`);
+                    errors++;
+                    continue;
+                }
+
+                // Create in-app notification
+                await prisma.notification.create({
+                    data: {
+                        userId: savedSearch.user.id,
+                        type: 'SEARCH_ALERT',
+                        title: 'New listing matches your search!',
+                        message: `"${newListing.title}" in ${newListing.city} - $${newListing.price}/mo`,
+                        link: `/listings/${newListing.id}`
+                    }
+                });
+
+                // Update lastAlertAt
+                await prisma.savedSearch.update({
+                    where: { id: savedSearch.id },
+                    data: { lastAlertAt: new Date() }
+                });
+
+                sent++;
+                console.log(`[INSTANT ALERTS] Alert sent for search "${savedSearch.name}"`);
+
+            } catch (error) {
+                console.error(`[INSTANT ALERTS] Error processing search ${savedSearch.id}:`, error);
+                errors++;
+            }
+        }
+
+    } catch (error) {
+        console.error('[INSTANT ALERTS] Fatal error:', error);
+        errors++;
+    }
+
+    console.log(`[INSTANT ALERTS] Complete: ${sent} sent, ${errors} errors`);
+    return { sent, errors };
 }

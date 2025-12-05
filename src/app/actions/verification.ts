@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { sendNotificationEmail } from '@/lib/email';
+import { logAdminAction } from '@/lib/audit';
 
 export type DocumentType = 'passport' | 'driver_license' | 'national_id';
 
@@ -13,10 +14,13 @@ interface SubmitVerificationInput {
     selfieUrl?: string;
 }
 
+// 24-hour cooldown period after rejection (balances spam prevention with UX)
+const COOLDOWN_HOURS = 24;
+
 export async function submitVerificationRequest(input: SubmitVerificationInput) {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized' };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
     try {
@@ -40,6 +44,27 @@ export async function submitVerificationRequest(input: SubmitVerificationInput) 
 
         if (user?.isVerified) {
             return { error: 'You are already verified' };
+        }
+
+        // Check for recent rejection (24-hour cooldown - balances spam prevention with UX)
+        // Per best practices: focus on clear feedback to help users succeed on retry
+        const cooldownTime = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000);
+        const recentRejection = await prisma.verificationRequest.findFirst({
+            where: {
+                userId: session.user.id,
+                status: 'REJECTED',
+                updatedAt: { gte: cooldownTime }
+            },
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        if (recentRejection) {
+            const cooldownEndTime = new Date(recentRejection.updatedAt.getTime() + COOLDOWN_HOURS * 60 * 60 * 1000);
+            const hoursRemaining = Math.ceil((cooldownEndTime.getTime() - Date.now()) / (1000 * 60 * 60));
+            return {
+                error: `Please wait ${hoursRemaining} hour${hoursRemaining !== 1 ? 's' : ''} before resubmitting. Review the rejection reason and ensure your documents are clear, well-lit, and show all corners of the ID.`,
+                cooldownRemaining: hoursRemaining
+            };
         }
 
         // Create verification request
@@ -97,14 +122,28 @@ export async function getMyVerificationStatus() {
                 userId: session.user.id,
                 status: 'REJECTED'
             },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { updatedAt: 'desc' }
         });
 
         if (rejectedRequest) {
+            // Calculate cooldown status
+            const cooldownTime = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000);
+            const isInCooldown = rejectedRequest.updatedAt >= cooldownTime;
+            let cooldownRemaining: number | undefined;
+            let canResubmitAt: Date | undefined;
+
+            if (isInCooldown) {
+                canResubmitAt = new Date(rejectedRequest.updatedAt.getTime() + COOLDOWN_HOURS * 60 * 60 * 1000);
+                cooldownRemaining = Math.ceil((canResubmitAt.getTime() - Date.now()) / (1000 * 60 * 60));
+            }
+
             return {
                 status: 'rejected' as const,
                 reason: rejectedRequest.adminNotes || 'Your verification was not approved',
-                requestId: rejectedRequest.id
+                requestId: rejectedRequest.id,
+                canResubmit: !isInCooldown,
+                cooldownRemaining,
+                canResubmitAt: canResubmitAt?.toISOString()
             };
         }
 
@@ -119,7 +158,7 @@ export async function getMyVerificationStatus() {
 export async function getPendingVerifications() {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized', requests: [] };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED', requests: [] };
     }
 
     // Check if user is admin
@@ -158,7 +197,7 @@ export async function getPendingVerifications() {
 export async function approveVerification(requestId: string) {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized' };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
     // Check if user is admin
@@ -208,6 +247,20 @@ export async function approveVerification(requestId: string) {
             });
         }
 
+        // Audit log
+        await logAdminAction({
+            adminId: session.user.id,
+            action: 'VERIFICATION_APPROVED',
+            targetType: 'VerificationRequest',
+            targetId: requestId,
+            details: {
+                userId: request.userId,
+                userName: request.user.name,
+                userEmail: request.user.email,
+                documentType: request.documentType
+            }
+        });
+
         revalidatePath('/admin/verifications');
 
         return { success: true };
@@ -220,7 +273,7 @@ export async function approveVerification(requestId: string) {
 export async function rejectVerification(requestId: string, reason: string) {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized' };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
     // Check if user is admin
@@ -235,7 +288,12 @@ export async function rejectVerification(requestId: string, reason: string) {
 
     try {
         const request = await prisma.verificationRequest.findUnique({
-            where: { id: requestId }
+            where: { id: requestId },
+            include: {
+                user: {
+                    select: { id: true, name: true, email: true }
+                }
+            }
         });
 
         if (!request) {
@@ -253,7 +311,31 @@ export async function rejectVerification(requestId: string, reason: string) {
             }
         });
 
+        // Send rejection email notification to user
+        if (request.user.email) {
+            await sendNotificationEmail('verificationRejected', request.user.email, {
+                userName: request.user.name || 'User',
+                reason: reason
+            });
+        }
+
+        // Audit log
+        await logAdminAction({
+            adminId: session.user.id,
+            action: 'VERIFICATION_REJECTED',
+            targetType: 'VerificationRequest',
+            targetId: requestId,
+            details: {
+                userId: request.userId,
+                userName: request.user.name,
+                userEmail: request.user.email,
+                documentType: request.documentType,
+                rejectionReason: reason
+            }
+        });
+
         revalidatePath('/admin/verifications');
+        revalidatePath('/verify');
 
         return { success: true };
     } catch (error) {
@@ -265,7 +347,7 @@ export async function rejectVerification(requestId: string, reason: string) {
 export async function cancelVerificationRequest() {
     const session = await auth();
     if (!session?.user?.id) {
-        return { error: 'Unauthorized' };
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
     try {

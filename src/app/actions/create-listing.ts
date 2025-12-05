@@ -5,10 +5,12 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
 import { createListingSchema } from '@/lib/schemas';
+import { triggerInstantAlerts } from '@/lib/search-alerts';
 
 export type CreateListingState = {
     success: boolean;
     error?: string;
+    code?: string;
     fields?: Record<string, string>;
     data?: any; // Using any for now to avoid circular dependency issues with Prisma types on the client if not careful, but ideally should be Listing
 };
@@ -50,7 +52,7 @@ export async function createListing(prevState: CreateListingState, formData: For
         // 2. Check authentication
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
-            return { success: false, error: 'You must be logged in to create a listing.' };
+            return { success: false, error: 'You must be logged in to create a listing.', code: 'SESSION_EXPIRED' };
         }
 
         const userId = session.user.id;
@@ -127,6 +129,22 @@ export async function createListing(prevState: CreateListingState, formData: For
         });
 
         console.log('Transaction completed successfully.');
+
+        // ASYNC: Trigger instant alerts in background - non-blocking for better UX and scalability
+        // This follows best practices: sync risks cascading failures, async improves resilience
+        triggerInstantAlerts({
+            id: listing.id,
+            title: listing.title,
+            description: listing.description,
+            price: listing.price,
+            city,
+            state,
+            roomType: null, // Not included in basic create form
+            leaseDuration: null, // Not included in basic create form
+            amenities: listing.amenities,
+            houseRules: listing.houseRules
+        }).catch(err => console.error('[INSTANT ALERTS] Failed to trigger:', err));
+
         return { success: true, data: listing };
 
     } catch (error: any) {

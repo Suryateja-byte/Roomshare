@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { startConversation } from '@/app/actions/chat';
 import { useRouter } from 'next/navigation';
 
@@ -15,9 +16,9 @@ export default function ContactHostButton({ listingId }: { listingId: string }) 
 
             if (result.error) {
                 if (result.error === 'Unauthorized') {
-                    router.push('/api/auth/signin');
+                    router.push('/login');
                 } else {
-                    alert(result.error);
+                    toast.error(result.error);
                 }
                 return;
             }
@@ -27,7 +28,7 @@ export default function ContactHostButton({ listingId }: { listingId: string }) 
             }
         } catch (error: any) {
             console.error('Failed to start conversation:', error);
-            alert('Failed to start conversation');
+            toast.error('Failed to start conversation');
         } finally {
             setIsLoading(false);
         }

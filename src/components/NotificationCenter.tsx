@@ -10,7 +10,8 @@ import {
     Heart,
     Check,
     X,
-    CheckCheck
+    CheckCheck,
+    Search
 } from 'lucide-react';
 import {
     getNotifications,
@@ -37,7 +38,8 @@ const notificationIcons: Record<NotificationType, typeof Bell> = {
     BOOKING_CANCELLED: X,
     NEW_MESSAGE: MessageSquare,
     NEW_REVIEW: Star,
-    LISTING_SAVED: Heart
+    LISTING_SAVED: Heart,
+    SEARCH_ALERT: Search
 };
 
 const notificationColors: Record<NotificationType, string> = {
@@ -47,7 +49,8 @@ const notificationColors: Record<NotificationType, string> = {
     BOOKING_CANCELLED: 'bg-zinc-100 text-zinc-600',
     NEW_MESSAGE: 'bg-purple-100 text-purple-600',
     NEW_REVIEW: 'bg-yellow-100 text-yellow-600',
-    LISTING_SAVED: 'bg-pink-100 text-pink-600'
+    LISTING_SAVED: 'bg-pink-100 text-pink-600',
+    SEARCH_ALERT: 'bg-orange-100 text-orange-600'
 };
 
 function formatTimeAgo(date: Date) {

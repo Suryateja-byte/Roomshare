@@ -18,7 +18,7 @@ export async function DELETE(
         // Check if listing exists and user is the owner
         const listing = await prisma.listing.findUnique({
             where: { id },
-            select: { ownerId: true }
+            select: { ownerId: true, title: true }
         });
 
         if (!listing) {
@@ -29,13 +29,63 @@ export async function DELETE(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // Delete associated location and listing
+        // Check for active ACCEPTED bookings - block deletion if any exist
+        const activeAcceptedBookings = await prisma.booking.count({
+            where: {
+                listingId: id,
+                status: 'ACCEPTED',
+                endDate: { gte: new Date() }
+            }
+        });
+
+        if (activeAcceptedBookings > 0) {
+            return NextResponse.json(
+                {
+                    error: 'Cannot delete listing with active bookings',
+                    message: 'You have active bookings for this listing. Please cancel them before deleting.',
+                    activeBookings: activeAcceptedBookings
+                },
+                { status: 400 }
+            );
+        }
+
+        // Get all PENDING bookings to notify tenants before deletion
+        const pendingBookings = await prisma.booking.findMany({
+            where: {
+                listingId: id,
+                status: 'PENDING'
+            },
+            select: {
+                id: true,
+                tenantId: true
+            }
+        });
+
+        // Create notifications for tenants with pending bookings
+        const notificationPromises = pendingBookings.map(booking =>
+            prisma.notification.create({
+                data: {
+                    userId: booking.tenantId,
+                    type: 'BOOKING_CANCELLED',
+                    title: 'Booking Request Cancelled',
+                    message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
+                    link: '/bookings'
+                }
+            })
+        );
+
+        // Delete listing and create notifications in transaction
+        // Location and bookings will be cascade deleted automatically
         await prisma.$transaction([
+            ...notificationPromises,
             prisma.location.deleteMany({ where: { listingId: id } }),
             prisma.listing.delete({ where: { id } })
         ]);
 
-        return NextResponse.json({ success: true }, { status: 200 });
+        return NextResponse.json({
+            success: true,
+            notifiedTenants: pendingBookings.length
+        }, { status: 200 });
     } catch (error) {
         console.error('Error deleting listing:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

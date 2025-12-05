@@ -14,9 +14,11 @@ import {
     User,
     Home,
     DollarSign,
-    List
+    List,
+    Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { updateBookingStatus, BookingStatus } from '@/app/actions/manage-booking';
 import UserAvatar from '@/components/UserAvatar';
 import BookingCalendar from '@/components/BookingCalendar';
@@ -107,13 +109,15 @@ function BookingCard({
     type: 'sent' | 'received';
     onStatusUpdate: (bookingId: string, status: BookingStatus) => Promise<void>;
 }) {
-    const [isUpdating, setIsUpdating] = useState(false);
+    const [updatingStatus, setUpdatingStatus] = useState<BookingStatus | null>(null);
 
     const handleStatusUpdate = async (status: BookingStatus) => {
-        setIsUpdating(true);
+        setUpdatingStatus(status);
         await onStatusUpdate(booking.id, status);
-        setIsUpdating(false);
+        setUpdatingStatus(null);
     };
+
+    const isUpdating = updatingStatus !== null;
 
     const locationText = booking.listing.location
         ? `${booking.listing.location.city}, ${booking.listing.location.state}`
@@ -210,7 +214,14 @@ function BookingCard({
                                     disabled={isUpdating}
                                     className="flex-1"
                                 >
-                                    {isUpdating ? 'Updating...' : 'Accept'}
+                                    {updatingStatus === 'ACCEPTED' ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Accepting...
+                                        </>
+                                    ) : (
+                                        'Accept'
+                                    )}
                                 </Button>
                                 <Button
                                     onClick={() => handleStatusUpdate('REJECTED')}
@@ -218,7 +229,14 @@ function BookingCard({
                                     variant="outline"
                                     className="flex-1"
                                 >
-                                    {isUpdating ? 'Updating...' : 'Reject'}
+                                    {updatingStatus === 'REJECTED' ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Rejecting...
+                                        </>
+                                    ) : (
+                                        'Reject'
+                                    )}
                                 </Button>
                             </>
                         )}
@@ -229,7 +247,14 @@ function BookingCard({
                                 variant="destructive"
                                 className="flex-1"
                             >
-                                {isUpdating ? 'Cancelling...' : 'Cancel Booking'}
+                                {updatingStatus === 'CANCELLED' ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Cancelling...
+                                    </>
+                                ) : (
+                                    'Cancel Booking'
+                                )}
                             </Button>
                         )}
                     </div>
@@ -252,7 +277,7 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
         const result = await updateBookingStatus(bookingId, status);
 
         if (result.error) {
-            alert(result.error);
+            toast.error(result.error);
             return;
         }
 
@@ -346,6 +371,10 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
 
                 {/* Calendar View for Received Bookings */}
                 {activeTab === 'received' && viewMode === 'calendar' && (
+                    <div
+                        key="calendar"
+                        className="animate-in fade-in slide-in-from-bottom-2 duration-200"
+                    >
                     <BookingCalendar
                         bookings={bookings.received.map(b => ({
                             id: b.id,
@@ -363,11 +392,15 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                             }
                         }))}
                     />
+                    </div>
                 )}
 
                 {/* List View */}
                 {(activeTab === 'sent' || viewMode === 'list') && (
-                    <>
+                    <div
+                        key={activeTab}
+                        className="animate-in fade-in slide-in-from-bottom-2 duration-200"
+                    >
                         {currentBookings.length === 0 ? (
                             <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-12 text-center">
                                 <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -406,7 +439,7 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                                 ))}
                             </div>
                         )}
-                    </>
+                    </div>
                 )}
             </div>
         </div>

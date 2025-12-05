@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { approveVerification, rejectVerification } from '@/app/actions/verification';
 import UserAvatar from '@/components/UserAvatar';
 import {
@@ -83,7 +84,7 @@ export default function VerificationList({ initialRequests }: VerificationListPr
 
     const handleReject = async (requestId: string) => {
         if (!rejectReason.trim()) {
-            alert('Please provide a reason for rejection');
+            toast.warning('Please provide a reason for rejection');
             return;
         }
 

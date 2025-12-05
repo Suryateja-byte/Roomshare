@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
+import { toast } from 'sonner';
 import { Bell, Lock, Trash2, Loader2, Check, AlertTriangle, ShieldOff, Ban } from 'lucide-react';
 import {
     NotificationPreferences,
@@ -11,6 +12,7 @@ import {
     deleteAccount
 } from '@/app/actions/settings';
 import { unblockUser } from '@/app/actions/block';
+import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 
 interface BlockedUserInfo {
     id: string;
@@ -69,7 +71,10 @@ export default function SettingsClient({
         setSaving(false);
         if (result.success) {
             setSaveSuccess(true);
+            toast.success('Preferences saved');
             setTimeout(() => setSaveSuccess(false), 3000);
+        } else {
+            toast.error('Failed to save preferences');
         }
     };
 
@@ -113,7 +118,7 @@ export default function SettingsClient({
             await signOut({ callbackUrl: '/' });
         } else {
             setDeleting(false);
-            alert(result.error || 'Failed to delete account');
+            toast.error(result.error || 'Failed to delete account');
         }
     };
 
@@ -164,14 +169,12 @@ export default function SettingsClient({
                             </div>
                             <button
                                 onClick={() => handleToggle(option.key)}
-                                className={`relative w-11 h-6 rounded-full transition-colors ${
-                                    preferences[option.key] ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-600'
-                                }`}
+                                className={`relative w-11 h-6 rounded-full transition-colors ${preferences[option.key] ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-600'
+                                    }`}
                             >
                                 <span
-                                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                                        preferences[option.key] ? 'translate-x-5' : 'translate-x-0'
-                                    }`}
+                                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${preferences[option.key] ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
                                 />
                             </button>
                         </div>
@@ -232,6 +235,7 @@ export default function SettingsClient({
                                 required
                                 minLength={6}
                             />
+                            <PasswordStrengthMeter password={newPassword} className="mt-2" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">

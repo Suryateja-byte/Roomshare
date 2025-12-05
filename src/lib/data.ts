@@ -61,12 +61,12 @@ export interface PaginatedResult<T> {
 }
 
 // Constants for query validation
-const MIN_QUERY_LENGTH = 2;
-const MAX_QUERY_LENGTH = 200;
+export const MIN_QUERY_LENGTH = 2;
+export const MAX_QUERY_LENGTH = 200;
 
 // Helper function to sanitize search query and escape special characters
 // Supports international characters (unicode) while escaping SQL-dangerous chars
-function sanitizeSearchQuery(query: string): string {
+export function sanitizeSearchQuery(query: string): string {
     if (!query) return '';
 
     // Trim and limit length first
@@ -91,14 +91,14 @@ function sanitizeSearchQuery(query: string): string {
 }
 
 // Validate query meets minimum requirements
-function isValidQuery(query: string): boolean {
+export function isValidQuery(query: string): boolean {
     const sanitized = sanitizeSearchQuery(query);
     return sanitized.length >= MIN_QUERY_LENGTH;
 }
 
 // Check if coordinates are valid (not NULL, not zero, within valid range)
 // lat=0, lng=0 is in the Gulf of Guinea and not a valid address
-function hasValidCoordinates(lat: number | null | undefined, lng: number | null | undefined): boolean {
+export function hasValidCoordinates(lat: number | null | undefined, lng: number | null | undefined): boolean {
     if (lat === null || lat === undefined || lng === null || lng === undefined) {
         return false;
     }
@@ -111,6 +111,216 @@ function hasValidCoordinates(lat: number | null | undefined, lng: number | null 
         return false;
     }
     return true;
+}
+
+// Extended listing type with computed fields for filtering/sorting
+export interface ListingWithMetadata extends ListingData {
+    createdAt: Date;
+    viewCount: number;
+    avgRating: number;
+    reviewCount: number;
+}
+
+// ============================================
+// Pure filter functions for testability
+// ============================================
+
+// Filter by price range
+export function filterByPrice<T extends { price: number }>(
+    listings: T[],
+    minPrice?: number | null,
+    maxPrice?: number | null
+): T[] {
+    let results = listings;
+    if (minPrice !== undefined && minPrice !== null) {
+        results = results.filter(l => l.price >= minPrice);
+    }
+    if (maxPrice !== undefined && maxPrice !== null) {
+        results = results.filter(l => l.price <= maxPrice);
+    }
+    return results;
+}
+
+// Filter by amenities (AND logic - must have ALL selected)
+export function filterByAmenities<T extends { amenities: string[] }>(
+    listings: T[],
+    amenities?: string[]
+): T[] {
+    if (!amenities || amenities.length === 0) return listings;
+    const amenitiesLower = amenities.map(a => a.toLowerCase());
+    return listings.filter(l =>
+        amenitiesLower.every(a => l.amenities.some((la: string) => la.toLowerCase() === a))
+    );
+}
+
+// Filter by house rules (AND logic - must have ALL selected)
+export function filterByHouseRules<T extends { houseRules: string[] }>(
+    listings: T[],
+    houseRules?: string[]
+): T[] {
+    if (!houseRules || houseRules.length === 0) return listings;
+    const rulesLower = houseRules.map(r => r.toLowerCase());
+    return listings.filter(l =>
+        rulesLower.every(r => l.houseRules.some((hr: string) => hr.toLowerCase() === r))
+    );
+}
+
+// Filter by languages (OR logic - show if household speaks ANY selected language)
+export function filterByLanguages<T extends { languages: string[] }>(
+    listings: T[],
+    languages?: string[]
+): T[] {
+    if (!languages || languages.length === 0) return listings;
+    const languagesLower = languages.map(l => l.toLowerCase());
+    return listings.filter(listing =>
+        languagesLower.some(lang =>
+            listing.languages.some((ll: string) => ll.toLowerCase() === lang)
+        )
+    );
+}
+
+// Filter by room type (exact match, case-insensitive)
+export function filterByRoomType<T extends { roomType?: string }>(
+    listings: T[],
+    roomType?: string
+): T[] {
+    if (!roomType) return listings;
+    const roomTypeLower = roomType.toLowerCase();
+    return listings.filter(l =>
+        l.roomType && l.roomType.toLowerCase() === roomTypeLower
+    );
+}
+
+// Filter by lease duration (exact match, case-insensitive)
+export function filterByLeaseDuration<T extends { leaseDuration?: string }>(
+    listings: T[],
+    leaseDuration?: string
+): T[] {
+    if (!leaseDuration) return listings;
+    const leaseLower = leaseDuration.toLowerCase();
+    return listings.filter(l =>
+        l.leaseDuration && l.leaseDuration.toLowerCase() === leaseLower
+    );
+}
+
+// Filter by move-in date (listing available by target date)
+export function filterByMoveInDate<T extends { moveInDate?: Date }>(
+    listings: T[],
+    moveInDate?: string
+): T[] {
+    if (!moveInDate) return listings;
+    const targetDate = new Date(moveInDate);
+    return listings.filter(l =>
+        !l.moveInDate || new Date(l.moveInDate) <= targetDate
+    );
+}
+
+// Filter by gender preference (exact match, case-insensitive)
+export function filterByGenderPreference<T extends { genderPreference?: string }>(
+    listings: T[],
+    genderPreference?: string
+): T[] {
+    if (!genderPreference) return listings;
+    const prefLower = genderPreference.toLowerCase();
+    return listings.filter(l =>
+        l.genderPreference && l.genderPreference.toLowerCase() === prefLower
+    );
+}
+
+// Filter by household gender (exact match, case-insensitive)
+export function filterByHouseholdGender<T extends { householdGender?: string }>(
+    listings: T[],
+    householdGender?: string
+): T[] {
+    if (!householdGender) return listings;
+    const householdLower = householdGender.toLowerCase();
+    return listings.filter(l =>
+        l.householdGender && l.householdGender.toLowerCase() === householdLower
+    );
+}
+
+// Filter by geographic bounds
+export function filterByBounds<T extends { location: { lat: number; lng: number } }>(
+    listings: T[],
+    bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number }
+): T[] {
+    if (!bounds) return listings;
+    return listings.filter(l =>
+        l.location.lat >= bounds.minLat &&
+        l.location.lat <= bounds.maxLat &&
+        l.location.lng >= bounds.minLng &&
+        l.location.lng <= bounds.maxLng
+    );
+}
+
+// Filter by text query (searches title, description, city, state)
+export function filterByQuery<T extends { title: string; description: string; location: { city: string; state: string } }>(
+    listings: T[],
+    query?: string
+): T[] {
+    if (!query || !isValidQuery(query)) return listings;
+    const q = sanitizeSearchQuery(query).toLowerCase();
+    if (!q) return listings;
+    return listings.filter(l =>
+        l.title.toLowerCase().includes(q) ||
+        l.description.toLowerCase().includes(q) ||
+        l.location.city.toLowerCase().includes(q) ||
+        l.location.state.toLowerCase().includes(q)
+    );
+}
+
+// ============================================
+// Sorting functions for testability
+// ============================================
+
+export function sortListings(
+    listings: ListingWithMetadata[],
+    sort: SortOption = 'recommended'
+): ListingWithMetadata[] {
+    const results = [...listings]; // Don't mutate original
+    switch (sort) {
+        case 'price_asc':
+            results.sort((a, b) => {
+                const priceDiff = a.price - b.price;
+                if (priceDiff !== 0) return priceDiff;
+                return b.createdAt.getTime() - a.createdAt.getTime();
+            });
+            break;
+        case 'price_desc':
+            results.sort((a, b) => {
+                const priceDiff = b.price - a.price;
+                if (priceDiff !== 0) return priceDiff;
+                return b.createdAt.getTime() - a.createdAt.getTime();
+            });
+            break;
+        case 'newest':
+            results.sort((a, b) => {
+                const timeDiff = b.createdAt.getTime() - a.createdAt.getTime();
+                if (timeDiff !== 0) return timeDiff;
+                return a.id.localeCompare(b.id);
+            });
+            break;
+        case 'rating':
+            results.sort((a, b) => {
+                const ratingDiff = b.avgRating - a.avgRating;
+                if (ratingDiff !== 0) return ratingDiff;
+                const reviewDiff = b.reviewCount - a.reviewCount;
+                if (reviewDiff !== 0) return reviewDiff;
+                return b.createdAt.getTime() - a.createdAt.getTime();
+            });
+            break;
+        case 'recommended':
+        default:
+            results.sort((a, b) => {
+                const aScore = (a.avgRating * 20) + (a.viewCount * 0.1) + (a.reviewCount * 5);
+                const bScore = (b.avgRating * 20) + (b.viewCount * 0.1) + (b.reviewCount * 5);
+                const scoreDiff = bScore - aScore;
+                if (scoreDiff !== 0) return scoreDiff;
+                return b.createdAt.getTime() - a.createdAt.getTime();
+            });
+            break;
+    }
+    return results;
 }
 
 // Maximum results to return for performance (prevents memory issues on wide map bounds)
@@ -712,26 +922,69 @@ export async function getSavedListingIds(userId: string): Promise<string[]> {
 }
 
 export async function getSavedListings(userId: string): Promise<ListingData[]> {
-    const saved = await prisma.savedListing.findMany({
-        where: { userId },
-        include: {
-            listing: {
-                include: {
-                    location: true
-                }
-            }
-        },
-        orderBy: { createdAt: 'desc' }
-    });
+    // Use raw query to properly fetch PostGIS coordinates
+    const savedListings = await prisma.$queryRaw<Array<{
+        id: string;
+        title: string;
+        description: string;
+        price: number;
+        images: string[];
+        availableSlots: number;
+        totalSlots: number;
+        amenities: string[];
+        houseRules: string[];
+        languages: string[];
+        genderPreference: string | null;
+        householdGender: string | null;
+        leaseDuration: string | null;
+        roomType: string | null;
+        moveInDate: Date | null;
+        ownerId: string;
+        address: string;
+        city: string;
+        state: string;
+        zip: string;
+        lat: number;
+        lng: number;
+    }>>`
+        SELECT
+            l.id,
+            l.title,
+            l.description,
+            l.price,
+            l.images,
+            l."availableSlots",
+            l."totalSlots",
+            l.amenities,
+            l."houseRules",
+            l.languages,
+            l."genderPreference",
+            l."householdGender",
+            l."leaseDuration",
+            l."roomType",
+            l."moveInDate",
+            l."ownerId",
+            loc.address,
+            loc.city,
+            loc.state,
+            loc.zip,
+            ST_Y(loc.coords::geometry) as lat,
+            ST_X(loc.coords::geometry) as lng
+        FROM "SavedListing" sl
+        JOIN "Listing" l ON sl."listingId" = l.id
+        JOIN "Location" loc ON l.id = loc."listingId"
+        WHERE sl."userId" = ${userId}
+            AND l.status = 'ACTIVE'
+            AND ST_X(loc.coords::geometry) IS NOT NULL
+            AND ST_Y(loc.coords::geometry) IS NOT NULL
+            AND NOT (ST_X(loc.coords::geometry) = 0 AND ST_Y(loc.coords::geometry) = 0)
+        ORDER BY sl."createdAt" DESC
+    `;
 
-    return saved.map(s => {
-        const l = s.listing;
-        // Handle potential null location (though schema says optional, our logic usually ensures it)
-        // If location is missing, we might want to skip or handle gracefully.
-        // For now assuming location exists as per our creation logic.
-        const loc = l.location!;
-
-        return {
+    // Filter out any listings with invalid coordinates and map to ListingData
+    return savedListings
+        .filter(l => hasValidCoordinates(l.lat, l.lng))
+        .map(l => ({
             id: l.id,
             title: l.title,
             description: l.description,
@@ -739,28 +992,24 @@ export async function getSavedListings(userId: string): Promise<ListingData[]> {
             images: l.images || [],
             availableSlots: l.availableSlots,
             totalSlots: l.totalSlots,
-            amenities: l.amenities,
-            houseRules: l.houseRules,
+            amenities: l.amenities || [],
+            houseRules: l.houseRules || [],
+            languages: l.languages || [],
+            genderPreference: l.genderPreference ?? undefined,
+            householdGender: l.householdGender ?? undefined,
             leaseDuration: l.leaseDuration ?? undefined,
             roomType: l.roomType ?? undefined,
             moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
             ownerId: l.ownerId,
             location: {
-                address: loc.address,
-                city: loc.city,
-                state: loc.state,
-                zip: loc.zip,
-                // Note: Prisma doesn't fetch Unsupported types like geometry directly easily without raw query.
-                // For saved listings page, we might not need exact coords for map immediately,
-                // or we can accept 0,0 if we don't use the map there.
-                // If we need coords, we should use queryRaw or a helper.
-                // For simplicity here, I'll use 0,0 as placeholders or try to fetch if needed.
-                // Actually, let's use a raw query for this too to be consistent and get coords.
-                lat: 0,
-                lng: 0
+                address: l.address,
+                city: l.city,
+                state: l.state,
+                zip: l.zip,
+                lat: l.lat,
+                lng: l.lng
             }
-        };
-    });
+        }));
 }
 
 export async function getReviews(listingId?: string, userId?: string) {

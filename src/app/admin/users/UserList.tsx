@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { toggleUserAdmin, suspendUser } from '@/app/actions/admin';
 import UserAvatar from '@/components/UserAvatar';
 import {
@@ -57,7 +58,7 @@ export default function UserList({ initialUsers, totalUsers, currentUserId }: Us
                     )
                 );
             } else if (result.error) {
-                alert(result.error);
+                toast.error(result.error);
             }
         } catch (error) {
             console.error('Error toggling admin:', error);
@@ -78,7 +79,7 @@ export default function UserList({ initialUsers, totalUsers, currentUserId }: Us
                     )
                 );
             } else if (result.error) {
-                alert(result.error);
+                toast.error(result.error);
             }
         } catch (error) {
             console.error('Error suspending user:', error);

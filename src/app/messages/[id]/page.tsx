@@ -9,7 +9,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
     const session = await auth();
 
     if (!session?.user?.id) {
-        redirect('/api/auth/signin');
+        redirect('/login');
     }
 
     // Fetch conversation to verify access and get other participant info
@@ -35,7 +35,10 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
 
     const otherParticipant = conversation.participants.find(p => p.id !== userId);
     const currentParticipant = conversation.participants.find(p => p.id === userId);
-    const messages = await getMessages(id);
+    const result = await getMessages(id);
+
+    // Handle potential error response (extract messages array)
+    const messages = Array.isArray(result) ? result : (result.messages || []);
 
     return (
         <ChatWindow
@@ -43,6 +46,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
             conversationId={id}
             currentUserId={userId}
             currentUserName={currentParticipant?.name || session.user.name || 'User'}
+            otherUserId={otherParticipant?.id || ''}
             otherUserName={otherParticipant?.name || 'User'}
             otherUserImage={otherParticipant?.image}
         />

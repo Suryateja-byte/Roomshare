@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, X, Plus, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, X, Plus, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ImageObject {
     file?: File;
@@ -141,6 +142,42 @@ export default function ImageUploader({
         setImages(updatedImages);
     };
 
+    // Retry a failed upload
+    const retryUpload = async (imageId: string) => {
+        const img = images.find(i => i.id === imageId);
+        if (!img?.file) return;
+
+        // Reset error state and set uploading
+        setImages(prev => prev.map(i =>
+            i.id === imageId
+                ? { ...i, error: undefined, isUploading: true }
+                : i
+        ));
+
+        try {
+            const url = await uploadFile(img.file);
+            setImages(prev => prev.map(i =>
+                i.id === imageId
+                    ? { ...i, uploadedUrl: url, isUploading: false, error: undefined }
+                    : i
+            ));
+        } catch (error) {
+            setImages(prev => prev.map(i =>
+                i.id === imageId
+                    ? { ...i, error: (error as Error).message, isUploading: false }
+                    : i
+            ));
+        }
+    };
+
+    // Retry all failed uploads
+    const retryAllFailed = async () => {
+        const failedImages = images.filter(img => img.error && img.file);
+        for (const img of failedImages) {
+            await retryUpload(img.id);
+        }
+    };
+
     // Cleanup ObjectURLs to avoid memory leaks
     useEffect(() => {
         return () => {
@@ -154,6 +191,9 @@ export default function ImageUploader({
 
     const canAddMore = images.length < maxImages;
     const isAnyUploading = images.some(img => img.isUploading);
+    const failedImages = images.filter(img => img.error && img.file);
+    const successfulImages = images.filter(img => img.uploadedUrl && !img.error);
+    const hasMultipleFailures = failedImages.length > 1;
 
     return (
         <div className="w-full">
@@ -212,11 +252,24 @@ export default function ImageUploader({
                                 </div>
                             )}
 
-                            {/* Error Overlay */}
+                            {/* Error Overlay with Retry */}
                             {image.error && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/80 text-white p-2">
-                                    <AlertCircle className="w-6 h-6 mb-1" />
-                                    <p className="text-xs text-center">{image.error}</p>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/90 text-white p-2">
+                                    <AlertCircle className="w-5 h-5 mb-1" />
+                                    <p className="text-[10px] text-center mb-2 line-clamp-2">{image.error}</p>
+                                    {image.file && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                retryUpload(image.id);
+                                            }}
+                                            className="flex items-center gap-1 px-2 py-1 bg-white/20 hover:bg-white/30 rounded text-xs font-medium transition-colors"
+                                        >
+                                            <RotateCcw className="w-3 h-3" />
+                                            Retry
+                                        </button>
+                                    )}
                                 </div>
                             )}
 
@@ -260,12 +313,46 @@ export default function ImageUploader({
                 </div>
             )}
 
-            {/* Image count */}
+            {/* Image count and status summary */}
             {images.length > 0 && (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-3">
-                    {images.length} of {maxImages} images
-                    {isAnyUploading && ' (uploading...)'}
-                </p>
+                <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {images.length} of {maxImages} images
+                            {isAnyUploading && ' (uploading...)'}
+                        </p>
+                        {hasMultipleFailures && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={retryAllFailed}
+                                className="text-xs h-7"
+                            >
+                                <RotateCcw className="w-3 h-3 mr-1" />
+                                Retry All Failed ({failedImages.length})
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Upload Summary */}
+                    {(successfulImages.length > 0 || failedImages.length > 0) && !isAnyUploading && (
+                        <div className="text-xs space-y-1">
+                            {successfulImages.length > 0 && (
+                                <p className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                    {successfulImages.length} image{successfulImages.length !== 1 ? 's' : ''} uploaded successfully
+                                </p>
+                            )}
+                            {failedImages.length > 0 && (
+                                <p className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                    {failedImages.length} image{failedImages.length !== 1 ? 's' : ''} failed to upload
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     );

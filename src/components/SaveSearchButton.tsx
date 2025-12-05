@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { saveSearch } from '@/app/actions/saved-search';
 import type { SearchFilters } from '@/lib/search-utils';
 import { Bookmark, Loader2, X, Bell, BellOff } from 'lucide-react';
+import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 interface SaveSearchButtonProps {
@@ -92,7 +93,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                 setError(result.error);
             } else {
                 setIsOpen(false);
-                // Optional: Show success toast
+                toast.success('Search saved successfully!');
             }
         } catch (err) {
             setError('Something went wrong');
@@ -182,7 +183,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                                             Alert Frequency
                                         </label>
                                         <div className="flex gap-2">
-                                            {(['DAILY', 'WEEKLY'] as const).map((freq) => (
+                                            {(['INSTANT', 'DAILY', 'WEEKLY'] as const).map((freq) => (
                                                 <button
                                                     key={freq}
                                                     type="button"
@@ -193,10 +194,15 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                                                             : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'
                                                     }`}
                                                 >
-                                                    {freq === 'DAILY' ? 'Daily' : 'Weekly'}
+                                                    {freq === 'INSTANT' ? 'Instant' : freq === 'DAILY' ? 'Daily' : 'Weekly'}
                                                 </button>
                                             ))}
                                         </div>
+                                        {alertFrequency === 'INSTANT' && (
+                                            <p className="mt-2 text-xs text-zinc-500">
+                                                Get notified immediately when a new listing matches your search
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                             </div>

@@ -50,6 +50,7 @@ model User {
   isAdmin                 Boolean               @default(false)
   isSuspended             Boolean               @default(false)
   notificationPreferences Json?
+  createdAt               DateTime              @default(now())
   accounts                Account[]
   listings                Listing[]
   messages                Message[]
@@ -67,6 +68,8 @@ model User {
   savedSearches           SavedSearch[]
   blockedUsers            BlockedUser[]         @relation("BlocksMade")
   blockedByUsers          BlockedUser[]         @relation("BlocksReceived")
+  auditLogs               AuditLog[]            @relation("AuditLogs")
+  typingStatuses          TypingStatus[]
 }
 
 model VerificationToken {
@@ -142,6 +145,9 @@ model Review {
   listing       Listing?        @relation(fields: [listingId], references: [id], onDelete: Cascade)
   targetUser    User?           @relation("ReviewTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   response      ReviewResponse?
+
+  // One review per user per listing (duplicate prevention)
+  @@unique([authorId, listingId])
 }
 
 enum BookingStatus {
@@ -170,6 +176,9 @@ model Booking {
 
   listing   Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
   tenant    User          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Prevent duplicate booking requests for same tenant/listing/dates
+  @@unique([tenantId, listingId, startDate, endDate])
 }
 
 enum ReportStatus {
@@ -209,13 +218,15 @@ model Location {
 }
 
 model Conversation {
-  id           String   @id @default(cuid())
-  listingId    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  listing      Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  messages     Message[]
-  participants User[]   @relation("ConversationParticipants")
+  id             String         @id @default(cuid())
+  listingId      String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?      // Soft delete timestamp
+  listing        Listing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  messages       Message[]
+  participants   User[]         @relation("ConversationParticipants")
+  typingStatuses TypingStatus[]
 }
 
 model Message {
@@ -225,6 +236,8 @@ model Message {
   content        String
   read           Boolean      @default(false)
   createdAt      DateTime     @default(now())
+  deletedAt      DateTime?    // Soft delete timestamp
+  deletedBy      String?      // User who deleted (for audit)
   sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
@@ -343,6 +356,7 @@ model RateLimitEntry {
   @@index([expiresAt])
 }
 
+
 // User Blocking
 model BlockedUser {
   id        String   @id @default(cuid())
@@ -356,4 +370,38 @@ model BlockedUser {
   @@unique([blockerId, blockedId])
   @@index([blockerId])
   @@index([blockedId])
+}
+
+// Admin Audit Trail - Immutable log of all admin actions for security/compliance
+model AuditLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  action      String   // e.g., "USER_SUSPENDED", "LISTING_DELETED", "REPORT_RESOLVED"
+  targetType  String   // e.g., "User", "Listing", "Report"
+  targetId    String
+  details     Json?    // Additional context (old/new values, reason, etc.)
+  ipAddress   String?  // For security tracking
+  createdAt   DateTime @default(now())
+
+  admin       User     @relation("AuditLogs", fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+model TypingStatus {
+  id             String       @id @default(cuid())
+  userId         String
+  conversationId String
+  isTyping       Boolean      @default(false)
+  updatedAt      DateTime     @updatedAt
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationId])
+  @@index([conversationId])
+  @@index([updatedAt])
 }

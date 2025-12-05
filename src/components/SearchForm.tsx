@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -378,145 +378,154 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                     )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-                    {/* Move-in Date */}
-                    <div className="space-y-2">
-                        <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">Move-in Date</label>
-                        <DatePicker
-                            id="filter-move-in"
-                            value={moveInDate}
-                            onChange={setMoveInDate}
-                            placeholder="Select move-in date"
-                            minDate={new Date().toISOString().split('T')[0]}
-                        />
-                    </div>
-
-                    {/* Lease Duration */}
-                    <div className="space-y-2">
-                        <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 dark:text-white">Lease Duration</label>
-                        <Select value={leaseDuration} onValueChange={setLeaseDuration}>
-                            <SelectTrigger id="filter-lease">
-                                <SelectValue placeholder="Any" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="any">Any</SelectItem>
-                                <SelectItem value="Month-to-month">Month-to-month</SelectItem>
-                                <SelectItem value="6 months">6 months</SelectItem>
-                                <SelectItem value="1 year">1 year</SelectItem>
-                                <SelectItem value="1 year+">1 year+</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Room Type */}
-                    <div className="space-y-2 sm:col-span-2 md:col-span-1">
-                        <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 dark:text-white">Room Type</label>
-                        <Select value={roomType} onValueChange={setRoomType}>
-                            <SelectTrigger id="filter-room-type">
-                                <SelectValue placeholder="Any" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="any">Any</SelectItem>
-                                <SelectItem value="Private Room">Private Room</SelectItem>
-                                <SelectItem value="Shared Room">Shared Room</SelectItem>
-                                <SelectItem value="Entire Place">Entire Place</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Amenities */}
-                    <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
-                        <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
-                        <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
-                            {['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'].map(amenity => (
-                                <button
-                                    key={amenity}
-                                    type="button"
-                                    onClick={() => toggleAmenity(amenity)}
-                                    aria-pressed={amenities.includes(amenity)}
-                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${amenities.includes(amenity)
-                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
-                                        : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
-                                        }`}
-                                >
-                                    {amenity}
-                                </button>
-                            ))}
+                        {/* Move-in Date */}
+                        <div className="space-y-2">
+                            <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">Move-in Date</label>
+                            <DatePicker
+                                id="filter-move-in"
+                                value={moveInDate}
+                                onChange={setMoveInDate}
+                                placeholder="Select move-in date"
+                                minDate={new Date().toISOString().split('T')[0]}
+                            />
                         </div>
-                    </fieldset>
 
-                    {/* House Rules */}
-                    <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
-                        <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
-                        <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
-                            {['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'].map(rule => (
-                                <button
-                                    key={rule}
-                                    type="button"
-                                    onClick={() => toggleHouseRule(rule)}
-                                    aria-pressed={houseRules.includes(rule)}
-                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${houseRules.includes(rule)
-                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
-                                        : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
-                                        }`}
-                                >
-                                    {rule}
-                                </button>
-                            ))}
+                        {/* Lease Duration */}
+                        <div className="space-y-2">
+                            <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 dark:text-white">Lease Duration</label>
+                            <Select value={leaseDuration} onValueChange={setLeaseDuration}>
+                                <SelectTrigger id="filter-lease">
+                                    <SelectValue placeholder="Any" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="any">Any</SelectItem>
+                                    <SelectItem value="Month-to-month">Month-to-month</SelectItem>
+                                    <SelectItem value="6 months">6 months</SelectItem>
+                                    <SelectItem value="1 year">1 year</SelectItem>
+                                    <SelectItem value="1 year+">1 year+</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
-                    </fieldset>
 
-                    {/* Languages */}
-                    <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
-                        <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Languages Spoken</legend>
-                        <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
-                            {LANGUAGES.map(lang => (
-                                <button
-                                    key={lang}
-                                    type="button"
-                                    onClick={() => toggleLanguage(lang)}
-                                    aria-pressed={languages.includes(lang)}
-                                    className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${languages.includes(lang)
-                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
-                                        : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
-                                        }`}
-                                >
-                                    {lang}
-                                </button>
-                            ))}
+                        {/* Room Type */}
+                        <div className="space-y-2 sm:col-span-2 md:col-span-1">
+                            <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 dark:text-white">Room Type</label>
+                            <Select value={roomType} onValueChange={setRoomType}>
+                                <SelectTrigger id="filter-room-type">
+                                    <SelectValue placeholder="Any" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="any">Any</SelectItem>
+                                    <SelectItem value="Private Room">Private Room</SelectItem>
+                                    <SelectItem value="Shared Room">Shared Room</SelectItem>
+                                    <SelectItem value="Entire Place">Entire Place</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
-                    </fieldset>
 
-                    {/* Gender Preferences */}
-                    <div className="space-y-2">
-                        <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900 dark:text-white">Gender Preference</label>
-                        <Select value={genderPreference} onValueChange={setGenderPreference}>
-                            <SelectTrigger id="filter-gender-pref">
-                                <SelectValue placeholder="Any" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="any">Any</SelectItem>
-                                <SelectItem value="MALE_ONLY">Male Identifying Only</SelectItem>
-                                <SelectItem value="FEMALE_ONLY">Female Identifying Only</SelectItem>
-                                <SelectItem value="NO_PREFERENCE">Any Gender / All Welcome</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                        {/* Amenities */}
+                        <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
+                            <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
+                            <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
+                                {['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'].map(amenity => (
+                                    <button
+                                        key={amenity}
+                                        type="button"
+                                        onClick={() => toggleAmenity(amenity)}
+                                        aria-pressed={amenities.includes(amenity)}
+                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${amenities.includes(amenity)
+                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
+                                            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
+                                            }`}
+                                    >
+                                        {amenity}
+                                        {amenities.includes(amenity) && (
+                                            <X className="w-3.5 h-3.5" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </fieldset>
 
-                    {/* Household Gender */}
-                    <div className="space-y-2">
-                        <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900 dark:text-white">Household Gender</label>
-                        <Select value={householdGender} onValueChange={setHouseholdGender}>
-                            <SelectTrigger id="filter-household-gender">
-                                <SelectValue placeholder="Any" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="any">Any</SelectItem>
-                                <SelectItem value="ALL_MALE">All Male</SelectItem>
-                                <SelectItem value="ALL_FEMALE">All Female</SelectItem>
-                                <SelectItem value="MIXED">Mixed (Co-ed)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                        {/* House Rules */}
+                        <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
+                            <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
+                            <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
+                                {['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'].map(rule => (
+                                    <button
+                                        key={rule}
+                                        type="button"
+                                        onClick={() => toggleHouseRule(rule)}
+                                        aria-pressed={houseRules.includes(rule)}
+                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${houseRules.includes(rule)
+                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
+                                            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
+                                            }`}
+                                    >
+                                        {rule}
+                                        {houseRules.includes(rule) && (
+                                            <X className="w-3.5 h-3.5" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </fieldset>
+
+                        {/* Languages */}
+                        <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
+                            <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Languages Spoken</legend>
+                            <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
+                                {LANGUAGES.map(lang => (
+                                    <button
+                                        key={lang}
+                                        type="button"
+                                        onClick={() => toggleLanguage(lang)}
+                                        aria-pressed={languages.includes(lang)}
+                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${languages.includes(lang)
+                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
+                                            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
+                                            }`}
+                                    >
+                                        {lang}
+                                        {languages.includes(lang) && (
+                                            <X className="w-3.5 h-3.5" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </fieldset>
+
+                        {/* Gender Preferences */}
+                        <div className="space-y-2">
+                            <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900 dark:text-white">Gender Preference</label>
+                            <Select value={genderPreference} onValueChange={setGenderPreference}>
+                                <SelectTrigger id="filter-gender-pref">
+                                    <SelectValue placeholder="Any" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="any">Any</SelectItem>
+                                    <SelectItem value="MALE_ONLY">Male Identifying Only</SelectItem>
+                                    <SelectItem value="FEMALE_ONLY">Female Identifying Only</SelectItem>
+                                    <SelectItem value="NO_PREFERENCE">Any Gender / All Welcome</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Household Gender */}
+                        <div className="space-y-2">
+                            <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900 dark:text-white">Household Gender</label>
+                            <Select value={householdGender} onValueChange={setHouseholdGender}>
+                                <SelectTrigger id="filter-household-gender">
+                                    <SelectValue placeholder="Any" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="any">Any</SelectItem>
+                                    <SelectItem value="ALL_MALE">All Male</SelectItem>
+                                    <SelectItem value="ALL_FEMALE">All Female</SelectItem>
+                                    <SelectItem value="MIXED">Mixed (Co-ed)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </div>
             )}

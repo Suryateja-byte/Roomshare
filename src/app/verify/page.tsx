@@ -96,11 +96,58 @@ export default async function VerifyPage() {
                                     )}
                                 </div>
 
-                                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-8">
-                                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 text-center">
-                                        Try Again
+                                {/* Tips for successful verification */}
+                                <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-6 mb-8">
+                                    <h3 className="font-semibold text-zinc-900 dark:text-white mb-3">
+                                        Tips for a Successful Verification
                                     </h3>
-                                    <VerificationForm />
+                                    <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <span>Ensure your document is clearly visible with all corners showing</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <span>Take photos in good lighting without glare or shadows</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <span>Make sure the text on your ID is readable</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <span>Use the original document, not a photocopy</span>
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-8">
+                                    {status.canResubmit ? (
+                                        <>
+                                            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 text-center">
+                                                Try Again
+                                            </h3>
+                                            <VerificationForm />
+                                        </>
+                                    ) : (
+                                        <div className="text-center">
+                                            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <Clock className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                                            </div>
+                                            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+                                                Cooldown Period Active
+                                            </h3>
+                                            <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+                                                You can resubmit your verification in{' '}
+                                                <span className="font-bold text-amber-600 dark:text-amber-400">
+                                                    {status.cooldownRemaining} hour{status.cooldownRemaining !== 1 ? 's' : ''}
+                                                </span>
+                                            </p>
+                                            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                                                Use this time to review the tips above and prepare better documents.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

@@ -1,23 +1,21 @@
 'use client';
 
 /**
- * Map Component for displaying listings
+ * Map Component for displaying listings with marker clustering
  *
- * TODO: Performance optimization for large result sets (500+ markers)
- * Consider implementing marker clustering using:
- * - Mapbox GL JS built-in clustering: https://docs.mapbox.com/mapbox-gl-js/example/cluster/
- * - supercluster library: https://github.com/mapbox/supercluster
- * - react-map-gl cluster layer
- *
- * Current behavior: All markers rendered individually which can cause lag
- * with 500+ listings. The MAX_RESULTS_CAP in data.ts limits to 500 results.
+ * Uses Mapbox GL JS built-in clustering for performance optimization.
+ * - Clustered points show as circles with count
+ * - Individual points show custom price markers
+ * - Click cluster to zoom and expand
  */
 
-import Map, { Marker, Popup, MapLayerMouseEvent, ViewStateChangeEvent } from 'react-map-gl';
+import Map, { Marker, Popup, Source, Layer, MapLayerMouseEvent, ViewStateChangeEvent } from 'react-map-gl';
+import type { LayerProps, GeoJSONSource } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Home, Loader2, MapPin } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from './SearchForm';
@@ -28,6 +26,7 @@ interface Listing {
     price: number;
     availableSlots: number;
     ownerId?: string;
+    images?: string[];
     location: {
         lat: number;
         lng: number;
@@ -40,21 +39,201 @@ interface MarkerPosition {
     lng: number;
 }
 
+// Cluster layer - circles for grouped markers
+const clusterLayer: LayerProps = {
+    id: 'clusters',
+    type: 'circle',
+    source: 'listings',
+    filter: ['has', 'point_count'],
+    paint: {
+        'circle-color': '#18181b', // zinc-900
+        'circle-radius': [
+            'step',
+            ['get', 'point_count'],
+            20,  // 20px radius for < 10 points
+            10, 25,  // 25px radius for 10-49 points
+            50, 32,  // 32px radius for 50-99 points
+            100, 40  // 40px radius for 100+ points
+        ],
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#ffffff'
+    }
+};
+
+// Dark mode cluster layer
+const clusterLayerDark: LayerProps = {
+    id: 'clusters-dark',
+    type: 'circle',
+    source: 'listings',
+    filter: ['has', 'point_count'],
+    paint: {
+        'circle-color': '#ffffff',
+        'circle-radius': [
+            'step',
+            ['get', 'point_count'],
+            20,
+            10, 25,
+            50, 32,
+            100, 40
+        ],
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#18181b'
+    }
+};
+
+// Cluster count label layer
+const clusterCountLayer: LayerProps = {
+    id: 'cluster-count',
+    type: 'symbol',
+    source: 'listings',
+    filter: ['has', 'point_count'],
+    layout: {
+        'text-field': '{point_count_abbreviated}',
+        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 14
+    },
+    paint: {
+        'text-color': '#ffffff'
+    }
+};
+
+// Dark mode cluster count
+const clusterCountLayerDark: LayerProps = {
+    id: 'cluster-count-dark',
+    type: 'symbol',
+    source: 'listings',
+    filter: ['has', 'point_count'],
+    layout: {
+        'text-field': '{point_count_abbreviated}',
+        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 14
+    },
+    paint: {
+        'text-color': '#18181b'
+    }
+};
+
+// Threshold for when to use clustering vs individual markers
+const CLUSTER_THRESHOLD = 50;
+
 export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
     const [searchAsMove, setSearchAsMove] = useState(true);
+    const [unclusteredListings, setUnclusteredListings] = useState<Listing[]>([]);
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [isMapLoaded, setIsMapLoaded] = useState(false);
+    const [areTilesLoading, setAreTilesLoading] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
     const mapRef = useRef<any>(null);
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
+    // Detect dark mode
+    useEffect(() => {
+        const checkDarkMode = () => {
+            setIsDarkMode(document.documentElement.classList.contains('dark'));
+        };
+        checkDarkMode();
+
+        // Watch for theme changes
+        const observer = new MutationObserver(checkDarkMode);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+        return () => observer.disconnect();
+    }, []);
+
+    // Use clustering only when there are many listings
+    const useClustering = listings.length >= CLUSTER_THRESHOLD;
+
+    // Convert listings to GeoJSON for Mapbox clustering
+    const geojsonData = useMemo(() => ({
+        type: 'FeatureCollection' as const,
+        features: listings.map(listing => ({
+            type: 'Feature' as const,
+            geometry: {
+                type: 'Point' as const,
+                coordinates: [listing.location.lng, listing.location.lat]
+            },
+            properties: {
+                id: listing.id,
+                title: listing.title,
+                price: listing.price,
+                availableSlots: listing.availableSlots,
+                ownerId: listing.ownerId || '',
+                images: JSON.stringify(listing.images || []),
+                lat: listing.location.lat,
+                lng: listing.location.lng
+            }
+        }))
+    }), [listings]);
+
+    // Handle cluster click to zoom in and expand
+    const onClusterClick = useCallback((event: MapLayerMouseEvent) => {
+        const feature = event.features?.[0];
+        if (!feature || !mapRef.current) return;
+
+        const clusterId = feature.properties?.cluster_id;
+        if (!clusterId) return;
+
+        const mapboxSource = mapRef.current.getSource('listings') as GeoJSONSource;
+
+        mapboxSource.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
+            if (err || !feature.geometry || feature.geometry.type !== 'Point') return;
+
+            mapRef.current?.flyTo({
+                center: feature.geometry.coordinates as [number, number],
+                zoom: zoom,
+                duration: 500
+            });
+        });
+    }, []);
+
+    // Update unclustered listings when map moves (for rendering individual markers)
+    const updateUnclusteredListings = useCallback(() => {
+        if (!mapRef.current || !useClustering) return;
+
+        const map = mapRef.current.getMap();
+        if (!map) return;
+
+        // Query for unclustered points (points without cluster)
+        const features = map.querySourceFeatures('listings', {
+            filter: ['!', ['has', 'point_count']]
+        });
+
+        const unclustered = features.map((f: any) => ({
+            id: f.properties.id,
+            title: f.properties.title,
+            price: f.properties.price,
+            availableSlots: f.properties.availableSlots,
+            ownerId: f.properties.ownerId,
+            images: JSON.parse(f.properties.images || '[]'),
+            location: {
+                lat: f.properties.lat,
+                lng: f.properties.lng
+            }
+        }));
+
+        // Deduplicate by id
+        const seen = new Set<string>();
+        const unique = unclustered.filter((l: Listing) => {
+            if (seen.has(l.id)) return false;
+            seen.add(l.id);
+            return true;
+        });
+
+        setUnclusteredListings(unique);
+    }, [useClustering]);
+
     // Add small offsets to markers that share the same coordinates
+    // When clustering, use unclustered listings; otherwise use all listings
+    const markersSource = useClustering ? unclusteredListings : listings;
+
     const markerPositions = useMemo(() => {
         const positions: MarkerPosition[] = [];
         const coordsCounts: Record<string, number> = {};
 
         // First pass: count how many listings share each coordinate
-        listings.forEach(listing => {
+        markersSource.forEach(listing => {
             const key = `${listing.location.lat},${listing.location.lng}`;
             coordsCounts[key] = (coordsCounts[key] || 0) + 1;
         });
@@ -62,7 +241,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         // Second pass: add offsets for overlapping markers
         const coordsIndices: Record<string, number> = {};
 
-        listings.forEach(listing => {
+        markersSource.forEach(listing => {
             const key = `${listing.location.lat},${listing.location.lng}`;
             const count = coordsCounts[key] || 1;
 
@@ -94,7 +273,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         });
 
         return positions;
-    }, [listings]);
+    }, [markersSource]);
 
     // Default to San Francisco if no listings, or center on first listing
     const initialViewState = listings.length > 0
@@ -177,6 +356,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     }, []);
 
     const handleMoveEnd = (e: ViewStateChangeEvent) => {
+        // Update unclustered listings for rendering individual markers
+        updateUnclusteredListings();
+
         if (!searchAsMove) return;
 
         if (debounceTimer.current) {
@@ -222,6 +404,26 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
     return (
         <div className="w-full h-full rounded-xl overflow-hidden border shadow-lg relative group">
+            {/* Initial loading skeleton */}
+            {!isMapLoaded && (
+                <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3">
+                        <MapPin className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse" />
+                        <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading map...</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Tile loading indicator */}
+            {isMapLoaded && areTilesLoading && (
+                <div className="absolute inset-0 bg-zinc-100/30 dark:bg-zinc-900/30 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
+                    <div className="flex items-center gap-2 bg-white/90 dark:bg-zinc-800/90 px-4 py-2 rounded-lg shadow-sm">
+                        <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" />
+                        <span className="text-sm text-zinc-600 dark:text-zinc-300">Loading tiles...</span>
+                    </div>
+                </div>
+            )}
+
             <Map
                 ref={mapRef}
                 mapboxAccessToken={token}
@@ -229,8 +431,42 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 style={{ width: '100%', height: '100%' }}
                 mapStyle="mapbox://styles/mapbox/streets-v11"
                 onMoveEnd={handleMoveEnd}
+                onLoad={() => {
+                    setIsMapLoaded(true);
+                    updateUnclusteredListings();
+                }}
+                onMoveStart={() => setAreTilesLoading(true)}
+                onIdle={() => setAreTilesLoading(false)}
+                onClick={useClustering ? onClusterClick : undefined}
+                interactiveLayerIds={useClustering ? [isDarkMode ? 'clusters-dark' : 'clusters'] : []}
                 onError={(e) => console.error('Map Error:', e)}
             >
+                {/* Clustering Source and Layers - only when many listings */}
+                {useClustering && (
+                    <Source
+                        id="listings"
+                        type="geojson"
+                        data={geojsonData}
+                        cluster={true}
+                        clusterMaxZoom={14}
+                        clusterRadius={50}
+                    >
+                        {/* Show appropriate theme layers */}
+                        {isDarkMode ? (
+                            <>
+                                <Layer {...clusterLayerDark} />
+                                <Layer {...clusterCountLayerDark} />
+                            </>
+                        ) : (
+                            <>
+                                <Layer {...clusterLayer} />
+                                <Layer {...clusterCountLayer} />
+                            </>
+                        )}
+                    </Source>
+                )}
+
+                {/* Individual price markers - shown for unclustered points or when not clustering */}
                 {markerPositions.map((position) => (
                     <Marker
                         key={position.listing.id}
@@ -240,6 +476,13 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         onClick={(e: any) => {
                             e.originalEvent.stopPropagation();
                             setSelectedListing(position.listing);
+
+                            // Smooth pan to center popup both horizontally and vertically
+                            mapRef.current?.easeTo({
+                                center: [position.lng, position.lat],
+                                offset: [0, -150], // NEGATIVE Y pushes marker UP, centering popup below it
+                                duration: 400
+                            });
                         }}
                     >
                         <div className="relative cursor-pointer group/marker">
@@ -262,22 +505,93 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         anchor="top"
                         onClose={() => setSelectedListing(null)}
                         closeOnClick={false}
-                        className="z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:shadow-lg [&_.mapboxgl-popup-content]:border [&_.mapboxgl-popup-content]:border-zinc-100 dark:[&_.mapboxgl-popup-content]:border-zinc-700 [&_.mapboxgl-popup-content]:bg-white dark:[&_.mapboxgl-popup-content]:bg-zinc-900 [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-tip]:border-t-white dark:[&_.mapboxgl-popup-tip]:border-t-zinc-900"
+                        maxWidth="320px"
+                        className={`z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${
+                            isDarkMode
+                                ? '[&_.mapboxgl-popup-tip]:border-t-zinc-900'
+                                : '[&_.mapboxgl-popup-tip]:border-t-white'
+                        }`}
                     >
-                        <div className="p-3 min-w-[220px]">
-                            <h3 className="font-semibold text-[15px] text-zinc-900 dark:text-white mb-0.5 line-clamp-1">{selectedListing.title}</h3>
-                            <p className="text-zinc-500 dark:text-zinc-400 text-[13px] mb-3">
-                                <span className="font-semibold text-zinc-900 dark:text-white">${selectedListing.price}</span>/month
-                            </p>
-                            <div className="flex gap-2">
-                                <Link href={`/listings/${selectedListing.id}`} className="flex-1">
-                                    <Button size="sm" className="w-full h-8 text-[13px] rounded-lg">View</Button>
-                                </Link>
-                                {selectedListing.ownerId && (
-                                    <Link href={`/messages?userId=${selectedListing.ownerId}`} className="flex-1">
-                                        <Button size="sm" variant="outline" className="w-full h-8 text-[13px] rounded-lg">Message</Button>
-                                    </Link>
+                        {/* Premium Card Design */}
+                        <div className={`w-[280px] overflow-hidden rounded-xl ${
+                            isDarkMode
+                                ? 'bg-zinc-900 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]'
+                                : 'bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]'
+                        }`}>
+                            {/* Image Thumbnail */}
+                            <div className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
+                                {selectedListing.images && selectedListing.images[0] ? (
+                                    <img
+                                        src={selectedListing.images[0]}
+                                        alt={selectedListing.title}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <Home className={`w-10 h-10 ${isDarkMode ? 'text-zinc-600' : 'text-zinc-300'}`} />
+                                    </div>
                                 )}
+                                {/* Close button overlay */}
+                                <button
+                                    onClick={() => setSelectedListing(null)}
+                                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors"
+                                >
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                                {/* Availability badge */}
+                                <div className="absolute bottom-2 left-2">
+                                    <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase ${
+                                        selectedListing.availableSlots > 0
+                                            ? 'bg-emerald-500 text-white'
+                                            : 'bg-zinc-900 text-white'
+                                    }`}>
+                                        {selectedListing.availableSlots > 0 ? `${selectedListing.availableSlots} Available` : 'Filled'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-3">
+                                <h3 className={`font-semibold text-[15px] line-clamp-1 mb-1 ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
+                                    {selectedListing.title}
+                                </h3>
+                                <p className="mb-3">
+                                    <span className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
+                                        ${selectedListing.price}
+                                    </span>
+                                    <span className={`text-sm ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>/month</span>
+                                </p>
+                                <div className="flex gap-2">
+                                    <Link href={`/listings/${selectedListing.id}`} className="flex-1">
+                                        <Button
+                                            size="sm"
+                                            className={`w-full h-9 text-[13px] font-medium rounded-lg ${
+                                                isDarkMode
+                                                    ? 'bg-white text-zinc-900 hover:bg-zinc-200'
+                                                    : 'bg-zinc-900 text-white hover:bg-zinc-800'
+                                            }`}
+                                        >
+                                            View Details
+                                        </Button>
+                                    </Link>
+                                    {selectedListing.ownerId && (
+                                        <Link href={`/messages?userId=${selectedListing.ownerId}`} className="flex-1">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className={`w-full h-9 text-[13px] font-medium rounded-lg ${
+                                                    isDarkMode
+                                                        ? 'border-zinc-700 text-white hover:bg-zinc-800'
+                                                        : 'border-zinc-300 text-zinc-900 hover:bg-zinc-100'
+                                                }`}
+                                            >
+                                                Message
+                                            </Button>
+                                        </Link>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </Popup>

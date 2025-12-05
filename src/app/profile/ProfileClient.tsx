@@ -14,7 +14,9 @@ import {
     Languages,
     ArrowLeft,
     Share2,
-    MapPin
+    MapPin,
+    MessageSquare,
+    ChevronRight
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import UserAvatar from '@/components/UserAvatar';
@@ -225,6 +227,25 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                                 </ul>
                             </div>
                         )}
+
+                        {/* Reviews About You */}
+                        <Link
+                            href={`/users/${user.id}#reviews`}
+                            className="block bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 shadow-sm border border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 hover:shadow-md transition-all group"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                        <Star className="w-5 h-5 text-amber-500" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-bold text-zinc-900 dark:text-white">Reviews About You</h3>
+                                        <p className="text-sm text-zinc-500 dark:text-zinc-400">See what others are saying</p>
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 group-hover:translate-x-1 transition-all" />
+                            </div>
+                        </Link>
 
                         <button
                             onClick={handleLogout}

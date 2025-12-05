@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Home, ChevronDown } from 'lucide-react';
 import { updateListingStatus, ListingStatus } from '@/app/actions/listing-status';
@@ -53,7 +54,7 @@ export default function ListingStatusToggle({ listingId, currentStatus }: Listin
         const result = await updateListingStatus(listingId, newStatus);
 
         if (result.error) {
-            alert(result.error);
+            toast.error(result.error);
         } else {
             setStatus(newStatus);
             router.refresh();

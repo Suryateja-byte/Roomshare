@@ -16,13 +16,23 @@ export async function POST(request: NextRequest) {
 
         // Check Supabase configuration
         if (!supabaseUrl || !supabaseServiceKey) {
+            console.error('Missing Supabase config:', {
+                hasUrl: !!supabaseUrl,
+                hasKey: !!supabaseServiceKey
+            });
             return NextResponse.json(
-                { error: 'Storage not configured. Please set up Supabase environment variables.' },
+                { error: 'Storage not configured. Please check your Supabase environment variables.' },
                 { status: 500 }
             );
         }
 
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        // Create Supabase client with explicit fetch options for better error handling
+        const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+            },
+        });
 
         // Get form data
         const formData = await request.formData();
@@ -75,7 +85,21 @@ export async function POST(request: NextRequest) {
             });
 
         if (uploadError) {
-            console.error('Upload error:', uploadError);
+            console.error('Supabase upload error:', {
+                message: uploadError.message,
+                name: uploadError.name,
+                bucket,
+                path
+            });
+
+            // Provide more specific error messages
+            if (uploadError.message.includes('Bucket not found')) {
+                return NextResponse.json(
+                    { error: 'Storage bucket not configured. Please create an "images" bucket in Supabase.' },
+                    { status: 500 }
+                );
+            }
+
             return NextResponse.json(
                 { error: 'Failed to upload file: ' + uploadError.message },
                 { status: 500 }
@@ -93,8 +117,17 @@ export async function POST(request: NextRequest) {
         });
     } catch (error) {
         console.error('Upload error:', error);
+
+        // Handle specific error types
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+            return NextResponse.json(
+                { error: 'Network error: Unable to connect to storage service. Please check your internet connection and Supabase configuration.' },
+                { status: 503 }
+            );
+        }
+
         return NextResponse.json(
-            { error: 'Internal server error' },
+            { error: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error') },
             { status: 500 }
         );
     }

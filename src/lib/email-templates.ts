@@ -283,7 +283,10 @@ export const emailTemplates = {
                 Verify Email Address
             </a>
             <p style="margin: 24px 0 0; color: #71717a; font-size: 14px;">
-                This link will expire in 24 hours. If you didn't create a RoomShare account, you can safely ignore this email.
+                This link will expire in 24 hours. If it expires, simply log in to your account and request a new verification email.
+            </p>
+            <p style="margin: 12px 0 0; color: #a1a1aa; font-size: 12px;">
+                If you didn't create a RoomShare account, you can safely ignore this email.
             </p>
         `),
     }),
@@ -330,6 +333,43 @@ export const emailTemplates = {
             </div>
             <a href="${APP_URL}/listings/${data.listingId}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 View Response
+            </a>
+        `),
+    }),
+
+    verificationRejected: (data: {
+        userName: string;
+        reason: string;
+    }) => ({
+        subject: 'Your Verification Request Update',
+        html: baseTemplate(`
+            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Verification Request Update</h2>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Hi ${data.userName},
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Your identity verification request was not approved.
+            </p>
+            <div style="background-color: #fef2f2; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #fecaca;">
+                <p style="margin: 0 0 8px; color: #991b1b; font-size: 14px; font-weight: 600;">Reason:</p>
+                <p style="margin: 0; color: #7f1d1d; font-size: 14px;">
+                    ${data.reason}
+                </p>
+            </div>
+            <div style="background-color: #f4f4f5; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                <p style="margin: 0 0 12px; color: #18181b; font-size: 14px; font-weight: 600;">Tips for a successful verification:</p>
+                <ul style="margin: 0; padding: 0 0 0 20px; color: #52525b; font-size: 14px; line-height: 1.8;">
+                    <li>Ensure your document is clearly visible with all corners showing</li>
+                    <li>Take photos in good lighting without glare or shadows</li>
+                    <li>Make sure the text on your ID is readable</li>
+                    <li>Use the original document, not a photocopy</li>
+                </ul>
+            </div>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                You can submit a new verification request after 24 hours.
+            </p>
+            <a href="${APP_URL}/verify" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                View Verification Status
             </a>
         `),
     }),
