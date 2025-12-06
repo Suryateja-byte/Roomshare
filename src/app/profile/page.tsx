@@ -15,7 +15,13 @@ export default async function ProfilePage() {
         where: { id: session.user.id },
         include: {
             listings: {
-                include: {
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    price: true,
+                    availableSlots: true,
+                    images: true,
                     location: true,
                 },
                 orderBy: {

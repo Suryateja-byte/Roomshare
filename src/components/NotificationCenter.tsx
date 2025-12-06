@@ -151,8 +151,11 @@ export default function NotificationCenter() {
                             </div>
                         ) : notifications.length === 0 ? (
                             <div className="p-8 text-center">
-                                <Bell className="w-12 h-12 text-zinc-200 mx-auto mb-3" />
-                                <p className="text-zinc-500 text-sm">No notifications yet</p>
+                                <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Bell className="w-8 h-8 text-zinc-300 dark:text-zinc-600" />
+                                </div>
+                                <h4 className="font-medium text-zinc-900 dark:text-white mb-1">You&apos;re all caught up!</h4>
+                                <p className="text-zinc-500 dark:text-zinc-400 text-sm">No new notifications at the moment.</p>
                             </div>
                         ) : (
                             notifications.map((notification) => {

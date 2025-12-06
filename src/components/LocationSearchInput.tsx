@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MapPin, Loader2, X } from 'lucide-react';
+import { MapPin, Loader2, X, AlertCircle, SearchX } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 
 interface LocationSuggestion {
@@ -20,6 +20,8 @@ interface LocationSearchInputProps {
         lng: number;
         bbox?: [number, number, number, number]; // [minLng, minLat, maxLng, maxLat]
     }) => void;
+    onFocus?: () => void;
+    onBlur?: () => void;
     placeholder?: string;
     className?: string;
 }
@@ -28,6 +30,8 @@ export default function LocationSearchInput({
     value,
     onChange,
     onLocationSelect,
+    onFocus,
+    onBlur,
     placeholder = "City, neighborhood...",
     className = ""
 }: LocationSearchInputProps) {
@@ -35,6 +39,8 @@ export default function LocationSearchInput({
     const [isLoading, setIsLoading] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
+    const [error, setError] = useState<string | null>(null);
+    const [noResults, setNoResults] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -42,6 +48,10 @@ export default function LocationSearchInput({
 
     // Fetch suggestions from Mapbox Geocoding API
     const fetchSuggestions = useCallback(async (query: string) => {
+        // Reset states
+        setError(null);
+        setNoResults(false);
+
         if (!query || query.length < 2) {
             setSuggestions([]);
             return;
@@ -49,6 +59,7 @@ export default function LocationSearchInput({
 
         const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
         if (!token) {
+            setError('Location search is temporarily unavailable');
             console.error('Mapbox token is missing');
             return;
         }
@@ -60,14 +71,29 @@ export default function LocationSearchInput({
             const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${token}&types=place,locality,neighborhood,address,region&limit=5&autocomplete=true`;
 
             const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to fetch suggestions');
+
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error('Location service authentication failed');
+                } else if (response.status >= 500) {
+                    throw new Error('Location service is temporarily unavailable');
+                }
+                throw new Error('Failed to fetch suggestions');
+            }
 
             const data = await response.json();
-            setSuggestions(data.features || []);
+            const features = data.features || [];
+            setSuggestions(features);
             setSelectedIndex(-1);
-        } catch (error) {
-            console.error('Error fetching location suggestions:', error);
+
+            // Set noResults if query was long enough but no results found
+            if (query.length >= 3 && features.length === 0) {
+                setNoResults(true);
+            }
+        } catch (err) {
+            console.error('Error fetching location suggestions:', err);
             setSuggestions([]);
+            setError(err instanceof Error ? err.message : 'Unable to search locations');
         } finally {
             setIsLoading(false);
         }
@@ -170,6 +196,10 @@ export default function LocationSearchInput({
                         if (suggestions.length > 0 || value.length >= 2) {
                             setShowSuggestions(true);
                         }
+                        onFocus?.();
+                    }}
+                    onBlur={() => {
+                        onBlur?.();
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
@@ -205,11 +235,10 @@ export default function LocationSearchInput({
                                 <button
                                     type="button"
                                     onClick={() => handleSelectSuggestion(suggestion)}
-                                    className={`w-full px-3 py-2.5 flex items-start gap-3 rounded-xl transition-colors duration-150 text-left ${
-                                        index === selectedIndex
-                                            ? 'bg-zinc-100 dark:bg-zinc-800'
-                                            : 'hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80'
-                                    }`}
+                                    className={`w-full px-3 py-2.5 flex items-start gap-3 rounded-xl transition-colors duration-150 text-left ${index === selectedIndex
+                                        ? 'bg-zinc-100 dark:bg-zinc-800'
+                                        : 'hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80'
+                                        }`}
                                 >
                                     <MapPin className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getPlaceTypeIcon(suggestion.place_type)}`} />
                                     <div className="flex-1 min-w-0">
@@ -224,6 +253,50 @@ export default function LocationSearchInput({
                             </li>
                         ))}
                     </ul>
+                </div>
+            )}
+
+            {/* Error state dropdown */}
+            {showSuggestions && error && !isLoading && (
+                <div
+                    ref={suggestionsRef}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-red-200/80 dark:border-red-700/80 overflow-hidden z-[1000] min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+                >
+                    <div className="p-4 flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
+                            <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                                Search unavailable
+                            </p>
+                            <p className="text-xs text-red-500 dark:text-red-400">
+                                {error}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* No results dropdown */}
+            {showSuggestions && noResults && !error && !isLoading && suggestions.length === 0 && (
+                <div
+                    ref={suggestionsRef}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-[1000] min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+                >
+                    <div className="p-4 flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800">
+                            <SearchX className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                No locations found
+                            </p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                Try a different city or neighborhood name
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -15,13 +15,15 @@ import {
     Home,
     DollarSign,
     List,
-    Loader2
+    Loader2,
+    WifiOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { updateBookingStatus, BookingStatus } from '@/app/actions/manage-booking';
 import UserAvatar from '@/components/UserAvatar';
 import BookingCalendar from '@/components/BookingCalendar';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 type Booking = {
     id: string;
@@ -103,15 +105,23 @@ function formatDate(date: Date) {
 function BookingCard({
     booking,
     type,
-    onStatusUpdate
+    onStatusUpdate,
+    isOffline
 }: {
     booking: Booking;
     type: 'sent' | 'received';
     onStatusUpdate: (bookingId: string, status: BookingStatus) => Promise<void>;
+    isOffline: boolean;
 }) {
     const [updatingStatus, setUpdatingStatus] = useState<BookingStatus | null>(null);
 
     const handleStatusUpdate = async (status: BookingStatus) => {
+        if (isOffline) {
+            toast.error("You're offline", {
+                description: 'Please check your internet connection to update booking status.'
+            });
+            return;
+        }
         setUpdatingStatus(status);
         await onStatusUpdate(booking.id, status);
         setUpdatingStatus(null);
@@ -272,16 +282,13 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
     const [activeTab, setActiveTab] = useState<'sent' | 'received'>('received');
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
     const [bookings, setBookings] = useState({ sent: sentBookings, received: receivedBookings });
+    const { isOffline } = useNetworkStatus();
 
     const handleStatusUpdate = async (bookingId: string, status: BookingStatus) => {
-        const result = await updateBookingStatus(bookingId, status);
+        // Store previous state for rollback
+        const previousBookings = { ...bookings };
 
-        if (result.error) {
-            toast.error(result.error);
-            return;
-        }
-
-        // Update local state
+        // Optimistically update local state immediately
         setBookings(prev => ({
             sent: prev.sent.map(b =>
                 b.id === bookingId ? { ...b, status } : b
@@ -290,6 +297,19 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                 b.id === bookingId ? { ...b, status } : b
             )
         }));
+
+        // Then make the API call
+        const result = await updateBookingStatus(bookingId, status);
+
+        if (result.error) {
+            // Revert to previous state on error
+            setBookings(previousBookings);
+            toast.error(result.error);
+            return;
+        }
+
+        // Show success feedback
+        toast.success(`Booking ${status.toLowerCase()}`);
     };
 
     const currentBookings = activeTab === 'sent' ? bookings.sent : bookings.received;
@@ -304,16 +324,25 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                     <p className="text-zinc-500 dark:text-zinc-400 mt-2">Manage your booking requests and reservations</p>
                 </div>
 
+                {/* Offline Banner */}
+                {isOffline && (
+                    <div className="mb-6 p-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center gap-3">
+                        <WifiOff className="w-5 h-5 text-zinc-500 dark:text-zinc-400 flex-shrink-0" />
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                            You&apos;re offline. Booking actions are disabled until you reconnect.
+                        </p>
+                    </div>
+                )}
+
                 {/* Tabs and View Toggle */}
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex gap-2 bg-white dark:bg-zinc-900 p-1.5 rounded-xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
                         <button
                             onClick={() => setActiveTab('received')}
-                            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                                activeTab === 'received'
-                                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-                                    : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800'
-                            }`}
+                            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'received'
+                                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                                : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800'
+                                }`}
                         >
                             <span className="flex items-center gap-2">
                                 <Home className="w-4 h-4" />
@@ -327,11 +356,10 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                         </button>
                         <button
                             onClick={() => setActiveTab('sent')}
-                            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                                activeTab === 'sent'
-                                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-                                    : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800'
-                            }`}
+                            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'sent'
+                                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                                : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800'
+                                }`}
                         >
                             <span className="flex items-center gap-2">
                                 <User className="w-4 h-4" />
@@ -345,22 +373,20 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                         <div className="flex gap-1 bg-white dark:bg-zinc-900 p-1 rounded-lg border border-zinc-100 dark:border-zinc-800 shadow-sm">
                             <button
                                 onClick={() => setViewMode('list')}
-                                className={`p-2 rounded-md transition-all ${
-                                    viewMode === 'list'
-                                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-                                        : 'text-zinc-500 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                                }`}
+                                className={`p-2 rounded-md transition-all ${viewMode === 'list'
+                                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                                    : 'text-zinc-500 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                                    }`}
                                 title="List view"
                             >
                                 <List className="w-4 h-4" />
                             </button>
                             <button
                                 onClick={() => setViewMode('calendar')}
-                                className={`p-2 rounded-md transition-all ${
-                                    viewMode === 'calendar'
-                                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-                                        : 'text-zinc-500 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                                }`}
+                                className={`p-2 rounded-md transition-all ${viewMode === 'calendar'
+                                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                                    : 'text-zinc-500 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                                    }`}
                                 title="Calendar view"
                             >
                                 <CalendarDays className="w-4 h-4" />
@@ -375,23 +401,23 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                         key="calendar"
                         className="animate-in fade-in slide-in-from-bottom-2 duration-200"
                     >
-                    <BookingCalendar
-                        bookings={bookings.received.map(b => ({
-                            id: b.id,
-                            startDate: new Date(b.startDate),
-                            endDate: new Date(b.endDate),
-                            status: b.status,
-                            tenant: {
-                                id: b.tenant?.id || '',
-                                name: b.tenant?.name || null,
-                                image: b.tenant?.image || null
-                            },
-                            listing: {
-                                id: b.listing.id,
-                                title: b.listing.title
-                            }
-                        }))}
-                    />
+                        <BookingCalendar
+                            bookings={bookings.received.map(b => ({
+                                id: b.id,
+                                startDate: new Date(b.startDate),
+                                endDate: new Date(b.endDate),
+                                status: b.status,
+                                tenant: {
+                                    id: b.tenant?.id || '',
+                                    name: b.tenant?.name || null,
+                                    image: b.tenant?.image || null
+                                },
+                                listing: {
+                                    id: b.listing.id,
+                                    title: b.listing.title
+                                }
+                            }))}
+                        />
                     </div>
                 )}
 
@@ -435,6 +461,7 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                                         booking={booking}
                                         type={activeTab}
                                         onStatusUpdate={handleStatusUpdate}
+                                        isOffline={isOffline}
                                     />
                                 ))}
                             </div>

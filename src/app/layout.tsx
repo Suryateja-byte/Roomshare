@@ -53,10 +53,10 @@ export default function RootLayout({
           <SkipLink />
           <CustomScrollContainer>
             <div className="flex flex-col min-h-screen">
-              <EmailVerificationWrapper />
               <NavbarWrapper>
                 <Navbar />
               </NavbarWrapper>
+              <EmailVerificationWrapper />
               <MainLayout>
                 {children}
               </MainLayout>

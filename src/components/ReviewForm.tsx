@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Star, LogIn, CheckCircle2 } from 'lucide-react';
+import { Star, LogIn, CheckCircle2, Edit3, Trash2, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
@@ -11,21 +11,109 @@ import CharacterCounter from '@/components/CharacterCounter';
 
 const COMMENT_MAX_LENGTH = 500;
 
+interface ExistingReview {
+    id: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+}
+
 interface ReviewFormProps {
     listingId?: string;
     targetUserId?: string;
     isLoggedIn?: boolean;
     onSuccess?: () => void;
+    hasExistingReview?: boolean;
+    existingReview?: ExistingReview;
 }
 
-export default function ReviewForm({ listingId, targetUserId, isLoggedIn = false, onSuccess }: ReviewFormProps) {
-    const [rating, setRating] = useState(0);
-    const [comment, setComment] = useState('');
+export default function ReviewForm({
+    listingId,
+    targetUserId,
+    isLoggedIn = false,
+    onSuccess,
+    hasExistingReview = false,
+    existingReview
+}: ReviewFormProps) {
+    const [rating, setRating] = useState(existingReview?.rating || 0);
+    const [comment, setComment] = useState(existingReview?.comment || '');
     const [hoveredRating, setHoveredRating] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [wasDeleted, setWasDeleted] = useState(false);
     const router = useRouter();
+
+    // Handle editing an existing review
+    const handleUpdate = async () => {
+        if (rating === 0) {
+            setError('Please select a rating');
+            return;
+        }
+        if (!comment.trim()) {
+            setError('Please write a comment');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setError('');
+
+        try {
+            const response = await fetch('/api/reviews', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    reviewId: existingReview?.id,
+                    rating,
+                    comment
+                }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to update review');
+            }
+
+            toast.success('Review updated successfully!');
+            setIsEditing(false);
+            router.refresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to update review');
+            toast.error('Failed to update review');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Handle deleting a review
+    const handleDelete = async () => {
+        if (!existingReview?.id) return;
+
+        setIsDeleting(true);
+
+        try {
+            const response = await fetch(`/api/reviews?reviewId=${existingReview.id}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to delete review');
+            }
+
+            toast.success('Review deleted successfully');
+            setWasDeleted(true);
+            router.refresh();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to delete review');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -111,6 +199,171 @@ export default function ReviewForm({ listingId, targetUserId, isLoggedIn = false
                             Sign in to review
                         </Button>
                     </Link>
+                </div>
+            </div>
+        );
+    }
+
+    // Show existing review state with edit/delete options
+    if (hasExistingReview && existingReview && !wasDeleted) {
+        // Edit mode
+        if (isEditing) {
+            return (
+                <div className="bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                    <h3 className="font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                        <Edit3 className="w-4 h-4" />
+                        Edit Your Review
+                    </h3>
+                    <div className="space-y-4">
+                        {/* Star Rating */}
+                        <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() => setRating(star)}
+                                    onMouseEnter={() => setHoveredRating(star)}
+                                    onMouseLeave={() => setHoveredRating(0)}
+                                    className="focus:outline-none transition-transform hover:scale-110"
+                                >
+                                    <Star
+                                        className={cn(
+                                            "w-6 h-6 transition-colors",
+                                            star <= (hoveredRating || rating)
+                                                ? "fill-yellow-400 text-yellow-400"
+                                                : "text-zinc-300 dark:text-zinc-600"
+                                        )}
+                                    />
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Comment */}
+                        <div>
+                            <textarea
+                                value={comment}
+                                onChange={(e) => setComment(e.target.value)}
+                                maxLength={COMMENT_MAX_LENGTH}
+                                rows={3}
+                                className="w-full px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white placeholder:text-zinc-400"
+                                placeholder="Update your review..."
+                            />
+                            <CharacterCounter current={comment.length} max={COMMENT_MAX_LENGTH} />
+                        </div>
+
+                        {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleUpdate}
+                                disabled={isSubmitting}
+                                className="flex-1"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Save Changes'
+                                )}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsEditing(false);
+                                    setRating(existingReview.rating);
+                                    setComment(existingReview.comment);
+                                    setError('');
+                                }}
+                                disabled={isSubmitting}
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // View mode with edit/delete buttons
+        return (
+            <div className="bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-zinc-900 dark:text-white mb-1">
+                            Your Review
+                        </h3>
+                        <div className="flex items-center gap-1 mb-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                    key={star}
+                                    className={cn(
+                                        "w-4 h-4",
+                                        star <= existingReview.rating
+                                            ? "fill-yellow-400 text-yellow-400"
+                                            : "text-zinc-300 dark:text-zinc-600"
+                                    )}
+                                />
+                            ))}
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-2">
+                                {new Date(existingReview.createdAt).toLocaleDateString()}
+                            </span>
+                        </div>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                            &ldquo;{existingReview.comment}&rdquo;
+                        </p>
+                    </div>
+                </div>
+                {/* Edit/Delete actions */}
+                <div className="flex gap-2 mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditing(true)}
+                        className="flex-1"
+                    >
+                        <Edit3 className="w-4 h-4 mr-2" />
+                        Edit
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="flex-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+                    >
+                        {isDeleting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                            </>
+                        )}
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    // Show "already reviewed" without details (fallback)
+    if (hasExistingReview) {
+        return (
+            <div className="bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                <div className="text-center py-4">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <h3 className="font-semibold text-lg text-zinc-900 dark:text-white mb-2">
+                        Thanks for your review!
+                    </h3>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                        You&apos;ve already shared your experience
+                    </p>
                 </div>
             </div>
         );

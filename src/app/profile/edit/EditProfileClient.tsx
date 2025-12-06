@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -12,7 +12,8 @@ import {
     Save,
     X,
     Plus,
-    Camera
+    Camera,
+    CheckCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,8 @@ import { Label } from '@/components/ui/label';
 import UserAvatar from '@/components/UserAvatar';
 import ImageUpload from '@/components/ImageUpload';
 import { updateProfile } from '@/app/actions/profile';
+import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
+
 
 type UserProfile = {
     id: string;
@@ -38,11 +41,21 @@ interface EditProfileClientProps {
     user: UserProfile;
 }
 
+interface ProfileFormData {
+    name: string;
+    bio: string;
+    countryOfOrigin: string;
+    languages: string[];
+    imageUrl: string;
+}
+
 const COMMON_LANGUAGES = [
     'English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese',
     'Chinese', 'Japanese', 'Korean', 'Hindi', 'Arabic', 'Russian',
     'Dutch', 'Swedish', 'Polish', 'Turkish', 'Vietnamese', 'Thai'
 ];
+
+const PROFILE_FORM_STORAGE_KEY = 'profile-edit-draft';
 
 export default function EditProfileClient({ user }: EditProfileClientProps) {
     const router = useRouter();
@@ -57,6 +70,21 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
     const [languages, setLanguages] = useState<string[]>(user.languages || []);
     const [imageUrl, setImageUrl] = useState(user.image || '');
     const [newLanguage, setNewLanguage] = useState('');
+
+    // Form persistence
+    const {
+        savedAt,
+        saveData,
+        clearPersistedData,
+        isHydrated
+    } = useFormPersistence<ProfileFormData>({ key: PROFILE_FORM_STORAGE_KEY });
+
+    // Auto-save when form changes
+    useEffect(() => {
+        if (!isHydrated || success) return;
+        saveData({ name, bio, countryOfOrigin, languages, imageUrl });
+    }, [name, bio, countryOfOrigin, languages, imageUrl, isHydrated, success, saveData]);
+
 
     const handleAddLanguage = (lang: string) => {
         if (lang && !languages.includes(lang)) {
@@ -88,6 +116,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                 setError(result.error);
             } else {
                 setSuccess(true);
+                clearPersistedData(); // Clear draft on successful save
                 setTimeout(() => {
                     router.push('/profile');
                 }, 1500);
@@ -114,6 +143,14 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">Edit Profile</h1>
                     <p className="text-zinc-500 dark:text-zinc-400 mt-2">Update your personal information</p>
                 </div>
+
+                {/* Auto-save status indicator */}
+                {savedAt && !isLoading && !success && (
+                    <div className="flex items-center justify-end gap-2 mb-4 text-xs text-zinc-500 dark:text-zinc-400 animate-in fade-in duration-300">
+                        <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                        <span>Draft saved {formatTimeSince(savedAt)}</span>
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-8">
                     {/* Profile Photo */}

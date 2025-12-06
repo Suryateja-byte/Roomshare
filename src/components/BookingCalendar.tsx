@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Clock, User, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, User, Home, Loader2 } from 'lucide-react';
 
 interface Booking {
     id: string;
@@ -22,6 +22,7 @@ interface Booking {
 interface BookingCalendarProps {
     bookings: Booking[];
     onBookingClick?: (booking: Booking) => void;
+    isLoading?: boolean;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -37,7 +38,7 @@ const statusColors = {
     CANCELLED: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700',
 };
 
-export default function BookingCalendar({ bookings, onBookingClick }: BookingCalendarProps) {
+export default function BookingCalendar({ bookings, onBookingClick, isLoading = false }: BookingCalendarProps) {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -136,7 +137,17 @@ export default function BookingCalendar({ bookings, onBookingClick }: BookingCal
 
             <div className="flex flex-col md:flex-row">
                 {/* Calendar Grid */}
-                <div className="flex-1 p-4">
+                <div className="flex-1 p-4 relative">
+                    {/* Loading overlay */}
+                    {isLoading && (
+                        <div className="absolute inset-0 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                            <div className="flex flex-col items-center gap-2">
+                                <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
+                                <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading bookings...</span>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Day headers */}
                     <div className="grid grid-cols-7 mb-2">
                         {DAYS.map(day => (

@@ -49,6 +49,13 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
                 subject,
                 html,
                 text: text || html.replace(/<[^>]*>/g, ''),
+                // Disable click tracking to prevent Resend from wrapping links
+                // This fixes issues with resend-clicks.com connection errors
+                headers: {
+                    'X-Entity-Ref-ID': new Date().getTime().toString(),
+                },
+                // Disable tracking features that wrap links
+                tags: [{ name: 'category', value: 'transactional' }],
             }),
         });
 

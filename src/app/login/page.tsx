@@ -188,6 +188,20 @@ function LoginForm() {
                                 />
                             </div>
                         </div>
+
+                        {/* Remember Me */}
+                        <div className="flex items-center">
+                            <input
+                                id="remember"
+                                name="remember"
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white bg-white dark:bg-zinc-800 focus:ring-zinc-900 dark:focus:ring-zinc-400 cursor-pointer"
+                            />
+                            <label htmlFor="remember" className="ml-2 block text-sm text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                                Remember me
+                            </label>
+                        </div>
+
                         <Button
                             type="submit"
                             disabled={loading}

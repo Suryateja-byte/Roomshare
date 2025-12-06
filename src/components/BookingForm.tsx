@@ -465,24 +465,57 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
             </form>
 
             <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
-                <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
-                    <span>Monthly rent</span>
-                    <span>${price}</span>
-                </div>
-                {bookingInfo && bookingInfo.diffDays > 0 && (
-                    <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
-                        <span>Duration</span>
-                        <span>{bookingInfo.diffDays} days</span>
-                    </div>
+                <h4 className="text-sm font-semibold text-zinc-900 dark:text-white mb-3">Price breakdown</h4>
+
+                {/* Daily rate calculation when dates are selected */}
+                {bookingInfo && bookingInfo.diffDays > 0 ? (
+                    <>
+                        <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+                            <span className="flex items-center gap-1">
+                                ${(price / 30).toFixed(2)}/day
+                                <span className="text-zinc-400 dark:text-zinc-500">×</span>
+                                {bookingInfo.diffDays} days
+                            </span>
+                            <span>${bookingInfo.totalPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+                            <span>Service fee</span>
+                            <span className="text-green-600 dark:text-green-400">Free</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-400 dark:text-zinc-500 text-xs">
+                            <span>Security deposit</span>
+                            <span>Handled separately</span>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+                            <span>Monthly rent</span>
+                            <span>${price}</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+                            <span>Daily rate</span>
+                            <span>${(price / 30).toFixed(2)}/day</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+                            <span>Service fee</span>
+                            <span className="text-green-600 dark:text-green-400">Free</span>
+                        </div>
+                    </>
                 )}
-                <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
-                    <span>Service fee</span>
-                    <span>$0</span>
-                </div>
-                <div className="flex justify-between font-bold text-lg pt-3 border-t border-zinc-100 dark:border-zinc-800 mt-3 text-zinc-900 dark:text-white">
+
+                <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-2" />
+
+                <div className="flex justify-between font-bold text-lg text-zinc-900 dark:text-white">
                     <span>Total</span>
-                    <span>${bookingInfo?.totalPrice || price}</span>
+                    <span>${bookingInfo?.totalPrice.toFixed(2) || price}</span>
                 </div>
+
+                {bookingInfo && bookingInfo.diffDays > 0 && (
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center">
+                        {Math.ceil(bookingInfo.diffDays / 30)} month{Math.ceil(bookingInfo.diffDays / 30) !== 1 ? 's' : ''} stay
+                    </p>
+                )}
             </div>
         </div>
     );

@@ -107,7 +107,7 @@ export async function PATCH(
         const body = await request.json();
         console.log('=== Request body:', JSON.stringify(body, null, 2));
 
-        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, languages, genderPreference, householdGender } = body;
+        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, languages, genderPreference, householdGender, images } = body;
 
         // Ch listing exists and user is the owner
         const listing = await prisma.listing.findUnique({
@@ -181,6 +181,7 @@ export async function PATCH(
                     totalSlots: totalSlotsNum,
                     availableSlots: Math.max(0, listing.availableSlots + (totalSlotsNum - listing.totalSlots)),
                     moveInDate: moveInDate ? new Date(moveInDate) : null,
+                    ...(Array.isArray(images) && { images }),
                 }
             });
             console.log('=== Listing updated');

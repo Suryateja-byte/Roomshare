@@ -16,7 +16,8 @@ import {
     Share2,
     MapPin,
     MessageSquare,
-    ChevronRight
+    ChevronRight,
+    ImageOff
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import UserAvatar from '@/components/UserAvatar';
@@ -38,6 +39,7 @@ type UserWithListings = {
         description: string;
         price: number;
         availableSlots: number;
+        images: string[];
         location: {
             city: string;
             state: string;
@@ -60,7 +62,8 @@ const Badge = ({ icon: Icon, text, variant = "default" }: any) => {
 };
 
 const ListingCard = ({ listing }: any) => {
-    const imageUrl = `https://source.unsplash.com/random/800x600/?apartment,room&sig=${listing.id}`;
+    const hasImages = listing.images && listing.images.length > 0;
+    const imageUrl = hasImages ? listing.images[0] : null;
     const locationText = listing.location
         ? `${listing.location.city}, ${listing.location.state}`
         : 'Location not specified';
@@ -68,12 +71,19 @@ const ListingCard = ({ listing }: any) => {
     return (
         <Link href={`/listings/${listing.id}`}>
             <div className="group relative flex flex-col gap-3 p-3 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 shadow-sm hover:shadow-md transition-all cursor-pointer">
-                <div className="relative aspect-[16/9] rounded-xl overflow-hidden">
-                    <img
-                        src={imageUrl}
-                        alt={listing.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
+                <div className="relative aspect-[16/9] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                    {imageUrl ? (
+                        <img
+                            src={imageUrl}
+                            alt={listing.title}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                    ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-500">
+                            <ImageOff className="w-8 h-8 mb-2" />
+                            <span className="text-xs">No image</span>
+                        </div>
+                    )}
                     <div className="absolute top-2 right-2 px-2 py-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-md text-[10px] font-bold uppercase tracking-wide text-green-600 dark:text-green-400">
                         {listing.availableSlots > 0 ? 'Active' : 'Full'}
                     </div>
@@ -280,18 +290,33 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                                         <ListingCard key={listing.id} listing={listing} />
                                     ))
                                 ) : (
-                                    <div className="col-span-2 text-center py-12 text-zinc-400 dark:text-zinc-500">
-                                        <p>No listings yet</p>
+                                    <div className="col-span-2 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-8 text-center">
+                                        <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <MapPin className="w-8 h-8 text-zinc-300 dark:text-zinc-600" />
+                                        </div>
+                                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-2">No listings yet</h4>
+                                        <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 max-w-xs mx-auto">
+                                            Have a room to share? List your first space and start earning as a host.
+                                        </p>
+                                        <Link
+                                            href="/listings/create"
+                                            className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+                                        >
+                                            Create your first listing
+                                            <ChevronRight className="w-4 h-4" />
+                                        </Link>
                                     </div>
                                 )}
 
-                                {/* Add New Listing Placeholder */}
-                                <Link href="/listings/create" className="group flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all cursor-pointer min-h-[200px]">
-                                    <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                        <span className="text-2xl text-zinc-400 dark:text-zinc-500 font-light">+</span>
-                                    </div>
-                                    <span className="text-sm font-bold text-zinc-500 dark:text-zinc-400">List a new room</span>
-                                </Link>
+                                {/* Add New Listing Placeholder - only show when user has some listings */}
+                                {user.listings.length > 0 && (
+                                    <Link href="/listings/create" className="group flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all cursor-pointer min-h-[200px]">
+                                        <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <span className="text-2xl text-zinc-400 dark:text-zinc-500 font-light">+</span>
+                                        </div>
+                                        <span className="text-sm font-bold text-zinc-500 dark:text-zinc-400">List a new room</span>
+                                    </Link>
+                                )}
                             </div>
                         </div>
 

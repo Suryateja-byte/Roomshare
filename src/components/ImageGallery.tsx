@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, ZoomIn, Grid3X3 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ZoomIn, Grid3X3, ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ImageGalleryProps {
@@ -9,10 +9,52 @@ interface ImageGalleryProps {
     title: string;
 }
 
+// Image component with error fallback
+function ImageWithFallback({
+    src,
+    alt,
+    className,
+    onError,
+    hasError,
+    ...props
+}: {
+    src: string;
+    alt: string;
+    className?: string;
+    onError: () => void;
+    hasError: boolean;
+    [key: string]: any;
+}) {
+    if (hasError) {
+        return (
+            <div className={cn("flex flex-col items-center justify-center bg-zinc-100 dark:bg-zinc-800", className)}>
+                <ImageOff className="w-8 h-8 text-zinc-400 dark:text-zinc-500 mb-2" />
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">Image unavailable</span>
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={src}
+            alt={alt}
+            className={className}
+            onError={onError}
+            {...props}
+        />
+    );
+}
+
 export default function ImageGallery({ images, title }: ImageGalleryProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isZoomed, setIsZoomed] = useState(false);
+    // Track which images have failed to load
+    const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
+
+    const markImageBroken = (index: number) => {
+        setBrokenImages(prev => new Set(prev).add(index));
+    };
 
     const mainImage = images[0];
     const galleryImages = images.slice(1, 5);
@@ -80,10 +122,12 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                     className="md:col-span-2 h-full relative group cursor-pointer"
                     onClick={() => openLightbox(0)}
                 >
-                    <img
+                    <ImageWithFallback
                         src={mainImage}
                         alt={title}
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        hasError={brokenImages.has(0)}
+                        onError={() => markImageBroken(0)}
                     />
                     <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
                     <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
@@ -101,10 +145,12 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                                 className="relative group overflow-hidden cursor-pointer"
                                 onClick={() => openLightbox(i + 1)}
                             >
-                                <img
+                                <ImageWithFallback
                                     src={img}
                                     alt={`${title} - Image ${i + 2}`}
                                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                    hasError={brokenImages.has(i + 1)}
+                                    onError={() => markImageBroken(i + 1)}
                                 />
                                 <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
 
@@ -193,7 +239,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                             )}
                             onClick={toggleZoom}
                         >
-                            <img
+                            <ImageWithFallback
                                 src={images[currentIndex]}
                                 alt={`${title} - Image ${currentIndex + 1}`}
                                 className={cn(
@@ -201,6 +247,8 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                                     isZoomed ? "scale-150" : "scale-100"
                                 )}
                                 draggable={false}
+                                hasError={brokenImages.has(currentIndex)}
+                                onError={() => markImageBroken(currentIndex)}
                             />
                         </div>
 
@@ -238,10 +286,12 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                                                 : "opacity-50 hover:opacity-100"
                                         )}
                                     >
-                                        <img
+                                        <ImageWithFallback
                                             src={img}
                                             alt={`Thumbnail ${i + 1}`}
                                             className="w-full h-full object-cover"
+                                            hasError={brokenImages.has(i)}
+                                            onError={() => markImageBroken(i)}
                                         />
                                     </button>
                                 ))}

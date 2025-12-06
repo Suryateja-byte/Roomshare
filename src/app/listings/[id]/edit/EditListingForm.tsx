@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,8 +13,30 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Home, MapPin, List, ArrowLeft } from 'lucide-react';
+import { Loader2, Home, MapPin, List, ArrowLeft, FileText, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import ImageUploader from '@/components/listings/ImageUploader';
+import { ImageIcon } from 'lucide-react';
+
+interface ImageObject {
+    file?: File;
+    id: string;
+    previewUrl: string;
+    uploadedUrl?: string;
+    isUploading?: boolean;
+    error?: string;
+}
 
 interface Listing {
     id: string;
@@ -36,10 +58,30 @@ interface Listing {
         state: string;
         zip: string;
     } | null;
+    images: string[];
 }
 
 interface EditListingFormProps {
     listing: Listing;
+}
+
+interface EditListingFormData {
+    title: string;
+    description: string;
+    price: string;
+    totalSlots: string;
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    amenities: string;
+    houseRules: string;
+    moveInDate: string;
+    leaseDuration: string;
+    roomType: string;
+    genderPreference: string;
+    householdGender: string;
+    selectedLanguages: string[];
 }
 
 // Format date for input (YYYY-MM-DD)
@@ -57,13 +99,147 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [selectedLanguages, setSelectedLanguages] = useState<string[]>(listing.languages || []);
+    const [formModified, setFormModified] = useState(false);
+    const formRef = useRef<HTMLFormElement>(null);
+    const [showDraftBanner, setShowDraftBanner] = useState(false);
+    const [draftRestored, setDraftRestored] = useState(false);
 
     // Form field states for premium components
+    const [description, setDescription] = useState(listing.description || '');
     const [moveInDate, setMoveInDate] = useState(formatDateForInput(listing.moveInDate));
     const [leaseDuration, setLeaseDuration] = useState(listing.leaseDuration || '');
     const [roomType, setRoomType] = useState(listing.roomType || '');
     const [genderPreference, setGenderPreference] = useState(listing.genderPreference || '');
     const [householdGender, setHouseholdGender] = useState(listing.householdGender || '');
+
+    // Image management state
+    const [images, setImages] = useState<ImageObject[]>([]);
+    const [imagesInitialized, setImagesInitialized] = useState(false);
+
+    // Form persistence hook - unique key per listing
+    const FORM_STORAGE_KEY = `edit-listing-draft-${listing.id}`;
+    const {
+        persistedData,
+        hasDraft,
+        savedAt,
+        saveData,
+        clearPersistedData,
+        isHydrated
+    } = useFormPersistence<EditListingFormData>({ key: FORM_STORAGE_KEY });
+
+    // Show draft banner when we have a draft and haven't restored yet
+    useEffect(() => {
+        if (isHydrated && hasDraft && !draftRestored) {
+            setShowDraftBanner(true);
+        }
+    }, [isHydrated, hasDraft, draftRestored]);
+
+    // Collect current form data for saving
+    const collectFormData = (): EditListingFormData => {
+        const form = formRef.current;
+        if (!form) {
+            return {
+                title: listing.title, description, price: String(listing.price), totalSlots: String(listing.totalSlots),
+                address: listing.location?.address || '', city: listing.location?.city || '',
+                state: listing.location?.state || '', zip: listing.location?.zip || '',
+                amenities: listing.amenities.join(', '), houseRules: listing.houseRules.join(', '),
+                moveInDate, leaseDuration, roomType, genderPreference, householdGender,
+                selectedLanguages
+            };
+        }
+
+        return {
+            title: (form.elements.namedItem('title') as HTMLInputElement)?.value || '',
+            description: description,
+            price: (form.elements.namedItem('price') as HTMLInputElement)?.value || '',
+            totalSlots: (form.elements.namedItem('totalSlots') as HTMLInputElement)?.value || '',
+            address: (form.elements.namedItem('address') as HTMLInputElement)?.value || '',
+            city: (form.elements.namedItem('city') as HTMLInputElement)?.value || '',
+            state: (form.elements.namedItem('state') as HTMLInputElement)?.value || '',
+            zip: (form.elements.namedItem('zip') as HTMLInputElement)?.value || '',
+            amenities: (form.elements.namedItem('amenities') as HTMLInputElement)?.value || '',
+            houseRules: (form.elements.namedItem('houseRules') as HTMLTextAreaElement)?.value || '',
+            moveInDate,
+            leaseDuration,
+            roomType,
+            genderPreference,
+            householdGender,
+            selectedLanguages
+        };
+    };
+
+    // Restore draft data to form
+    const restoreDraft = () => {
+        if (!persistedData || !formRef.current) return;
+
+        const form = formRef.current;
+        (form.elements.namedItem('title') as HTMLInputElement).value = persistedData.title || listing.title;
+        setDescription(persistedData.description || listing.description);
+        (form.elements.namedItem('price') as HTMLInputElement).value = persistedData.price || String(listing.price);
+        (form.elements.namedItem('totalSlots') as HTMLInputElement).value = persistedData.totalSlots || String(listing.totalSlots);
+        (form.elements.namedItem('address') as HTMLInputElement).value = persistedData.address || listing.location?.address || '';
+        (form.elements.namedItem('city') as HTMLInputElement).value = persistedData.city || listing.location?.city || '';
+        (form.elements.namedItem('state') as HTMLInputElement).value = persistedData.state || listing.location?.state || '';
+        (form.elements.namedItem('zip') as HTMLInputElement).value = persistedData.zip || listing.location?.zip || '';
+        (form.elements.namedItem('amenities') as HTMLInputElement).value = persistedData.amenities || listing.amenities.join(', ');
+        (form.elements.namedItem('houseRules') as HTMLTextAreaElement).value = persistedData.houseRules || listing.houseRules.join(', ');
+
+        setMoveInDate(persistedData.moveInDate || formatDateForInput(listing.moveInDate));
+        setLeaseDuration(persistedData.leaseDuration || listing.leaseDuration || '');
+        setRoomType(persistedData.roomType || listing.roomType || '');
+        setGenderPreference(persistedData.genderPreference || listing.genderPreference || '');
+        setHouseholdGender(persistedData.householdGender || listing.householdGender || '');
+        setSelectedLanguages(persistedData.selectedLanguages || listing.languages || []);
+
+        setDraftRestored(true);
+        setShowDraftBanner(false);
+        setFormModified(true);
+    };
+
+    // Discard draft and use original listing data
+    const discardDraft = () => {
+        clearPersistedData();
+        setShowDraftBanner(false);
+        setDraftRestored(true);
+    };
+
+    // Auto-save form data on changes
+    const handleFormChangeWithSave = () => {
+        if (!formModified) {
+            setFormModified(true);
+        }
+        if (!isHydrated) return;
+        if (!draftRestored && hasDraft) return; // Don't overwrite existing draft until user decides
+        const formData = collectFormData();
+        saveData(formData);
+    };
+
+    // Save when controlled states change
+    useEffect(() => {
+        if (!isHydrated || (!draftRestored && hasDraft)) return;
+        if (!formModified) return;
+        const formData = collectFormData();
+        saveData(formData);
+    }, [description, moveInDate, leaseDuration, roomType, genderPreference, householdGender, selectedLanguages]);
+
+    // Warn user when navigating away with unsaved changes
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (formModified && !loading) {
+                e.preventDefault();
+                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [formModified, loading]);
+
+    // Track form modifications (legacy - now merged with save)
+    const handleFormChange = () => {
+        handleFormChangeWithSave();
+    };
 
     const LANGUAGES = [
         'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
@@ -71,12 +247,27 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     ];
 
     const toggleLanguage = (lang: string) => {
+        setFormModified(true);
         setSelectedLanguages(prev =>
             prev.includes(lang)
                 ? prev.filter(l => l !== lang)
                 : [...prev, lang]
         );
     };
+
+    // Handle image changes from ImageUploader
+    const handleImagesChange = (newImages: ImageObject[]) => {
+        setImages(newImages);
+        if (imagesInitialized) {
+            setFormModified(true);
+        } else {
+            setImagesInitialized(true);
+        }
+    };
+
+    // Check if any images are still uploading
+    const isAnyImageUploading = images.some(img => img.isUploading);
+    const hasFailedImages = images.some(img => img.error);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -100,6 +291,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                     roomType: roomType || undefined,
                     genderPreference: genderPreference || undefined,
                     householdGender: householdGender || undefined,
+                    images: images.filter(img => img.uploadedUrl).map(img => img.uploadedUrl),
                 }),
             });
 
@@ -108,6 +300,8 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                 throw new Error(json.error || 'Failed to update listing');
             }
 
+            // Clear draft on successful submission
+            clearPersistedData();
             // Redirect to listing page on success
             router.push(`/listings/${listing.id}`);
             router.refresh();
@@ -135,7 +329,51 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-12">
+            {/* Draft Resume Banner */}
+            {showDraftBanner && savedAt && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                You have unsaved edits
+                            </p>
+                            <p className="text-xs text-blue-600 dark:text-blue-400">
+                                Last saved {formatTimeSince(savedAt)}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={discardDraft}
+                            className="text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                        >
+                            Discard
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={restoreDraft}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            Resume Edits
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Auto-save status indicator */}
+            {!showDraftBanner && savedAt && formModified && !loading && (
+                <div className="flex items-center justify-end gap-2 mb-4 text-xs text-zinc-500 dark:text-zinc-400 animate-in fade-in duration-300">
+                    <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                    <span>Draft saved {formatTimeSince(savedAt)}</span>
+                </div>
+            )}
+
+            <form ref={formRef} onSubmit={handleSubmit} onChange={handleFormChange} className="space-y-12">
                 {/* Section 1: The Basics */}
                 <div className="space-y-6">
                     <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
@@ -164,7 +402,8 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             className="w-full bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:bg-white dark:focus:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3.5 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/10 focus:border-zinc-900 dark:focus:border-zinc-500 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 resize-none leading-relaxed"
                             placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
                             disabled={loading}
-                            defaultValue={listing.description}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
                         />
                     </div>
 
@@ -198,7 +437,40 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
 
                 <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
 
-                {/* Section 2: Location */}
+                {/* Section 2: Photos */}
+                <div className="space-y-6">
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4" /> Photos
+                    </h3>
+
+                    <div className="space-y-2">
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            Add photos of your space to attract potential roommates. The first image will be used as the main photo.
+                        </p>
+                        <ImageUploader
+                            initialImages={listing.images || []}
+                            onImagesChange={handleImagesChange}
+                            maxImages={10}
+                            uploadToCloud={true}
+                        />
+
+                        {images.length === 0 && (
+                            <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
+                                ⚠️ At least one photo is required for your listing
+                            </p>
+                        )}
+
+                        {isAnyImageUploading && (
+                            <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
+                                Please wait for image uploads to complete before saving...
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
+
+                {/* Section 3: Location */}
                 <div className="space-y-6">
                     <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
                         <MapPin className="w-4 h-4" /> Location
@@ -323,11 +595,10 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                     type="button"
                                     onClick={() => toggleLanguage(lang)}
                                     disabled={loading}
-                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                                        selectedLanguages.includes(lang)
-                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
-                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-                                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${selectedLanguages.includes(lang)
+                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                                        } disabled:cursor-not-allowed disabled:opacity-50`}
                                 >
                                     {lang}
                                 </button>
@@ -393,7 +664,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                     </Button>
                     <Button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || isAnyImageUploading || (images.length === 0)}
                         size="lg"
                         className="flex-1 h-14 rounded-xl shadow-xl shadow-zinc-900/10 text-lg"
                     >

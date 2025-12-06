@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Home, MapPin, List, Camera, FileText, X, AlertTriangle } from 'lucide-react';
+import { Loader2, Home, MapPin, List, Camera, FileText, X, AlertTriangle, CheckCircle } from 'lucide-react';
 import ImageUploader from '@/components/listings/ImageUploader';
 import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
 import {
@@ -335,8 +335,48 @@ export default function CreateListingForm() {
         );
     };
 
+    // Form sections for progress indicator
+    const FORM_SECTIONS = [
+        { id: 'basics', label: 'The Basics', icon: Home },
+        { id: 'location', label: 'Location', icon: MapPin },
+        { id: 'photos', label: 'Photos', icon: Camera },
+        { id: 'details', label: 'Finer Details', icon: List },
+    ];
+
     return (
         <>
+            {/* Step Progress Indicator */}
+            <div className="mb-8">
+                <div className="flex items-center justify-between">
+                    {FORM_SECTIONS.map((section, index) => {
+                        const Icon = section.icon;
+                        return (
+                            <div key={section.id} className="flex items-center flex-1">
+                                {/* Step Circle */}
+                                <div className="flex flex-col items-center">
+                                    <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border-2 border-zinc-200 dark:border-zinc-700">
+                                        <Icon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                                    </div>
+                                    <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mt-2 text-center hidden sm:block">
+                                        {section.label}
+                                    </span>
+                                    <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mt-2 text-center sm:hidden">
+                                        {index + 1}
+                                    </span>
+                                </div>
+                                {/* Connector Line */}
+                                {index < FORM_SECTIONS.length - 1 && (
+                                    <div className="flex-1 h-0.5 bg-zinc-200 dark:bg-zinc-700 mx-2 sm:mx-4" />
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+                <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-4">
+                    Fill out all sections below to publish your listing
+                </p>
+            </div>
+
             {/* Draft Resume Banner */}
             {showDraftBanner && savedAt && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4">
@@ -376,6 +416,14 @@ export default function CreateListingForm() {
             {error && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-4 rounded-xl mb-8 text-sm">
                     {error}
+                </div>
+            )}
+
+            {/* Auto-save status indicator */}
+            {!showDraftBanner && savedAt && !loading && (
+                <div className="flex items-center justify-end gap-2 mb-4 text-xs text-zinc-500 dark:text-zinc-400 animate-in fade-in duration-300">
+                    <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                    <span>Draft saved {formatTimeSince(savedAt)}</span>
                 </div>
             )}
 

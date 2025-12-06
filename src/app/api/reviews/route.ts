@@ -157,3 +157,107 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
+
+// Update a review (only the author can update their own review)
+export async function PUT(request: Request) {
+    try {
+        const session = await auth();
+        if (!session || !session.user || !session.user.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const { reviewId, rating, comment } = body;
+
+        if (!reviewId) {
+            return NextResponse.json({ error: 'Review ID is required' }, { status: 400 });
+        }
+
+        if (!rating || !comment) {
+            return NextResponse.json({ error: 'Missing rating or comment' }, { status: 400 });
+        }
+
+        // Rating validation: must be integer between 1-5
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+            return NextResponse.json(
+                { error: 'Rating must be an integer between 1 and 5' },
+                { status: 400 }
+            );
+        }
+
+        // Check if the review exists and belongs to the current user
+        const existingReview = await prisma.review.findUnique({
+            where: { id: reviewId }
+        });
+
+        if (!existingReview) {
+            return NextResponse.json({ error: 'Review not found' }, { status: 404 });
+        }
+
+        if (existingReview.authorId !== session.user.id) {
+            return NextResponse.json({ error: 'You can only edit your own reviews' }, { status: 403 });
+        }
+
+        // Update the review
+        const updatedReview = await prisma.review.update({
+            where: { id: reviewId },
+            data: {
+                rating,
+                comment
+            },
+            include: {
+                author: {
+                    select: {
+                        name: true,
+                        image: true
+                    }
+                }
+            }
+        });
+
+        return NextResponse.json(updatedReview);
+    } catch (error) {
+        console.error('Error updating review:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+// Delete a review (only the author can delete their own review)
+export async function DELETE(request: Request) {
+    try {
+        const session = await auth();
+        if (!session || !session.user || !session.user.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(request.url);
+        const reviewId = searchParams.get('reviewId');
+
+        if (!reviewId) {
+            return NextResponse.json({ error: 'Review ID is required' }, { status: 400 });
+        }
+
+        // Check if the review exists and belongs to the current user
+        const existingReview = await prisma.review.findUnique({
+            where: { id: reviewId }
+        });
+
+        if (!existingReview) {
+            return NextResponse.json({ error: 'Review not found' }, { status: 404 });
+        }
+
+        if (existingReview.authorId !== session.user.id) {
+            return NextResponse.json({ error: 'You can only delete your own reviews' }, { status: 403 });
+        }
+
+        // Delete the review
+        await prisma.review.delete({
+            where: { id: reviewId }
+        });
+
+        return NextResponse.json({ success: true, message: 'Review deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting review:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}

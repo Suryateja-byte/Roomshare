@@ -18,6 +18,8 @@ interface Listing {
     amenities: string[];
     availableSlots: number;
     images?: string[];
+    avgRating?: number;
+    reviewCount?: number;
 }
 
 // State abbreviation map
@@ -92,11 +94,11 @@ export default function ListingCard({ listing, isSaved }: { listing: Listing, is
     return (
         <Link
             href={`/listings/${listing.id}`}
-            className="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 rounded-xl"
+            className="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 rounded-xl"
         >
-            <div className="relative bg-white flex flex-col rounded-xl border border-zinc-200/60 overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] hover:border-zinc-300">
+            <div className="relative bg-white dark:bg-zinc-900 flex flex-col rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.4)] hover:border-zinc-300 dark:hover:border-zinc-700">
                 {/* Image Area */}
-                <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
+                <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
                     {/* Actual image or placeholder */}
                     <Image
                         src={imageUrl}
@@ -110,11 +112,11 @@ export default function ListingCard({ listing, isSaved }: { listing: Listing, is
 
                     {/* Empty state overlay - Intentional waiting state */}
                     {showImagePlaceholder && (
-                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-150 flex flex-col items-center justify-center">
-                            <div className="w-14 h-14 rounded-2xl bg-zinc-200/80 flex items-center justify-center mb-2">
-                                <Home className="w-7 h-7 text-zinc-400" strokeWidth={1.5} fill="currentColor" fillOpacity={0.1} />
+                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-150 dark:from-zinc-800 dark:to-zinc-850 flex flex-col items-center justify-center">
+                            <div className="w-14 h-14 rounded-2xl bg-zinc-200/80 dark:bg-zinc-700/80 flex items-center justify-center mb-2">
+                                <Home className="w-7 h-7 text-zinc-400 dark:text-zinc-500" strokeWidth={1.5} fill="currentColor" fillOpacity={0.1} />
                             </div>
-                            <span className="text-[11px] text-zinc-400 font-medium uppercase tracking-wider">No Photos</span>
+                            <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wider">No Photos</span>
                         </div>
                     )}
 
@@ -129,8 +131,8 @@ export default function ListingCard({ listing, isSaved }: { listing: Listing, is
                             inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold uppercase tracking-wide
                             shadow-sm
                             ${isAvailable
-                                ? 'bg-white text-zinc-900 shadow-black/5'
-                                : 'bg-zinc-900 text-white'
+                                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-black/5'
+                                : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
                             }
                         `}>
                             {isAvailable ? 'Available' : 'Filled'}
@@ -142,24 +144,28 @@ export default function ListingCard({ listing, isSaved }: { listing: Listing, is
                 <div className="flex flex-col flex-1 p-4">
                     {/* Title Row with Rating */}
                     <div className="flex justify-between items-start gap-3 mb-0.5">
-                        <h3 className="font-semibold text-[15px] text-zinc-900 line-clamp-1 leading-snug" title={displayTitle}>
+                        <h3 className="font-semibold text-[15px] text-zinc-900 dark:text-white line-clamp-1 leading-snug" title={displayTitle}>
                             {displayTitle}
                         </h3>
-                        <div className="flex items-center gap-1 flex-shrink-0" aria-label="Rating 4.9 out of 5">
-                            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                            <span className="text-[13px] text-zinc-600 font-medium">4.9</span>
-                        </div>
+                        {listing.reviewCount && listing.reviewCount > 0 && listing.avgRating ? (
+                            <div className="flex items-center gap-1 flex-shrink-0" aria-label={`Rating ${listing.avgRating.toFixed(1)} out of 5`}>
+                                <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                                <span className="text-[13px] text-zinc-600 dark:text-zinc-400 font-medium">{listing.avgRating.toFixed(1)}</span>
+                            </div>
+                        ) : (
+                            <span className="text-[11px] text-zinc-400 dark:text-zinc-500 flex-shrink-0">New</span>
+                        )}
                     </div>
 
                     {/* Location - Tight spacing with title */}
-                    <p className="text-[13px] text-zinc-500 mb-3">
+                    <p className="text-[13px] text-zinc-500 dark:text-zinc-400 mb-3">
                         {formatLocation(listing.location.city, listing.location.state)}
                     </p>
 
                     {/* Amenities */}
                     <div className="flex flex-wrap gap-1.5 mb-4">
                         {listing.amenities.slice(0, 3).map((amenity, i) => (
-                            <span key={i} className="text-[11px] bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded font-medium">
+                            <span key={i} className="text-[11px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded font-medium">
                                 {amenity}
                             </span>
                         ))}
@@ -168,8 +174,8 @@ export default function ListingCard({ listing, isSaved }: { listing: Listing, is
                     {/* Price Row - Clean, no button */}
                     <div className="mt-auto">
                         <div className="flex items-baseline">
-                            <span className="font-bold text-xl text-zinc-900 tracking-tight">{formatPrice(listing.price)}</span>
-                            {listing.price > 0 && <span className="text-zinc-400 text-sm ml-0.5">/mo</span>}
+                            <span className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
+                            {listing.price > 0 && <span className="text-zinc-400 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
                         </div>
                     </div>
                 </div>

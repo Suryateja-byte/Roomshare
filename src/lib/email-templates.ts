@@ -285,6 +285,12 @@ export const emailTemplates = {
             <p style="margin: 24px 0 0; color: #71717a; font-size: 14px;">
                 This link will expire in 24 hours. If it expires, simply log in to your account and request a new verification email.
             </p>
+            <p style="margin: 16px 0 0; color: #a1a1aa; font-size: 12px;">
+                If the button above doesn't work, copy and paste this link into your browser:
+            </p>
+            <p style="margin: 8px 0 0; color: #71717a; font-size: 11px; word-break: break-all;">
+                ${data.verificationUrl}
+            </p>
             <p style="margin: 12px 0 0; color: #a1a1aa; font-size: 12px;">
                 If you didn't create a RoomShare account, you can safely ignore this email.
             </p>

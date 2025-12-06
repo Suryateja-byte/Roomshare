@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, X } from 'lucide-react';
+import { Search, X, Clock, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -16,6 +17,16 @@ import {
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
+
+// Recent searches config
+const RECENT_SEARCHES_KEY = 'roomshare-recent-searches';
+const MAX_RECENT_SEARCHES = 5;
+
+interface RecentSearch {
+    location: string;
+    coords?: { lat: number; lng: number };
+    timestamp: number;
+}
 
 // Custom event for map fly-to
 export const MAP_FLY_TO_EVENT = 'mapFlyToLocation';
@@ -65,6 +76,67 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const [isSearching, setIsSearching] = useState(false);
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastSearchRef = useRef<string>(''); // Track last search to prevent duplicates
+
+    // Recent searches state
+    const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+    const [showRecentSearches, setShowRecentSearches] = useState(false);
+
+    // Load recent searches from localStorage on mount
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+            if (stored) {
+                setRecentSearches(JSON.parse(stored));
+            }
+        } catch (e) {
+            // Ignore localStorage errors
+        }
+    }, []);
+
+    // Save a search to recent searches
+    const saveRecentSearch = useCallback((loc: string, coords?: { lat: number; lng: number }) => {
+        if (!loc.trim()) return;
+
+        const newSearch: RecentSearch = {
+            location: loc.trim(),
+            coords,
+            timestamp: Date.now()
+        };
+
+        setRecentSearches(prev => {
+            // Remove duplicates and add new search at the beginning
+            const filtered = prev.filter(s => s.location.toLowerCase() !== loc.toLowerCase());
+            const updated = [newSearch, ...filtered].slice(0, MAX_RECENT_SEARCHES);
+
+            // Persist to localStorage
+            try {
+                localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+            } catch (e) {
+                // Ignore localStorage errors
+            }
+
+            return updated;
+        });
+    }, []);
+
+    // Clear all recent searches
+    const clearRecentSearches = useCallback(() => {
+        setRecentSearches([]);
+        try {
+            localStorage.removeItem(RECENT_SEARCHES_KEY);
+        } catch (e) {
+            // Ignore localStorage errors
+        }
+    }, []);
+
+    // Select a recent search
+    const selectRecentSearch = useCallback((search: RecentSearch) => {
+        setLocation(search.location);
+        if (search.coords) {
+            setSelectedCoords(search.coords);
+        }
+        setShowRecentSearches(false);
+    }, []);
 
     // Sync state with URL params when they change (e.g., after navigation)
     useEffect(() => {
@@ -171,12 +243,20 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setIsSearching(true);
         lastSearchRef.current = searchUrl;
 
+        // Save to recent searches when navigating
+        if (trimmedLocation) {
+            saveRecentSearch(trimmedLocation, selectedCoords || undefined);
+        }
+
+        // Close filter drawer on search
+        setShowFilters(false);
+
         searchTimeoutRef.current = setTimeout(() => {
             router.push(searchUrl);
             // Reset searching state after navigation starts
             setTimeout(() => setIsSearching(false), 500);
         }, SEARCH_DEBOUNCE_MS);
-    }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching]);
+    }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching, saveRecentSearch]);
 
     // Cleanup timeout on unmount
     useEffect(() => {
@@ -228,8 +308,43 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         leaseDuration || roomType || amenities.length > 0 || houseRules.length > 0 ||
         languages.length > 0 || genderPreference || householdGender;
 
+    // Count active filters for badge
+    const activeFilterCount = [
+        moveInDate,
+        leaseDuration && leaseDuration !== 'any',
+        roomType && roomType !== 'any',
+        ...amenities,
+        ...houseRules,
+        ...languages,
+        genderPreference && genderPreference !== 'any',
+        householdGender && householdGender !== 'any',
+    ].filter(Boolean).length;
+
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;
+
+    // Handle Escape key to close filter drawer
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && showFilters) {
+                setShowFilters(false);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+        return () => document.removeEventListener('keydown', handleEscape);
+    }, [showFilters]);
+
+    // Prevent body scroll when drawer is open
+    useEffect(() => {
+        if (showFilters) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [showFilters]);
 
     const isCompact = variant === 'compact';
 
@@ -241,7 +356,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 role="search"
             >
                 {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
-                <div className={`w-full md:flex-1 flex flex-col ${isCompact ? 'px-4 py-2' : 'px-5 sm:px-6 py-3 md:py-2'}`}>
+                <div className={`w-full md:flex-1 flex flex-col relative ${isCompact ? 'px-4 py-2' : 'px-5 sm:px-6 py-3 md:py-2'}`}>
                     {!isCompact && (
                         <span className="text-[10px] font-bold text-[#0f172a] dark:text-white uppercase tracking-wider mb-1">
                             Where
@@ -252,11 +367,64 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                         onChange={(value) => {
                             setLocation(value);
                             if (selectedCoords) setSelectedCoords(null);
+                            setShowRecentSearches(false);
                         }}
-                        onLocationSelect={handleLocationSelect}
+                        onLocationSelect={(data) => {
+                            handleLocationSelect(data);
+                            setShowRecentSearches(false);
+                        }}
+                        onFocus={() => {
+                            if (recentSearches.length > 0 && !location) {
+                                setShowRecentSearches(true);
+                            }
+                        }}
+                        onBlur={() => {
+                            // Delay hiding to allow click on recent search
+                            setTimeout(() => setShowRecentSearches(false), 200);
+                        }}
                         placeholder="Search destinations"
                         className={isCompact ? "text-sm" : "text-sm"}
                     />
+
+                    {/* Recent Searches Dropdown */}
+                    {showRecentSearches && recentSearches.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 z-50 overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-100 dark:border-zinc-800">
+                                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase">Recent Searches</span>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        clearRecentSearches();
+                                    }}
+                                    className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                            <ul className="py-1">
+                                {recentSearches.map((search, idx) => (
+                                    <li key={`${search.location}-${idx}`}>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                selectRecentSearch(search);
+                                            }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left transition-colors"
+                                        >
+                                            <Clock className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                                            <span className="text-sm text-zinc-700 dark:text-zinc-200 truncate">
+                                                {search.location}
+                                            </span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
 
                 {/* Divider - Taller for better segmentation */}
@@ -313,11 +481,17 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                         <button
                             type="button"
                             onClick={() => setShowFilters(!showFilters)}
-                            className={`hidden sm:flex items-center px-4 py-2 text-sm font-medium rounded-full border transition-colors touch-target ${showFilters ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-zinc-200 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-100 dark:hover:border-zinc-700'}`}
+                            className={`hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all duration-200 touch-target ${showFilters ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : 'text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600'}`}
                             aria-expanded={showFilters}
                             aria-controls="search-filters"
                         >
+                            <SlidersHorizontal className="w-4 h-4" />
                             Filters
+                            {activeFilterCount > 0 && (
+                                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full transition-colors ${showFilters ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white' : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'}`}>
+                                    {activeFilterCount}
+                                </span>
+                            )}
                         </button>
                     </>
                 )}
@@ -358,176 +532,227 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 </div>
             )}
 
-            {/* Expanded Filters */}
-            {showFilters && (
+            {/* Filter Drawer Overlay - Rendered via Portal to escape stacking contexts */}
+            {showFilters && typeof document !== 'undefined' && createPortal(
                 <div
-                    id="search-filters"
-                    className="mt-3 sm:mt-4 p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl shadow-xl dark:shadow-2xl border border-zinc-100 dark:border-zinc-800 animate-in fade-in slide-in-from-top-4"
+                    className="fixed inset-0 z-[9999] overflow-hidden"
+                    aria-labelledby="filter-drawer-title"
+                    role="dialog"
+                    aria-modal="true"
                 >
-                    {/* Clear All Button - only show when filters are active */}
-                    {hasActiveFilters && (
-                        <div className="flex justify-end mb-4">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"
+                        onClick={() => setShowFilters(false)}
+                        aria-label="Close filters"
+                    />
+
+                    {/* Drawer Panel */}
+                    <div
+                        id="search-filters"
+                        className="absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col"
+                    >
+                        {/* Drawer Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                            <h2 id="filter-drawer-title" className="text-lg font-semibold text-zinc-900 dark:text-white">
+                                Filters
+                                {activeFilterCount > 0 && (
+                                    <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </h2>
                             <button
                                 type="button"
-                                onClick={handleClearAllFilters}
-                                className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white underline underline-offset-2 transition-colors"
+                                onClick={() => setShowFilters(false)}
+                                className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors touch-target"
+                                aria-label="Close filters"
                             >
-                                Clear all filters
+                                <X className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
                             </button>
                         </div>
-                    )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-                        {/* Move-in Date */}
-                        <div className="space-y-2">
-                            <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">Move-in Date</label>
-                            <DatePicker
-                                id="filter-move-in"
-                                value={moveInDate}
-                                onChange={setMoveInDate}
-                                placeholder="Select move-in date"
-                                minDate={new Date().toISOString().split('T')[0]}
-                            />
-                        </div>
-
-                        {/* Lease Duration */}
-                        <div className="space-y-2">
-                            <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 dark:text-white">Lease Duration</label>
-                            <Select value={leaseDuration} onValueChange={setLeaseDuration}>
-                                <SelectTrigger id="filter-lease">
-                                    <SelectValue placeholder="Any" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="any">Any</SelectItem>
-                                    <SelectItem value="Month-to-month">Month-to-month</SelectItem>
-                                    <SelectItem value="6 months">6 months</SelectItem>
-                                    <SelectItem value="1 year">1 year</SelectItem>
-                                    <SelectItem value="1 year+">1 year+</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* Room Type */}
-                        <div className="space-y-2 sm:col-span-2 md:col-span-1">
-                            <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 dark:text-white">Room Type</label>
-                            <Select value={roomType} onValueChange={setRoomType}>
-                                <SelectTrigger id="filter-room-type">
-                                    <SelectValue placeholder="Any" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="any">Any</SelectItem>
-                                    <SelectItem value="Private Room">Private Room</SelectItem>
-                                    <SelectItem value="Shared Room">Shared Room</SelectItem>
-                                    <SelectItem value="Entire Place">Entire Place</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* Amenities */}
-                        <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
-                            <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
-                            <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
-                                {['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'].map(amenity => (
-                                    <button
-                                        key={amenity}
-                                        type="button"
-                                        onClick={() => toggleAmenity(amenity)}
-                                        aria-pressed={amenities.includes(amenity)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${amenities.includes(amenity)
-                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
-                                            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
-                                            }`}
-                                    >
-                                        {amenity}
-                                        {amenities.includes(amenity) && (
-                                            <X className="w-3.5 h-3.5" />
-                                        )}
-                                    </button>
-                                ))}
+                        {/* Scrollable Filter Content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                            {/* Move-in Date */}
+                            <div className="space-y-2">
+                                <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">Move-in Date</label>
+                                <DatePicker
+                                    id="filter-move-in"
+                                    value={moveInDate}
+                                    onChange={setMoveInDate}
+                                    placeholder="Select move-in date"
+                                    minDate={new Date().toISOString().split('T')[0]}
+                                />
                             </div>
-                        </fieldset>
 
-                        {/* House Rules */}
-                        <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
-                            <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
-                            <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
-                                {['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'].map(rule => (
-                                    <button
-                                        key={rule}
-                                        type="button"
-                                        onClick={() => toggleHouseRule(rule)}
-                                        aria-pressed={houseRules.includes(rule)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${houseRules.includes(rule)
-                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
-                                            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
-                                            }`}
-                                    >
-                                        {rule}
-                                        {houseRules.includes(rule) && (
-                                            <X className="w-3.5 h-3.5" />
-                                        )}
-                                    </button>
-                                ))}
+                            {/* Lease Duration */}
+                            <div className="space-y-2">
+                                <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 dark:text-white">Lease Duration</label>
+                                <Select value={leaseDuration} onValueChange={setLeaseDuration}>
+                                    <SelectTrigger id="filter-lease">
+                                        <SelectValue placeholder="Any" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="any">Any</SelectItem>
+                                        <SelectItem value="Month-to-month">Month-to-month</SelectItem>
+                                        <SelectItem value="6 months">6 months</SelectItem>
+                                        <SelectItem value="1 year">1 year</SelectItem>
+                                        <SelectItem value="1 year+">1 year+</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </fieldset>
 
-                        {/* Languages */}
-                        <fieldset className="space-y-2 sm:col-span-2 md:col-span-3">
-                            <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Languages Spoken</legend>
-                            <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
-                                {LANGUAGES.map(lang => (
-                                    <button
-                                        key={lang}
-                                        type="button"
-                                        onClick={() => toggleLanguage(lang)}
-                                        aria-pressed={languages.includes(lang)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${languages.includes(lang)
-                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
-                                            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
-                                            }`}
-                                    >
-                                        {lang}
-                                        {languages.includes(lang) && (
-                                            <X className="w-3.5 h-3.5" />
-                                        )}
-                                    </button>
-                                ))}
+                            {/* Room Type */}
+                            <div className="space-y-2">
+                                <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 dark:text-white">Room Type</label>
+                                <Select value={roomType} onValueChange={setRoomType}>
+                                    <SelectTrigger id="filter-room-type">
+                                        <SelectValue placeholder="Any" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="any">Any</SelectItem>
+                                        <SelectItem value="Private Room">Private Room</SelectItem>
+                                        <SelectItem value="Shared Room">Shared Room</SelectItem>
+                                        <SelectItem value="Entire Place">Entire Place</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </fieldset>
 
-                        {/* Gender Preferences */}
-                        <div className="space-y-2">
-                            <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900 dark:text-white">Gender Preference</label>
-                            <Select value={genderPreference} onValueChange={setGenderPreference}>
-                                <SelectTrigger id="filter-gender-pref">
-                                    <SelectValue placeholder="Any" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="any">Any</SelectItem>
-                                    <SelectItem value="MALE_ONLY">Male Identifying Only</SelectItem>
-                                    <SelectItem value="FEMALE_ONLY">Female Identifying Only</SelectItem>
-                                    <SelectItem value="NO_PREFERENCE">Any Gender / All Welcome</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            {/* Amenities */}
+                            <fieldset className="space-y-3">
+                                <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
+                                <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
+                                    {['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'].map(amenity => (
+                                        <button
+                                            key={amenity}
+                                            type="button"
+                                            onClick={() => toggleAmenity(amenity)}
+                                            aria-pressed={amenities.includes(amenity)}
+                                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${amenities.includes(amenity)
+                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
+                                                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
+                                                }`}
+                                        >
+                                            {amenity}
+                                            {amenities.includes(amenity) && (
+                                                <X className="w-3.5 h-3.5" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            {/* House Rules */}
+                            <fieldset className="space-y-3">
+                                <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
+                                <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
+                                    {['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'].map(rule => (
+                                        <button
+                                            key={rule}
+                                            type="button"
+                                            onClick={() => toggleHouseRule(rule)}
+                                            aria-pressed={houseRules.includes(rule)}
+                                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${houseRules.includes(rule)
+                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
+                                                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
+                                                }`}
+                                        >
+                                            {rule}
+                                            {houseRules.includes(rule) && (
+                                                <X className="w-3.5 h-3.5" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            {/* Languages */}
+                            <fieldset className="space-y-3">
+                                <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Languages Spoken</legend>
+                                <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
+                                    {LANGUAGES.map(lang => (
+                                        <button
+                                            key={lang}
+                                            type="button"
+                                            onClick={() => toggleLanguage(lang)}
+                                            aria-pressed={languages.includes(lang)}
+                                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${languages.includes(lang)
+                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
+                                                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
+                                                }`}
+                                        >
+                                            {lang}
+                                            {languages.includes(lang) && (
+                                                <X className="w-3.5 h-3.5" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            {/* Gender Preferences */}
+                            <div className="space-y-2">
+                                <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900 dark:text-white">Gender Preference</label>
+                                <Select value={genderPreference} onValueChange={setGenderPreference}>
+                                    <SelectTrigger id="filter-gender-pref">
+                                        <SelectValue placeholder="Any" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="any">Any</SelectItem>
+                                        <SelectItem value="MALE_ONLY">Male Identifying Only</SelectItem>
+                                        <SelectItem value="FEMALE_ONLY">Female Identifying Only</SelectItem>
+                                        <SelectItem value="NO_PREFERENCE">Any Gender / All Welcome</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Household Gender */}
+                            <div className="space-y-2">
+                                <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900 dark:text-white">Household Gender</label>
+                                <Select value={householdGender} onValueChange={setHouseholdGender}>
+                                    <SelectTrigger id="filter-household-gender">
+                                        <SelectValue placeholder="Any" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="any">Any</SelectItem>
+                                        <SelectItem value="ALL_MALE">All Male</SelectItem>
+                                        <SelectItem value="ALL_FEMALE">All Female</SelectItem>
+                                        <SelectItem value="MIXED">Mixed (Co-ed)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
 
-                        {/* Household Gender */}
-                        <div className="space-y-2">
-                            <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900 dark:text-white">Household Gender</label>
-                            <Select value={householdGender} onValueChange={setHouseholdGender}>
-                                <SelectTrigger id="filter-household-gender">
-                                    <SelectValue placeholder="Any" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="any">Any</SelectItem>
-                                    <SelectItem value="ALL_MALE">All Male</SelectItem>
-                                    <SelectItem value="ALL_FEMALE">All Female</SelectItem>
-                                    <SelectItem value="MIXED">Mixed (Co-ed)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        {/* Drawer Footer with Actions */}
+                        <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-3">
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    onClick={handleClearAllFilters}
+                                    className="flex-1 px-4 py-3 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl transition-colors touch-target"
+                                >
+                                    Clear all
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowFilters(false);
+                                    // Trigger search with current filters
+                                    const form = document.querySelector('form[role="search"]') as HTMLFormElement;
+                                    if (form) {
+                                        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                                    }
+                                }}
+                                className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-zinc-900 dark:bg-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md touch-target"
+                            >
+                                Show Results
+                            </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

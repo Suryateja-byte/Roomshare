@@ -271,6 +271,49 @@ export async function getUnreadMessageCount() {
 }
 
 /**
+ * Mark all unread messages across all conversations as read
+ */
+export async function markAllMessagesAsRead() {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
+    }
+
+    try {
+        // Get all conversations the user is part of
+        const conversations = await prisma.conversation.findMany({
+            where: {
+                participants: {
+                    some: { id: session.user.id }
+                },
+                deletedAt: null
+            },
+            select: { id: true }
+        });
+
+        const conversationIds = conversations.map(c => c.id);
+
+        // Mark all unread messages in these conversations as read
+        const result = await prisma.message.updateMany({
+            where: {
+                conversationId: { in: conversationIds },
+                senderId: { not: session.user.id },
+                read: false,
+                deletedAt: null
+            },
+            data: { read: true }
+        });
+
+        console.log(`[Mark All Read] User ${session.user.id} - Marked ${result.count} messages as read`);
+
+        return { success: true, count: result.count };
+    } catch (error) {
+        console.error('[MARK ALL READ] Error:', error);
+        return { error: 'Failed to mark all messages as read' };
+    }
+}
+
+/**
  * Soft delete a message - only the sender can delete their own messages
  */
 export async function deleteMessage(messageId: string): Promise<{ success: boolean; error?: string; code?: string }> {

@@ -70,6 +70,23 @@ export default async function ListingPage({ params }: PageProps) {
     const reviews = await getReviews(listing.id);
     const isOwner = session?.user?.id === listing.ownerId;
 
+    // Check if logged-in user has already reviewed this listing
+    let userExistingReview = null;
+    if (session?.user?.id && !isOwner) {
+        userExistingReview = await prisma.review.findFirst({
+            where: {
+                listingId: listing.id,
+                authorId: session.user.id,
+            },
+            select: {
+                id: true,
+                rating: true,
+                comment: true,
+                createdAt: true,
+            },
+        });
+    }
+
     // Track view if user is not the owner
     if (session?.user?.id && !isOwner) {
         await trackListingView(listing.id);
@@ -275,7 +292,17 @@ export default async function ListingPage({ params }: PageProps) {
 
                             {!isOwner && (
                                 <div>
-                                    <ReviewForm listingId={listing.id} isLoggedIn={!!session?.user} />
+                                    <ReviewForm
+                                        listingId={listing.id}
+                                        isLoggedIn={!!session?.user}
+                                        hasExistingReview={!!userExistingReview}
+                                        existingReview={userExistingReview ? {
+                                            id: userExistingReview.id,
+                                            rating: userExistingReview.rating,
+                                            comment: userExistingReview.comment,
+                                            createdAt: userExistingReview.createdAt.toISOString(),
+                                        } : undefined}
+                                    />
                                 </div>
                             )}
                         </div>

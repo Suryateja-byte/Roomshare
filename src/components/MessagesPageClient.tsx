@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Send, ArrowLeft, MoreVertical, Paperclip, AlertCircle, Ban, ShieldOff } from 'lucide-react';
+import { Search, Send, ArrowLeft, MoreVertical, Paperclip, AlertCircle, Ban, ShieldOff, WifiOff, CheckCheck, Loader2 } from 'lucide-react';
+import CharacterCounter from '@/components/CharacterCounter';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { toast } from 'sonner';
-import { getMessages, sendMessage, pollMessages, setTypingStatus } from '@/app/actions/chat';
+import { getMessages, sendMessage, pollMessages, setTypingStatus, markAllMessagesAsRead } from '@/app/actions/chat';
 import { blockUser, unblockUser } from '@/app/actions/block';
 import { useRouter } from 'next/navigation';
 import UserAvatar from '@/components/UserAvatar';
@@ -25,6 +27,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+const MESSAGE_MAX_LENGTH = 1000;
 
 interface TypingUser {
     id: string;
@@ -78,9 +82,36 @@ export default function MessagesPageClient({ currentUserId, initialConversations
     const [showBlockDialog, setShowBlockDialog] = useState(false);
     const [isBlocking, setIsBlocking] = useState(false);
     const [isUnblocking, setIsUnblocking] = useState(false);
+    const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const router = useRouter();
+    const { isOffline } = useNetworkStatus();
+
+    // Calculate total unread count
+    const totalUnread = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+
+    // Handle marking all messages as read
+    const handleMarkAllAsRead = async () => {
+        if (isMarkingAllRead || totalUnread === 0) return;
+
+        setIsMarkingAllRead(true);
+        try {
+            const result = await markAllMessagesAsRead();
+            if (result.error) {
+                toast.error(result.error);
+            } else {
+                toast.success(`Marked ${result.count} messages as read`);
+                // Update local state to reflect changes
+                setConversations(prev => prev.map(c => ({ ...c, unreadCount: 0 })));
+                router.refresh();
+            }
+        } catch (error) {
+            toast.error('Failed to mark messages as read');
+        } finally {
+            setIsMarkingAllRead(false);
+        }
+    };
 
     // Get the other participant for the active conversation
     const activeConversation = conversations.find(c => c.id === activeId);
@@ -91,6 +122,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         otherParticipant?.id,
         currentUserId
     );
+
 
     // Handle blocking a user
     const handleBlock = async () => {
@@ -249,7 +281,23 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         e.preventDefault();
         if (!input.trim() || !activeId) return;
 
+        // Block if offline
+        if (isOffline) {
+            toast.error('You are offline', {
+                description: 'Please check your internet connection to send messages.'
+            });
+            return;
+        }
+
         const content = input.trim();
+
+        // Length validation
+        if (content.length > MESSAGE_MAX_LENGTH) {
+            toast.error('Message too long', {
+                description: `Maximum ${MESSAGE_MAX_LENGTH} characters allowed.`
+            });
+            return;
+        }
         setInput('');
 
         // Clear typing status when sending
@@ -387,8 +435,35 @@ export default function MessagesPageClient({ currentUserId, initialConversations
             <div className={`w-full md:w-[400px] flex flex-col border-r border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 ${activeId ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-6 border-b border-zinc-50 dark:border-zinc-800">
                     <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Messages</h1>
-                        <button className="p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-full"><MoreVertical className="w-5 h-5 text-zinc-400 dark:text-zinc-500" /></button>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Messages</h1>
+                            {totalUnread > 0 && (
+                                <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-semibold rounded-full">
+                                    {totalUnread > 99 ? '99+' : totalUnread}
+                                </span>
+                            )}
+                        </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-full">
+                                    <MoreVertical className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                    onClick={handleMarkAllAsRead}
+                                    disabled={totalUnread === 0 || isMarkingAllRead}
+                                    className="cursor-pointer"
+                                >
+                                    {isMarkingAllRead ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <CheckCheck className="w-4 h-4 mr-2" />
+                                    )}
+                                    Mark all as read
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
@@ -572,12 +647,28 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                 isUnblocking={isUnblocking}
                             />
                         ) : (
-                            <div className="p-4 md:p-6">
+                            <div className="p-4 md:p-6 space-y-2">
+                                {/* Offline Banner */}
+                                {isOffline && (
+                                    <div className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                                        <WifiOff className="w-4 h-4" />
+                                        <span>You&apos;re offline. Messages will be sent when you reconnect.</span>
+                                    </div>
+                                )}
                                 <form onSubmit={handleSend} className="flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 focus-within:bg-white dark:focus-within:bg-zinc-800 focus-within:shadow-lg transition-all">
                                     <button type="button" className="p-2 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"><Paperclip className="w-5 h-5" /></button>
-                                    <input value={input} onChange={e => handleInputChange(e.target.value)} placeholder="Type a message..." className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500" />
-                                    <button type="submit" disabled={!input.trim()} className="w-10 h-10 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-all"><Send className="w-4 h-4 ml-0.5" /></button>
+                                    <input
+                                        value={input}
+                                        onChange={e => handleInputChange(e.target.value)}
+                                        placeholder={isOffline ? "You're offline..." : "Type a message..."}
+                                        maxLength={MESSAGE_MAX_LENGTH}
+                                        className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+                                    />
+                                    <button type="submit" disabled={!input.trim() || isOffline} className="w-10 h-10 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-all"><Send className="w-4 h-4 ml-0.5" /></button>
                                 </form>
+                                {input.length > MESSAGE_MAX_LENGTH * 0.8 && (
+                                    <CharacterCounter current={input.length} max={MESSAGE_MAX_LENGTH} />
+                                )}
                             </div>
                         )}
                     </>
