@@ -45,6 +45,21 @@ export async function POST(request: Request) {
                     { status: 409 }
                 );
             }
+
+            // Require booking history before allowing review (prevents fake reviews)
+            const hasBooking = await prisma.booking.findFirst({
+                where: {
+                    listingId,
+                    tenantId: session.user.id,
+                },
+            });
+
+            if (!hasBooking) {
+                return NextResponse.json(
+                    { error: 'You must have a booking to review this listing' },
+                    { status: 403 }
+                );
+            }
         }
 
         // Check for existing user review (duplicate prevention)

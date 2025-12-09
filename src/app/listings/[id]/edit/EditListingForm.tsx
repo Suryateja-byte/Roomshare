@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Home, MapPin, List, ArrowLeft, FileText, CheckCircle } from 'lucide-react';
+import { Loader2, Home, MapPin, List, ArrowLeft, FileText, CheckCircle, RefreshCcw, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
 import {
@@ -36,6 +36,11 @@ interface ImageObject {
     uploadedUrl?: string;
     isUploading?: boolean;
     error?: string;
+}
+
+interface PersistedImageData {
+    id: string;
+    uploadedUrl: string;
 }
 
 interface Listing {
@@ -82,6 +87,7 @@ interface EditListingFormData {
     genderPreference: string;
     householdGender: string;
     selectedLanguages: string[];
+    images: PersistedImageData[];
 }
 
 // Format date for input (YYYY-MM-DD)
@@ -98,6 +104,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [selectedLanguages, setSelectedLanguages] = useState<string[]>(listing.languages || []);
     const [formModified, setFormModified] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
@@ -134,9 +141,24 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
         }
     }, [isHydrated, hasDraft, draftRestored]);
 
+    // Helper component for field-level errors
+    const FieldError = ({ field }: { field: string }) => {
+        if (!fieldErrors[field]) return null;
+        return (
+            <p className="text-red-500 dark:text-red-400 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                {fieldErrors[field]}
+            </p>
+        );
+    };
+
     // Collect current form data for saving
     const collectFormData = (): EditListingFormData => {
         const form = formRef.current;
+        const currentImages = images
+            .filter(img => img.uploadedUrl && !img.error)
+            .map(img => ({ id: img.id, uploadedUrl: img.uploadedUrl! }));
+
         if (!form) {
             return {
                 title: listing.title, description, price: String(listing.price), totalSlots: String(listing.totalSlots),
@@ -144,7 +166,8 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                 state: listing.location?.state || '', zip: listing.location?.zip || '',
                 amenities: listing.amenities.join(', '), houseRules: listing.houseRules.join(', '),
                 moveInDate, leaseDuration, roomType, genderPreference, householdGender,
-                selectedLanguages
+                selectedLanguages,
+                images: currentImages
             };
         }
 
@@ -164,7 +187,8 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
             roomType,
             genderPreference,
             householdGender,
-            selectedLanguages
+            selectedLanguages,
+            images: currentImages
         };
     };
 
@@ -190,6 +214,18 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
         setGenderPreference(persistedData.genderPreference || listing.genderPreference || '');
         setHouseholdGender(persistedData.householdGender || listing.householdGender || '');
         setSelectedLanguages(persistedData.selectedLanguages || listing.languages || []);
+
+        // Restore images (they're already uploaded to Supabase)
+        if (persistedData.images && persistedData.images.length > 0) {
+            const restoredImages: ImageObject[] = persistedData.images.map(img => ({
+                id: img.id,
+                previewUrl: img.uploadedUrl, // Use the uploaded URL as preview
+                uploadedUrl: img.uploadedUrl,
+                isUploading: false
+            }));
+            setImages(restoredImages);
+            setImagesInitialized(true);
+        }
 
         setDraftRestored(true);
         setShowDraftBanner(false);
@@ -269,10 +305,20 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     const isAnyImageUploading = images.some(img => img.isUploading);
     const hasFailedImages = images.some(img => img.error);
 
+    // Retry handler for failed submissions
+    const handleRetry = () => {
+        setError('');
+        setFieldErrors({});
+        if (formRef.current) {
+            formRef.current.requestSubmit();
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setFieldErrors({});
 
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
@@ -297,6 +343,10 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
 
             if (!res.ok) {
                 const json = await res.json();
+                // Handle field-level errors if provided
+                if (json.fields) {
+                    setFieldErrors(json.fields);
+                }
                 throw new Error(json.error || 'Failed to update listing');
             }
 
@@ -307,6 +357,8 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
             router.refresh();
         } catch (err: any) {
             setError(err.message);
+            // Save current form state on error so nothing is lost
+            saveData(collectFormData());
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
             setLoading(false);
@@ -324,8 +376,34 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
             </Link>
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-4 rounded-xl mb-8 text-sm">
-                    {error}
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 px-4 py-4 rounded-xl mb-8">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                                    Failed to save changes
+                                </p>
+                                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                                    {error}
+                                </p>
+                                <p className="text-xs text-red-500 dark:text-red-500 mt-2">
+                                    Your changes have been saved locally and won't be lost.
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRetry}
+                            disabled={loading}
+                            className="flex-shrink-0 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/50"
+                        >
+                            <RefreshCcw className="w-4 h-4 mr-1" />
+                            Retry
+                        </Button>
+                    </div>
                 </div>
             )}
 
@@ -390,6 +468,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             placeholder="e.g. Sun-drenched Loft in Arts District"
                             disabled={loading}
                         />
+                        <FieldError field="title" />
                     </div>
 
                     <div>
@@ -405,6 +484,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                         />
+                        <FieldError field="description" />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -419,6 +499,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                 placeholder="2400"
                                 disabled={loading}
                             />
+                            <FieldError field="price" />
                         </div>
                         <div>
                             <Label htmlFor="totalSlots">Total Roommates</Label>
@@ -431,6 +512,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                 placeholder="1"
                                 disabled={loading}
                             />
+                            <FieldError field="totalSlots" />
                         </div>
                     </div>
                 </div>
@@ -486,6 +568,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             placeholder="123 Boulevard St"
                             disabled={loading}
                         />
+                        <FieldError field="address" />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>

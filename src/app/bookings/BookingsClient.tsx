@@ -16,7 +16,9 @@ import {
     DollarSign,
     List,
     Loader2,
-    WifiOff
+    WifiOff,
+    Filter,
+    AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -24,6 +26,16 @@ import { updateBookingStatus, BookingStatus } from '@/app/actions/manage-booking
 import UserAvatar from '@/components/UserAvatar';
 import BookingCalendar from '@/components/BookingCalendar';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type Booking = {
     id: string;
@@ -114,6 +126,7 @@ function BookingCard({
     isOffline: boolean;
 }) {
     const [updatingStatus, setUpdatingStatus] = useState<BookingStatus | null>(null);
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
 
     const handleStatusUpdate = async (status: BookingStatus) => {
         if (isOffline) {
@@ -252,7 +265,7 @@ function BookingCard({
                         )}
                         {showCancelButton && (
                             <Button
-                                onClick={() => handleStatusUpdate('CANCELLED')}
+                                onClick={() => setShowCancelDialog(true)}
                                 disabled={isUpdating}
                                 variant="destructive"
                                 className="flex-1"
@@ -270,6 +283,43 @@ function BookingCard({
                     </div>
                 )}
 
+                {/* Cancel Confirmation Dialog */}
+                <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                </div>
+                                <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+                            </div>
+                            <AlertDialogDescription className="text-left">
+                                <span className="block mb-2">You&apos;re about to cancel your booking for:</span>
+                                <span className="block font-semibold text-zinc-900 dark:text-white">{booking.listing.title}</span>
+                                <span className="block text-sm mt-1">
+                                    {formatDate(booking.startDate)} — {formatDate(booking.endDate)}
+                                </span>
+                                <span className="block text-sm mt-3 text-red-600 dark:text-red-400">
+                                    This action cannot be undone.
+                                </span>
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isUpdating}>Keep Booking</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => {
+                                    setShowCancelDialog(false);
+                                    handleStatusUpdate('CANCELLED');
+                                }}
+                                disabled={isUpdating}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                {isUpdating ? 'Cancelling...' : 'Yes, Cancel Booking'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
                 <p className="text-xs text-zinc-400 mt-4">
                     Requested on {formatDate(booking.createdAt)}
                 </p>
@@ -281,6 +331,7 @@ function BookingCard({
 export default function BookingsClient({ sentBookings, receivedBookings }: BookingsClientProps) {
     const [activeTab, setActiveTab] = useState<'sent' | 'received'>('received');
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+    const [statusFilter, setStatusFilter] = useState<BookingStatus | 'ALL'>('ALL');
     const [bookings, setBookings] = useState({ sent: sentBookings, received: receivedBookings });
     const { isOffline } = useNetworkStatus();
 
@@ -312,8 +363,20 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
         toast.success(`Booking ${status.toLowerCase()}`);
     };
 
-    const currentBookings = activeTab === 'sent' ? bookings.sent : bookings.received;
+    const allBookings = activeTab === 'sent' ? bookings.sent : bookings.received;
+    const currentBookings = statusFilter === 'ALL'
+        ? allBookings
+        : allBookings.filter(b => b.status === statusFilter);
     const pendingReceivedCount = bookings.received.filter(b => b.status === 'PENDING').length;
+
+    // Status filter options with counts
+    const statusOptions: { value: BookingStatus | 'ALL'; label: string; count: number }[] = [
+        { value: 'ALL', label: 'All', count: allBookings.length },
+        { value: 'PENDING', label: 'Pending', count: allBookings.filter(b => b.status === 'PENDING').length },
+        { value: 'ACCEPTED', label: 'Accepted', count: allBookings.filter(b => b.status === 'ACCEPTED').length },
+        { value: 'REJECTED', label: 'Rejected', count: allBookings.filter(b => b.status === 'REJECTED').length },
+        { value: 'CANCELLED', label: 'Cancelled', count: allBookings.filter(b => b.status === 'CANCELLED').length },
+    ];
 
     return (
         <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 pt-20 pb-20">
@@ -394,6 +457,36 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                         </div>
                     )}
                 </div>
+
+                {/* Status Filter Chips */}
+                {allBookings.length > 0 && viewMode === 'list' && (
+                    <div className="flex flex-wrap gap-2 mb-6">
+                        <div className="flex items-center gap-1 mr-2 text-zinc-500 dark:text-zinc-400">
+                            <Filter className="w-4 h-4" />
+                            <span className="text-sm font-medium">Filter:</span>
+                        </div>
+                        {statusOptions.map(option => (
+                            <button
+                                key={option.value}
+                                onClick={() => setStatusFilter(option.value)}
+                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${statusFilter === option.value
+                                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                                    : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                                    }`}
+                            >
+                                {option.label}
+                                {option.count > 0 && (
+                                    <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${statusFilter === option.value
+                                        ? 'bg-white/20 dark:bg-zinc-900/20'
+                                        : 'bg-zinc-100 dark:bg-zinc-700'
+                                        }`}>
+                                        {option.count}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {/* Calendar View for Received Bookings */}
                 {activeTab === 'received' && viewMode === 'calendar' && (

@@ -5,13 +5,18 @@ import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { createBooking, BookingResult } from '@/app/actions/booking';
 import { useRouter } from 'next/navigation';
-import { Loader2, LogIn, AlertTriangle, RefreshCw, CheckCircle, XCircle, WifiOff } from 'lucide-react';
+import { Loader2, LogIn, AlertTriangle, RefreshCw, CheckCircle, XCircle, WifiOff, Calendar, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 type ListingStatus = 'ACTIVE' | 'PAUSED' | 'RENTED';
 
 type ErrorType = 'validation' | 'server' | 'network' | 'blocked' | 'auth' | null;
+
+interface BookedDateRange {
+    startDate: string;
+    endDate: string;
+}
 
 interface BookingFormProps {
     listingId: string;
@@ -20,6 +25,7 @@ interface BookingFormProps {
     isOwner: boolean;
     isLoggedIn: boolean;
     status?: ListingStatus;
+    bookedDates?: BookedDateRange[];
 }
 
 const MIN_BOOKING_DAYS = 30; // Industry standard minimum stay
@@ -45,7 +51,7 @@ const availabilityConfig: Record<ListingStatus, { label: string; colorClass: str
     }
 };
 
-export default function BookingForm({ listingId, price, ownerId, isOwner, isLoggedIn, status = 'ACTIVE' }: BookingFormProps) {
+export default function BookingForm({ listingId, price, ownerId, isOwner, isLoggedIn, status = 'ACTIVE', bookedDates = [] }: BookingFormProps) {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -53,14 +59,31 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
     const [errorType, setErrorType] = useState<ErrorType>(null);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [hasSubmittedSuccessfully, setHasSubmittedSuccessfully] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
     const router = useRouter();
     const { isOffline } = useNetworkStatus();
 
     // Ref to prevent concurrent submissions (debounce protection)
     const isSubmittingRef = useRef(false);
     const lastSubmissionRef = useRef<number>(0);
-    const submissionIdRef = useRef<string | null>(null);
     const DEBOUNCE_MS = 1000; // Minimum time between submissions
+
+    // Generate idempotency key on mount to prevent duplicate submissions on refresh
+    const idempotencyKeyRef = useRef<string>('');
+
+    // On mount, check for pending submission key (page was refreshed during submission)
+    // or generate a new one if no pending submission
+    useEffect(() => {
+        const pendingKey = sessionStorage.getItem(`booking_pending_key_${listingId}`);
+        if (pendingKey) {
+            // Recover the pending key - this will be used if user resubmits
+            idempotencyKeyRef.current = pendingKey;
+            console.log('Recovered pending idempotency key:', pendingKey);
+        } else {
+            // Generate a new key for this session
+            idempotencyKeyRef.current = `booking_${listingId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        }
+    }, [listingId]);
 
     // Check for previous successful submission (browser back navigation)
     useEffect(() => {
@@ -97,6 +120,27 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
         return { diffDays, totalPrice, isValid: diffDays >= MIN_BOOKING_DAYS && end > start };
     }, [startDate, endDate, price]);
 
+    // Check if a date range overlaps with any booked dates
+    const checkDateOverlap = useCallback((start: Date, end: Date): { overlaps: boolean; conflictingBooking?: BookedDateRange } => {
+        for (const booking of bookedDates) {
+            const bookedStart = new Date(booking.startDate);
+            const bookedEnd = new Date(booking.endDate);
+            // Check if ranges overlap
+            if (start < bookedEnd && end > bookedStart) {
+                return { overlaps: true, conflictingBooking: booking };
+            }
+        }
+        return { overlaps: false };
+    }, [bookedDates]);
+
+    // Check if selected dates have any conflicts
+    const dateConflict = useMemo(() => {
+        if (!startDate || !endDate) return null;
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return checkDateOverlap(start, end);
+    }, [startDate, endDate, checkDateOverlap]);
+
     // Determine error type from error message/code
     const categorizeError = (result: BookingResult): ErrorType => {
         if (result.code === 'SESSION_EXPIRED') return 'auth';
@@ -110,7 +154,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
         return 'validation'; // Default to validation for user-facing errors
     };
 
-    const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    // Opens confirmation modal after validating form inputs
+    const handleSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
 
         // Prevent resubmission after successful submit (browser back)
@@ -123,12 +168,6 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
         if (isOffline) {
             setMessage('You are currently offline. Please check your internet connection.');
             setErrorType('network');
-            return;
-        }
-
-        // Debounce protection: prevent rapid submissions
-        const now = Date.now();
-        if (isSubmittingRef.current || (now - lastSubmissionRef.current) < DEBOUNCE_MS) {
             return;
         }
 
@@ -168,6 +207,36 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
             return;
         }
 
+        // Check for date conflicts with existing bookings
+        if (dateConflict?.overlaps && dateConflict.conflictingBooking) {
+            const conflictStart = new Date(dateConflict.conflictingBooking.startDate).toLocaleDateString();
+            const conflictEnd = new Date(dateConflict.conflictingBooking.endDate).toLocaleDateString();
+            setMessage(`Selected dates overlap with an existing booking (${conflictStart} - ${conflictEnd})`);
+            setErrorType('validation');
+            return;
+        }
+
+        // Generate and store idempotency key BEFORE showing modal
+        // This ensures the key survives page refresh during confirmation or submission
+        const newKey = `booking_${listingId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        idempotencyKeyRef.current = newKey;
+        sessionStorage.setItem(`booking_pending_key_${listingId}`, newKey);
+
+        // Show confirmation modal
+        setShowConfirmModal(true);
+    }, [startDate, endDate, bookingInfo, hasSubmittedSuccessfully, isOffline, dateConflict, listingId]);
+
+    // Actual submission after user confirms
+    const confirmSubmit = useCallback(async () => {
+        // Close the modal
+        setShowConfirmModal(false);
+
+        // Debounce protection: prevent rapid submissions
+        const now = Date.now();
+        if (isSubmittingRef.current || (now - lastSubmissionRef.current) < DEBOUNCE_MS) {
+            return;
+        }
+
         // Set submission guards
         isSubmittingRef.current = true;
         lastSubmissionRef.current = now;
@@ -176,14 +245,28 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
         setErrorType(null);
 
         try {
+            // Check if this idempotency key was already processed
+            const processedKey = sessionStorage.getItem(`booking_key_${idempotencyKeyRef.current}`);
+            if (processedKey) {
+                setMessage('This booking request was already submitted. Redirecting...');
+                setHasSubmittedSuccessfully(true);
+                setTimeout(() => router.push('/bookings'), 1500);
+                return;
+            }
+
             const result: BookingResult = await createBooking(
                 listingId,
                 new Date(startDate),
                 new Date(endDate),
-                price
+                price,
+                idempotencyKeyRef.current
             );
 
             if (result.success) {
+                // Mark this idempotency key as processed
+                sessionStorage.setItem(`booking_key_${idempotencyKeyRef.current}`, 'processed');
+                // Clear the pending key since submission succeeded
+                sessionStorage.removeItem(`booking_pending_key_${listingId}`);
                 setMessage('Request sent successfully!');
                 setErrorType(null);
                 setHasSubmittedSuccessfully(true);
@@ -227,7 +310,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 isSubmittingRef.current = false;
             }, 2000);
         }
-    }, [startDate, endDate, bookingInfo, listingId, price, router]);
+    }, [startDate, endDate, listingId, price, router]);
 
     const handleRetry = useCallback(() => {
         // Reset error state and allow immediate retry
@@ -336,6 +419,37 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 </div>
             </div>
 
+            {/* Booked Dates Display */}
+            {bookedDates.length > 0 && (
+                <div className="mb-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Calendar className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                        <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Booked Periods</h4>
+                    </div>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {bookedDates.map((booking, index) => {
+                            const start = new Date(booking.startDate);
+                            const end = new Date(booking.endDate);
+                            return (
+                                <div
+                                    key={index}
+                                    className="flex items-center justify-between text-xs px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800"
+                                >
+                                    <span className="text-red-700 dark:text-red-300 font-medium">
+                                        {start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — {end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                    <span className="text-red-500 dark:text-red-400 text-[10px] uppercase font-bold">Booked</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-2 flex items-center gap-1">
+                        <Info className="w-3 h-3" />
+                        Select dates that don't overlap with booked periods
+                    </p>
+                </div>
+            )}
+
             {/* Offline Banner */}
             {isOffline && (
                 <div className="mb-4 p-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center gap-3">
@@ -421,10 +535,22 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     </div>
                 </div>
 
-                {/* Minimum stay notice */}
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center">
-                    Minimum stay: {MIN_BOOKING_DAYS} days
-                </p>
+                {/* Minimum stay tooltip - hover to see */}
+                <div className="flex items-center justify-center gap-1 group cursor-help" title={`Minimum stay: ${MIN_BOOKING_DAYS} days`}>
+                    <Info className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors" />
+                    <span className="text-xs text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors">
+                        {MIN_BOOKING_DAYS} day minimum
+                    </span>
+                </div>
+
+                {/* Date Conflict Warning */}
+                {dateConflict?.overlaps && (
+                    <div className="rounded-xl p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                        <p className="text-xs text-red-700 dark:text-red-300 font-medium">
+                            ⚠️ Selected dates overlap with an existing booking
+                        </p>
+                    </div>
+                )}
 
                 {/* Duration indicator */}
                 {bookingInfo && (
@@ -442,7 +568,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 <Button
                     type="submit"
                     className="w-full h-12 text-lg font-semibold rounded-xl"
-                    disabled={isLoading || isOffline || hasSubmittedSuccessfully || (bookingInfo !== null && !bookingInfo.isValid)}
+                    disabled={isLoading || isOffline || hasSubmittedSuccessfully || (bookingInfo !== null && !bookingInfo.isValid) || (dateConflict?.overlaps ?? false)}
                 >
                     {isLoading ? (
                         <span className="flex items-center justify-center gap-2">
@@ -517,6 +643,115 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     </p>
                 )}
             </div>
+
+            {/* Confirmation Modal */}
+            {showConfirmModal && bookingInfo && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop - disabled during loading to prevent accidental dismissal */}
+                    <div
+                        className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isLoading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        onClick={() => !isLoading && setShowConfirmModal(false)}
+                    />
+
+                    {/* Modal Content */}
+                    <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-700 max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200">
+                        <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4">
+                            Confirm Your Booking Request
+                        </h3>
+
+                        <div className="space-y-4">
+                            {/* Dates Summary */}
+                            <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm text-zinc-500 dark:text-zinc-400">Check-in</span>
+                                    <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                                        {new Date(startDate).toLocaleDateString('en-US', {
+                                            weekday: 'short',
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric'
+                                        })}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm text-zinc-500 dark:text-zinc-400">Check-out</span>
+                                    <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                                        {new Date(endDate).toLocaleDateString('en-US', {
+                                            weekday: 'short',
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric'
+                                        })}
+                                    </span>
+                                </div>
+                                <div className="h-px bg-zinc-200 dark:bg-zinc-700" />
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm text-zinc-500 dark:text-zinc-400">Duration</span>
+                                    <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                                        {bookingInfo.diffDays} days ({Math.ceil(bookingInfo.diffDays / 30)} month{Math.ceil(bookingInfo.diffDays / 30) !== 1 ? 's' : ''})
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Price Summary */}
+                            <div className="bg-primary/5 dark:bg-primary/10 rounded-xl p-4 space-y-2">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-zinc-600 dark:text-zinc-400">
+                                        ${(price / 30).toFixed(2)}/day × {bookingInfo.diffDays} days
+                                    </span>
+                                    <span className="text-zinc-900 dark:text-white">
+                                        ${bookingInfo.totalPrice.toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-zinc-600 dark:text-zinc-400">Service fee</span>
+                                    <span className="text-green-600 dark:text-green-400">Free</span>
+                                </div>
+                                <div className="h-px bg-primary/20" />
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-zinc-900 dark:text-white">Total</span>
+                                    <span className="text-xl font-bold text-primary">
+                                        ${bookingInfo.totalPrice.toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Notice */}
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center">
+                                By confirming, you&apos;re sending a booking request to the host. You won&apos;t be charged until the host accepts.
+                            </p>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 mt-6">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="flex-1 h-11"
+                                onClick={() => setShowConfirmModal(false)}
+                                disabled={isLoading}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                className="flex-1 h-11 font-semibold"
+                                onClick={confirmSubmit}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : (
+                                    'Confirm Booking'
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

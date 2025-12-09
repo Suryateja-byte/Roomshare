@@ -2,28 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { processSearchAlerts } from '@/lib/search-alerts';
 
 // Vercel Cron or external cron service endpoint
-// Secured with CRON_SECRET
+// Secured with CRON_SECRET in all environments
 export async function GET(request: NextRequest) {
-    // Verify authorization
+    // Verify authorization - required in all environments
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    // Allow in development without secret
-    if (process.env.NODE_ENV === 'production') {
-        if (!cronSecret) {
-            console.error('CRON_SECRET not configured');
-            return NextResponse.json(
-                { error: 'Server configuration error' },
-                { status: 500 }
-            );
-        }
+    if (!cronSecret) {
+        console.error('CRON_SECRET not configured. Set this in your environment variables.');
+        return NextResponse.json(
+            { error: 'Server configuration error: CRON_SECRET not set' },
+            { status: 500 }
+        );
+    }
 
-        if (authHeader !== `Bearer ${cronSecret}`) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            );
-        }
+    if (authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json(
+            { error: 'Unauthorized' },
+            { status: 401 }
+        );
     }
 
     try {

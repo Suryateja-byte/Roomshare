@@ -1023,6 +1023,7 @@ export async function getReviews(listingId?: string, userId?: string) {
         include: {
             author: {
                 select: {
+                    id: true,
                     name: true,
                     image: true
                 }

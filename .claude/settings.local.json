@@ -20,7 +20,9 @@
       "mcp__playwright__browser_evaluate",
       "Bash(findstr:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(grep:*)",
+      "Bash(powershell -Command \"Get-Process -Name node | Stop-Process -Force\")"
     ],
     "deny": [],
     "ask": []

@@ -185,3 +185,22 @@ export async function getUnreadNotificationCount() {
         return 0;
     }
 }
+
+export async function deleteAllNotifications() {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
+    }
+
+    try {
+        const result = await prisma.notification.deleteMany({
+            where: { userId: session.user.id }
+        });
+
+        revalidatePath('/notifications');
+        return { success: true, count: result.count };
+    } catch (error) {
+        console.error('Error deleting all notifications:', error);
+        return { error: 'Failed to delete notifications' };
+    }
+}

@@ -33,6 +33,7 @@ type UserWithListings = {
     countryOfOrigin: string | null;
     languages: string[];
     isVerified: boolean;
+    createdAt: Date;
     listings: Array<{
         id: string;
         title: string;
@@ -115,10 +116,51 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
         await signOut({ callbackUrl: '/' });
     };
 
+    // Loading skeleton when user data is incomplete
+    if (!user || !user.id) {
+        return (
+            <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 font-sans pb-20 pt-20">
+                <main className="container mx-auto max-w-5xl px-4 sm:px-6 py-10">
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 shadow-sm border border-zinc-100 dark:border-zinc-800 mb-8">
+                        <div className="flex flex-col md:flex-row gap-6 md:gap-8 md:items-start animate-pulse">
+                            {/* Avatar skeleton */}
+                            <div className="w-28 h-28 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full bg-zinc-200 dark:bg-zinc-700 mx-auto md:mx-0" />
+                            {/* Info skeleton */}
+                            <div className="flex-1 pt-0 md:pt-2 text-center md:text-left space-y-4">
+                                <div className="h-8 bg-zinc-200 dark:bg-zinc-700 rounded-lg w-48 mx-auto md:mx-0" />
+                                <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded w-32 mx-auto md:mx-0" />
+                                <div className="h-8 bg-zinc-100 dark:bg-zinc-800 rounded-full w-36 mx-auto md:mx-0" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-1 space-y-8">
+                            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-100 dark:border-zinc-800 animate-pulse">
+                                <div className="h-6 bg-zinc-200 dark:bg-zinc-700 rounded w-24 mb-6" />
+                                <div className="space-y-4">
+                                    <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded w-full" />
+                                    <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded w-full" />
+                                    <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded w-3/4" />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="lg:col-span-2 space-y-8">
+                            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-100 dark:border-zinc-800 animate-pulse">
+                                <div className="h-6 bg-zinc-200 dark:bg-zinc-700 rounded w-32 mb-4" />
+                                <div className="space-y-2">
+                                    <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded w-full" />
+                                    <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded w-5/6" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
     // Format join date
-    const joinedDate = user.emailVerified
-        ? new Date(user.emailVerified).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-        : 'Recently';
+    const joinedDate = new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     return (
         <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black pb-20 pt-20">

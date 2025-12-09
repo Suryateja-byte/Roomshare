@@ -14,6 +14,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Home, MapPin, List, Camera, FileText, X, AlertTriangle, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import ImageUploader from '@/components/listings/ImageUploader';
 import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
 import {
@@ -301,6 +302,10 @@ export default function CreateListingForm() {
             const result = await res.json();
             // Clear draft on successful submission
             clearPersistedData();
+            // Show success toast
+            toast.success('Listing published successfully!', {
+                description: 'Your listing is now live and visible to potential roommates.'
+            });
             router.push(`/listings/${result.id}`);
         } catch (err: any) {
             setError(err.message);
@@ -568,7 +573,7 @@ export default function CreateListingForm() {
                     <div>
                         <Label>Upload Photos</Label>
                         <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-4">
-                            Add photos to showcase your space (optional but recommended)
+                            At least one photo required to publish your listing
                         </p>
                         <ImageUploader
                             onImagesChange={setUploadedImages}

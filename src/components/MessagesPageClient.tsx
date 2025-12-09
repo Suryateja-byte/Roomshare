@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Send, ArrowLeft, MoreVertical, Paperclip, AlertCircle, Ban, ShieldOff, WifiOff, CheckCheck, Loader2 } from 'lucide-react';
+import { Search, Send, ArrowLeft, MoreVertical, Paperclip, AlertCircle, Ban, ShieldOff, WifiOff, CheckCheck, Loader2, MessageSquare, Trash2, ArrowDown } from 'lucide-react';
 import CharacterCounter from '@/components/CharacterCounter';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { toast } from 'sonner';
-import { getMessages, sendMessage, pollMessages, setTypingStatus, markAllMessagesAsRead } from '@/app/actions/chat';
+import { getMessages, sendMessage, pollMessages, setTypingStatus, markAllMessagesAsRead, deleteConversation } from '@/app/actions/chat';
 import { blockUser, unblockUser } from '@/app/actions/block';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import UserAvatar from '@/components/UserAvatar';
 import { useBlockStatus } from '@/hooks/useBlockStatus';
 import BlockedConversationBanner from '@/components/chat/BlockedConversationBanner';
@@ -87,6 +88,10 @@ export default function MessagesPageClient({ currentUserId, initialConversations
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const router = useRouter();
     const { isOffline } = useNetworkStatus();
+    const [showDeleteConversationDialog, setShowDeleteConversationDialog] = useState(false);
+    const [isDeletingConversation, setIsDeletingConversation] = useState(false);
+    const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
 
     // Calculate total unread count
     const totalUnread = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
@@ -160,6 +165,29 @@ export default function MessagesPageClient({ currentUserId, initialConversations
             toast.error('Failed to unblock user');
         } finally {
             setIsUnblocking(false);
+        }
+    };
+
+    // Handle deleting a conversation
+    const handleDeleteConversation = async () => {
+        if (!activeId) return;
+        setIsDeletingConversation(true);
+        try {
+            const result = await deleteConversation(activeId);
+            if (result.error) {
+                toast.error(result.error);
+            } else {
+                toast.success('Conversation deleted');
+                setConversations(prev => prev.filter(c => c.id !== activeId));
+                setActiveId(null);
+                setMsgs([]);
+                router.refresh();
+            }
+        } catch (error) {
+            toast.error('Failed to delete conversation');
+        } finally {
+            setIsDeletingConversation(false);
+            setShowDeleteConversationDialog(false);
         }
     };
 
@@ -506,8 +534,28 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                         );
                     })}
                     {filteredConversations.length === 0 && (
-                        <div className="p-6 text-center text-zinc-500 dark:text-zinc-400">
-                            {searchQuery.trim() ? 'No conversations match your search' : 'No conversations yet'}
+                        <div className="p-8 text-center">
+                            {searchQuery.trim() ? (
+                                <p className="text-zinc-500 dark:text-zinc-400">No conversations match your search</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="w-16 h-16 mx-auto rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                                        <MessageSquare className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-zinc-900 dark:text-white mb-1">No conversations yet</h3>
+                                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                                            Start chatting by contacting a listing host
+                                        </p>
+                                    </div>
+                                    <Link
+                                        href="/listings"
+                                        className="inline-flex items-center justify-center px-6 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full font-medium text-sm hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+                                    >
+                                        Browse Listings
+                                    </Link>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -563,6 +611,13 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                             Block User
                                         </DropdownMenuItem>
                                     )}
+                                    <DropdownMenuItem
+                                        onClick={() => setShowDeleteConversationDialog(true)}
+                                        className="text-red-600 dark:text-red-400"
+                                    >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete Conversation
+                                    </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </header>
@@ -589,8 +644,38 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                             </AlertDialogContent>
                         </AlertDialog>
 
+                        {/* Delete Conversation Confirmation Dialog */}
+                        <AlertDialog open={showDeleteConversationDialog} onOpenChange={setShowDeleteConversationDialog}>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will remove this conversation from your view. The other participant may still see it.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel disabled={isDeletingConversation}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={handleDeleteConversation}
+                                        disabled={isDeletingConversation}
+                                        className="bg-red-600 hover:bg-red-700 text-white"
+                                    >
+                                        {isDeletingConversation ? 'Deleting...' : 'Delete'}
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                        <div
+                            ref={messagesContainerRef}
+                            className="flex-1 overflow-y-auto p-6 space-y-4 relative"
+                            onScroll={(e) => {
+                                const target = e.target as HTMLDivElement;
+                                const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
+                                setShowScrollToBottom(!isNearBottom && target.scrollHeight > target.clientHeight);
+                            }}
+                        >
                             {loadingMessages ? (
                                 <div className="flex justify-center p-4"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-zinc-900 dark:border-white"></div></div>
                             ) : (
@@ -636,6 +721,24 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                             )}
 
                             <div ref={messagesEndRef} />
+
+                            {/* Scroll to Latest Button */}
+                            {showScrollToBottom && (
+                                <button
+                                    onClick={() => {
+                                        messagesContainerRef.current?.scrollTo({
+                                            top: messagesContainerRef.current.scrollHeight,
+                                            behavior: 'smooth'
+                                        });
+                                        setShowScrollToBottom(false);
+                                    }}
+                                    className="fixed bottom-28 right-8 z-10 flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full shadow-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                    aria-label="Scroll to latest messages"
+                                >
+                                    <ArrowDown className="w-4 h-4" />
+                                    <span className="text-sm font-medium">New messages</span>
+                                </button>
+                            )}
                         </div>
 
                         {/* Input or Blocked Banner */}
@@ -656,7 +759,14 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                     </div>
                                 )}
                                 <form onSubmit={handleSend} className="flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 focus-within:bg-white dark:focus-within:bg-zinc-800 focus-within:shadow-lg transition-all">
-                                    <button type="button" className="p-2 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"><Paperclip className="w-5 h-5" /></button>
+                                    <button
+                                        type="button"
+                                        onClick={() => toast.info('Attachments coming soon!', { description: 'File sharing feature is currently in development.' })}
+                                        className="p-2 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
+                                        title="Attachments coming soon"
+                                    >
+                                        <Paperclip className="w-5 h-5" />
+                                    </button>
                                     <input
                                         value={input}
                                         onChange={e => handleInputChange(e.target.value)}
@@ -666,7 +776,8 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                     />
                                     <button type="submit" disabled={!input.trim() || isOffline} className="w-10 h-10 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-all"><Send className="w-4 h-4 ml-0.5" /></button>
                                 </form>
-                                {input.length > MESSAGE_MAX_LENGTH * 0.8 && (
+                                {/* Character counter - show when user is typing */}
+                                {input.length > 0 && (
                                     <CharacterCounter current={input.length} max={MESSAGE_MAX_LENGTH} />
                                 )}
                             </div>

@@ -1,0 +1,281 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "neighborhood-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a8376798-c30f-4766-ad29-056f0eaeacb8",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1648, -32],
+      "webhookId": "neighborhood-agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate a random UUID for Mapbox session-based pricing\nfunction generateUUID() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\n    const r = Math.random() * 16 | 0;\n    const v = c === 'x' ? r : (r & 0x3 | 0x8);\n    return v.toString(16);\n  });\n}\n\nconst input = $input.first().json;\n\nreturn {\n  question: input.body.question,\n  lat: parseFloat(input.body.lat),\n  lng: parseFloat(input.body.lng),\n  sessionToken: generateUUID()\n};"
+      },
+      "id": "5051f128-4cfe-41f9-8ab7-94d190128dff",
+      "name": "Generate Session Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1424, -32]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Smart Keyword Cleaner & Intent Mapper\nconst input = $input.first().json;\nconst rawQuestion = input.question || '';\n\n// 1. Define synonyms\nconst synonyms = {\n  'food': 'restaurant',\n  'eat': 'restaurant',\n  'hungry': 'restaurant',\n  'dinner': 'restaurant',\n  'lunch': 'restaurant',\n  'breakfast': 'restaurant',\n  'drink': 'bar',\n  'drinks': 'bar',\n  'coffee': 'coffee shop',\n  'cafe': 'coffee shop',\n  'gym': 'fitness center',\n  'workout': 'fitness center',\n  'groceries': 'grocery',\n  'market': 'grocery'\n};\n\n// 2. Clean punctuation\nlet clean = rawQuestion.toLowerCase().replace(/[.,\\/#!$%\\^&\\*;:{}=\\-_`~()?]/g, \"\");\n\n// 3. Replace synonyms\nfor (const [key, value] of Object.entries(synonyms)) {\n  const regex = new RegExp(`\\\\b${key}\\\\b`, 'g');\n  clean = clean.replace(regex, value);\n}\n\n// 4. Remove stop words\nconst stopWords = ['is', 'there', 'are', 'any', 'find', 'me', 'a', 'the', 'near', 'nearby', 'closest', 'show', 'location', 'of', 'please', 'can', 'you', 'tell', 'looking', 'for', 'where', 'whats', 'what'];\n\nconst keywords = clean\n  .split(/\\s+/)\n  .filter(word => !stopWords.includes(word))\n  .join(' ');\n\nreturn {\n  ...input,\n  cleaned_query: keywords || rawQuestion \n};"
+      },
+      "id": "d3c63119-e5a5-43b7-95f1-cbeb396d2e4d",
+      "name": "Smart Keyword Cleaner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1200, -32]
+    },
+    {
+      "parameters": {
+        "url": "https://api.mapbox.com/search/searchbox/v1/suggest",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.cleaned_query }}"
+            },
+            {
+              "name": "proximity",
+              "value": "={{ $json.lng }},{{ $json.lat }}"
+            },
+            {
+              "name": "session_token",
+              "value": "={{ $json.sessionToken }}"
+            },
+            {
+              "name": "access_token",
+              "value": "=pk.eyJ1Ijoic3VyeWF0aGVqYTAwNyIsImEiOiJjbWk5NWJ3eW0wM2NiMmtxMGNnOTZldTBuIn0.AAfDObbez1AlkBIAaPzxLw"
+            },
+            {
+              "name": "limit",
+              "value": "5"
+            },
+            {
+              "name": "types",
+              "value": "poi"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "7d0b72a8-3c6d-4e82-8cb3-b95988a91512",
+      "name": "Mapbox Search (Suggest)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-992, -32]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst sessionData = $('Generate Session Token').first().json;\nconst userLat = sessionData.lat;\nconst userLng = sessionData.lng;\nconst question = sessionData.question;\n\n// Mapbox Suggest returns 'suggestions'\nconst suggestions = input.suggestions || [];\n\n// Helper: Haversine Distance (Miles)\nfunction getDistance(lat1, lon1, lat2, lon2) {\n  if ((lat1 == lat2) && (lon1 == lon2)) return 0;\n  const radlat1 = Math.PI * lat1/180;\n  const radlat2 = Math.PI * lat2/180;\n  const theta = lon1-lon2;\n  const radtheta = Math.PI * theta/180;\n  let dist = Math.sin(radlat1) * Math.sin(radlat2) + Math.cos(radlat1) * Math.cos(radlat2) * Math.cos(radtheta);\n  if (dist > 1) dist = 1;\n  dist = Math.acos(dist);\n  dist = dist * 180/Math.PI;\n  dist = dist * 60 * 1.1515;\n  return dist;\n}\n\nconst formattedResults = suggestions.map((s, i) => {\n  const name = s.name || 'Unknown';\n  const address = s.full_address || s.address || '';\n  const category = (s.poi_category && s.poi_category[0]) || '';\n  \n  // Some Mapbox suggestions don't have coords immediately. \n  // If missing, we skip distance or mark as 'Nearby'.\n  // Note: /suggest is approximate.\n  let distanceStr = '';\n  // Note: /suggest response DOES NOT always include coords for distance calc.\n  // It relies on 'distance' field from API if present (in meters).\n  if (s.distance) {\n     distanceStr = `${(s.distance / 1609.34).toFixed(2)} miles away`;\n  }\n  \n  return `${i + 1}. ${name} ${category ? `(${category})` : ''}\n   - Address: ${address}\n   - ${distanceStr}`;\n}).join('\\n\\n');\n\nreturn {\n  question,\n  resultsCount: suggestions.length,\n  formattedResults: formattedResults || null\n};"
+      },
+      "id": "2b515f6c-1d34-45ee-9b7d-9a7cb61befae",
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-768, -32]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.resultsCount }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "fca8bd57-56bd-4ef2-ad67-025abf7638ac",
+      "name": "Found Results?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [-544, -32]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4o-mini",
+        "prompt": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a helpful neighborhood assistant. Answer the user's question about nearby places using the provided search results. Be friendly, concise, and always mention distance."
+            },
+            {
+              "content": "=User Question: {{ $('Generate Session Token').first().json.question }}  Search Results: {{ $json.formattedResults }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 250,
+          "temperature": 0.5
+        },
+        "requestOptions": {}
+      },
+      "id": "6ac82466-b325-4e86-9029-1805c0ac336b",
+      "name": "AI Summarize",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [-304, -144],
+      "credentials": {
+        "openAiApi": {
+          "id": "XYSSZQVSOEjsCBvj",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "message.content",
+              "value": "I'm sorry, I couldn't find any places matching that description nearby. Try asking for something else!"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b2dcc215-bf8d-4a5d-8c45-9d993e622cac",
+      "name": "Set No Results",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [-304, 96]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ answer: $json.message?.content || $json.text }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "16f001be-69a5-4771-94cc-b642a977a9ea",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-48, -32]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Generate Session Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Session Token": {
+      "main": [
+        [
+          {
+            "node": "Smart Keyword Cleaner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smart Keyword Cleaner": {
+      "main": [
+        [
+          {
+            "node": "Mapbox Search (Suggest)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapbox Search (Suggest)": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Results": {
+      "main": [
+        [
+          {
+            "node": "Found Results?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Found Results?": {
+      "main": [
+        [
+          {
+            "node": "AI Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set No Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Summarize": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set No Results": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4dea4e92ff5f03ab41b3324f2345065c9f526b95fb28742b95744d07c549a795"
+  }
+}

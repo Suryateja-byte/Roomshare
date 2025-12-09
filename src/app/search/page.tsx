@@ -12,6 +12,39 @@ import Link from 'next/link';
 import { Search, Map, List } from 'lucide-react';
 import SearchViewToggle from '@/components/SearchViewToggle';
 
+// Skeleton component for listing cards during loading
+function ListingSkeleton() {
+    return (
+        <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-[840px] mx-auto pb-24 md:pb-6">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+                <div>
+                    <div className="h-6 w-48 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse" />
+                    <div className="h-4 w-64 bg-zinc-100 dark:bg-zinc-800 rounded mt-2 animate-pulse" />
+                </div>
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="h-9 w-24 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
+                    <div className="h-9 w-32 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
+                </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
+                {[...Array(6)].map((_, i) => (
+                    <div key={i} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden animate-pulse">
+                        <div className="aspect-[4/3] bg-zinc-200 dark:bg-zinc-700" />
+                        <div className="p-4 space-y-3">
+                            <div className="h-5 bg-zinc-200 dark:bg-zinc-700 rounded w-3/4" />
+                            <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded w-1/2" />
+                            <div className="flex justify-between items-center pt-2">
+                                <div className="h-5 bg-zinc-200 dark:bg-zinc-700 rounded w-20" />
+                                <div className="h-8 w-8 bg-zinc-100 dark:bg-zinc-800 rounded-full" />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 const ITEMS_PER_PAGE = 12;
 
 export default async function SearchPage({

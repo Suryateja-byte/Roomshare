@@ -12,17 +12,29 @@ import {
     X,
     CheckCheck,
     Trash2,
-    Search
+    Search,
+    AlertTriangle
 } from 'lucide-react';
 import {
     markNotificationAsRead,
     markAllNotificationsAsRead,
     deleteNotification,
+    deleteAllNotifications,
     getMoreNotifications,
     NotificationType
 } from '@/app/actions/notifications';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Notification {
     id: string;
@@ -83,6 +95,8 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
     const [filter, setFilter] = useState<'all' | 'unread'>('all');
     const [hasMore, setHasMore] = useState(initialHasMore);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
+    const [isDeletingAll, setIsDeletingAll] = useState(false);
 
     const unreadCount = notifications.filter(n => !n.read).length;
     const filteredNotifications = filter === 'unread'
@@ -120,14 +134,32 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
         setIsLoadingMore(false);
     };
 
+    const handleDeleteAll = async () => {
+        setIsDeletingAll(true);
+        try {
+            const result = await deleteAllNotifications();
+            if ('error' in result) {
+                console.error(result.error);
+            } else {
+                setNotifications([]);
+                setHasMore(false);
+            }
+        } catch (error) {
+            console.error('Failed to delete all notifications:', error);
+        } finally {
+            setIsDeletingAll(false);
+            setShowDeleteAllDialog(false);
+        }
+    };
+
     return (
-        <div className="min-h-screen bg-zinc-50/50 pt-24 pb-20">
+        <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 pt-24 pb-20">
             <div className="container mx-auto max-w-3xl px-6 py-10">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Notifications</h1>
-                        <p className="text-zinc-500 mt-1">
+                        <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">Notifications</h1>
+                        <p className="text-zinc-500 dark:text-zinc-400 mt-1">
                             {unreadCount > 0
                                 ? `You have ${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`
                                 : 'All caught up!'
@@ -140,6 +172,12 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
                             Mark all read
                         </Button>
                     )}
+                    {notifications.length > 0 && (
+                        <Button variant="outline" onClick={() => setShowDeleteAllDialog(true)} className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20">
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete all
+                        </Button>
+                    )}
                 </div>
 
                 {/* Filters */}
@@ -147,8 +185,8 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
                     <button
                         onClick={() => setFilter('all')}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all'
-                                ? 'bg-zinc-900 text-white'
-                                : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                            : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700'
                             }`}
                     >
                         All
@@ -156,8 +194,8 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
                     <button
                         onClick={() => setFilter('unread')}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'unread'
-                                ? 'bg-zinc-900 text-white'
-                                : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                            : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700'
                             }`}
                     >
                         Unread ({unreadCount})
@@ -165,14 +203,14 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
                 </div>
 
                 {/* Notifications List */}
-                <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
                     {filteredNotifications.length === 0 ? (
                         <div className="p-12 text-center">
-                            <Bell className="w-16 h-16 text-zinc-200 mx-auto mb-4" />
-                            <h3 className="text-lg font-semibold text-zinc-900 mb-2">
+                            <Bell className="w-16 h-16 text-zinc-200 dark:text-zinc-700 mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
                                 {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
                             </h3>
-                            <p className="text-zinc-500">
+                            <p className="text-zinc-500 dark:text-zinc-400">
                                 {filter === 'unread'
                                     ? 'You\'re all caught up!'
                                     : 'When you get notifications, they\'ll show up here.'
@@ -188,7 +226,7 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
                                 return (
                                     <div
                                         key={notification.id}
-                                        className={`p-4 hover:bg-zinc-50 transition-colors ${!notification.read ? 'bg-blue-50/30' : ''}`}
+                                        className={`p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors ${!notification.read ? 'bg-blue-50/30 dark:bg-blue-900/20' : ''}`}
                                     >
                                         <div className="flex gap-4">
                                             <div className={`p-3 rounded-xl ${colorClass} shrink-0`}>
@@ -197,19 +235,19 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
                                             <div className="flex-1 min-w-0">
                                                 {notification.link ? (
                                                     <Link href={notification.link}>
-                                                        <h4 className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-zinc-900 hover:underline`}>
+                                                        <h4 className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-zinc-900 dark:text-white hover:underline`}>
                                                             {notification.title}
                                                         </h4>
                                                     </Link>
                                                 ) : (
-                                                    <h4 className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-zinc-900`}>
+                                                    <h4 className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-zinc-900 dark:text-white`}>
                                                         {notification.title}
                                                     </h4>
                                                 )}
-                                                <p className="text-sm text-zinc-500 mt-1">
+                                                <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
                                                     {notification.message}
                                                 </p>
-                                                <p className="text-xs text-zinc-400 mt-2">
+                                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
                                                     {formatDate(notification.createdAt)}
                                                 </p>
                                             </div>
@@ -217,7 +255,7 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
                                                 {!notification.read && (
                                                     <button
                                                         onClick={() => handleMarkAsRead(notification.id)}
-                                                        className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+                                                        className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
                                                         title="Mark as read"
                                                     >
                                                         <Check className="w-4 h-4" />
@@ -225,7 +263,7 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
                                                 )}
                                                 <button
                                                     onClick={() => handleDelete(notification.id)}
-                                                    className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                                                     title="Delete"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -259,6 +297,33 @@ export default function NotificationsClient({ initialNotifications, initialHasMo
                         </Button>
                     </div>
                 )}
+
+                {/* Delete All Confirmation Dialog */}
+                <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                </div>
+                                <AlertDialogTitle>Delete all notifications?</AlertDialogTitle>
+                            </div>
+                            <AlertDialogDescription>
+                                This will permanently delete all {notifications.length} notification{notifications.length !== 1 ? 's' : ''}. This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isDeletingAll}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={handleDeleteAll}
+                                disabled={isDeletingAll}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                {isDeletingAll ? 'Deleting...' : 'Delete All'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </div>
     );

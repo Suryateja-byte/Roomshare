@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, X, Clock, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FocusTrap } from '@/components/ui/FocusTrap';
 import LocationSearchInput from '@/components/LocationSearchInput';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
@@ -547,210 +548,212 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                         aria-label="Close filters"
                     />
 
-                    {/* Drawer Panel */}
-                    <div
-                        id="search-filters"
-                        className="absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col"
-                    >
-                        {/* Drawer Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-                            <h2 id="filter-drawer-title" className="text-lg font-semibold text-zinc-900 dark:text-white">
-                                Filters
-                                {activeFilterCount > 0 && (
-                                    <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">
-                                        {activeFilterCount}
-                                    </span>
-                                )}
-                            </h2>
-                            <button
-                                type="button"
-                                onClick={() => setShowFilters(false)}
-                                className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors touch-target"
-                                aria-label="Close filters"
-                            >
-                                <X className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
-                            </button>
-                        </div>
-
-                        {/* Scrollable Filter Content */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-                            {/* Move-in Date */}
-                            <div className="space-y-2">
-                                <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">Move-in Date</label>
-                                <DatePicker
-                                    id="filter-move-in"
-                                    value={moveInDate}
-                                    onChange={setMoveInDate}
-                                    placeholder="Select move-in date"
-                                    minDate={new Date().toISOString().split('T')[0]}
-                                />
-                            </div>
-
-                            {/* Lease Duration */}
-                            <div className="space-y-2">
-                                <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 dark:text-white">Lease Duration</label>
-                                <Select value={leaseDuration} onValueChange={setLeaseDuration}>
-                                    <SelectTrigger id="filter-lease">
-                                        <SelectValue placeholder="Any" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="any">Any</SelectItem>
-                                        <SelectItem value="Month-to-month">Month-to-month</SelectItem>
-                                        <SelectItem value="6 months">6 months</SelectItem>
-                                        <SelectItem value="1 year">1 year</SelectItem>
-                                        <SelectItem value="1 year+">1 year+</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {/* Room Type */}
-                            <div className="space-y-2">
-                                <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 dark:text-white">Room Type</label>
-                                <Select value={roomType} onValueChange={setRoomType}>
-                                    <SelectTrigger id="filter-room-type">
-                                        <SelectValue placeholder="Any" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="any">Any</SelectItem>
-                                        <SelectItem value="Private Room">Private Room</SelectItem>
-                                        <SelectItem value="Shared Room">Shared Room</SelectItem>
-                                        <SelectItem value="Entire Place">Entire Place</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {/* Amenities */}
-                            <fieldset className="space-y-3">
-                                <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
-                                <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
-                                    {['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'].map(amenity => (
-                                        <button
-                                            key={amenity}
-                                            type="button"
-                                            onClick={() => toggleAmenity(amenity)}
-                                            aria-pressed={amenities.includes(amenity)}
-                                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${amenities.includes(amenity)
-                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
-                                                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
-                                                }`}
-                                        >
-                                            {amenity}
-                                            {amenities.includes(amenity) && (
-                                                <X className="w-3.5 h-3.5" />
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </fieldset>
-
-                            {/* House Rules */}
-                            <fieldset className="space-y-3">
-                                <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
-                                <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
-                                    {['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'].map(rule => (
-                                        <button
-                                            key={rule}
-                                            type="button"
-                                            onClick={() => toggleHouseRule(rule)}
-                                            aria-pressed={houseRules.includes(rule)}
-                                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${houseRules.includes(rule)
-                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
-                                                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
-                                                }`}
-                                        >
-                                            {rule}
-                                            {houseRules.includes(rule) && (
-                                                <X className="w-3.5 h-3.5" />
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </fieldset>
-
-                            {/* Languages */}
-                            <fieldset className="space-y-3">
-                                <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Languages Spoken</legend>
-                                <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
-                                    {LANGUAGES.map(lang => (
-                                        <button
-                                            key={lang}
-                                            type="button"
-                                            onClick={() => toggleLanguage(lang)}
-                                            aria-pressed={languages.includes(lang)}
-                                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${languages.includes(lang)
-                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
-                                                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
-                                                }`}
-                                        >
-                                            {lang}
-                                            {languages.includes(lang) && (
-                                                <X className="w-3.5 h-3.5" />
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </fieldset>
-
-                            {/* Gender Preferences */}
-                            <div className="space-y-2">
-                                <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900 dark:text-white">Gender Preference</label>
-                                <Select value={genderPreference} onValueChange={setGenderPreference}>
-                                    <SelectTrigger id="filter-gender-pref">
-                                        <SelectValue placeholder="Any" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="any">Any</SelectItem>
-                                        <SelectItem value="MALE_ONLY">Male Identifying Only</SelectItem>
-                                        <SelectItem value="FEMALE_ONLY">Female Identifying Only</SelectItem>
-                                        <SelectItem value="NO_PREFERENCE">Any Gender / All Welcome</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {/* Household Gender */}
-                            <div className="space-y-2">
-                                <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900 dark:text-white">Household Gender</label>
-                                <Select value={householdGender} onValueChange={setHouseholdGender}>
-                                    <SelectTrigger id="filter-household-gender">
-                                        <SelectValue placeholder="Any" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="any">Any</SelectItem>
-                                        <SelectItem value="ALL_MALE">All Male</SelectItem>
-                                        <SelectItem value="ALL_FEMALE">All Female</SelectItem>
-                                        <SelectItem value="MIXED">Mixed (Co-ed)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        {/* Drawer Footer with Actions */}
-                        <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-3">
-                            {hasActiveFilters && (
+                    {/* Drawer Panel with Focus Trap for accessibility */}
+                    <FocusTrap active={showFilters}>
+                        <div
+                            id="search-filters"
+                            className="absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col">
+                            {/* Note: FocusTrap wraps this - close button below will receive focus */}
+                            {/* Drawer Header */}
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                                <h2 id="filter-drawer-title" className="text-lg font-semibold text-zinc-900 dark:text-white">
+                                    Filters
+                                    {activeFilterCount > 0 && (
+                                        <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">
+                                            {activeFilterCount}
+                                        </span>
+                                    )}
+                                </h2>
                                 <button
                                     type="button"
-                                    onClick={handleClearAllFilters}
-                                    className="flex-1 px-4 py-3 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl transition-colors touch-target"
+                                    onClick={() => setShowFilters(false)}
+                                    className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors touch-target"
+                                    aria-label="Close filters"
                                 >
-                                    Clear all
+                                    <X className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
                                 </button>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowFilters(false);
-                                    // Trigger search with current filters
-                                    const form = document.querySelector('form[role="search"]') as HTMLFormElement;
-                                    if (form) {
-                                        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-                                    }
-                                }}
-                                className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-zinc-900 dark:bg-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md touch-target"
-                            >
-                                Show Results
-                            </button>
+                            </div>
+
+                            {/* Scrollable Filter Content */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                                {/* Move-in Date */}
+                                <div className="space-y-2">
+                                    <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">Move-in Date</label>
+                                    <DatePicker
+                                        id="filter-move-in"
+                                        value={moveInDate}
+                                        onChange={setMoveInDate}
+                                        placeholder="Select move-in date"
+                                        minDate={new Date().toISOString().split('T')[0]}
+                                    />
+                                </div>
+
+                                {/* Lease Duration */}
+                                <div className="space-y-2">
+                                    <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 dark:text-white">Lease Duration</label>
+                                    <Select value={leaseDuration} onValueChange={setLeaseDuration}>
+                                        <SelectTrigger id="filter-lease">
+                                            <SelectValue placeholder="Any" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="any">Any</SelectItem>
+                                            <SelectItem value="Month-to-month">Month-to-month</SelectItem>
+                                            <SelectItem value="6 months">6 months</SelectItem>
+                                            <SelectItem value="1 year">1 year</SelectItem>
+                                            <SelectItem value="1 year+">1 year+</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Room Type */}
+                                <div className="space-y-2">
+                                    <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 dark:text-white">Room Type</label>
+                                    <Select value={roomType} onValueChange={setRoomType}>
+                                        <SelectTrigger id="filter-room-type">
+                                            <SelectValue placeholder="Any" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="any">Any</SelectItem>
+                                            <SelectItem value="Private Room">Private Room</SelectItem>
+                                            <SelectItem value="Shared Room">Shared Room</SelectItem>
+                                            <SelectItem value="Entire Place">Entire Place</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Amenities */}
+                                <fieldset className="space-y-3">
+                                    <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
+                                    <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
+                                        {['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'].map(amenity => (
+                                            <button
+                                                key={amenity}
+                                                type="button"
+                                                onClick={() => toggleAmenity(amenity)}
+                                                aria-pressed={amenities.includes(amenity)}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${amenities.includes(amenity)
+                                                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
+                                                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
+                                                    }`}
+                                            >
+                                                {amenity}
+                                                {amenities.includes(amenity) && (
+                                                    <X className="w-3.5 h-3.5" />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </fieldset>
+
+                                {/* House Rules */}
+                                <fieldset className="space-y-3">
+                                    <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
+                                    <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
+                                        {['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'].map(rule => (
+                                            <button
+                                                key={rule}
+                                                type="button"
+                                                onClick={() => toggleHouseRule(rule)}
+                                                aria-pressed={houseRules.includes(rule)}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${houseRules.includes(rule)
+                                                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
+                                                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
+                                                    }`}
+                                            >
+                                                {rule}
+                                                {houseRules.includes(rule) && (
+                                                    <X className="w-3.5 h-3.5" />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </fieldset>
+
+                                {/* Languages */}
+                                <fieldset className="space-y-3">
+                                    <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Languages Spoken</legend>
+                                    <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
+                                        {LANGUAGES.map(lang => (
+                                            <button
+                                                key={lang}
+                                                type="button"
+                                                onClick={() => toggleLanguage(lang)}
+                                                aria-pressed={languages.includes(lang)}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${languages.includes(lang)
+                                                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
+                                                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
+                                                    }`}
+                                            >
+                                                {lang}
+                                                {languages.includes(lang) && (
+                                                    <X className="w-3.5 h-3.5" />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </fieldset>
+
+                                {/* Gender Preferences */}
+                                <div className="space-y-2">
+                                    <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900 dark:text-white">Gender Preference</label>
+                                    <Select value={genderPreference} onValueChange={setGenderPreference}>
+                                        <SelectTrigger id="filter-gender-pref">
+                                            <SelectValue placeholder="Any" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="any">Any</SelectItem>
+                                            <SelectItem value="MALE_ONLY">Male Identifying Only</SelectItem>
+                                            <SelectItem value="FEMALE_ONLY">Female Identifying Only</SelectItem>
+                                            <SelectItem value="NO_PREFERENCE">Any Gender / All Welcome</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Household Gender */}
+                                <div className="space-y-2">
+                                    <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900 dark:text-white">Household Gender</label>
+                                    <Select value={householdGender} onValueChange={setHouseholdGender}>
+                                        <SelectTrigger id="filter-household-gender">
+                                            <SelectValue placeholder="Any" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="any">Any</SelectItem>
+                                            <SelectItem value="ALL_MALE">All Male</SelectItem>
+                                            <SelectItem value="ALL_FEMALE">All Female</SelectItem>
+                                            <SelectItem value="MIXED">Mixed (Co-ed)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {/* Drawer Footer with Actions */}
+                            <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-3">
+                                {hasActiveFilters && (
+                                    <button
+                                        type="button"
+                                        onClick={handleClearAllFilters}
+                                        className="flex-1 px-4 py-3 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl transition-colors touch-target"
+                                    >
+                                        Clear all
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowFilters(false);
+                                        // Trigger search with current filters
+                                        const form = document.querySelector('form[role="search"]') as HTMLFormElement;
+                                        if (form) {
+                                            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                                        }
+                                    }}
+                                    className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-zinc-900 dark:bg-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md touch-target"
+                                >
+                                    Show Results
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    </FocusTrap>
                 </div>,
                 document.body
             )}

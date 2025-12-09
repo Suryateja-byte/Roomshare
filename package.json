@@ -14,6 +14,9 @@
     "test:ci": "jest --ci --coverage --maxWorkers=2"
   },
   "dependencies": {
+    "@ai-sdk/groq": "^2.0.32",
+    "@ai-sdk/openai": "^2.0.80",
+    "@ai-sdk/react": "^2.0.109",
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/client": "^6.0.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -25,6 +28,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@supabase/supabase-js": "^2.84.0",
     "@types/bcryptjs": "^3.0.0",
+    "ai": "^5.0.108",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",

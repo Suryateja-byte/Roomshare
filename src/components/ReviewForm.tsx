@@ -1,13 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { Star, LogIn, CheckCircle2, Edit3, Trash2, Loader2 } from 'lucide-react';
+import { Star, LogIn, CheckCircle2, Edit3, Trash2, Loader2, Calendar, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import CharacterCounter from '@/components/CharacterCounter';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const COMMENT_MAX_LENGTH = 500;
 
@@ -25,6 +35,7 @@ interface ReviewFormProps {
     onSuccess?: () => void;
     hasExistingReview?: boolean;
     existingReview?: ExistingReview;
+    hasBookingHistory?: boolean; // Whether user has booking history for this listing
 }
 
 export default function ReviewForm({
@@ -33,7 +44,8 @@ export default function ReviewForm({
     isLoggedIn = false,
     onSuccess,
     hasExistingReview = false,
-    existingReview
+    existingReview,
+    hasBookingHistory
 }: ReviewFormProps) {
     const [rating, setRating] = useState(existingReview?.rating || 0);
     const [comment, setComment] = useState(existingReview?.comment || '');
@@ -44,6 +56,7 @@ export default function ReviewForm({
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [wasDeleted, setWasDeleted] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const router = useRouter();
 
     // Handle editing an existing review
@@ -204,6 +217,25 @@ export default function ReviewForm({
         );
     }
 
+    // Show "booking required" message for logged-in users without booking history
+    if (listingId && hasBookingHistory === false) {
+        return (
+            <div className="bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                <div className="text-center py-4">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                        <Calendar className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <h3 className="font-semibold text-lg text-zinc-900 dark:text-white mb-2">
+                        Booking required
+                    </h3>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                        You can leave a review after making a booking request for this listing
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     // Show existing review state with edit/delete options
     if (hasExistingReview && existingReview && !wasDeleted) {
         // Edit mode
@@ -332,7 +364,7 @@ export default function ReviewForm({
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={handleDelete}
+                        onClick={() => setShowDeleteDialog(true)}
                         disabled={isDeleting}
                         className="flex-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
                     >
@@ -346,6 +378,40 @@ export default function ReviewForm({
                         )}
                     </Button>
                 </div>
+
+                {/* Delete Confirmation Dialog */}
+                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                </div>
+                                <AlertDialogTitle>Delete your review?</AlertDialogTitle>
+                            </div>
+                            <AlertDialogDescription className="text-left space-y-2">
+                                <span className="block">You&apos;re about to delete your {existingReview.rating}-star review:</span>
+                                <span className="block italic text-zinc-600 dark:text-zinc-300">&ldquo;{existingReview.comment.length > 100 ? existingReview.comment.slice(0, 100) + '...' : existingReview.comment}&rdquo;</span>
+                                <span className="block text-sm text-red-600 dark:text-red-400 mt-2">
+                                    This action cannot be undone.
+                                </span>
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isDeleting}>Keep Review</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => {
+                                    setShowDeleteDialog(false);
+                                    handleDelete();
+                                }}
+                                disabled={isDeleting}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                {isDeleting ? 'Deleting...' : 'Yes, Delete Review'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         );
     }

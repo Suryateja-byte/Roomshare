@@ -405,3 +405,18 @@ model TypingStatus {
   @@index([conversationId])
   @@index([updatedAt])
 }
+
+// Idempotency Keys for preventing duplicate submissions (e.g., booking, payment)
+// Keys are stored with cached results and expire after 24 hours
+model IdempotencyKey {
+  id         String   @id @default(cuid())
+  key        String   @unique // Client-provided unique key
+  userId     String   // User who made the request
+  endpoint   String   // Which endpoint (e.g., "createBooking")
+  resultData Json?    // Cached result of the operation
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime // Auto-expire after 24 hours
+
+  @@index([expiresAt])
+  @@index([userId, endpoint])
+}
