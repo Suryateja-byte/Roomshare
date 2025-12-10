@@ -429,7 +429,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 mapboxAccessToken={token}
                 initialViewState={initialViewState}
                 style={{ width: '100%', height: '100%' }}
-                mapStyle="mapbox://styles/mapbox/streets-v11"
+                mapStyle={isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v11"}
                 onMoveEnd={handleMoveEnd}
                 onLoad={() => {
                     setIsMapLoaded(true);

@@ -117,7 +117,7 @@ export default function NotificationCenter() {
         <div className="relative" ref={menuRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="relative p-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-all"
+                className="relative p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all"
             >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
@@ -128,14 +128,14 @@ export default function NotificationCenter() {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-zinc-100 overflow-hidden z-[1100] animate-in fade-in zoom-in-95 duration-200">
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden z-[1100] animate-in fade-in zoom-in-95 duration-200">
                     {/* Header */}
-                    <div className="px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
-                        <h3 className="font-semibold text-zinc-900">Notifications</h3>
+                    <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                        <h3 className="font-semibold text-zinc-900 dark:text-white">Notifications</h3>
                         {unreadCount > 0 && (
                             <button
                                 onClick={handleMarkAllAsRead}
-                                className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition-colors"
+                                className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1 transition-colors"
                             >
                                 <CheckCheck className="w-3 h-3" />
                                 Mark all read
@@ -146,7 +146,7 @@ export default function NotificationCenter() {
                     {/* Notifications List */}
                     <div className="max-h-96 overflow-y-auto">
                         {isLoading && notifications.length === 0 ? (
-                            <div className="p-8 text-center text-zinc-400">
+                            <div className="p-8 text-center text-zinc-400 dark:text-zinc-500">
                                 Loading...
                             </div>
                         ) : notifications.length === 0 ? (
@@ -164,7 +164,7 @@ export default function NotificationCenter() {
 
                                 const content = (
                                     <div
-                                        className={`px-4 py-3 border-b border-zinc-50 hover:bg-zinc-50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''}`}
+                                        className={`px-4 py-3 border-b border-zinc-50 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors ${!notification.read ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}
                                         onClick={() => !notification.read && handleMarkAsRead(notification.id)}
                                     >
                                         <div className="flex gap-3">
@@ -172,13 +172,13 @@ export default function NotificationCenter() {
                                                 <Icon className="w-4 h-4" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-zinc-900 truncate`}>
+                                                <p className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-zinc-900 dark:text-white truncate`}>
                                                     {notification.title}
                                                 </p>
-                                                <p className="text-xs text-zinc-500 line-clamp-2 mt-0.5">
+                                                <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-0.5">
                                                     {notification.message}
                                                 </p>
-                                                <p className="text-[10px] text-zinc-400 mt-1">
+                                                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1">
                                                     {formatTimeAgo(notification.createdAt)}
                                                 </p>
                                             </div>
@@ -208,7 +208,7 @@ export default function NotificationCenter() {
 
                     {/* Footer */}
                     {notifications.length > 0 && (
-                        <div className="px-4 py-3 border-t border-zinc-100">
+                        <div className="px-4 py-3 border-t border-zinc-100 dark:border-zinc-800">
                             <Link href="/notifications" onClick={() => setIsOpen(false)}>
                                 <Button variant="ghost" className="w-full text-sm">
                                     View all notifications

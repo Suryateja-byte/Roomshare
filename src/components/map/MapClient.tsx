@@ -316,7 +316,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                 onClick={useClustering ? onClusterClick : undefined}
                 interactiveLayerIds={useClustering ? [isDarkMode ? 'clusters-dark' : 'clusters'] : []}
                 style={{ width: '100%', height: '100%' }}
-                mapStyle="mapbox://styles/mapbox/streets-v11"
+                mapStyle={isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v11"}
             >
                 {/* Clustering Source and Layers - only when many listings */}
                 {useClustering && (
@@ -380,18 +380,16 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                         onClose={() => setSelectedListing(null)}
                         closeOnClick={false}
                         closeButton={false}
-                        className={`z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${
-                            isDarkMode
+                        className={`z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${isDarkMode
                                 ? '[&_.mapboxgl-popup-tip]:border-t-zinc-900'
                                 : '[&_.mapboxgl-popup-tip]:border-t-white'
-                        }`}
+                            }`}
                         maxWidth="300px"
                     >
-                        <div className={`w-[280px] overflow-hidden rounded-xl ${
-                            isDarkMode
+                        <div className={`w-[280px] overflow-hidden rounded-xl ${isDarkMode
                                 ? 'bg-zinc-900 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]'
                                 : 'bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]'
-                        }`}>
+                            }`}>
                             {/* Image Thumbnail */}
                             <div className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
                                 {selectedListing.images && selectedListing.images[0] ? (
@@ -408,28 +406,25 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                                 {/* Close button */}
                                 <button
                                     onClick={() => setSelectedListing(null)}
-                                    className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                                        isDarkMode
+                                    className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${isDarkMode
                                             ? 'bg-zinc-900/80 hover:bg-zinc-900 text-white'
                                             : 'bg-white/80 hover:bg-white text-zinc-900'
-                                    }`}
+                                        }`}
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
                                 {/* Availability badge */}
-                                <div className={`absolute bottom-2 left-2 px-2 py-1 rounded-md text-xs font-medium ${
-                                    isDarkMode
+                                <div className={`absolute bottom-2 left-2 px-2 py-1 rounded-md text-xs font-medium ${isDarkMode
                                         ? 'bg-zinc-900/80 text-white'
                                         : 'bg-white/90 text-zinc-900'
-                                }`}>
+                                    }`}>
                                     {selectedListing.availableSlots} {selectedListing.availableSlots === 1 ? 'spot' : 'spots'} available
                                 </div>
                             </div>
                             {/* Content */}
                             <div className="p-3">
-                                <h3 className={`font-semibold text-[15px] line-clamp-1 mb-1 ${
-                                    isDarkMode ? 'text-white' : 'text-zinc-900'
-                                }`}>
+                                <h3 className={`font-semibold text-[15px] line-clamp-1 mb-1 ${isDarkMode ? 'text-white' : 'text-zinc-900'
+                                    }`}>
                                     {selectedListing.title}
                                 </h3>
                                 <p className="mb-3">
@@ -442,11 +437,10 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                                     <Link href={`/listings/${selectedListing.id}`} className="flex-1">
                                         <Button
                                             size="sm"
-                                            className={`w-full h-9 text-[13px] font-medium rounded-lg ${
-                                                isDarkMode
+                                            className={`w-full h-9 text-[13px] font-medium rounded-lg ${isDarkMode
                                                     ? 'bg-white text-zinc-900 hover:bg-zinc-200'
                                                     : 'bg-zinc-900 text-white hover:bg-zinc-800'
-                                            }`}
+                                                }`}
                                         >
                                             View Details
                                         </Button>
@@ -455,11 +449,10 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className={`w-full h-9 text-[13px] font-medium rounded-lg ${
-                                                isDarkMode
+                                            className={`w-full h-9 text-[13px] font-medium rounded-lg ${isDarkMode
                                                     ? 'border-zinc-700 text-white hover:bg-zinc-800'
                                                     : 'border-zinc-300 text-zinc-900 hover:bg-zinc-100'
-                                            }`}
+                                                }`}
                                         >
                                             Message
                                         </Button>
