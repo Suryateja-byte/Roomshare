@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ContactHostButton from '@/components/ContactHostButton'
+import { toast } from 'sonner'
 
 // Mock next/navigation
 const mockPush = jest.fn()
@@ -16,8 +17,13 @@ jest.mock('@/app/actions/chat', () => ({
   startConversation: (...args: any[]) => mockStartConversation(...args),
 }))
 
-// Mock alert
-global.alert = jest.fn()
+// Mock sonner toast
+jest.mock('sonner', () => ({
+  toast: {
+    error: jest.fn(),
+    success: jest.fn(),
+  },
+}))
 
 describe('ContactHostButton', () => {
   beforeEach(() => {
@@ -30,7 +36,7 @@ describe('ContactHostButton', () => {
   })
 
   it('shows loading state when clicked', async () => {
-    mockStartConversation.mockImplementation(() => new Promise(() => {}))
+    mockStartConversation.mockImplementation(() => new Promise(() => { }))
 
     render(<ContactHostButton listingId="listing-123" />)
     await userEvent.click(screen.getByText('Contact Host'))
@@ -39,25 +45,25 @@ describe('ContactHostButton', () => {
     expect(screen.getByRole('button')).toBeDisabled()
   })
 
-  it('redirects to signin when unauthorized', async () => {
+  it('redirects to login when unauthorized', async () => {
     mockStartConversation.mockResolvedValue({ error: 'Unauthorized' })
 
     render(<ContactHostButton listingId="listing-123" />)
     await userEvent.click(screen.getByText('Contact Host'))
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/api/auth/signin')
+      expect(mockPush).toHaveBeenCalledWith('/login')
     })
   })
 
-  it('shows alert on other errors', async () => {
+  it('shows toast error on other errors', async () => {
     mockStartConversation.mockResolvedValue({ error: 'Cannot chat with yourself' })
 
     render(<ContactHostButton listingId="listing-123" />)
     await userEvent.click(screen.getByText('Contact Host'))
 
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('Cannot chat with yourself')
+      expect(toast.error).toHaveBeenCalledWith('Cannot chat with yourself')
     })
   })
 
@@ -79,7 +85,7 @@ describe('ContactHostButton', () => {
     await userEvent.click(screen.getByText('Contact Host'))
 
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('Failed to start conversation')
+      expect(toast.error).toHaveBeenCalledWith('Failed to start conversation')
     })
   })
 

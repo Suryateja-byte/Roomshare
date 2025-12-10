@@ -36,7 +36,7 @@ describe('LoginPage', () => {
 
     expect(screen.getByText('Welcome back')).toBeInTheDocument()
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Password')).toBeInTheDocument()
   })
 
   it('renders google sign in button', () => {
@@ -65,7 +65,7 @@ describe('LoginPage', () => {
     render(<LoginPage />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText(/password/i), 'password123')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
@@ -83,7 +83,7 @@ describe('LoginPage', () => {
     render(<LoginPage />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText(/password/i), 'password123')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
@@ -98,7 +98,7 @@ describe('LoginPage', () => {
     render(<LoginPage />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText(/password/i), 'wrongpassword')
+    await userEvent.type(screen.getByLabelText('Password'), 'wrongpassword')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
@@ -115,15 +115,16 @@ describe('LoginPage', () => {
   })
 
   it('shows loading state during login', async () => {
-    mockSignIn.mockImplementation(() => new Promise(() => {})) // Never resolves
+    mockSignIn.mockImplementation(() => new Promise(() => { })) // Never resolves
 
     render(<LoginPage />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText(/password/i), 'password123')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
-    // Button should be disabled
-    expect(screen.getByRole('button', { name: '' })).toBeDisabled()
+    // Submit button should be disabled during loading
+    const submitButton = screen.getByRole('button', { name: '' })
+    expect(submitButton).toBeDisabled()
   })
 })

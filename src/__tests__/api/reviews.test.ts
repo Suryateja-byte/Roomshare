@@ -21,9 +21,13 @@ jest.mock('@/lib/prisma', () => ({
     review: {
       create: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
     listing: {
       findUnique: jest.fn(),
+    },
+    booking: {
+      findFirst: jest.fn(),
     },
   },
 }))
@@ -37,14 +41,14 @@ jest.mock('@/app/actions/notifications', () => ({
 }))
 
 jest.mock('@/lib/email', () => ({
-  sendNotificationEmail: jest.fn(),
+  sendNotificationEmailWithPreference: jest.fn(),
 }))
 
 import { POST, GET } from '@/app/api/reviews/route'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { createNotification } from '@/app/actions/notifications'
-import { sendNotificationEmail } from '@/lib/email'
+import { sendNotificationEmailWithPreference } from '@/lib/email'
 
 describe('/api/reviews', () => {
   const mockSession = {
@@ -80,6 +84,8 @@ describe('/api/reviews', () => {
     }
 
     beforeEach(() => {
+      ;(prisma.review.findFirst as jest.Mock).mockResolvedValue(null)
+      ;(prisma.booking.findFirst as jest.Mock).mockResolvedValue({ id: 'booking-123' })
       ;(prisma.review.create as jest.Mock).mockResolvedValue(mockReview)
     })
 
@@ -222,8 +228,9 @@ describe('/api/reviews', () => {
           comment: 'Great!',
         }))
 
-        expect(sendNotificationEmail).toHaveBeenCalledWith(
+        expect(sendNotificationEmailWithPreference).toHaveBeenCalledWith(
           'newReview',
+          'owner-456',
           'owner@example.com',
           expect.objectContaining({
             rating: 5,
@@ -247,7 +254,7 @@ describe('/api/reviews', () => {
         }))
 
         expect(createNotification).not.toHaveBeenCalled()
-        expect(sendNotificationEmail).not.toHaveBeenCalled()
+        expect(sendNotificationEmailWithPreference).not.toHaveBeenCalled()
       })
     })
 

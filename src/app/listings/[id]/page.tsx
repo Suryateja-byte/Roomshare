@@ -130,8 +130,8 @@ export default async function ListingPage({ params }: PageProps) {
         userHasBooking = !!bookingExists;
     }
 
-    // Track view if user is not the owner
-    if (session?.user?.id && !isOwner) {
+    // Track view if user is not the owner (works for both logged-in and anonymous users)
+    if (!isOwner) {
         await trackListingView(listing.id);
     }
 

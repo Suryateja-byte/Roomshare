@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTransition } from 'react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 interface PaginationProps {
     currentPage: number;
@@ -13,13 +14,16 @@ interface PaginationProps {
 export default function Pagination({ currentPage, totalPages, totalItems, itemsPerPage }: PaginationProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const [isPending, startTransition] = useTransition();
 
     if (totalPages <= 1) return null;
 
     const handlePageChange = (page: number) => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set('page', page.toString());
-        router.push(`?${params.toString()}`, { scroll: false });
+        startTransition(() => {
+            const params = new URLSearchParams(searchParams.toString());
+            params.set('page', page.toString());
+            router.push(`?${params.toString()}`, { scroll: false });
+        });
     };
 
     // Generate page numbers to show
@@ -65,14 +69,16 @@ export default function Pagination({ currentPage, totalPages, totalItems, itemsP
 
     return (
         <nav
-            className="flex flex-col sm:flex-row items-center justify-between gap-4 py-6 sm:py-8"
+            className={`flex flex-col sm:flex-row items-center justify-between gap-4 py-6 sm:py-8 transition-opacity ${isPending ? 'opacity-70' : ''}`}
             aria-label="Pagination navigation"
+            aria-busy={isPending}
         >
             {/* Results info */}
             <p className="text-sm text-zinc-500 ">
                 Showing <span className="font-medium text-zinc-900 ">{startItem}</span> to{' '}
                 <span className="font-medium text-zinc-900 ">{endItem}</span> of{' '}
                 <span className="font-medium text-zinc-900 ">{totalItems}</span> results
+                {isPending && <span className="ml-2 text-zinc-400">(Loading...)</span>}
             </p>
 
             {/* Pagination controls */}
@@ -80,11 +86,15 @@ export default function Pagination({ currentPage, totalPages, totalItems, itemsP
                 {/* Previous button */}
                 <button
                     onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
+                    disabled={currentPage === 1 || isPending}
                     aria-label="Go to previous page"
-                    className="p-2.5 sm:p-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
+                    className="p-2.5 sm:p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
                 >
-                    <ChevronLeft className="w-4 h-4" />
+                    {isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                        <ChevronLeft className="w-4 h-4" />
+                    )}
                 </button>
 
                 {/* Page numbers */}
@@ -94,13 +104,13 @@ export default function Pagination({ currentPage, totalPages, totalItems, itemsP
                             <button
                                 key={index}
                                 onClick={() => handlePageChange(page)}
+                                disabled={isPending}
                                 aria-label={`Page ${page}`}
                                 aria-current={page === currentPage ? 'page' : undefined}
-                                className={`min-w-[40px] sm:min-w-[36px] h-10 sm:h-9 px-2 sm:px-3 rounded-lg text-sm font-medium transition-colors touch-target ${
-                                    page === currentPage
-                                        ? 'bg-zinc-900 text-white '
-                                        : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 '
-                                }`}
+                                className={`min-w-[40px] sm:min-w-[36px] h-10 sm:h-9 px-2 sm:px-3 rounded-lg text-sm font-medium transition-colors touch-target disabled:cursor-not-allowed ${page === currentPage
+                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:hover:bg-transparent'
+                                    }`}
                             >
                                 {page}
                             </button>
@@ -115,11 +125,15 @@ export default function Pagination({ currentPage, totalPages, totalItems, itemsP
                 {/* Next button */}
                 <button
                     onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
+                    disabled={currentPage === totalPages || isPending}
                     aria-label="Go to next page"
-                    className="p-2.5 sm:p-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
+                    className="p-2.5 sm:p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
                 >
-                    <ChevronRight className="w-4 h-4" />
+                    {isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                        <ChevronRight className="w-4 h-4" />
+                    )}
                 </button>
             </div>
         </nav>

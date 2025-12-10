@@ -8,7 +8,18 @@ jest.mock('@/lib/prisma', () => ({
       findUnique: jest.fn(),
       create: jest.fn(),
     },
+    verificationToken: {
+      create: jest.fn(),
+    },
   },
+}))
+
+jest.mock('@/lib/with-rate-limit', () => ({
+  withRateLimit: jest.fn().mockResolvedValue(null),
+}))
+
+jest.mock('@/lib/email', () => ({
+  sendNotificationEmail: jest.fn().mockResolvedValue(undefined),
 }))
 
 jest.mock('bcryptjs', () => ({
@@ -112,6 +123,7 @@ describe('Register API', () => {
           name: 'Test User',
           email: 'new@test.com',
           password: 'hashed_password',
+          emailVerified: null,
         },
       })
 

@@ -16,7 +16,7 @@ export function Skeleton({
   style,
   ...props
 }: SkeletonProps) {
-  const baseClasses = "bg-zinc-200 ";
+  const baseClasses = "bg-zinc-200 dark:bg-zinc-700 ";
 
   const variantClasses = {
     text: "rounded h-4 w-full",
@@ -27,7 +27,7 @@ export function Skeleton({
 
   const animationClasses = {
     pulse: "animate-pulse",
-    shimmer: "animate-shimmer bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 bg-[length:200%_100%]",
+    shimmer: "animate-shimmer bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-700 dark:via-zinc-600 dark:to-zinc-700 bg-[length:200%_100%]",
     none: "",
   };
 
@@ -70,7 +70,7 @@ export function AvatarSkeleton({ size = 40 }: { size?: number }) {
 export function CardSkeleton({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`rounded-lg border border-zinc-200 bg-white p-4 ${className}`}
+      className={`rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 ${className}`}
       aria-hidden="true"
       role="presentation"
     >

@@ -47,6 +47,7 @@ interface Message {
     content: string;
     senderId: string;
     createdAt: Date;
+    read?: boolean;
     status?: 'sending' | 'sent' | 'failed';
     sender?: {
         id: string;
@@ -549,7 +550,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                         </p>
                                     </div>
                                     <Link
-                                        href="/listings"
+                                        href="/search"
                                         className="inline-flex items-center justify-center px-6 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full font-medium text-sm hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
                                     >
                                         Browse Listings
@@ -699,6 +700,13 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                                 <div className="flex items-center gap-1 mt-2 text-red-600 dark:text-red-400 text-xs">
                                                     <AlertCircle className="w-3 h-3" />
                                                     <span>Failed to send. Tap to retry</span>
+                                                </div>
+                                            )}
+                                            {/* Read receipt indicator for sent messages */}
+                                            {m.senderId === currentUserId && m.status !== 'failed' && m.status !== 'sending' && (
+                                                <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${m.read ? 'text-blue-400' : 'text-white/50 dark:text-zinc-600'}`}>
+                                                    <CheckCheck className="w-3 h-3" />
+                                                    <span>{m.read ? 'Read' : 'Delivered'}</span>
                                                 </div>
                                             )}
                                         </div>

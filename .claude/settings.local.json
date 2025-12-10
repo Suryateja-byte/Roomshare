@@ -22,7 +22,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(grep:*)",
-      "Bash(powershell -Command \"Get-Process -Name node | Stop-Process -Force\")"
+      "Bash(powershell -Command \"Get-Process -Name node | Stop-Process -Force\")",
+      "Bash(mkdir:*)",
+      "Bash(if not exist:*)"
     ],
     "deny": [],
     "ask": []

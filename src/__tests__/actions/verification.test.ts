@@ -31,6 +31,10 @@ jest.mock('@/lib/email', () => ({
   sendNotificationEmail: jest.fn().mockResolvedValue({ success: true }),
 }))
 
+jest.mock('@/lib/audit', () => ({
+  logAdminAction: jest.fn().mockResolvedValue(undefined),
+}))
+
 import {
   submitVerificationRequest,
   getMyVerificationStatus,
@@ -63,7 +67,7 @@ describe('Verification Actions', () => {
         documentUrl: 'https://example.com/doc.jpg',
       })
 
-      expect(result).toEqual({ error: 'Unauthorized' })
+      expect(result).toEqual({ error: 'Unauthorized', code: 'SESSION_EXPIRED' })
     })
 
     it('returns error if pending request exists', async () => {
@@ -165,15 +169,17 @@ describe('Verification Actions', () => {
           id: 'rejected-123',
           status: 'REJECTED',
           adminNotes: 'Document not clear',
+          updatedAt: new Date(Date.now() - 48 * 60 * 60 * 1000), // 48 hours ago - outside cooldown
         })
 
       const result = await getMyVerificationStatus()
 
-      expect(result).toEqual({
+      expect(result).toEqual(expect.objectContaining({
         status: 'rejected',
         reason: 'Document not clear',
         requestId: 'rejected-123',
-      })
+        canResubmit: true,
+      }))
     })
 
     it('returns not_started when no requests exist', async () => {
@@ -202,7 +208,7 @@ describe('Verification Actions', () => {
 
       const result = await getPendingVerifications()
 
-      expect(result).toEqual({ error: 'Unauthorized', requests: [] })
+      expect(result).toEqual({ error: 'Unauthorized', code: 'SESSION_EXPIRED', requests: [] })
     })
 
     it('returns error when not admin', async () => {
@@ -242,7 +248,7 @@ describe('Verification Actions', () => {
 
       const result = await approveVerification('request-123')
 
-      expect(result).toEqual({ error: 'Unauthorized' })
+      expect(result).toEqual({ error: 'Unauthorized', code: 'SESSION_EXPIRED' })
     })
 
     it('returns error when not admin', async () => {
@@ -306,7 +312,7 @@ describe('Verification Actions', () => {
 
       const result = await rejectVerification('request-123', 'Invalid document')
 
-      expect(result).toEqual({ error: 'Unauthorized' })
+      expect(result).toEqual({ error: 'Unauthorized', code: 'SESSION_EXPIRED' })
     })
 
     it('returns error when not admin', async () => {
@@ -330,6 +336,8 @@ describe('Verification Actions', () => {
       ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ isAdmin: true })
       ;(prisma.verificationRequest.findUnique as jest.Mock).mockResolvedValue({
         id: 'request-123',
+        userId: 'user-456',
+        user: { id: 'user-456', name: 'Test User', email: 'test@test.com' },
       })
       ;(prisma.verificationRequest.update as jest.Mock).mockResolvedValue({})
 
@@ -345,6 +353,7 @@ describe('Verification Actions', () => {
         },
       })
       expect(revalidatePath).toHaveBeenCalledWith('/admin/verifications')
+      expect(revalidatePath).toHaveBeenCalledWith('/verify')
       expect(result).toEqual({ success: true })
     })
 
@@ -364,7 +373,7 @@ describe('Verification Actions', () => {
 
       const result = await cancelVerificationRequest()
 
-      expect(result).toEqual({ error: 'Unauthorized' })
+      expect(result).toEqual({ error: 'Unauthorized', code: 'SESSION_EXPIRED' })
     })
 
     it('cancels pending request successfully', async () => {

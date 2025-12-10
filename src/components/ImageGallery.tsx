@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, ZoomIn, Grid3X3, ImageOff } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ZoomIn, Grid3X3, ImageOff, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ImageGalleryProps {
@@ -45,6 +45,42 @@ function ImageWithFallback({
     );
 }
 
+// Gallery item with hover effects - uses named group to prevent parent group interference
+function GalleryItem({
+    src,
+    alt,
+    onClick,
+    hasError,
+    onError,
+    overlay,
+    className
+}: {
+    src: string;
+    alt: string;
+    onClick: () => void;
+    hasError: boolean;
+    onError: () => void;
+    overlay?: React.ReactNode;
+    className?: string;
+}) {
+    return (
+        <div
+            className={cn("relative group/item cursor-pointer overflow-hidden", className)}
+            onClick={onClick}
+        >
+            <ImageWithFallback
+                src={src}
+                alt={alt}
+                className="w-full h-full object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover/item:scale-[1.03]"
+                hasError={hasError}
+                onError={onError}
+            />
+            <div className="absolute inset-0 bg-black/5 group-hover/item:bg-black/0 transition-colors duration-500 ease-out" />
+            {overlay}
+        </div>
+    );
+}
+
 export default function ImageGallery({ images, title }: ImageGalleryProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -56,11 +92,10 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
         setBrokenImages(prev => new Set(prev).add(index));
     };
 
-    const mainImage = images[0];
-    const galleryImages = images.slice(1, 5);
-    const hasMoreImages = images.length > 5;
+    const imageCount = images.length;
 
     const openLightbox = (index: number) => {
+        if (imageCount === 0) return;
         setCurrentIndex(index);
         setLightboxOpen(true);
         setIsZoomed(false);
@@ -113,77 +148,172 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
         };
     }, [lightboxOpen, goToPrevious, goToNext]);
 
-    return (
-        <>
-            {/* Gallery Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[400px] md:h-[500px] rounded-3xl overflow-hidden">
-                {/* Main Image */}
-                <div
-                    className="md:col-span-2 h-full relative group cursor-pointer"
-                    onClick={() => openLightbox(0)}
-                >
-                    <ImageWithFallback
-                        src={mainImage}
+    // Container classes shared across all layouts
+    const containerClasses = "w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-sm dark:shadow-none bg-zinc-100 dark:bg-zinc-900";
+
+    // Render gallery based on image count
+    const renderGallery = () => {
+        // 0 images - Placeholder
+        if (imageCount === 0) {
+            return (
+                <div className={cn(containerClasses, "flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-600 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800")}>
+                    <div className="p-6 rounded-full bg-zinc-100 dark:bg-zinc-800 mb-4">
+                        <ImageIcon className="w-10 h-10" />
+                    </div>
+                    <p className="font-medium text-lg">No photos added yet</p>
+                    <p className="text-sm mt-1 opacity-70">Listing preview will appear here</p>
+                </div>
+            );
+        }
+
+        // 1 image - Full hero
+        if (imageCount === 1) {
+            return (
+                <div className={containerClasses}>
+                    <GalleryItem
+                        src={images[0]}
                         alt={title}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onClick={() => openLightbox(0)}
                         hasError={brokenImages.has(0)}
                         onError={() => markImageBroken(0)}
+                        className="w-full h-full"
                     />
-                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
-                    <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ZoomIn className="w-4 h-4" />
-                        Click to enlarge
+                </div>
+            );
+        }
+
+        // 2 images - Split layout
+        if (imageCount === 2) {
+            return (
+                <div className={cn(containerClasses, "grid grid-cols-1 md:grid-cols-2 gap-2")}>
+                    <GalleryItem
+                        src={images[0]}
+                        alt={`${title} - Image 1`}
+                        onClick={() => openLightbox(0)}
+                        hasError={brokenImages.has(0)}
+                        onError={() => markImageBroken(0)}
+                        className="h-full"
+                    />
+                    <GalleryItem
+                        src={images[1]}
+                        alt={`${title} - Image 2`}
+                        onClick={() => openLightbox(1)}
+                        hasError={brokenImages.has(1)}
+                        onError={() => markImageBroken(1)}
+                        className="h-full"
+                    />
+                </div>
+            );
+        }
+
+        // 3 images - 2/3 + 1/3 stacked layout
+        if (imageCount === 3) {
+            return (
+                <div className={cn(containerClasses, "grid grid-cols-1 md:grid-cols-3 gap-2")}>
+                    <GalleryItem
+                        src={images[0]}
+                        alt={`${title} - Main`}
+                        onClick={() => openLightbox(0)}
+                        hasError={brokenImages.has(0)}
+                        onError={() => markImageBroken(0)}
+                        className="md:col-span-2 h-full"
+                    />
+                    <div className="hidden md:flex flex-col gap-2 h-full">
+                        <GalleryItem
+                            src={images[1]}
+                            alt={`${title} - Image 2`}
+                            onClick={() => openLightbox(1)}
+                            hasError={brokenImages.has(1)}
+                            onError={() => markImageBroken(1)}
+                            className="h-full"
+                        />
+                        <GalleryItem
+                            src={images[2]}
+                            alt={`${title} - Image 3`}
+                            onClick={() => openLightbox(2)}
+                            hasError={brokenImages.has(2)}
+                            onError={() => markImageBroken(2)}
+                            className="h-full"
+                        />
                     </div>
                 </div>
+            );
+        }
 
-                {/* Gallery Images */}
-                {galleryImages.length > 0 && (
-                    <div className="hidden md:grid grid-cols-2 gap-4 col-span-2 h-full">
-                        {galleryImages.map((img, i) => (
-                            <div
-                                key={i}
-                                className="relative group overflow-hidden cursor-pointer"
-                                onClick={() => openLightbox(i + 1)}
-                            >
-                                <ImageWithFallback
-                                    src={img}
-                                    alt={`${title} - Image ${i + 2}`}
-                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                    hasError={brokenImages.has(i + 1)}
-                                    onError={() => markImageBroken(i + 1)}
-                                />
-                                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
+        // 4+ images - Bento grid layout
+        return (
+            <div className={cn(containerClasses, "grid grid-cols-1 md:grid-cols-4 gap-2")}>
+                {/* Main Image (50% width) */}
+                <GalleryItem
+                    src={images[0]}
+                    alt={`${title} - Main`}
+                    onClick={() => openLightbox(0)}
+                    hasError={brokenImages.has(0)}
+                    onError={() => markImageBroken(0)}
+                    className="md:col-span-2 h-full"
+                />
 
-                                {/* Show "View all" button on the last visible image if there are more */}
-                                {i === galleryImages.length - 1 && hasMoreImages && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <div className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full text-zinc-900 text-sm font-medium">
-                                            <Grid3X3 className="w-4 h-4" />
-                                            View all {images.length} photos
-                                        </div>
-                                    </div>
-                                )}
+                {/* Side Images Grid */}
+                <div className="hidden md:grid grid-cols-2 grid-rows-2 gap-2 col-span-2 h-full">
+                    {/* Tall image spanning 2 rows */}
+                    <GalleryItem
+                        src={images[1]}
+                        alt={`${title} - Image 2`}
+                        onClick={() => openLightbox(1)}
+                        hasError={brokenImages.has(1)}
+                        onError={() => markImageBroken(1)}
+                        className="row-span-2"
+                    />
+                    {/* Top right */}
+                    <GalleryItem
+                        src={images[2]}
+                        alt={`${title} - Image 3`}
+                        onClick={() => openLightbox(2)}
+                        hasError={brokenImages.has(2)}
+                        onError={() => markImageBroken(2)}
+                    />
+                    {/* Bottom right with "more" overlay */}
+                    <GalleryItem
+                        src={images[3]}
+                        alt={`${title} - Image 4`}
+                        onClick={() => openLightbox(3)}
+                        hasError={brokenImages.has(3)}
+                        onError={() => markImageBroken(3)}
+                        overlay={imageCount > 4 ? (
+                            <div className="absolute inset-0 bg-black/50 hover:bg-black/40 transition-colors flex items-center justify-center">
+                                <span className="text-white font-medium text-sm border border-white/50 bg-black/20 backdrop-blur-md px-3 py-1 rounded-full">
+                                    +{imageCount - 4} more
+                                </span>
                             </div>
-                        ))}
-                    </div>
-                )}
+                        ) : undefined}
+                    />
+                </div>
 
                 {/* Mobile: Show all photos button */}
-                {images.length > 1 && (
+                {imageCount > 1 && (
                     <button
                         onClick={() => openLightbox(0)}
                         className="md:hidden absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full text-zinc-900 text-sm font-medium shadow-lg"
                     >
                         <Grid3X3 className="w-4 h-4" />
-                        View all {images.length} photos
+                        View all {imageCount} photos
                     </button>
                 )}
+            </div>
+        );
+    };
+
+    return (
+        <>
+            {/* Dynamic Gallery */}
+            <div className="relative">
+                {renderGallery()}
             </div>
 
             {/* Lightbox Modal */}
             {lightboxOpen && (
                 <div
-                    className="fixed inset-0 z-50 bg-black/95 flex flex-col"
+                    className="fixed inset-0 z-[1200] bg-black/95 flex flex-col"
                     onClick={closeLightbox}
                 >
                     {/* Header */}

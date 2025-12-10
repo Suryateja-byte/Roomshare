@@ -33,6 +33,8 @@ const mockListing = {
   amenities: ['WiFi', 'Parking', 'Laundry', 'Pool'],
   availableSlots: 2,
   images: ['/image1.jpg'],
+  avgRating: 4.9,
+  reviewCount: 5,
 }
 
 describe('ListingCard', () => {

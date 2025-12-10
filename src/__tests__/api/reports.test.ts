@@ -6,6 +6,7 @@ jest.mock('@/lib/prisma', () => ({
   prisma: {
     report: {
       create: jest.fn(),
+      findFirst: jest.fn(),
     },
   },
 }))
@@ -81,6 +82,7 @@ describe('Reports API', () => {
         reason: 'Spam',
         details: 'This is spam content',
       }
+      ;(prisma.report.findFirst as jest.Mock).mockResolvedValue(null)
       ;(prisma.report.create as jest.Mock).mockResolvedValue(mockReport)
 
       const request = new Request('http://localhost/api/reports', {
@@ -105,6 +107,7 @@ describe('Reports API', () => {
     })
 
     it('handles database errors', async () => {
+      ;(prisma.report.findFirst as jest.Mock).mockResolvedValue(null)
       ;(prisma.report.create as jest.Mock).mockRejectedValue(new Error('DB Error'))
 
       const request = new Request('http://localhost/api/reports', {

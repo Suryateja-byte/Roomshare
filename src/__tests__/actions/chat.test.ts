@@ -26,11 +26,16 @@ jest.mock('@/lib/prisma', () => ({
       findMany: jest.fn(),
       create: jest.fn(),
       updateMany: jest.fn(),
+      count: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
     },
   },
+}))
+
+jest.mock('@/app/actions/block', () => ({
+  checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
 }))
 
 jest.mock('@/auth', () => ({
@@ -43,6 +48,7 @@ jest.mock('@/app/actions/notifications', () => ({
 
 jest.mock('@/lib/email', () => ({
   sendNotificationEmail: jest.fn().mockResolvedValue({ success: true }),
+  sendNotificationEmailWithPreference: jest.fn().mockResolvedValue({ success: true }),
 }))
 
 import {
@@ -84,7 +90,7 @@ describe('Chat Actions', () => {
 
       const result = await startConversation('listing-123')
 
-      expect(result).toEqual({ error: 'Unauthorized' })
+      expect(result).toEqual({ error: 'Unauthorized', code: 'SESSION_EXPIRED' })
     })
 
     it('returns error when listing not found', async () => {
@@ -156,19 +162,23 @@ describe('Chat Actions', () => {
     beforeEach(() => {
       ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
       ;(prisma.message.create as jest.Mock).mockResolvedValue(mockMessage)
-      ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ name: 'Test User' })
+      ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ name: 'Test User', emailVerified: new Date() })
     })
 
-    it('throws error when not authenticated', async () => {
+    it('returns error when not authenticated', async () => {
       ;(auth as jest.Mock).mockResolvedValue(null)
 
-      await expect(sendMessage('conv-123', 'Hello!')).rejects.toThrow('Unauthorized')
+      const result = await sendMessage('conv-123', 'Hello!')
+
+      expect(result).toEqual({ error: 'Unauthorized', code: 'SESSION_EXPIRED' })
     })
 
-    it('throws error when conversation not found', async () => {
+    it('returns error when conversation not found', async () => {
       ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(null)
 
-      await expect(sendMessage('invalid-conv', 'Hello!')).rejects.toThrow('Conversation not found')
+      const result = await sendMessage('invalid-conv', 'Hello!')
+
+      expect(result).toEqual({ error: 'Conversation not found' })
     })
 
     it('creates message successfully', async () => {
@@ -203,7 +213,7 @@ describe('Chat Actions', () => {
       expect(result).toEqual([])
     })
 
-    it('returns user conversations', async () => {
+    it('returns user conversations with unread count', async () => {
       const mockConversations = [
         {
           id: 'conv-1',
@@ -219,16 +229,21 @@ describe('Chat Actions', () => {
         },
       ]
       ;(prisma.conversation.findMany as jest.Mock).mockResolvedValue(mockConversations)
+      ;(prisma.message.count as jest.Mock).mockResolvedValue(0)
 
       const result = await getConversations()
 
-      expect(result).toEqual(mockConversations)
+      expect(result).toEqual([
+        { ...mockConversations[0], unreadCount: 0 },
+        { ...mockConversations[1], unreadCount: 0 },
+      ])
       expect(prisma.conversation.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             participants: {
               some: { id: 'user-123' },
             },
+            deletedAt: null,
           },
           orderBy: { updatedAt: 'desc' },
         })
@@ -253,21 +268,23 @@ describe('Chat Actions', () => {
       ;(prisma.message.updateMany as jest.Mock).mockResolvedValue({ count: 1 })
     })
 
-    it('returns empty array when not authenticated', async () => {
+    it('returns error when not authenticated', async () => {
       ;(auth as jest.Mock).mockResolvedValue(null)
 
       const result = await getMessages('conv-123')
 
-      expect(result).toEqual([])
+      expect(result).toEqual({ error: 'Unauthorized', code: 'SESSION_EXPIRED', messages: [] })
     })
 
-    it('throws error when user is not participant', async () => {
+    it('returns error when user is not participant', async () => {
       ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conv-123',
         participants: [{ id: 'other-1' }, { id: 'other-2' }], // user-123 not included
       })
 
-      await expect(getMessages('conv-123')).rejects.toThrow('Unauthorized')
+      const result = await getMessages('conv-123')
+
+      expect(result).toEqual({ error: 'Unauthorized', messages: [] })
     })
 
     it('returns messages for valid participant', async () => {
@@ -324,9 +341,11 @@ describe('Chat Actions', () => {
               participants: {
                 some: { id: 'user-123' },
               },
+              deletedAt: null,
             },
             senderId: { not: 'user-123' },
             read: false,
+            deletedAt: null,
           },
         })
       )

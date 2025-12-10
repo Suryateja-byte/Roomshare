@@ -24,7 +24,11 @@ const staggerContainer: Variants = {
 // Filter tags for the search section
 const filterTags = ['Move-in Date', 'Lease Duration', 'Room Type', 'Amenities', 'House Rules'];
 
-export default function HomeClient() {
+interface HomeClientProps {
+    isLoggedIn?: boolean;
+}
+
+export default function HomeClient({ isLoggedIn = false }: HomeClientProps) {
     const searchFormRef = useRef<HTMLDivElement>(null);
 
     const handleFilterClick = () => {
@@ -63,9 +67,37 @@ export default function HomeClient() {
                                 </motion.h1>
 
                                 {/* Subheadline */}
-                                <motion.p variants={fadeInUp} className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 mb-10 max-w-xl mx-auto lg:mx-0 font-light leading-relaxed">
+                                <motion.p variants={fadeInUp} className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 mb-6 max-w-xl mx-auto lg:mx-0 font-light leading-relaxed">
                                     Curated spaces. Compatible people. The modern way to find your sanctuary.
                                 </motion.p>
+
+                                {/* Signup CTA for non-logged-in users */}
+                                {!isLoggedIn && (
+                                    <motion.div variants={fadeInUp} className="mb-8">
+                                        <div className="inline-flex flex-col sm:flex-row gap-3 p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/50 dark:to-purple-950/50 border border-indigo-100 dark:border-indigo-900/50">
+                                            <div className="flex-1 text-left">
+                                                <p className="text-sm font-semibold text-zinc-900 dark:text-white mb-1">
+                                                    🏠 Start your journey today
+                                                </p>
+                                                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                                                    No fees • Verified users • Flexible leases
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-2 items-center">
+                                                <Link href="/signup">
+                                                    <Button className="h-10 px-6 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-lg shadow-indigo-500/20 transition-all">
+                                                        Sign Up Free
+                                                    </Button>
+                                                </Link>
+                                                <Link href="/login">
+                                                    <Button variant="ghost" className="h-10 px-4 rounded-full text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-950 font-medium text-sm">
+                                                        Log In
+                                                    </Button>
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
 
                                 {/* Search Component */}
                                 <motion.div variants={fadeInUp} ref={searchFormRef} className="w-full mx-auto max-w-2xl lg:mx-0">

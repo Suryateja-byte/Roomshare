@@ -17,6 +17,7 @@ import {
     MapPin,
     MessageSquare,
     ChevronRight,
+    Loader2,
     ImageOff
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
@@ -107,12 +108,15 @@ const ListingCard = ({ listing }: any) => {
 // --- Main Component ---
 export default function ProfileClient({ user }: { user: UserWithListings }) {
     const [isEditing, setIsEditing] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const handleEdit = () => {
         window.location.href = '/profile/edit';
     };
 
     const handleLogout = async () => {
+        if (isLoggingOut) return;
+        setIsLoggingOut(true);
         await signOut({ callbackUrl: '/' });
     };
 
@@ -301,9 +305,15 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
 
                         <button
                             onClick={handleLogout}
-                            className="w-full py-4 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-2xl transition-colors flex items-center justify-center gap-2"
+                            disabled={isLoggingOut}
+                            className="w-full py-4 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-2xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <LogOut className="w-4 h-4" /> Log Out
+                            {isLoggingOut ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <LogOut className="w-4 h-4" />
+                            )}
+                            {isLoggingOut ? 'Logging out...' : 'Log Out'}
                         </button>
 
                     </div>

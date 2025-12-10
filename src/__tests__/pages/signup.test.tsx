@@ -14,6 +14,7 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 // Mock next/link
@@ -38,7 +39,9 @@ describe('SignUpPage', () => {
     expect(screen.getByText('Create an account')).toBeInTheDocument()
     expect(screen.getByLabelText(/full name/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Password')).toBeInTheDocument()
+    expect(screen.getByLabelText('Confirm Password')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).toBeInTheDocument()
   })
 
   it('renders google sign up button', () => {
@@ -64,7 +67,9 @@ describe('SignUpPage', () => {
 
     await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
     await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText(/password/i), 'password123')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.type(screen.getByLabelText('Confirm Password'), 'password123')
+    await userEvent.click(screen.getByRole('checkbox'))
     await userEvent.click(screen.getByRole('button', { name: /create account/i }))
 
     await waitFor(() => {
@@ -90,7 +95,9 @@ describe('SignUpPage', () => {
 
     await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
     await userEvent.type(screen.getByLabelText(/email/i), 'existing@example.com')
-    await userEvent.type(screen.getByLabelText(/password/i), 'password123')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.type(screen.getByLabelText('Confirm Password'), 'password123')
+    await userEvent.click(screen.getByRole('checkbox'))
     await userEvent.click(screen.getByRole('button', { name: /create account/i }))
 
     await waitFor(() => {
@@ -113,17 +120,24 @@ describe('SignUpPage', () => {
 
     await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
     await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText(/password/i), 'password123')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.type(screen.getByLabelText('Confirm Password'), 'password123')
+    await userEvent.click(screen.getByRole('checkbox'))
     await userEvent.click(screen.getByRole('button', { name: /create account/i }))
 
-    // Button should be disabled
-    expect(screen.getByRole('button', { name: '' })).toBeDisabled()
+    // Button should be disabled during loading
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '' })).toBeDisabled()
+    })
   })
 
-  it('shows password requirements', () => {
+  it('shows password requirements', async () => {
     render(<SignUpPage />)
 
-    expect(screen.getByText(/must be at least 8 characters/i)).toBeInTheDocument()
+    // Password strength meter only shows after typing starts
+    await userEvent.type(screen.getByLabelText('Password'), 'a')
+
+    expect(screen.getByText('At least 8 characters')).toBeInTheDocument()
   })
 
   it('handles network errors', async () => {
@@ -133,7 +147,9 @@ describe('SignUpPage', () => {
 
     await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
     await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText(/password/i), 'password123')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.type(screen.getByLabelText('Confirm Password'), 'password123')
+    await userEvent.click(screen.getByRole('checkbox'))
     await userEvent.click(screen.getByRole('button', { name: /create account/i }))
 
     await waitFor(() => {

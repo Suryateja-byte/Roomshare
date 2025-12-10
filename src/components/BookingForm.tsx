@@ -110,6 +110,24 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isLoading]);
 
+    // Handle Escape key for modal - prevent closing during submission
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && showConfirmModal) {
+                if (isLoading) {
+                    // Block escape during submission
+                    e.preventDefault();
+                    e.stopPropagation();
+                } else {
+                    setShowConfirmModal(false);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [showConfirmModal, isLoading]);
+
     // Calculate booking duration and validate client-side
     const bookingInfo = useMemo(() => {
         if (!startDate || !endDate) return null;

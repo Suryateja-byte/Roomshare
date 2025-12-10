@@ -18,7 +18,8 @@ import {
     Loader2,
     WifiOff,
     Filter,
-    AlertTriangle
+    AlertTriangle,
+    Bell
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -382,9 +383,18 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
         <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 pt-20 pb-20">
             <div className="container mx-auto max-w-4xl px-6 py-10">
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">My Bookings</h1>
-                    <p className="text-zinc-500 dark:text-zinc-400 mt-2">Manage your booking requests and reservations</p>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">My Bookings</h1>
+                        <p className="text-zinc-500 dark:text-zinc-400 mt-2">Manage your booking requests and reservations</p>
+                    </div>
+                    <Link
+                        href="/notifications"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                        <Bell className="w-4 h-4" />
+                        Manage notifications
+                    </Link>
                 </div>
 
                 {/* Offline Banner */}

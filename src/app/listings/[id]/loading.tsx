@@ -91,7 +91,7 @@ export default function ListingLoading() {
                     {/* Sidebar Skeleton */}
                     <div className="lg:w-[380px]">
                         <div className="sticky top-24">
-                            <div className="bg-white rounded-2xl shadow-lg border border-border/50 p-6 space-y-6">
+                            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-lg border border-border/50 p-6 space-y-6">
                                 <div className="flex justify-between items-end">
                                     <SimpleSkeleton className="h-10 w-32" />
                                     <SimpleSkeleton className="h-5 w-24" />

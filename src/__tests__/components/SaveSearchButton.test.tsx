@@ -95,12 +95,13 @@ describe('SaveSearchButton', () => {
           maxPrice: 1500,
         },
         alertEnabled: true,
+        alertFrequency: 'DAILY',
       })
     })
   })
 
   it('shows loading state while saving', async () => {
-    mockSaveSearch.mockImplementation(() => new Promise(() => {}))
+    mockSaveSearch.mockImplementation(() => new Promise(() => { }))
 
     render(<SaveSearchButton />)
 

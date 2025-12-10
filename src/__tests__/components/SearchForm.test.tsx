@@ -477,13 +477,13 @@ describe('SearchForm', () => {
       jest.runAllTimers()
 
       // Initially no clear button
-      expect(screen.queryByText('Clear all filters')).not.toBeInTheDocument()
+      expect(screen.queryByText('Clear all')).not.toBeInTheDocument()
 
       // Add a filter
       await user.click(screen.getByRole('button', { name: 'Wifi' }))
 
       // Now clear button should appear
-      expect(screen.getByText('Clear all filters')).toBeInTheDocument()
+      expect(screen.getByText('Clear all')).toBeInTheDocument()
     })
 
     it('clear button resets all filter states', async () => {
@@ -496,7 +496,7 @@ describe('SearchForm', () => {
       expect(screen.getByRole('button', { name: 'Wifi' })).toHaveAttribute('aria-pressed', 'true')
 
       // Clear all
-      await user.click(screen.getByText('Clear all filters'))
+      await user.click(screen.getByText('Clear all'))
       jest.runAllTimers()
 
       // Should navigate to clean search

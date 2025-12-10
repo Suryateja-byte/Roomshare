@@ -1,11 +1,15 @@
 import { Suspense } from 'react';
+import { auth } from '@/auth';
 import HomeClient from './HomeClient';
 import FeaturedListings from '@/components/FeaturedListings';
 
-export default function HomePage() {
+export default async function HomePage() {
+    const session = await auth();
+    const isLoggedIn = !!session?.user;
+
     return (
         <>
-            <HomeClient />
+            <HomeClient isLoggedIn={isLoggedIn} />
             <Suspense fallback={
                 <section className="py-16 md:py-24 bg-zinc-50 dark:bg-zinc-900/50">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -34,3 +38,4 @@ export default function HomePage() {
         </>
     );
 }
+

@@ -88,6 +88,7 @@ describe('Saved Search Actions', () => {
           query: 'apartment',
           filters: mockFilters,
           alertEnabled: true,
+          alertFrequency: 'DAILY',
         },
       })
       expect(revalidatePath).toHaveBeenCalledWith('/saved-searches')
@@ -106,6 +107,7 @@ describe('Saved Search Actions', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             alertEnabled: true,
+            alertFrequency: 'DAILY',
           }),
         })
       )

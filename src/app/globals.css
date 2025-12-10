@@ -85,6 +85,8 @@
 
     --destructive: 0 62.8% 30.6%;
     --ring: 240 4.9% 83.9%;
+
+    color-scheme: dark;
   }
 
   html,

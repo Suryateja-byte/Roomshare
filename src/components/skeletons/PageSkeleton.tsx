@@ -2,9 +2,9 @@ import { Skeleton, TextSkeleton, CardSkeleton } from "./Skeleton";
 
 export function PageSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 " aria-busy="true" aria-label="Loading page content">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading page content">
       {/* Header skeleton */}
-      <header className="border-b border-zinc-200 bg-white px-4 py-3 ">
+      <header className="border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Skeleton variant="rounded" width={120} height={32} />
           <div className="flex items-center gap-4">
@@ -36,9 +36,9 @@ export function PageSkeleton() {
 
 export function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 " aria-busy="true" aria-label="Loading dashboard">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading dashboard">
       {/* Sidebar skeleton */}
-      <aside className="fixed left-0 top-0 hidden h-full w-64 border-r border-zinc-200 bg-white p-4 lg:block">
+      <aside className="fixed left-0 top-0 hidden h-full w-64 border-r border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 lg:block">
         <Skeleton variant="rounded" width={140} height={32} className="mb-8" />
         <nav className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -50,7 +50,7 @@ export function DashboardSkeleton() {
       {/* Main content */}
       <div className="lg:ml-64">
         {/* Header */}
-        <header className="border-b border-zinc-200 bg-white px-6 py-4 ">
+        <header className="border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-6 py-4">
           <div className="flex items-center justify-between">
             <Skeleton variant="text" width={200} height={28} />
             <div className="flex items-center gap-4">
@@ -65,7 +65,7 @@ export function DashboardSkeleton() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="rounded-lg border border-zinc-200 bg-white p-4 "
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4"
             >
               <Skeleton variant="text" width={80} height={14} className="mb-2" />
               <Skeleton variant="text" width={120} height={32} />
@@ -74,8 +74,8 @@ export function DashboardSkeleton() {
         </div>
 
         {/* Table skeleton */}
-        <div className="mx-6 rounded-lg border border-zinc-200 bg-white ">
-          <div className="border-b border-zinc-200 p-4 ">
+        <div className="mx-6 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+          <div className="border-b border-zinc-200 dark:border-zinc-700 p-4">
             <Skeleton variant="text" width={150} height={24} />
           </div>
           <div className="p-4">
@@ -103,7 +103,7 @@ export function ProfileSkeleton() {
       {/* Profile sections */}
       <div className="space-y-6">
         {Array.from({ length: 3 }).map((_, i) => (
-          <section key={i} className="rounded-lg border border-zinc-200 bg-white p-4 ">
+          <section key={i} className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
             <Skeleton variant="text" width={120} height={20} className="mb-4" />
             <TextSkeleton lines={4} />
           </section>
@@ -134,7 +134,7 @@ export function FormSkeleton() {
 
 export function ListingSkeleton() {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden ">
+    <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
       <Skeleton variant="rectangular" height={200} />
       <div className="p-4 space-y-3">
         <Skeleton variant="text" width="80%" height={20} />
@@ -150,7 +150,7 @@ export function ListingSkeleton() {
 
 export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading listings">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading listings">
       <main className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-8">
           <Skeleton variant="text" width={250} height={32} className="mb-2" />
@@ -220,14 +220,14 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
 
 export function MessageListSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading messages">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading messages">
       <main className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={200} height={32} className="mb-2" />
         </div>
         <div className="space-y-3">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 p-4 bg-white rounded-lg border border-zinc-200">
+            <div key={i} className="flex items-center gap-4 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
               <Skeleton variant="circular" width={48} height={48} />
               <div className="flex-1 space-y-2">
                 <Skeleton variant="text" width="40%" height={18} />
@@ -244,11 +244,11 @@ export function MessageListSkeleton() {
 
 export function ChatSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading chat">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading chat">
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden">
+        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
           {/* Chat header */}
-          <div className="flex items-center gap-4 p-4 border-b border-zinc-200">
+          <div className="flex items-center gap-4 p-4 border-b border-zinc-200 dark:border-zinc-700">
             <Skeleton variant="circular" width={40} height={40} />
             <div className="space-y-1">
               <Skeleton variant="text" width={150} height={18} />
@@ -264,7 +264,7 @@ export function ChatSkeleton() {
             ))}
           </div>
           {/* Input */}
-          <div className="p-4 border-t border-zinc-200">
+          <div className="p-4 border-t border-zinc-200 dark:border-zinc-700">
             <Skeleton variant="rounded" height={44} />
           </div>
         </div>
@@ -275,22 +275,22 @@ export function ChatSkeleton() {
 
 export function AdminTableSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading admin data">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading admin data">
       <main className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <Skeleton variant="text" width={200} height={32} />
           <Skeleton variant="rounded" width={120} height={40} />
         </div>
-        <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden">
+        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
           {/* Table header */}
-          <div className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-200 bg-zinc-50">
+          <div className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} variant="text" width="80%" height={14} />
             ))}
           </div>
           {/* Table rows */}
           {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-100">
+            <div key={i} className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-100 dark:border-zinc-800">
               {Array.from({ length: 5 }).map((_, j) => (
                 <Skeleton key={j} variant="text" width={`${60 + (j * 10)}%`} height={16} />
               ))}
@@ -304,14 +304,14 @@ export function AdminTableSkeleton() {
 
 export function BookingsSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading bookings">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading bookings">
       <main className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={180} height={32} className="mb-2" />
         </div>
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex gap-4 p-4 bg-white rounded-lg border border-zinc-200">
+            <div key={i} className="flex gap-4 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
               <Skeleton variant="rounded" width={120} height={80} />
               <div className="flex-1 space-y-2">
                 <Skeleton variant="text" width="60%" height={20} />
@@ -332,14 +332,14 @@ export function BookingsSkeleton() {
 
 export function SettingsSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading settings">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading settings">
       <main className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-8">
           <Skeleton variant="text" width={150} height={32} />
         </div>
         <div className="space-y-6">
           {Array.from({ length: 4 }).map((_, i) => (
-            <section key={i} className="bg-white rounded-lg border border-zinc-200 p-6">
+            <section key={i} className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
               <Skeleton variant="text" width={140} height={20} className="mb-4" />
               <div className="space-y-4">
                 {Array.from({ length: 3 }).map((_, j) => (
@@ -362,14 +362,14 @@ export function SettingsSkeleton() {
 
 export function SavedSearchesSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading saved searches">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading saved searches">
       <main className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={200} height={32} className="mb-2" />
         </div>
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex items-center justify-between p-4 bg-white rounded-lg border border-zinc-200">
+            <div key={i} className="flex items-center justify-between p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
               <div className="space-y-2">
                 <Skeleton variant="text" width={180} height={18} />
                 <Skeleton variant="text" width={250} height={14} />
@@ -388,14 +388,14 @@ export function SavedSearchesSkeleton() {
 
 export function NotificationsSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50" aria-busy="true" aria-label="Loading notifications">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading notifications">
       <main className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={180} height={32} />
         </div>
         <div className="space-y-2">
           {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="flex items-start gap-3 p-4 bg-white rounded-lg border border-zinc-200">
+            <div key={i} className="flex items-start gap-3 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
               <Skeleton variant="circular" width={40} height={40} />
               <div className="flex-1 space-y-2">
                 <Skeleton variant="text" width="80%" height={16} />

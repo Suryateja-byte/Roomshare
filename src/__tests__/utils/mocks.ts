@@ -26,6 +26,7 @@ export const prismaMock = {
     findMany: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
   },
   conversation: {
     findUnique: jest.fn(),
@@ -62,7 +63,11 @@ export const prismaMock = {
   notification: {
     findMany: jest.fn(),
     create: jest.fn(),
+    update: jest.fn(),
     updateMany: jest.fn(),
+    delete: jest.fn(),
+    deleteMany: jest.fn(),
+    count: jest.fn(),
   },
   verificationRequest: {
     findMany: jest.fn(),
@@ -71,10 +76,32 @@ export const prismaMock = {
   },
   report: {
     create: jest.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
   },
   recentlyViewed: {
     findMany: jest.fn(),
     upsert: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+  blockedUser: {
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    delete: jest.fn(),
+  },
+  rateLimitEntry: {
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+  auditLog: {
+    create: jest.fn(),
+    findMany: jest.fn(),
   },
   $queryRaw: jest.fn(),
   $queryRawUnsafe: jest.fn(),

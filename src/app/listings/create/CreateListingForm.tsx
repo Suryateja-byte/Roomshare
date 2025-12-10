@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Home, MapPin, List, Camera, FileText, X, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Loader2, Home, MapPin, List, Camera, FileText, X, AlertTriangle, CheckCircle, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import ImageUploader from '@/components/listings/ImageUploader';
 import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
@@ -85,6 +85,15 @@ export default function CreateListingForm() {
     const [genderPreference, setGenderPreference] = useState('');
     const [householdGender, setHouseholdGender] = useState('');
 
+    // Form field states for tracking completion
+    const [title, setTitle] = useState('');
+    const [price, setPrice] = useState('');
+    const [totalSlots, setTotalSlots] = useState('1');
+    const [address, setAddress] = useState('');
+    const [city, setCity] = useState('');
+    const [state, setState] = useState('');
+    const [zip, setZip] = useState('');
+
     const DESCRIPTION_MAX_LENGTH = 1000;
 
     // Form persistence hook
@@ -133,22 +142,17 @@ export default function CreateListingForm() {
 
     // Restore draft data to form
     const restoreDraft = () => {
-        if (!persistedData || !formRef.current) return;
-
-        // Restore text fields via form elements
-        const form = formRef.current;
-        (form.elements.namedItem('title') as HTMLInputElement).value = persistedData.title || '';
-        setDescription(persistedData.description || '');
-        (form.elements.namedItem('price') as HTMLInputElement).value = persistedData.price || '';
-        (form.elements.namedItem('totalSlots') as HTMLInputElement).value = persistedData.totalSlots || '1';
-        (form.elements.namedItem('address') as HTMLInputElement).value = persistedData.address || '';
-        (form.elements.namedItem('city') as HTMLInputElement).value = persistedData.city || '';
-        (form.elements.namedItem('state') as HTMLInputElement).value = persistedData.state || '';
-        (form.elements.namedItem('zip') as HTMLInputElement).value = persistedData.zip || '';
-        (form.elements.namedItem('amenities') as HTMLInputElement).value = persistedData.amenities || '';
-        (form.elements.namedItem('houseRules') as HTMLInputElement).value = persistedData.houseRules || '';
+        if (!persistedData) return;
 
         // Restore controlled component states
+        setTitle(persistedData.title || '');
+        setDescription(persistedData.description || '');
+        setPrice(persistedData.price || '');
+        setTotalSlots(persistedData.totalSlots || '1');
+        setAddress(persistedData.address || '');
+        setCity(persistedData.city || '');
+        setState(persistedData.state || '');
+        setZip(persistedData.zip || '');
         setMoveInDate(persistedData.moveInDate || '');
         setLeaseDuration(persistedData.leaseDuration || '');
         setRoomType(persistedData.roomType || '');
@@ -181,28 +185,18 @@ export default function CreateListingForm() {
     // Collect current form data for saving
     const collectFormData = (): ListingFormData => {
         const form = formRef.current;
-        if (!form) {
-            return {
-                title: '', description: '', price: '', totalSlots: '',
-                address: '', city: '', state: '', zip: '',
-                amenities: '', houseRules: '',
-                moveInDate, leaseDuration, roomType, genderPreference, householdGender,
-                selectedLanguages,
-                images: []
-            };
-        }
 
         return {
-            title: (form.elements.namedItem('title') as HTMLInputElement)?.value || '',
-            description: description,
-            price: (form.elements.namedItem('price') as HTMLInputElement)?.value || '',
-            totalSlots: (form.elements.namedItem('totalSlots') as HTMLInputElement)?.value || '',
-            address: (form.elements.namedItem('address') as HTMLInputElement)?.value || '',
-            city: (form.elements.namedItem('city') as HTMLInputElement)?.value || '',
-            state: (form.elements.namedItem('state') as HTMLInputElement)?.value || '',
-            zip: (form.elements.namedItem('zip') as HTMLInputElement)?.value || '',
-            amenities: (form.elements.namedItem('amenities') as HTMLInputElement)?.value || '',
-            houseRules: (form.elements.namedItem('houseRules') as HTMLInputElement)?.value || '',
+            title,
+            description,
+            price,
+            totalSlots,
+            address,
+            city,
+            state,
+            zip,
+            amenities: form ? (form.elements.namedItem('amenities') as HTMLInputElement)?.value || '' : '',
+            houseRules: form ? (form.elements.namedItem('houseRules') as HTMLInputElement)?.value || '' : '',
             moveInDate,
             leaseDuration,
             roomType,
@@ -226,7 +220,7 @@ export default function CreateListingForm() {
     useEffect(() => {
         if (!isHydrated || !draftRestored && hasDraft) return;
         handleFormChange();
-    }, [description, moveInDate, leaseDuration, roomType, genderPreference, householdGender, selectedLanguages, uploadedImages]);
+    }, [title, description, price, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, genderPreference, householdGender, selectedLanguages, uploadedImages]);
 
     const toggleLanguage = (lang: string) => {
         setSelectedLanguages(prev =>
@@ -340,7 +334,14 @@ export default function CreateListingForm() {
         );
     };
 
-    // Form sections for progress indicator
+    // Form sections for progress indicator with completion tracking
+    const sectionCompletion = {
+        basics: title.trim() !== '' && description.trim().length >= 10 && price.trim() !== '' && totalSlots.trim() !== '',
+        location: address.trim() !== '' && city.trim() !== '' && state.trim() !== '' && zip.trim() !== '',
+        photos: successfulImages.length > 0,
+        details: true, // Details section is optional, always considered complete
+    };
+
     const FORM_SECTIONS = [
         { id: 'basics', label: 'The Basics', icon: Home },
         { id: 'location', label: 'Location', icon: MapPin },
@@ -355,30 +356,46 @@ export default function CreateListingForm() {
                 <div className="flex items-center justify-between">
                     {FORM_SECTIONS.map((section, index) => {
                         const Icon = section.icon;
+                        const isComplete = sectionCompletion[section.id as keyof typeof sectionCompletion];
                         return (
                             <div key={section.id} className="flex items-center flex-1">
                                 {/* Step Circle */}
                                 <div className="flex flex-col items-center">
-                                    <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border-2 border-zinc-200 dark:border-zinc-700">
-                                        <Icon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${isComplete
+                                        ? 'bg-green-50 dark:bg-green-900/30 border-green-500 dark:border-green-400'
+                                        : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
+                                        }`}>
+                                        {isComplete ? (
+                                            <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                        ) : (
+                                            <Icon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                                        )}
                                     </div>
-                                    <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mt-2 text-center hidden sm:block">
+                                    <span className={`text-xs font-medium mt-2 text-center hidden sm:block transition-colors duration-300 ${isComplete ? 'text-green-600 dark:text-green-400' : 'text-zinc-600 dark:text-zinc-400'
+                                        }`}>
                                         {section.label}
                                     </span>
-                                    <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mt-2 text-center sm:hidden">
+                                    <span className={`text-xs font-medium mt-2 text-center sm:hidden transition-colors duration-300 ${isComplete ? 'text-green-600 dark:text-green-400' : 'text-zinc-600 dark:text-zinc-400'
+                                        }`}>
                                         {index + 1}
                                     </span>
                                 </div>
                                 {/* Connector Line */}
                                 {index < FORM_SECTIONS.length - 1 && (
-                                    <div className="flex-1 h-0.5 bg-zinc-200 dark:bg-zinc-700 mx-2 sm:mx-4" />
+                                    <div className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors duration-300 ${isComplete && sectionCompletion[FORM_SECTIONS[index + 1].id as keyof typeof sectionCompletion]
+                                        ? 'bg-green-500 dark:bg-green-400'
+                                        : 'bg-zinc-200 dark:bg-zinc-700'
+                                        }`} />
                                 )}
                             </div>
                         );
                     })}
                 </div>
                 <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-4">
-                    Fill out all sections below to publish your listing
+                    {Object.values(sectionCompletion).filter(Boolean).length === 4
+                        ? '✓ All sections complete! Ready to publish.'
+                        : `Fill out all sections below to publish your listing (${Object.values(sectionCompletion).filter(Boolean).length}/4 complete)`
+                    }
                 </p>
             </div>
 
@@ -445,6 +462,8 @@ export default function CreateListingForm() {
                             id="title"
                             name="title"
                             required
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
                             placeholder="e.g. Sun-drenched Loft in Arts District"
                             disabled={loading}
                             className={fieldErrors.title ? 'border-red-500 dark:border-red-500' : ''}
@@ -480,6 +499,8 @@ export default function CreateListingForm() {
                                 name="price"
                                 type="number"
                                 required
+                                value={price}
+                                onChange={(e) => setPrice(e.target.value)}
                                 placeholder="2400"
                                 disabled={loading}
                                 className={fieldErrors.price ? 'border-red-500 dark:border-red-500' : ''}
@@ -493,8 +514,9 @@ export default function CreateListingForm() {
                                 name="totalSlots"
                                 type="number"
                                 required
+                                value={totalSlots}
+                                onChange={(e) => setTotalSlots(e.target.value)}
                                 placeholder="1"
-                                defaultValue="1"
                                 disabled={loading}
                                 className={fieldErrors.totalSlots ? 'border-red-500 dark:border-red-500' : ''}
                             />
@@ -517,6 +539,8 @@ export default function CreateListingForm() {
                             id="address"
                             name="address"
                             required
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
                             placeholder="123 Boulevard St"
                             disabled={loading}
                             className={fieldErrors.address ? 'border-red-500 dark:border-red-500' : ''}
@@ -530,6 +554,8 @@ export default function CreateListingForm() {
                                 id="city"
                                 name="city"
                                 required
+                                value={city}
+                                onChange={(e) => setCity(e.target.value)}
                                 placeholder="San Francisco"
                                 disabled={loading}
                                 className={fieldErrors.city ? 'border-red-500 dark:border-red-500' : ''}
@@ -542,6 +568,8 @@ export default function CreateListingForm() {
                                 id="state"
                                 name="state"
                                 required
+                                value={state}
+                                onChange={(e) => setState(e.target.value)}
                                 placeholder="CA"
                                 disabled={loading}
                                 className={fieldErrors.state ? 'border-red-500 dark:border-red-500' : ''}
@@ -554,6 +582,8 @@ export default function CreateListingForm() {
                                 id="zip"
                                 name="zip"
                                 required
+                                value={zip}
+                                onChange={(e) => setZip(e.target.value)}
                                 placeholder="94103"
                                 disabled={loading}
                                 className={fieldErrors.zip ? 'border-red-500 dark:border-red-500' : ''}
