@@ -279,17 +279,10 @@ export function NearbyPlacesCard({
   // Render loading state
   if (status === 'loading') {
     return (
-      <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 shadow-sm">
+      <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-6 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700">
         <div className="flex items-center gap-3">
-          <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />
-          <div>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Searching nearby places...
-            </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {queryText}
-            </p>
-          </div>
+          <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+          <span className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">Searching nearby...</span>
         </div>
       </div>
     );
@@ -298,19 +291,21 @@ export function NearbyPlacesCard({
   // Render error state
   if (status === 'error') {
     return (
-      <div className="bg-white dark:bg-zinc-800 border border-red-200 dark:border-red-900 rounded-xl p-4 shadow-sm">
+      <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-5 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-red-100 dark:border-red-900/50">
         <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="w-6 h-6 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
+          </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-700 dark:text-red-400">
+            <p className="text-sm font-semibold text-red-700 dark:text-red-400">
               Unable to search places
             </p>
-            <p className="text-xs text-red-600 dark:text-red-500 mt-1">
+            <p className="text-xs text-red-600/80 dark:text-red-400/70 mt-1">
               {errorMessage || 'An unexpected error occurred'}
             </p>
             <button
               onClick={handleRetry}
-              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
             >
               <RefreshCw className="w-3 h-3" />
               Try again
@@ -324,11 +319,13 @@ export function NearbyPlacesCard({
   // Render no results state
   if (status === 'no-results') {
     return (
-      <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 shadow-sm">
+      <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-5 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700">
         <div className="flex items-start gap-3">
-          <MapPin className="w-5 h-5 text-zinc-400 flex-shrink-0 mt-0.5" />
+          <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center flex-shrink-0">
+            <MapPin className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
+          </div>
           <div>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
               No places found nearby
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
@@ -345,40 +342,32 @@ export function NearbyPlacesCard({
   return (
     <div
       ref={containerRef}
-      className={cn(
-        'bg-white dark:bg-zinc-800',
-        'border border-zinc-200 dark:border-zinc-700',
-        'rounded-xl shadow-sm overflow-hidden'
-      )}
+      className="bg-white dark:bg-zinc-800 rounded-[24px] shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700 overflow-hidden"
     >
       {/* Header with selected distance pill */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+      <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-zinc-500" />
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Places near this listing
+          <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+            <MapPin className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+          </div>
+          <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 tracking-tight">
+            Nearby Results
           </span>
           {currentRadius > INITIAL_RADIUS && (
-            <span className="text-xs text-zinc-400 ml-1">(expanded)</span>
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">(expanded)</span>
           )}
         </div>
 
         {/* Selected distance pill */}
-        <div className="text-xs">
-          {selectedPlaceDistance ? (
-            <span className="px-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium">
-              {selectedPlaceDistance}
-            </span>
-          ) : (
-            <span className="text-zinc-400 dark:text-zinc-500">
-              Select a place
-            </span>
-          )}
-        </div>
+        {selectedPlaceDistance && (
+          <span className="text-xs font-bold bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-2.5 py-1 rounded-full animate-in fade-in slide-in-from-right-2">
+            {selectedPlaceDistance}
+          </span>
+        )}
       </div>
 
       {/* Body: left = UI Kit, right = distance rail */}
-      <div className="grid grid-cols-[1fr_auto] gap-2 p-2">
+      <div className="grid grid-cols-[1fr_auto] gap-3 p-3 bg-zinc-50/50 dark:bg-zinc-800/50">
         {/* Places UI Kit Content */}
         <div className="min-w-0">
           {normalizedIntent.mode === 'type' && normalizedIntent.includedTypes ? (
@@ -417,16 +406,16 @@ export function NearbyPlacesCard({
 
         {/* Distance rail - aligned to result order */}
         {distances.length > 0 && (
-          <ol className="flex flex-col gap-1.5 pt-1">
+          <ol className="flex flex-col gap-2 pt-1">
             {distances.map((d, i) => (
               <li key={i}>
                 <span
                   className={cn(
                     'inline-flex items-center justify-center',
-                    'w-14 px-1.5 py-1 rounded text-xs',
-                    'bg-zinc-100 dark:bg-zinc-700/50 border border-zinc-200 dark:border-zinc-600',
-                    'text-zinc-600 dark:text-zinc-300',
-                    selectedIndex === i && 'ring-2 ring-blue-500 dark:ring-blue-400'
+                    'w-14 px-1.5 py-1.5 rounded-lg text-[10px] font-medium',
+                    'bg-white dark:bg-zinc-700 border border-zinc-100 dark:border-zinc-600',
+                    'text-zinc-500 dark:text-zinc-300',
+                    selectedIndex === i && 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
                   )}
                   title={`Result #${i + 1}`}
                 >
@@ -439,7 +428,7 @@ export function NearbyPlacesCard({
       </div>
 
       {/* Google Attribution - DO NOT REMOVE/ALTER/OBSCURE */}
-      <div className="px-4 py-2 border-t border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+      <div className="px-4 py-2 border-t border-zinc-100 dark:border-zinc-700 bg-white dark:bg-zinc-800">
         <gmp-place-attribution color-scheme="light" />
       </div>
     </div>

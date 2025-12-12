@@ -90,7 +90,7 @@ export async function loadPlacesUiKit(): Promise<void> {
     }
 
     // Create the callback function
-    (window as Window & { [key: string]: () => void })[CALLBACK_NAME] = async () => {
+    (window as unknown as { [key: string]: () => void })[CALLBACK_NAME] = async () => {
       try {
         console.log('Google Maps callback fired');
         console.log('google.maps:', window.google?.maps);
@@ -110,7 +110,7 @@ export async function loadPlacesUiKit(): Promise<void> {
         reject(new Error(`Failed to load Places library: ${errorMessage}`));
       } finally {
         // Clean up callback
-        delete (window as Window & { [key: string]: unknown })[CALLBACK_NAME];
+        delete (window as unknown as { [key: string]: unknown })[CALLBACK_NAME];
       }
     };
 
@@ -122,7 +122,7 @@ export async function loadPlacesUiKit(): Promise<void> {
 
     script.onerror = () => {
       loadPromise = null;
-      delete (window as Window & { [key: string]: unknown })[CALLBACK_NAME];
+      delete (window as unknown as { [key: string]: unknown })[CALLBACK_NAME];
       reject(
         new Error(
           'Failed to load Google Maps API script. ' +
