@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { RefreshCw, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function SettingsError({
     error,
@@ -27,19 +28,13 @@ export default function SettingsError({
                 {error.message || 'We encountered an error while loading your settings. Please try again.'}
             </p>
             <div className="flex gap-3">
-                <button
-                    onClick={() => reset()}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
-                >
+                <Button onClick={() => reset()} size="lg" className="gap-2">
                     <RefreshCw className="w-4 h-4" />
                     Try again
-                </button>
-                <Link
-                    href="/profile"
-                    className="inline-flex items-center gap-2 px-6 py-3 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-xl font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                >
-                    Go to profile
-                </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="gap-2">
+                    <Link href="/profile">Go to profile</Link>
+                </Button>
             </div>
         </div>
     );

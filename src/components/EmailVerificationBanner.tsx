@@ -40,7 +40,7 @@ export default function EmailVerificationBanner({ userEmail }: EmailVerification
     if (!isVisible) return null;
 
     return (
-        <div className="fixed top-16 md:top-20 left-0 right-0 z-[999] bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+        <div className="fixed top-16 md:top-20 left-0 right-0 z-sticky bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
             <div className="max-w-7xl mx-auto px-4 py-3">
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">

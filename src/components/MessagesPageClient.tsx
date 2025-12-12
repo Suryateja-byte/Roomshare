@@ -522,7 +522,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h3 className={`font-semibold text-sm truncate ${hasUnread ? 'text-zinc-900 dark:text-white' : activeId === c.id ? 'text-zinc-900 dark:text-white' : 'text-zinc-700 dark:text-zinc-300'}`}>{other?.name || 'Unknown User'}</h3>
-                                        <span className={`text-[10px] ${hasUnread ? 'text-red-500 font-semibold' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                                        <span className={`text-2xs ${hasUnread ? 'text-red-500 font-semibold' : 'text-zinc-400 dark:text-zinc-500'}`}>
                                             {lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                         </span>
                                     </div>
@@ -685,7 +685,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                         <div
                                             onClick={m.status === 'failed' ? () => handleRetry(m.id, m.content) : undefined}
                                             className={`
-                                                max-w-[70%] px-5 py-2.5 text-[15px] leading-relaxed shadow-sm
+                                                max-w-[70%] px-5 py-2.5 text-sm leading-relaxed shadow-sm
                                                 ${m.senderId === currentUserId
                                                     ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl rounded-tr-sm'
                                                     : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-2xl rounded-tl-sm'}
@@ -704,7 +704,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                             )}
                                             {/* Read receipt indicator for sent messages */}
                                             {m.senderId === currentUserId && m.status !== 'failed' && m.status !== 'sending' && (
-                                                <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${m.read ? 'text-blue-400' : 'text-white/50 dark:text-zinc-600'}`}>
+                                                <div className={`flex items-center justify-end gap-1 mt-1 text-2xs ${m.read ? 'text-blue-400' : 'text-white/50 dark:text-zinc-600'}`}>
                                                     <CheckCheck className="w-3 h-3" />
                                                     <span>{m.read ? 'Read' : 'Delivered'}</span>
                                                 </div>

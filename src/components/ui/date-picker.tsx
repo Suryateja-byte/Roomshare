@@ -193,10 +193,10 @@ export function DatePicker({
             <Popover.Portal>
                 <Popover.Content
                     className={cn(
-                        'z-50 p-4',
+                        'z-popover p-4',
                         'bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl',
-                        'rounded-2xl',
-                        'shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]',
+                        'rounded-xl',
+                        'shadow-lg dark:shadow-xl',
                         'border border-zinc-200/80 dark:border-zinc-700/80',
                         'animate-in fade-in-0',
                         'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',

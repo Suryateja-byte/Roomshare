@@ -90,7 +90,7 @@ const ListingCard = ({ listing }: { listing: UserWithDetails['listings'][0] }) =
                         alt={listing.title}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    <div className="absolute top-2 right-2 px-2 py-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-md text-[10px] font-bold uppercase tracking-wide text-green-600 dark:text-green-400">
+                    <div className="absolute top-2 right-2 px-2 py-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-md text-2xs font-bold uppercase tracking-wide text-green-600 dark:text-green-400">
                         {listing.availableSlots > 0 ? 'Available' : 'Full'}
                     </div>
                 </div>

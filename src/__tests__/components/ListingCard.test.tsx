@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import ListingCard from '@/components/ListingCard'
+import ListingCard from '@/components/listings/ListingCard';
 
 // Mock FavoriteButton
 jest.mock('@/components/FavoriteButton', () => {

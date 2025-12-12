@@ -85,11 +85,11 @@ const SelectContent = React.forwardRef<
         <SelectPrimitive.Content
             ref={ref}
             className={cn(
-                "relative z-50 max-h-96 min-w-[8rem] overflow-hidden",
-                "rounded-2xl",
+                "relative z-popover max-h-96 min-w-[8rem] overflow-hidden",
+                "rounded-xl",
                 "bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl",
                 "border border-zinc-200/80 dark:border-zinc-700/80",
-                "shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]",
+                "shadow-lg dark:shadow-xl",
                 "text-zinc-900 dark:text-white",
                 "data-[state=open]:animate-in data-[state=closed]:animate-out",
                 "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",

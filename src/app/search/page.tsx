@@ -3,7 +3,7 @@ import { getListingsPaginated, getListings, getSavedListingIds, analyzeFilterImp
 import { Suspense } from 'react';
 import SearchForm from '@/components/SearchForm';
 import MapComponent from '@/components/Map';
-import ListingCard from '@/components/ListingCard';
+import ListingCard from '@/components/listings/ListingCard';
 import Pagination from '@/components/Pagination';
 import SortSelect from '@/components/SortSelect';
 import SaveSearchButton from '@/components/SaveSearchButton';

@@ -5,6 +5,7 @@ import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { createNotification } from './notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
+import { checkSuspension } from './suspension';
 
 export type BookingStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
 
@@ -12,6 +13,11 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
     const session = await auth();
     if (!session?.user?.id) {
         return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
+    }
+
+    const suspension = await checkSuspension();
+    if (suspension.suspended) {
+        return { error: suspension.error || 'Account suspended' };
     }
 
     try {

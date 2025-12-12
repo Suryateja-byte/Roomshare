@@ -237,13 +237,13 @@ export default function ChatWindow({ conversationId, currentUserId }: { conversa
                         return (
                             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[70%] rounded-2xl px-4 py-2 relative ${isFailed
-                                        ? 'bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800'
-                                        : isMe
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-muted'
+                                    ? 'bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800'
+                                    : isMe
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted'
                                     } ${isSendingMsg ? 'opacity-70' : ''}`}>
                                     <p>{msg.content}</p>
-                                    <div className={`text-[10px] flex items-center justify-end gap-1 mt-1 ${isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                                    <div className={`text-2xs flex items-center justify-end gap-1 mt-1 ${isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                                         {isSendingMsg && <Loader2 className="w-3 h-3 animate-spin" />}
                                         {isFailed && (
                                             <span className="text-red-500 dark:text-red-400 flex items-center gap-1">

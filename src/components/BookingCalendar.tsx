@@ -179,8 +179,10 @@ export default function BookingCalendar({ bookings, onBookingClick, isLoading = 
                                 <button
                                     key={day}
                                     onClick={() => setSelectedDate(new Date(year, month, day))}
-                                    className={`aspect-square p-1 rounded-lg relative transition-all text-zinc-900 dark:text-white ${isToday(day) ? 'ring-2 ring-zinc-900 dark:ring-white' : ''
-                                        } ${isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                                    className={`aspect-square p-1 rounded-lg relative transition-all ${isToday(day) ? 'ring-2 ring-zinc-900 dark:ring-white' : ''
+                                        } ${isSelected
+                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                                            : 'text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800'
                                         }`}
                                 >
                                     <span className={`text-sm ${isSelected ? 'font-semibold' : ''}`}>

@@ -86,7 +86,7 @@ const ListingCard = ({ listing }: any) => {
                             <span className="text-xs">No image</span>
                         </div>
                     )}
-                    <div className="absolute top-2 right-2 px-2 py-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-md text-[10px] font-bold uppercase tracking-wide text-green-600 dark:text-green-400">
+                    <div className="absolute top-2 right-2 px-2 py-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-md text-2xs font-bold uppercase tracking-wide text-green-600 dark:text-green-400">
                         {listing.availableSlots > 0 ? 'Active' : 'Full'}
                     </div>
                 </div>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { startConversation } from '@/app/actions/chat';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 export default function ContactHostButton({ listingId }: { listingId: string }) {
     const [isLoading, setIsLoading] = useState(false);
@@ -35,12 +36,12 @@ export default function ContactHostButton({ listingId }: { listingId: string }) 
     };
 
     return (
-        <button
+        <Button
             onClick={handleContact}
             disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="w-full h-12 text-base font-semibold"
         >
             {isLoading ? 'Starting Chat...' : 'Contact Host'}
-        </button>
+        </Button>
     );
 }

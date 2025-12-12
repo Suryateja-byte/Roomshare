@@ -272,7 +272,7 @@ export default function ReportList({ initialReports, totalReports }: ReportListP
                                                             onChange={(e) => setAdminNotes(e.target.value)}
                                                             placeholder="Add notes about your decision..."
                                                             rows={2}
-                                                            className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                                            className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20"
                                                         />
                                                     </div>
 

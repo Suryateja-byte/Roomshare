@@ -201,8 +201,8 @@ export default function ImageUploader({
             {canAddMore && (
                 <div
                     className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${isDragging
-                            ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800 scale-[1.01]'
-                            : 'border-zinc-300 dark:border-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900'
+                        ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800 scale-[1.01]'
+                        : 'border-zinc-300 dark:border-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900'
                         }`}
                     onDragOver={onDragOver}
                     onDragLeave={onDragLeave}
@@ -256,7 +256,7 @@ export default function ImageUploader({
                             {image.error && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/90 text-white p-2">
                                     <AlertCircle className="w-5 h-5 mb-1" />
-                                    <p className="text-[10px] text-center mb-2 line-clamp-2">{image.error}</p>
+                                    <p className="text-2xs text-center mb-2 line-clamp-2">{image.error}</p>
                                     {image.file && (
                                         <button
                                             type="button"

@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Extract storage path from Supabase public URL
+function extractStoragePath(publicUrl: string): string | null {
+    const match = publicUrl.match(/\/storage\/v1\/object\/public\/images\/(.+)$/);
+    return match ? match[1] : null;
+}
 
 export async function DELETE(
     request: Request,
@@ -18,7 +28,7 @@ export async function DELETE(
         // Check if listing exists and user is the owner
         const listing = await prisma.listing.findUnique({
             where: { id },
-            select: { ownerId: true, title: true }
+            select: { ownerId: true, title: true, images: true }
         });
 
         if (!listing) {
@@ -73,6 +83,23 @@ export async function DELETE(
                 }
             })
         );
+
+        // Clean up images from Supabase storage
+        if (listing.images && listing.images.length > 0 && supabaseUrl && supabaseServiceKey) {
+            try {
+                const supabase = createClient(supabaseUrl, supabaseServiceKey);
+                const paths = listing.images
+                    .map(extractStoragePath)
+                    .filter((p): p is string => p !== null);
+
+                if (paths.length > 0) {
+                    await supabase.storage.from('images').remove(paths);
+                }
+            } catch (storageError) {
+                console.error('Failed to delete images from storage:', storageError);
+                // Continue with listing deletion even if storage cleanup fails
+            }
+        }
 
         // Delete listing and create notifications in transaction
         // Location and bookings will be cascade deleted automatically
@@ -179,7 +206,7 @@ export async function PATCH(
                     leaseDuration: leaseDuration || null,
                     roomType: roomType || null,
                     totalSlots: totalSlotsNum,
-                    availableSlots: Math.max(0, listing.availableSlots + (totalSlotsNum - listing.totalSlots)),
+                    availableSlots: Math.max(0, Math.min(listing.availableSlots + (totalSlotsNum - listing.totalSlots), totalSlotsNum)),
                     moveInDate: moveInDate ? new Date(moveInDate) : null,
                     ...(Array.isArray(images) && { images }),
                 }

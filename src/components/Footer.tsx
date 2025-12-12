@@ -15,7 +15,7 @@ export default function Footer() {
                                 RoomShare<span className="text-zinc-500 dark:text-zinc-400">.</span>
                             </span>
                         </Link>
-                        <p className="text-zinc-500 dark:text-zinc-400 text-[13px] leading-relaxed max-w-xs">
+                        <p className="text-zinc-500 dark:text-zinc-400 text-xs-plus leading-relaxed max-w-xs">
                             Designed for modern living. <br className="hidden sm:block" />
                             Connect, live, and thrive with people like you.
                         </p>
@@ -23,8 +23,8 @@ export default function Footer() {
 
                     {/* Platform Links */}
                     <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-[13px] tracking-tight">Platform</h4>
-                        <ul className="flex flex-col gap-2.5 text-[13px] text-zinc-500 dark:text-zinc-400">
+                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Platform</h4>
+                        <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
                             <li><Link href="/search" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block">Browse</Link></li>
                             <li><Link href="/listings/create" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block">List a Room</Link></li>
                             <li><button onClick={() => toast.info('Trust & Safety page coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Trust & Safety</button></li>
@@ -33,8 +33,8 @@ export default function Footer() {
 
                     {/* Company Links */}
                     <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-[13px] tracking-tight">Company</h4>
-                        <ul className="flex flex-col gap-2.5 text-[13px] text-zinc-500 dark:text-zinc-400">
+                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Company</h4>
+                        <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
                             <li><Link href="/about" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block">About</Link></li>
                             <li><button onClick={() => toast.info('Careers page coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Careers</button></li>
                             <li><button onClick={() => toast.info('Blog coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Blog</button></li>
@@ -43,8 +43,8 @@ export default function Footer() {
 
                     {/* Support Links */}
                     <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-[13px] tracking-tight">Support</h4>
-                        <ul className="flex flex-col gap-2.5 text-[13px] text-zinc-500 dark:text-zinc-400">
+                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Support</h4>
+                        <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
                             <li><button onClick={() => toast.info('Help Center coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Help Center</button></li>
                             <li><button onClick={() => toast.info('Contact support coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Contact</button></li>
                         </ul>
@@ -52,8 +52,8 @@ export default function Footer() {
 
                     {/* Legal Links */}
                     <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-[13px] tracking-tight">Legal</h4>
-                        <ul className="flex flex-col gap-2.5 text-[13px] text-zinc-500 dark:text-zinc-400">
+                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Legal</h4>
+                        <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
                             <li><button onClick={() => toast.info('Privacy Policy coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Privacy</button></li>
                             <li><button onClick={() => toast.info('Terms of Service coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Terms</button></li>
                         </ul>

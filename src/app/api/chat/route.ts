@@ -2,6 +2,19 @@ import { streamText, tool, zodSchema, stepCountIs, type CoreMessage, type UIMess
 import { createGroq } from '@ai-sdk/groq';
 import { z } from 'zod';
 
+/**
+ * Neighborhood Chat API Route
+ *
+ * MIGRATION NOTE:
+ * The findPlaces tool that called Google Places API has been removed.
+ * Nearby place searches are now handled client-side using Google Places UI Kit.
+ * See: src/components/chat/NearbyPlacesCard.tsx
+ *
+ * This route now includes a nearbyPlaceSearch tool that returns a structured
+ * NEARBY_UI_KIT action for cases where nearby intent slips past client-side detection.
+ * The client interprets this action and renders the NearbyPlacesCard component.
+ */
+
 // Extract text content from UI message parts
 function getTextContent(msg: UIMessage): string {
   if (!msg.parts) return '';
@@ -11,7 +24,7 @@ function getTextContent(msg: UIMessage): string {
     .join('');
 }
 
-// Convert UI messages to CoreMessage format for Groq (preserving tool calls)
+// Convert UI messages to CoreMessage format for Groq
 function convertToSimpleMessages(messages: UIMessage[]): CoreMessage[] {
   const result: CoreMessage[] = [];
 
@@ -23,13 +36,10 @@ function convertToSimpleMessages(messages: UIMessage[]): CoreMessage[] {
       }
     } else if (msg.role === 'assistant') {
       const content = getTextContent(msg);
-      // Only include assistant messages that have text content
-      // Skip pure tool-call messages (Groq handles these internally)
       if (content) {
         result.push({ role: 'assistant', content });
       }
     }
-    // Note: Tool call/result parts are handled by streamText internally
   }
 
   return result;
@@ -40,117 +50,47 @@ const groq = createGroq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-// Haversine distance calculation (returns miles)
-function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 3959; // Earth's radius in miles
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLng = (lng2 - lng1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+/**
+ * Valid place types for nearby search.
+ * Maps common terms to Google Places API types.
+ */
+const PLACE_TYPE_MAP: Record<string, string[]> = {
+  gym: ['gym'],
+  fitness: ['gym'],
+  grocery: ['supermarket'],
+  supermarket: ['supermarket'],
+  restaurant: ['restaurant'],
+  cafe: ['cafe'],
+  coffee: ['cafe'],
+  pharmacy: ['pharmacy'],
+  hospital: ['hospital'],
+  park: ['park'],
+  transit: ['transit_station'],
+  bus: ['bus_station'],
+  train: ['train_station'],
+  subway: ['subway_station'],
+  bank: ['bank'],
+  laundry: ['laundry'],
+};
 
-// Clean query by removing common filler words
-function cleanQuery(query: string): string {
-  const fillerWords = [
-    'nearby',
-    'near',
-    'find',
-    'closest',
-    'close',
-    'around',
-    'here',
-    'me',
-    'local',
-    'good',
-    'best',
-    'the',
-    'a',
-    'an',
-    'any',
-    'some',
-    'where',
-    'is',
-    'are',
-    'there',
-  ];
-  return query
-    .toLowerCase()
-    .replace(/[?.,!]/g, '')
-    .split(' ')
-    .filter((word) => !fillerWords.includes(word))
-    .join(' ')
-    .trim();
-}
+/**
+ * Determines the search type and included types for a query.
+ */
+function determineSearchParams(query: string): {
+  searchType: 'type' | 'text';
+  includedTypes?: string[];
+} {
+  const lowerQuery = query.toLowerCase().trim();
 
-interface Place {
-  name: string;
-  address: string;
-  distance: string;
-}
-
-// Search using Google Places API (New) Text Search
-async function searchGooglePlaces(
-  query: string,
-  lat: number,
-  lng: number
-): Promise<Place[]> {
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-  if (!apiKey) {
-    console.error('Google Places API key not configured');
-    return [];
-  }
-
-  try {
-    const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location',
-      },
-      body: JSON.stringify({
-        textQuery: query,
-        locationBias: {
-          circle: {
-            center: { latitude: lat, longitude: lng },
-            radius: 5000,
-          },
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('Google Places error:', response.status);
-      return [];
+  // Check if query matches a known place type
+  for (const [keyword, types] of Object.entries(PLACE_TYPE_MAP)) {
+    if (lowerQuery.includes(keyword)) {
+      return { searchType: 'type', includedTypes: types };
     }
-
-    const data = await response.json();
-    const places = data.places || [];
-
-    return places.slice(0, 5).map((place: {
-      displayName?: { text: string };
-      formattedAddress?: string;
-      location?: { latitude: number; longitude: number };
-    }) => {
-      const placeLat = place.location?.latitude ?? lat;
-      const placeLng = place.location?.longitude ?? lng;
-      const distance = calculateDistance(lat, lng, placeLat, placeLng);
-      return {
-        name: place.displayName?.text || 'Unknown',
-        address: place.formattedAddress || '',
-        distance: `${distance.toFixed(1)} miles`,
-      };
-    });
-  } catch (error) {
-    console.error('Google Places search error:', error);
-    return [];
   }
+
+  // Default to text search for specific/unknown queries
+  return { searchType: 'text' };
 }
 
 export async function POST(request: Request) {
@@ -176,33 +116,42 @@ export async function POST(request: Request) {
 
     const result = streamText({
       model: groq('llama-3.1-8b-instant'),
-      system:
-        'You are a helpful local guide. Be friendly and concise. Always mention the distance to the closest option.',
+      system: `You are a helpful assistant for a room rental listing. You can answer general questions about the property and neighborhood.
+
+For questions about nearby places (restaurants, gyms, grocery stores, transit, etc.), use the nearbyPlaceSearch tool. DO NOT try to provide specific place names, addresses, or distances - the tool will handle displaying that information.
+
+Be friendly and concise. Focus on being helpful without making up specific information about places you don't know about.`,
       messages: simpleMessages,
       tools: {
-        findPlaces: tool({
+        /**
+         * Fallback tool for nearby place searches.
+         * Returns a structured action that the client interprets to render
+         * the NearbyPlacesCard component.
+         *
+         * CRITICAL: This tool does NOT call Google Places API.
+         * It only returns the action metadata - no place data.
+         */
+        nearbyPlaceSearch: tool({
           description:
-            'Search for nearby places like restaurants, grocery stores, parks, transit stations, hospitals, etc.',
+            'Trigger a search for nearby places like restaurants, gyms, grocery stores, parks, transit stations, etc. Use this when users ask about places near the listing.',
           inputSchema: zodSchema(
             z.object({
-              query: z.string().describe('The type of place to search for (e.g., "indian grocery", "park", "hospital")'),
+              query: z
+                .string()
+                .describe('The type of place or specific query (e.g., "gym", "indian grocery", "Starbucks")'),
             })
           ),
           execute: async ({ query }: { query: string }) => {
-            const cleanedQuery = cleanQuery(query);
-            const places = await searchGooglePlaces(cleanedQuery, latitude, longitude);
+            const { searchType, includedTypes } = determineSearchParams(query);
 
-            if (places.length === 0) {
-              return {
-                success: false,
-                message: `No places found matching "${query}" nearby.`,
-              };
-            }
-
+            // Return structured action - NO place data
             return {
-              success: true,
-              places,
-              query: cleanedQuery,
+              action: 'NEARBY_UI_KIT',
+              query,
+              searchType,
+              includedTypes,
+              // The client will use these coordinates to configure the search
+              coordinates: { lat: latitude, lng: longitude },
             };
           },
         }),

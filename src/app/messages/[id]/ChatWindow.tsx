@@ -182,7 +182,7 @@ export default function ChatWindow({
 
     // Debounced function to broadcast typing stopped
     const stopTypingBroadcast = useDebouncedCallback(() => {
-        if (channelRef.current) {
+        if (channelRef.current && connectionStatus === 'connected') {
             broadcastTyping(channelRef.current, currentUserId, currentUserName || '', false);
         }
         setIsTyping(false);
@@ -194,7 +194,7 @@ export default function ChatWindow({
 
         if (e.target.value && !isTyping) {
             setIsTyping(true);
-            if (channelRef.current) {
+            if (channelRef.current && connectionStatus === 'connected') {
                 broadcastTyping(channelRef.current, currentUserId, currentUserName || '', true);
             }
         }
@@ -362,7 +362,7 @@ export default function ChatWindow({
         setIsTyping(false);
 
         // Broadcast that we stopped typing
-        if (channelRef.current) {
+        if (channelRef.current && connectionStatus === 'connected') {
             broadcastTyping(channelRef.current, currentUserId, currentUserName || '', false);
         }
 
@@ -576,7 +576,7 @@ export default function ChatWindow({
                                         >
                                             <p className="text-sm leading-relaxed">{msg.content}</p>
                                             <div className={`flex items-center gap-1 mt-1 ${isMe ? 'justify-end' : ''}`}>
-                                                <span className={`text-[10px] ${isMe ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                                                <span className={`text-2xs ${isMe ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-400 dark:text-zinc-500'}`}>
                                                     {new Date(msg.createdAt).toLocaleTimeString([], {
                                                         hour: '2-digit',
                                                         minute: '2-digit'

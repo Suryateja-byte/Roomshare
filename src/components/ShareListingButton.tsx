@@ -44,7 +44,7 @@ export default function ShareListingButton({ listingId, title }: ShareListingBut
                 );
                 setIsOpen(false);
             },
-            color: 'text-[#1DA1F2]'
+            color: 'text-[var(--social-twitter)]'
         },
         {
             name: 'Facebook',
@@ -56,7 +56,7 @@ export default function ShareListingButton({ listingId, title }: ShareListingBut
                 );
                 setIsOpen(false);
             },
-            color: 'text-[#1877F2]'
+            color: 'text-[var(--social-facebook)]'
         },
         {
             name: 'Email',

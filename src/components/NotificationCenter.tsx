@@ -121,14 +121,14 @@ export default function NotificationCenter() {
             >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
+                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-2xs font-bold flex items-center justify-center rounded-full">
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden z-[1100] animate-in fade-in zoom-in-95 duration-200">
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden z-sticky animate-in fade-in zoom-in-95 duration-200">
                     {/* Header */}
                     <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                         <h3 className="font-semibold text-zinc-900 dark:text-white">Notifications</h3>
@@ -178,7 +178,7 @@ export default function NotificationCenter() {
                                                 <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-0.5">
                                                     {notification.message}
                                                 </p>
-                                                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1">
+                                                <p className="text-2xs text-zinc-400 dark:text-zinc-500 mt-1">
                                                     {formatTimeAgo(notification.createdAt)}
                                                 </p>
                                             </div>

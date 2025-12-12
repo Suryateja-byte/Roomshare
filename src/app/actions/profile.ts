@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { checkSuspension } from './suspension';
 
 const updateProfileSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100, 'Name is too long'),
@@ -19,6 +20,11 @@ export async function updateProfile(data: UpdateProfileInput) {
     const session = await auth();
     if (!session?.user?.id) {
         return { error: 'Unauthorized' };
+    }
+
+    const suspension = await checkSuspension();
+    if (suspension.suspended) {
+        return { error: suspension.error || 'Account suspended' };
     }
 
     try {

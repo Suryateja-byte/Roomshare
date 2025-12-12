@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
+import { checkSuspension } from './suspension';
 
 export type ListingStatus = 'ACTIVE' | 'PAUSED' | 'RENTED';
 
@@ -10,6 +11,11 @@ export async function updateListingStatus(listingId: string, status: ListingStat
     const session = await auth();
     if (!session?.user?.id) {
         return { error: 'Unauthorized' };
+    }
+
+    const suspension = await checkSuspension();
+    if (suspension.suspended) {
+        return { error: suspension.error || 'Account suspended' };
     }
 
     try {

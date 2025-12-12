@@ -15,7 +15,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Home, Loader2, MapPin } from 'lucide-react';
+import { Home, Loader2, MapPin, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from './SearchForm';
@@ -39,6 +39,14 @@ interface MarkerPosition {
     lng: number;
 }
 
+// Mapbox Layer Colors - Synced with Tailwind Zinc Palette
+const MAP_COLORS = {
+    zinc900: '#18181b',
+    white: '#ffffff',
+    zinc800: '#27272a',
+};
+
+
 // Cluster layer - circles for grouped markers
 const clusterLayer: LayerProps = {
     id: 'clusters',
@@ -46,7 +54,7 @@ const clusterLayer: LayerProps = {
     source: 'listings',
     filter: ['has', 'point_count'],
     paint: {
-        'circle-color': '#18181b', // zinc-900
+        'circle-color': MAP_COLORS.zinc900, // zinc-900
         'circle-radius': [
             'step',
             ['get', 'point_count'],
@@ -56,7 +64,7 @@ const clusterLayer: LayerProps = {
             100, 40  // 40px radius for 100+ points
         ],
         'circle-stroke-width': 3,
-        'circle-stroke-color': '#ffffff'
+        'circle-stroke-color': MAP_COLORS.white
     }
 };
 
@@ -67,7 +75,7 @@ const clusterLayerDark: LayerProps = {
     source: 'listings',
     filter: ['has', 'point_count'],
     paint: {
-        'circle-color': '#ffffff',
+        'circle-color': MAP_COLORS.white,
         'circle-radius': [
             'step',
             ['get', 'point_count'],
@@ -77,7 +85,7 @@ const clusterLayerDark: LayerProps = {
             100, 40
         ],
         'circle-stroke-width': 3,
-        'circle-stroke-color': '#18181b'
+        'circle-stroke-color': MAP_COLORS.zinc900
     }
 };
 
@@ -93,7 +101,7 @@ const clusterCountLayer: LayerProps = {
         'text-size': 14
     },
     paint: {
-        'text-color': '#ffffff'
+        'text-color': MAP_COLORS.white
     }
 };
 
@@ -109,7 +117,7 @@ const clusterCountLayerDark: LayerProps = {
         'text-size': 14
     },
     paint: {
-        'text-color': '#18181b'
+        'text-color': MAP_COLORS.zinc900
     }
 };
 
@@ -493,7 +501,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                             {/* Pin tail/pointer - Properly styled triangle */}
                             <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200 transition-colors"></div>
                             {/* Shadow under the pin for depth */}
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-black/20 dark:bg-black/40 rounded-full blur-[2px]"></div>
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]"></div>
                         </div>
                     </Marker>
                 ))}
@@ -506,18 +514,16 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         onClose={() => setSelectedListing(null)}
                         closeOnClick={false}
                         maxWidth="320px"
-                        className={`z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${
-                            isDarkMode
-                                ? '[&_.mapboxgl-popup-tip]:border-t-zinc-900'
-                                : '[&_.mapboxgl-popup-tip]:border-t-white'
-                        }`}
+                        className={`z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${isDarkMode
+                            ? '[&_.mapboxgl-popup-tip]:border-t-zinc-900'
+                            : '[&_.mapboxgl-popup-tip]:border-t-white'
+                            }`}
                     >
                         {/* Premium Card Design */}
-                        <div className={`w-[280px] overflow-hidden rounded-xl ${
-                            isDarkMode
-                                ? 'bg-zinc-900 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]'
-                                : 'bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]'
-                        }`}>
+                        <div className={`w-[280px] overflow-hidden rounded-xl ${isDarkMode
+                            ? 'bg-zinc-900 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]'
+                            : 'bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]'
+                            }`}>
                             {/* Image Thumbnail */}
                             <div className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
                                 {selectedListing.images && selectedListing.images[0] ? (
@@ -532,21 +538,22 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                     </div>
                                 )}
                                 {/* Close button overlay */}
-                                <button
-                                    onClick={() => setSelectedListing(null)}
-                                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors"
-                                >
-                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
+                                <div className="absolute top-2 right-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setSelectedListing(null)}
+                                        className="w-7 h-7 rounded-full bg-zinc-950/50 hover:bg-zinc-950/70 text-white hover:text-white border-none"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                </div>
                                 {/* Availability badge */}
                                 <div className="absolute bottom-2 left-2">
-                                    <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase ${
-                                        selectedListing.availableSlots > 0
-                                            ? 'bg-emerald-500 text-white'
-                                            : 'bg-zinc-900 text-white'
-                                    }`}>
+                                    <span className={`inline-flex px-2 py-0.5 rounded-md text-2xs font-semibold uppercase ${selectedListing.availableSlots > 0
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'bg-zinc-900 text-white'
+                                        }`}>
                                         {selectedListing.availableSlots > 0 ? `${selectedListing.availableSlots} Available` : 'Filled'}
                                     </span>
                                 </div>
@@ -554,7 +561,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
                             {/* Content */}
                             <div className="p-3">
-                                <h3 className={`font-semibold text-[15px] line-clamp-1 mb-1 ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
+                                <h3 className={`font-semibold text-sm line-clamp-1 mb-1 ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
                                     {selectedListing.title}
                                 </h3>
                                 <p className="mb-3">
@@ -567,11 +574,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                     <Link href={`/listings/${selectedListing.id}`} className="flex-1">
                                         <Button
                                             size="sm"
-                                            className={`w-full h-9 text-[13px] font-medium rounded-lg ${
-                                                isDarkMode
-                                                    ? 'bg-white text-zinc-900 hover:bg-zinc-200'
-                                                    : 'bg-zinc-900 text-white hover:bg-zinc-800'
-                                            }`}
+                                            className={`w-full h-9 text-xs-plus font-medium rounded-lg ${isDarkMode
+                                                ? 'bg-white text-zinc-900 hover:bg-zinc-200'
+                                                : 'bg-zinc-900 text-white hover:bg-zinc-800'
+                                                }`}
                                         >
                                             View Details
                                         </Button>
@@ -581,11 +587,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                className={`w-full h-9 text-[13px] font-medium rounded-lg ${
-                                                    isDarkMode
-                                                        ? 'border-zinc-700 text-white hover:bg-zinc-800'
-                                                        : 'border-zinc-300 text-zinc-900 hover:bg-zinc-100'
-                                                }`}
+                                                className={`w-full h-9 text-xs-plus font-medium rounded-lg ${isDarkMode
+                                                    ? 'border-zinc-700 text-white hover:bg-zinc-800'
+                                                    : 'border-zinc-300 text-zinc-900 hover:bg-zinc-100'
+                                                    }`}
                                             >
                                                 Message
                                             </Button>
@@ -607,7 +612,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     onChange={(e) => setSearchAsMove(e.target.checked)}
                     className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white bg-white dark:bg-zinc-800 focus:ring-zinc-900 dark:focus:ring-zinc-400 focus:ring-offset-0"
                 />
-                <label htmlFor="searchAsMove" className="text-[13px] font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
+                <label htmlFor="searchAsMove" className="text-xs-plus font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
                     Search as I move the map
                 </label>
             </div>

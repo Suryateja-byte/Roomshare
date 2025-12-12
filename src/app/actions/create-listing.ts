@@ -6,6 +6,7 @@ import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
 import { createListingSchema } from '@/lib/schemas';
 import { triggerInstantAlerts } from '@/lib/search-alerts';
+import { checkSuspension, checkEmailVerified } from './suspension';
 
 export type CreateListingState = {
     success: boolean;
@@ -53,6 +54,16 @@ export async function createListing(prevState: CreateListingState, formData: For
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
             return { success: false, error: 'You must be logged in to create a listing.', code: 'SESSION_EXPIRED' };
+        }
+
+        const suspension = await checkSuspension();
+        if (suspension.suspended) {
+            return { success: false, error: suspension.error || 'Account suspended' };
+        }
+
+        const emailCheck = await checkEmailVerified();
+        if (!emailCheck.verified) {
+            return { success: false, error: emailCheck.error || 'Please verify your email to create a listing' };
         }
 
         const userId = session.user.id;

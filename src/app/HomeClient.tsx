@@ -134,7 +134,7 @@ export default function HomeClient({ isLoggedIn = false }: HomeClientProps) {
                                     <img
                                         src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80"
                                         alt="Modern Living Room"
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[2s] ease-out"
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-normal ease-out"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
                                 </div>
@@ -146,7 +146,7 @@ export default function HomeClient({ isLoggedIn = false }: HomeClientProps) {
                                         <img
                                             src="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"
                                             alt="Cozy Interior"
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[2s] ease-out"
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-normal ease-out"
                                         />
                                     </div>
 

@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import ListingCard from '@/components/ListingCard';
+import ListingCard from '@/components/listings/ListingCard';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 

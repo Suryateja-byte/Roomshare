@@ -2,10 +2,22 @@
 
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { checkSuspension, checkEmailVerified } from './suspension';
 
 export async function startConversation(listingId: string) {
     const session = await auth();
     if (!session?.user?.id) return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
+
+    const suspension = await checkSuspension();
+    if (suspension.suspended) {
+        return { error: suspension.error || 'Account suspended' };
+    }
+
+    const emailCheck = await checkEmailVerified();
+    if (!emailCheck.verified) {
+        return { error: emailCheck.error || 'Please verify your email to start a conversation' };
+    }
+
     const userId = session.user.id;
 
     const listing = await prisma.listing.findUnique({
@@ -52,6 +64,11 @@ export async function sendMessage(conversationId: string, content: string) {
     const session = await auth();
     if (!session?.user?.id) {
         return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
+    }
+
+    const suspension = await checkSuspension();
+    if (suspension.suspended) {
+        return { error: suspension.error || 'Account suspended' };
     }
 
     // Check if email is verified (soft enforcement - only block unverified users)

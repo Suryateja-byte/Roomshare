@@ -36,11 +36,15 @@ export async function broadcastTyping(
     isTyping: boolean
 ): Promise<void> {
     if (!channel) return;
-    await channel.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: { userId, userName, isTyping }
-    });
+    try {
+        await channel.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: { userId, userName, isTyping }
+        });
+    } catch {
+        // Channel not yet subscribed, silently ignore
+    }
 }
 
 // Helper to track presence in a conversation

@@ -1,15 +1,37 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Send, X, Bot, ChevronDown } from 'lucide-react';
+import { Sparkles, Send, X, Bot, ChevronDown, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 
+// Import intent detection and policy modules
+import { detectNearbyIntent, type NearbyIntentResult } from '@/lib/nearby-intent';
+import { checkFairHousingPolicy, POLICY_REFUSAL_MESSAGE } from '@/lib/fair-housing-policy';
+import { useNearbySearchRateLimit, RATE_LIMIT_CONFIG } from '@/hooks/useNearbySearchRateLimit';
+import { logSearchTrigger, logBlockedSearch } from '@/lib/logNearbySearch';
+import NearbyPlacesCard from '@/components/chat/NearbyPlacesCard';
+
 interface NeighborhoodChatProps {
   latitude: number;
   longitude: number;
+  listingId?: string;
+}
+
+/**
+ * Custom message type to support both text and nearby places cards.
+ */
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  type: 'text' | 'nearby-places' | 'policy-refusal' | 'rate-limit';
+  content?: string;
+  nearbyPlacesData?: {
+    queryText: string;
+    normalizedIntent: NearbyIntentResult;
+  };
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -21,7 +43,7 @@ const SUGGESTED_QUESTIONS = [
 
 const MAX_INPUT_LENGTH = 500;
 
-// Helper to extract text content from a message
+// Helper to extract text content from a UIMessage
 function getMessageContent(msg: UIMessage): string {
   if (!msg.parts) return '';
   return msg.parts
@@ -30,13 +52,25 @@ function getMessageContent(msg: UIMessage): string {
     .join('');
 }
 
-export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodChatProps) {
+// Generate unique message ID
+function generateMessageId(): string {
+  return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+export default function NeighborhoodChat({ latitude, longitude, listingId }: NeighborhoodChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [customMessages, setCustomMessages] = useState<ChatMessage[]>([]);
+  const [isProcessingLocally, setIsProcessingLocally] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Create transport with memoization to avoid recreating on every render
+  // Use coordinates as listing identifier for rate limiting if listingId not provided
+  const rateLimitKey = listingId || `${latitude.toFixed(4)}_${longitude.toFixed(4)}`;
+  const { canSearch, remainingSearches, isDebounceBusy, incrementCount } =
+    useNearbySearchRateLimit(rateLimitKey);
+
+  // Create transport with memoization
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -47,7 +81,7 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
   );
 
   const {
-    messages,
+    messages: aiMessages,
     sendMessage,
     status,
     error,
@@ -70,26 +104,125 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
     },
   });
 
-  const isLoading = status === 'streaming' || status === 'submitted';
+  const isLoading = status === 'streaming' || status === 'submitted' || isProcessingLocally;
 
-  // Auto-scroll to latest message
-  const scrollToBottom = () => {
+  // Scroll to bottom
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
     if (isOpen && inputRef.current) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [messages, isOpen]);
+  }, [aiMessages, customMessages, isOpen, scrollToBottom]);
+
+  // Handle message submission with intent routing
+  const handleMessage = useCallback(
+    async (messageText: string) => {
+      const trimmedMessage = messageText.trim();
+      if (!trimmedMessage || isLoading) return;
+
+      // Add user message to custom messages
+      const userMessage: ChatMessage = {
+        id: generateMessageId(),
+        role: 'user',
+        type: 'text',
+        content: trimmedMessage,
+      };
+      setCustomMessages((prev) => [...prev, userMessage]);
+
+      // Step 1: Check Fair Housing policy gate
+      const policyCheck = checkFairHousingPolicy(trimmedMessage);
+      if (!policyCheck.allowed) {
+        // Log blocked search
+        await logBlockedSearch(
+          rateLimitKey,
+          trimmedMessage,
+          policyCheck.blockedReason || 'unknown'
+        );
+
+        // Add policy refusal message
+        const refusalMessage: ChatMessage = {
+          id: generateMessageId(),
+          role: 'assistant',
+          type: 'policy-refusal',
+          content: POLICY_REFUSAL_MESSAGE,
+        };
+        setCustomMessages((prev) => [...prev, refusalMessage]);
+        return;
+      }
+
+      // Step 2: Detect nearby intent
+      const intent = detectNearbyIntent(trimmedMessage);
+
+      if (intent.isNearbyQuery) {
+        // Step 3a: Check rate limit for nearby queries
+        if (!canSearch) {
+          const rateLimitMessage: ChatMessage = {
+            id: generateMessageId(),
+            role: 'assistant',
+            type: 'rate-limit',
+            content: `You've reached the search limit for this listing. Please explore other features or contact the host for more information.`,
+          };
+          setCustomMessages((prev) => [...prev, rateLimitMessage]);
+          return;
+        }
+
+        if (isDebounceBusy) {
+          const debounceMessage: ChatMessage = {
+            id: generateMessageId(),
+            role: 'assistant',
+            type: 'text',
+            content: 'Please wait a moment before searching again.',
+          };
+          setCustomMessages((prev) => [...prev, debounceMessage]);
+          return;
+        }
+
+        // Increment rate limit and log
+        incrementCount();
+        await logSearchTrigger(
+          rateLimitKey,
+          intent.normalizedQuery || trimmedMessage,
+          intent.searchType
+        );
+
+        // Add NearbyPlacesCard as assistant response
+        const nearbyMessage: ChatMessage = {
+          id: generateMessageId(),
+          role: 'assistant',
+          type: 'nearby-places',
+          nearbyPlacesData: {
+            queryText: trimmedMessage,
+            normalizedIntent: intent,
+          },
+        };
+        setCustomMessages((prev) => [...prev, nearbyMessage]);
+      } else {
+        // Step 3b: Not a nearby query - send to LLM
+        setIsProcessingLocally(false);
+        await sendMessage({ text: trimmedMessage });
+      }
+    },
+    [
+      isLoading,
+      canSearch,
+      isDebounceBusy,
+      incrementCount,
+      rateLimitKey,
+      sendMessage,
+    ]
+  );
 
   const handleChipClick = async (question: string) => {
-    await sendMessage({ text: question });
+    setInput('');
+    await handleMessage(question);
   };
 
   const retryLastMessage = async () => {
-    const allMessages = messages as UIMessage[];
+    const allMessages = aiMessages as UIMessage[];
     const lastUserMessage = [...allMessages].reverse().find((m) => m.role === 'user');
     if (lastUserMessage) {
       const content = getMessageContent(lastUserMessage);
@@ -104,10 +237,88 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
     if (!input.trim() || isLoading) return;
     const message = input.trim();
     setInput('');
-    await sendMessage({ text: message });
+    await handleMessage(message);
   };
 
-  const showSuggestions = messages.length <= 1 && !isLoading;
+  // Combine AI messages and custom messages for rendering
+  const allMessages = useMemo(() => {
+    // Convert AI messages to ChatMessage format
+    const convertedAiMessages: ChatMessage[] = (aiMessages as UIMessage[]).map((msg) => ({
+      id: msg.id,
+      role: msg.role as 'user' | 'assistant',
+      type: 'text' as const,
+      content: getMessageContent(msg),
+    }));
+
+    // Merge and sort by ID (timestamp-based)
+    const combined = [...convertedAiMessages, ...customMessages];
+    return combined.sort((a, b) => {
+      // Initial greeting always first
+      if (a.id === '1') return -1;
+      if (b.id === '1') return 1;
+      return a.id.localeCompare(b.id);
+    });
+  }, [aiMessages, customMessages]);
+
+  const showSuggestions = allMessages.length <= 1 && !isLoading;
+
+  // Render a single message
+  const renderMessage = (msg: ChatMessage) => {
+    if (!msg.content && msg.type === 'text') return null;
+
+    return (
+      <motion.div
+        key={msg.id}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className={cn(
+          'flex gap-3',
+          msg.role === 'user' ? 'justify-end' : 'justify-start'
+        )}
+      >
+        {msg.role === 'assistant' && (
+          <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-1 border border-zinc-100 dark:border-zinc-700">
+            {msg.type === 'nearby-places' ? (
+              <MapPin className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+            ) : (
+              <Bot className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+            )}
+          </div>
+        )}
+
+        <div className="max-w-[85%]">
+          {msg.type === 'nearby-places' && msg.nearbyPlacesData ? (
+            <NearbyPlacesCard
+              latitude={latitude}
+              longitude={longitude}
+              queryText={msg.nearbyPlacesData.queryText}
+              normalizedIntent={{
+                mode: msg.nearbyPlacesData.normalizedIntent.searchType,
+                includedTypes: msg.nearbyPlacesData.normalizedIntent.includedTypes,
+                textQuery: msg.nearbyPlacesData.normalizedIntent.textQuery,
+              }}
+            />
+          ) : (
+            <div
+              className={cn(
+                'px-5 py-3 text-sm leading-relaxed shadow-sm relative',
+                msg.role === 'user'
+                  ? 'bg-zinc-900 dark:bg-zinc-700 text-white rounded-[1.25rem] rounded-tr-sm'
+                  : msg.type === 'policy-refusal'
+                  ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 rounded-[1.25rem] rounded-tl-sm'
+                  : msg.type === 'rate-limit'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 rounded-[1.25rem] rounded-tl-sm'
+                  : 'bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-[1.25rem] rounded-tl-sm'
+              )}
+            >
+              {msg.content}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
 
   return (
     <>
@@ -115,7 +326,7 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
       <motion.button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'fixed bottom-6 right-6 z-[100] h-14 w-14 rounded-full',
+          'fixed bottom-6 right-6 z-[9999] h-14 w-14 rounded-full',
           'shadow-[0_4px_20px_rgba(0,0,0,0.15)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.2)]',
           'transition-all duration-500 hover:scale-105',
           'flex items-center justify-center',
@@ -138,9 +349,9 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
             exit={{ opacity: 0, scale: 0.9, y: 32 }}
             transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
             className={cn(
-              'fixed bottom-24 right-6 z-[100]',
-              'w-[380px] max-w-[calc(100vw-48px)]',
-              'top-24',
+              'fixed bottom-24 right-6 z-[9999]',
+              'w-[380px] max-w-[calc(100vw-32px)]',
+              'h-auto max-h-[min(600px,calc(100vh-120px))]',
               'bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl',
               'rounded-[2rem] shadow-[0_20px_60px_-12px_rgba(0,0,0,0.12)]',
               'border border-zinc-100 dark:border-zinc-800',
@@ -156,7 +367,7 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 leading-tight">Concierge AI</h3>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1.5">
+                  <p className="text-2xs text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1.5">
                     <span className="relative flex h-1.5 w-1.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
@@ -165,55 +376,30 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-              >
-                <ChevronDown className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Rate limit indicator */}
+                {remainingSearches < RATE_LIMIT_CONFIG.maxSearchesPerListing && (
+                  <span className="text-2xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                    {remainingSearches} searches left
+                  </span>
+                )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Messages Area */}
             <div className="flex-1 min-h-0 overflow-y-auto p-6 bg-transparent scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent">
               <div className="space-y-6">
                 <div className="flex justify-center">
-                  <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 bg-zinc-50 dark:bg-zinc-800 px-3 py-1 rounded-full border border-zinc-100 dark:border-zinc-700">Today</span>
+                  <span className="text-2xs font-medium text-zinc-400 dark:text-zinc-500 bg-zinc-50 dark:bg-zinc-800 px-3 py-1 rounded-full border border-zinc-100 dark:border-zinc-700">Today</span>
                 </div>
 
-                {(messages as UIMessage[]).map((msg) => {
-                  const content = getMessageContent(msg);
-                  if (!content) return null;
-
-                  return (
-                    <motion.div
-                      key={msg.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className={cn(
-                        'flex gap-3',
-                        msg.role === 'user' ? 'justify-end' : 'justify-start'
-                      )}
-                    >
-                      {msg.role === 'assistant' && (
-                        <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-1 border border-zinc-100 dark:border-zinc-700">
-                          <Bot className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
-                        </div>
-                      )}
-
-                      <div
-                        className={cn(
-                          'max-w-[85%] px-5 py-3 text-sm leading-relaxed shadow-sm relative',
-                          msg.role === 'user'
-                            ? 'bg-zinc-900 dark:bg-zinc-700 text-white rounded-[1.25rem] rounded-tr-sm'
-                            : 'bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-[1.25rem] rounded-tl-sm'
-                        )}
-                      >
-                        {content}
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                {allMessages.map((msg) => renderMessage(msg))}
 
                 {/* Loading indicator (typing) */}
                 {isLoading && (
@@ -263,7 +449,7 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="px-6 pb-3"
+                  className="px-6 pb-4"
                 >
                   <div className="flex flex-wrap gap-2">
                     {SUGGESTED_QUESTIONS.map((q, i) => (
@@ -291,10 +477,10 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
             </AnimatePresence>
 
             {/* Input Area */}
-            <div className="p-4 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-t border-zinc-50 dark:border-zinc-800">
+            <div className="p-5 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-t border-zinc-50 dark:border-zinc-800">
               <form
                 onSubmit={onSubmit}
-                className="flex items-center gap-2 bg-zinc-100/50 dark:bg-zinc-800/50 p-1.5 pr-2 rounded-full border border-zinc-200 dark:border-zinc-700 focus-within:border-zinc-300 dark:focus-within:border-zinc-600 focus-within:bg-white dark:focus-within:bg-zinc-800 focus-within:ring-4 focus-within:ring-zinc-100 dark:focus-within:ring-zinc-800 transition-all duration-300"
+                className="flex items-center gap-2 bg-zinc-100/50 dark:bg-zinc-800/50 p-1.5 pr-2 rounded-full border border-zinc-200 dark:border-zinc-700 focus-within:border-zinc-300 dark:focus-within:border-zinc-600 focus-within:bg-white dark:focus-within:bg-zinc-800 focus-within:ring-4 focus-within:ring-zinc-100 dark:focus-within:ring-zinc-800 transition-all duration-300 mb-1"
               >
                 <input
                   ref={inputRef}
@@ -314,7 +500,7 @@ export default function NeighborhoodChat({ latitude, longitude }: NeighborhoodCh
               </form>
               <div className="text-center mt-3 flex items-center justify-center gap-1.5 opacity-60">
                 <Sparkles className="w-3 h-3 text-zinc-400" />
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium tracking-wide uppercase">Powered by RoomShare AI</p>
+                <p className="text-2xs text-zinc-400 dark:text-zinc-500 font-medium tracking-wide uppercase">Powered by RoomShare AI</p>
               </div>
             </div>
           </motion.div>

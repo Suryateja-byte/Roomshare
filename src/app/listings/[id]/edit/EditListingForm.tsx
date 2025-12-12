@@ -741,7 +741,8 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                         variant="outline"
                         onClick={() => router.push(`/listings/${listing.id}`)}
                         disabled={loading}
-                        className="flex-1"
+                        size="lg"
+                        className="flex-1 h-14 rounded-xl"
                     >
                         Cancel
                     </Button>

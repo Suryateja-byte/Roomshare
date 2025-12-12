@@ -423,7 +423,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                             </div>
                             {/* Content */}
                             <div className="p-3">
-                                <h3 className={`font-semibold text-[15px] line-clamp-1 mb-1 ${isDarkMode ? 'text-white' : 'text-zinc-900'
+                                <h3 className={`font-semibold text-sm line-clamp-1 mb-1 ${isDarkMode ? 'text-white' : 'text-zinc-900'
                                     }`}>
                                     {selectedListing.title}
                                 </h3>
@@ -437,7 +437,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                                     <Link href={`/listings/${selectedListing.id}`} className="flex-1">
                                         <Button
                                             size="sm"
-                                            className={`w-full h-9 text-[13px] font-medium rounded-lg ${isDarkMode
+                                            className={`w-full h-9 text-xs-plus font-medium rounded-lg ${isDarkMode
                                                     ? 'bg-white text-zinc-900 hover:bg-zinc-200'
                                                     : 'bg-zinc-900 text-white hover:bg-zinc-800'
                                                 }`}
@@ -449,7 +449,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className={`w-full h-9 text-[13px] font-medium rounded-lg ${isDarkMode
+                                            className={`w-full h-9 text-xs-plus font-medium rounded-lg ${isDarkMode
                                                     ? 'border-zinc-700 text-white hover:bg-zinc-800'
                                                     : 'border-zinc-300 text-zinc-900 hover:bg-zinc-100'
                                                 }`}

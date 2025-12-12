@@ -6,6 +6,38 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Magic bytes signatures for image validation
+const MAGIC_BYTES: Record<string, { offset: number; bytes: number[] }[]> = {
+    'image/jpeg': [{ offset: 0, bytes: [0xFF, 0xD8, 0xFF] }],
+    'image/png': [{ offset: 0, bytes: [0x89, 0x50, 0x4E, 0x47] }],
+    'image/gif': [{ offset: 0, bytes: [0x47, 0x49, 0x46, 0x38] }], // GIF8
+    'image/webp': [
+        { offset: 0, bytes: [0x52, 0x49, 0x46, 0x46] }, // RIFF
+        { offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] }, // WEBP
+    ],
+};
+
+function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
+    const signatures = MAGIC_BYTES[mimeType];
+    if (!signatures) return false;
+
+    for (const sig of signatures) {
+        if (buffer.length < sig.offset + sig.bytes.length) return false;
+        for (let i = 0; i < sig.bytes.length; i++) {
+            if (buffer[sig.offset + i] !== sig.bytes[i]) return false;
+        }
+    }
+    return true;
+}
+
+// Safe extension mapping from validated MIME type
+const MIME_TO_EXTENSION: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+};
+
 export async function POST(request: NextRequest) {
     try {
         // Check authentication
@@ -43,16 +75,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 });
         }
 
-        // Validate file type
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-        if (!allowedTypes.includes(file.type)) {
-            return NextResponse.json(
-                { error: 'Invalid file type. Allowed: JPEG, PNG, WebP, GIF' },
-                { status: 400 }
-            );
-        }
-
-        // Validate file size (max 5MB)
+        // Validate file size first (max 5MB) - check before reading buffer
         const maxSize = 5 * 1024 * 1024; // 5MB
         if (file.size > maxSize) {
             return NextResponse.json(
@@ -61,20 +84,37 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Validate declared MIME type
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!allowedTypes.includes(file.type)) {
+            return NextResponse.json(
+                { error: 'Invalid file type. Allowed: JPEG, PNG, WebP, GIF' },
+                { status: 400 }
+            );
+        }
+
+        // Convert file to buffer for magic bytes validation
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Validate magic bytes to prevent MIME type spoofing
+        if (!validateMagicBytes(buffer, file.type)) {
+            return NextResponse.json(
+                { error: 'File content does not match declared type. Upload rejected.' },
+                { status: 400 }
+            );
+        }
+
         // Generate unique filename
         const timestamp = Date.now();
         const randomString = Math.random().toString(36).substring(2, 15);
-        const extension = file.name.split('.').pop();
+        const extension = MIME_TO_EXTENSION[file.type];
         const filename = `${timestamp}-${randomString}.${extension}`;
 
         // Determine storage path based on type
         const bucket = 'images';
         const folder = type === 'profile' ? 'profiles' : 'listings';
         const path = `${folder}/${session.user.id}/${filename}`;
-
-        // Convert file to buffer
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
 
         // Upload to Supabase Storage
         const { data, error: uploadError } = await supabase.storage

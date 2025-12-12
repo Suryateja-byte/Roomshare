@@ -219,7 +219,7 @@ export default function SettingsClient({
                                 type="password"
                                 value={currentPassword}
                                 onChange={(e) => setCurrentPassword(e.target.value)}
-                                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20 focus:border-zinc-400"
                                 required
                             />
                         </div>
@@ -231,7 +231,7 @@ export default function SettingsClient({
                                 type="password"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20 focus:border-zinc-400"
                                 required
                                 minLength={6}
                             />
@@ -245,7 +245,7 @@ export default function SettingsClient({
                                 type="password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20 focus:border-zinc-400"
                                 required
                             />
                         </div>

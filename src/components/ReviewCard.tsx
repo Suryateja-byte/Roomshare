@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Star, MessageSquare, MoreVertical, Edit2, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import UserAvatar from './UserAvatar';
 import ReviewResponseForm from './ReviewResponseForm';
 import { deleteReviewResponse } from '@/app/actions/review-response';
@@ -75,8 +76,8 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
                         <Star
                             key={star}
                             className={`w-4 h-4 ${star <= review.rating
-                                    ? 'text-amber-400 fill-amber-400'
-                                    : 'text-zinc-200 dark:text-zinc-600'
+                                ? 'text-amber-400 fill-amber-400'
+                                : 'text-zinc-200 dark:text-zinc-600'
                                 }`}
                         />
                     ))}
@@ -106,21 +107,25 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
 
                         {isOwner && (
                             <div className="flex items-center gap-1">
-                                <button
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => setIsEditingResponse(true)}
-                                    className="p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                                    className="h-7 w-7 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
                                     title="Edit response"
                                 >
                                     <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={handleDeleteResponse}
                                     disabled={isDeleting}
-                                    className="p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                                    className="h-7 w-7 text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                                     title="Delete response"
                                 >
                                     <Trash2 className="w-4 h-4" />
-                                </button>
+                                </Button>
                             </div>
                         )}
                     </div>
@@ -129,13 +134,15 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
 
             {/* Response Form for Owner */}
             {isOwner && !review.response && !showResponseForm && (
-                <button
+                <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowResponseForm(true)}
-                    className="mt-4 inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+                    className="mt-4 text-zinc-500 dark:text-zinc-400"
                 >
-                    <MessageSquare className="w-4 h-4" />
+                    <MessageSquare className="w-4 h-4 mr-2" />
                     Respond to this review
-                </button>
+                </Button>
             )}
 
             {showResponseForm && !review.response && (

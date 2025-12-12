@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, X, Clock, SlidersHorizontal } from 'lucide-react';
+import { Search, X, Clock, SlidersHorizontal, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FocusTrap } from '@/components/ui/FocusTrap';
 import LocationSearchInput from '@/components/LocationSearchInput';
@@ -353,13 +353,13 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         <div className={`w-full mx-auto ${isCompact ? 'max-w-2xl' : 'max-w-4xl'}`}>
             <form
                 onSubmit={handleSearch}
-                className={`group relative flex flex-col md:flex-row md:items-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] md:rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] border border-zinc-200/80 dark:border-zinc-700/80 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-[0_4px_20px_rgba(0,0,0,0.1),0_16px_48px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.3),0_16px_48px_rgba(0,0,0,0.2)] transition-all duration-300 w-full ${isCompact ? 'p-1' : 'p-1.5 md:p-2 md:pr-2'}`}
+                className={`group relative flex flex-col md:flex-row md:items-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] border border-zinc-200/80 dark:border-zinc-700/80 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-[0_4px_20px_rgba(0,0,0,0.1),0_16px_48px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.3),0_16px_48px_rgba(0,0,0,0.2)] transition-all duration-200 w-full ${isCompact ? 'p-1' : 'p-1.5 md:p-2 md:pr-2'}`}
                 role="search"
             >
                 {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
                 <div className={`w-full md:flex-1 flex flex-col relative ${isCompact ? 'px-4 py-2' : 'px-5 sm:px-6 py-3 md:py-2'}`}>
                     {!isCompact && (
-                        <span className="text-[10px] font-bold text-[#0f172a] dark:text-white uppercase tracking-wider mb-1">
+                        <span className="text-2xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-1">
                             Where
                         </span>
                     )}
@@ -437,7 +437,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 {/* Price Range Input - Airbnb-style stacked layout */}
                 <div className={`w-full md:flex-1 flex flex-col ${isCompact ? 'px-4 py-2' : 'px-5 sm:px-6 py-3 md:py-2'}`}>
                     {!isCompact && (
-                        <label className="text-[10px] font-bold text-[#0f172a] dark:text-white uppercase tracking-wider mb-1">
+                        <label className="text-2xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-1">
                             Budget
                         </label>
                     )}
@@ -450,7 +450,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             value={minPrice}
                             onChange={(e) => setMinPrice(e.target.value)}
                             placeholder="Min"
-                            className={`w-full bg-transparent border-none p-0 text-[#0f172a] dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
+                            className={`w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
                             min="0"
                             step="50"
                             aria-label="Minimum budget"
@@ -464,7 +464,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             value={maxPrice}
                             onChange={(e) => setMaxPrice(e.target.value)}
                             placeholder="Max"
-                            className={`w-full bg-transparent border-none p-0 text-[#0f172a] dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
+                            className={`w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
                             min="0"
                             step="50"
                             aria-label="Maximum budget"
@@ -479,45 +479,44 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                         <div className="hidden md:flex items-center self-stretch" aria-hidden="true">
                             <div className="w-px h-10 bg-zinc-200 dark:bg-zinc-700"></div>
                         </div>
-                        <button
+                        <Button
                             type="button"
+                            variant="filter"
                             onClick={() => setShowFilters(!showFilters)}
-                            className={`hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all duration-200 touch-target ${showFilters ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : 'text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600'}`}
+                            data-active={activeFilterCount > 0}
+                            className={`hidden sm:flex items-center gap-2 rounded-full h-10 px-4 transition-all duration-200 ${showFilters ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : ''}`}
                             aria-expanded={showFilters}
                             aria-controls="search-filters"
                         >
                             <SlidersHorizontal className="w-4 h-4" />
                             Filters
                             {activeFilterCount > 0 && (
-                                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full transition-colors ${showFilters ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white' : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'}`}>
+                                <span className={`ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full transition-colors ${showFilters ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white' : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'}`}>
                                     {activeFilterCount}
                                 </span>
                             )}
-                        </button>
+                        </Button>
                     </>
                 )}
 
                 {/* Search Button */}
                 <div className={`flex items-center justify-center mt-2 md:mt-0 ${isCompact ? 'p-0.5' : 'p-1 md:ml-2'}`}>
-                    <button
+                    <Button
                         type="submit"
                         disabled={isSearching}
                         aria-label={isSearching ? "Searching..." : "Search listings"}
                         aria-busy={isSearching}
-                        className={`bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-600 disabled:cursor-not-allowed text-white rounded-full flex items-center justify-center transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md ${isCompact ? 'h-9 w-9' : 'h-11 sm:h-12 w-full md:w-12'}`}
+                        className={`rounded-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md ${isCompact ? 'h-9 w-9 p-0' : 'h-11 sm:h-12 w-full md:w-12'}`}
                     >
                         {isSearching ? (
-                            <svg className={`animate-spin ${isCompact ? 'w-4 h-4' : 'w-5 h-5'}`} fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
+                            <Loader2 className={`animate-spin ${isCompact ? 'w-4 h-4' : 'w-5 h-5'}`} />
                         ) : (
                             <Search className={`${isCompact ? 'w-4 h-4' : 'w-[22px] h-[22px]'}`} strokeWidth={2.5} />
                         )}
                         <span className={`md:hidden ml-2 font-medium text-sm ${isCompact ? 'hidden' : ''}`}>
                             {isSearching ? 'Searching...' : 'Search'}
                         </span>
-                    </button>
+                    </Button>
                 </div>
             </form>
 
@@ -536,7 +535,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             {/* Filter Drawer Overlay - Rendered via Portal to escape stacking contexts */}
             {showFilters && typeof document !== 'undefined' && createPortal(
                 <div
-                    className="fixed inset-0 z-[9999] overflow-hidden"
+                    className="fixed inset-0 z-modal overflow-hidden"
                     aria-labelledby="filter-drawer-title"
                     role="dialog"
                     aria-modal="true"
@@ -564,14 +563,15 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                         </span>
                                     )}
                                 </h2>
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => setShowFilters(false)}
-                                    className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors touch-target"
+                                    className="rounded-full w-9 h-9 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                                     aria-label="Close filters"
                                 >
                                     <X className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
-                                </button>
+                                </Button>
                             </div>
 
                             {/* Scrollable Filter Content */}
@@ -626,21 +626,20 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                     <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
                                     <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
                                         {['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'].map(amenity => (
-                                            <button
+                                            <Button
                                                 key={amenity}
                                                 type="button"
+                                                variant="filter"
                                                 onClick={() => toggleAmenity(amenity)}
+                                                data-active={amenities.includes(amenity)}
                                                 aria-pressed={amenities.includes(amenity)}
-                                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${amenities.includes(amenity)
-                                                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
-                                                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
-                                                    }`}
+                                                className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${amenities.includes(amenity) ? 'scale-[1.02]' : 'hover:scale-[1.02]'}`}
                                             >
                                                 {amenity}
                                                 {amenities.includes(amenity) && (
-                                                    <X className="w-3.5 h-3.5" />
+                                                    <X className="w-3.5 h-3.5 ml-1.5" />
                                                 )}
-                                            </button>
+                                            </Button>
                                         ))}
                                     </div>
                                 </fieldset>
@@ -650,21 +649,20 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                     <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
                                     <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
                                         {['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'].map(rule => (
-                                            <button
+                                            <Button
                                                 key={rule}
                                                 type="button"
+                                                variant="filter"
                                                 onClick={() => toggleHouseRule(rule)}
+                                                data-active={houseRules.includes(rule)}
                                                 aria-pressed={houseRules.includes(rule)}
-                                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${houseRules.includes(rule)
-                                                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
-                                                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
-                                                    }`}
+                                                className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${houseRules.includes(rule) ? 'scale-[1.02]' : 'hover:scale-[1.02]'}`}
                                             >
                                                 {rule}
                                                 {houseRules.includes(rule) && (
-                                                    <X className="w-3.5 h-3.5" />
+                                                    <X className="w-3.5 h-3.5 ml-1.5" />
                                                 )}
-                                            </button>
+                                            </Button>
                                         ))}
                                     </div>
                                 </fieldset>
@@ -674,21 +672,20 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                     <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Languages Spoken</legend>
                                     <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
                                         {LANGUAGES.map(lang => (
-                                            <button
+                                            <Button
                                                 key={lang}
                                                 type="button"
+                                                variant="filter"
                                                 onClick={() => toggleLanguage(lang)}
+                                                data-active={languages.includes(lang)}
                                                 aria-pressed={languages.includes(lang)}
-                                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-all duration-200 touch-target focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${languages.includes(lang)
-                                                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white scale-[1.02]'
-                                                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-[1.02]'
-                                                    }`}
+                                                className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${languages.includes(lang) ? 'scale-[1.02]' : 'hover:scale-[1.02]'}`}
                                             >
                                                 {lang}
                                                 {languages.includes(lang) && (
-                                                    <X className="w-3.5 h-3.5" />
+                                                    <X className="w-3.5 h-3.5 ml-1.5" />
                                                 )}
-                                            </button>
+                                            </Button>
                                         ))}
                                     </div>
                                 </fieldset>
@@ -729,15 +726,16 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             {/* Drawer Footer with Actions */}
                             <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-3">
                                 {hasActiveFilters && (
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="outline"
                                         onClick={handleClearAllFilters}
-                                        className="flex-1 px-4 py-3 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl transition-colors touch-target"
+                                        className="flex-1 rounded-xl h-12"
                                     >
                                         Clear all
-                                    </button>
+                                    </Button>
                                 )}
-                                <button
+                                <Button
                                     type="button"
                                     onClick={() => {
                                         setShowFilters(false);
@@ -747,16 +745,17 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                             form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
                                         }
                                     }}
-                                    className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-zinc-900 dark:bg-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md touch-target"
+                                    className="flex-1 rounded-xl h-12 bg-zinc-900 text-white hover:bg-zinc-800 shadow-md"
                                 >
                                     Show Results
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </FocusTrap>
-                </div>,
+                </div >,
                 document.body
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }

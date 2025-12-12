@@ -202,7 +202,7 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
 
     return (
         <nav
-            className={`fixed top-0 left-0 right-0 z-[1000] transition-all duration-300 ease-in-out ${isScrolled
+            className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-300 ease-in-out ${isScrolled
                     ? 'py-3 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border-b border-zinc-200/80 dark:border-white/10 shadow-lg shadow-zinc-900/5 dark:shadow-black/20'
                     : 'py-4 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-md'
                 }`}
@@ -290,7 +290,7 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
                                             transition={{ duration: 0.2 }}
-                                            className="absolute right-0 mt-3 w-72 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden origin-top-right ring-1 ring-black/5 z-[1100]"
+                                            className="absolute right-0 mt-3 w-72 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden origin-top-right ring-1 ring-black/5 z-sticky"
                                         >
                                             <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
                                                 <p className="font-semibold text-zinc-900 dark:text-white">{user.name}</p>

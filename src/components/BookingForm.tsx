@@ -456,12 +456,12 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                                     <span className="text-red-700 dark:text-red-300 font-medium">
                                         {start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — {end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                     </span>
-                                    <span className="text-red-500 dark:text-red-400 text-[10px] uppercase font-bold">Booked</span>
+                                    <span className="text-red-500 dark:text-red-400 text-2xs uppercase font-bold">Booked</span>
                                 </div>
                             );
                         })}
                     </div>
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-2 flex items-center gap-1">
+                    <p className="text-2xs text-zinc-500 dark:text-zinc-400 mt-2 flex items-center gap-1">
                         <Info className="w-3 h-3" />
                         Select dates that don't overlap with booked periods
                     </p>

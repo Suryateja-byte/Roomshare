@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function Error({
     error,
@@ -23,13 +24,10 @@ export default function Error({
             <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
                 {error.message || 'An unexpected error occurred.'}
             </p>
-            <button
-                onClick={() => reset()}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
-            >
+            <Button onClick={() => reset()} size="lg" className="gap-2">
                 <RefreshCw className="w-4 h-4" />
                 Try again
-            </button>
+            </Button>
         </div>
     );
 }

@@ -140,7 +140,7 @@ function LoginForm() {
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
                         </div>
-                        <div className="relative flex justify-center text-[11px] uppercase tracking-wider font-medium">
+                        <div className="relative flex justify-center text-xs uppercase tracking-wider font-medium">
                             <span className="bg-white dark:bg-zinc-950 px-4 text-zinc-400">or continue with email</span>
                         </div>
                     </div>

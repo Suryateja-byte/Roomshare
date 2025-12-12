@@ -8,11 +8,14 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const variantClasses = {
-    primary: "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm hover:shadow-md focus-visible:ring-zinc-900 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 dark:focus-visible:ring-white",
-    outline: "border border-zinc-200 bg-transparent hover:bg-zinc-50 text-zinc-900 focus-visible:ring-zinc-900 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800 dark:focus-visible:ring-zinc-400",
-    ghost: "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 focus-visible:ring-zinc-900 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800",
-    white: "bg-white text-zinc-900 hover:bg-zinc-50 shadow-sm border border-zinc-100 focus-visible:ring-zinc-900 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700 dark:border-zinc-700",
-    destructive: "bg-red-600 text-white hover:bg-red-700 shadow-sm focus-visible:ring-red-600",
+    primary: "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm hover:shadow-md focus-visible:ring-zinc-900/20 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 dark:focus-visible:ring-zinc-400/20",
+    outline: "border border-zinc-200 bg-transparent hover:bg-zinc-50 text-zinc-900 focus-visible:ring-zinc-900/20 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800 dark:focus-visible:ring-zinc-400/20",
+    ghost: "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 focus-visible:ring-zinc-900/20 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800 dark:focus-visible:ring-zinc-400/20",
+    white: "bg-white text-zinc-900 hover:bg-zinc-50 shadow-sm border border-zinc-100 focus-visible:ring-zinc-900/20 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700 dark:border-zinc-700 dark:focus-visible:ring-zinc-400/20",
+    destructive: "bg-red-600 text-white hover:bg-red-700 shadow-sm focus-visible:ring-red-600/20",
+    success: "bg-green-600 text-white hover:bg-green-700 shadow-sm focus-visible:ring-green-600/20",
+    warning: "bg-amber-500 text-white hover:bg-amber-600 shadow-sm focus-visible:ring-amber-500/20",
+    filter: "border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 data-[active=true]:bg-zinc-900 data-[active=true]:text-white data-[active=true]:border-zinc-900 focus-visible:ring-zinc-900/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:data-[active=true]:bg-white dark:data-[active=true]:text-zinc-900 dark:data-[active=true]:border-white dark:focus-visible:ring-zinc-400/20",
 }
 
 const sizeClasses = {

@@ -71,7 +71,7 @@ function GalleryItem({
             <ImageWithFallback
                 src={src}
                 alt={alt}
-                className="w-full h-full object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover/item:scale-[1.03]"
+                className="w-full h-full object-cover transition-transform duration-slow ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover/item:scale-[1.03]"
                 hasError={hasError}
                 onError={onError}
             />
@@ -313,7 +313,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
             {/* Lightbox Modal */}
             {lightboxOpen && (
                 <div
-                    className="fixed inset-0 z-[1200] bg-black/95 flex flex-col"
+                    className="fixed inset-0 z-modal bg-black/95 flex flex-col"
                     onClick={closeLightbox}
                 >
                     {/* Header */}

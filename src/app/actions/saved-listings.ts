@@ -3,12 +3,18 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { checkSuspension } from './suspension';
 
 export async function toggleSaveListing(listingId: string) {
     const session = await auth();
 
     if (!session?.user?.id) {
         return { error: 'You must be logged in to save listings', saved: false };
+    }
+
+    const suspension = await checkSuspension();
+    if (suspension.suspended) {
+        return { error: suspension.error || 'Account suspended', saved: false };
     }
 
     try {

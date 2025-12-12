@@ -8,6 +8,7 @@ import { createNotification } from './notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { createBookingSchema } from '@/lib/schemas';
 import { z } from 'zod';
+import { checkSuspension, checkEmailVerified } from './suspension';
 
 // Booking result type for structured error handling
 export type BookingResult = {
@@ -28,6 +29,16 @@ export async function createBooking(
     const session = await auth();
     if (!session?.user?.id) {
         return { success: false, error: 'You must be logged in to book', code: 'SESSION_EXPIRED' };
+    }
+
+    const suspension = await checkSuspension();
+    if (suspension.suspended) {
+        return { success: false, error: suspension.error || 'Account suspended' };
+    }
+
+    const emailCheck = await checkEmailVerified();
+    if (!emailCheck.verified) {
+        return { success: false, error: emailCheck.error || 'Please verify your email to book' };
     }
 
     const userId = session.user.id;

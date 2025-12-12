@@ -3,12 +3,18 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { createNotification } from '@/app/actions/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
+import { checkSuspension } from '@/app/actions/suspension';
 
 export async function POST(request: Request) {
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const suspension = await checkSuspension();
+        if (suspension.suspended) {
+            return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
         const body = await request.json();

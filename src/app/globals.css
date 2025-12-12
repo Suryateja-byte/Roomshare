@@ -35,6 +35,12 @@
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
 
+    /* Social Brand Colors */
+    --social-twitter: 203 89% 53%;
+    /* #1DA1F2 */
+    --social-facebook: 214 89% 52%;
+    /* #1877F2 */
+
     /* Design System - Border Radius */
     --radius-sm: 6px;
     --radius-md: 12px;
@@ -53,6 +59,13 @@
     --transition-fast: 150ms ease;
     --transition-base: 200ms ease;
     --transition-slow: 300ms ease;
+
+    /* Design System - Z-Index Scale */
+    --z-dropdown: 1000;
+    --z-sticky: 1100;
+    --z-modal: 1200;
+    --z-popover: 1300;
+    --z-tooltip: 1400;
 
     color-scheme: light;
   }
@@ -405,4 +418,61 @@ input:autofill {
 * {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
+}
+
+/* Custom Typography Scale */
+.text-2xs {
+  font-size: 0.625rem;
+  /* 10px */
+  line-height: 1.4;
+}
+
+.text-xs-plus {
+  font-size: 0.8125rem;
+  /* 13px */
+  line-height: 1.5;
+}
+
+/* Z-Index Utilities */
+.z-dropdown {
+  z-index: var(--z-dropdown);
+}
+
+.z-sticky {
+  z-index: var(--z-sticky);
+}
+
+.z-modal {
+  z-index: var(--z-modal);
+}
+
+.z-popover {
+  z-index: var(--z-popover);
+}
+
+.z-tooltip {
+  z-index: var(--z-tooltip);
+}
+
+@layer utilities {
+  .shadow-card-hover {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15);
+  }
+
+  .dark .shadow-card-hover {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Motion System */
+  .duration-fast {
+    transition-duration: 150ms;
+  }
+
+  .duration-normal {
+    transition-duration: 200ms;
+  }
+
+  .duration-slow {
+    transition-duration: 300ms;
+  }
 }

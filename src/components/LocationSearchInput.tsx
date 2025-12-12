@@ -227,7 +227,7 @@ export default function LocationSearchInput({
             {showSuggestions && suggestions.length > 0 && (
                 <div
                     ref={suggestionsRef}
-                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-[1000] min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
                 >
                     <ul className="p-2">
                         {suggestions.map((suggestion, index) => (
@@ -260,7 +260,7 @@ export default function LocationSearchInput({
             {showSuggestions && error && !isLoading && (
                 <div
                     ref={suggestionsRef}
-                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-red-200/80 dark:border-red-700/80 overflow-hidden z-[1000] min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
                 >
                     <div className="p-4 flex items-center gap-3">
                         <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
@@ -282,7 +282,7 @@ export default function LocationSearchInput({
             {showSuggestions && noResults && !error && !isLoading && suggestions.length === 0 && (
                 <div
                     ref={suggestionsRef}
-                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-[1000] min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
                 >
                     <div className="p-4 flex items-center gap-3">
                         <div className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800">
