@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MapPin, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { loadPlacesUiKit } from '@/lib/googleMapsUiKitLoader';
+import { useDistanceOverlay } from '@/hooks/useDistanceOverlay';
 
 /**
  * NearbyPlacesCard - Renders Google Places UI Kit components.
@@ -85,6 +86,7 @@ export function NearbyPlacesCard({
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLElement | null>(null);
   const requestRef = useRef<HTMLElement | null>(null);
+  const placesContainerRef = useRef<HTMLDivElement>(null);
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'no-results'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -93,6 +95,14 @@ export function NearbyPlacesCard({
   const [distances, setDistances] = useState<string[]>([]);
   const [selectedPlaceDistance, setSelectedPlaceDistance] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
+  // Use distance overlay hook for aligned positioning
+  const { positions, isAligned } = useDistanceOverlay({
+    searchRef,
+    containerRef: placesContainerRef,
+    distances,
+    isReady: status === 'ready',
+  });
 
   // Load Places UI Kit on mount
   useEffect(() => {
@@ -366,10 +376,10 @@ export function NearbyPlacesCard({
         )}
       </div>
 
-      {/* Body: left = UI Kit, right = distance rail */}
-      <div className="grid grid-cols-[1fr_auto] gap-3 p-3 bg-zinc-50/50 dark:bg-zinc-800/50">
+      {/* Body: Places UI Kit with aligned distance overlay */}
+      <div className="relative p-3 bg-zinc-50/50 dark:bg-zinc-800/50">
         {/* Places UI Kit Content */}
-        <div className="min-w-0">
+        <div ref={placesContainerRef} className="min-w-0 pr-16">
           {normalizedIntent.mode === 'type' && normalizedIntent.includedTypes ? (
             <gmp-place-search
               ref={(el: HTMLElement | null) => {
@@ -404,26 +414,59 @@ export function NearbyPlacesCard({
           )}
         </div>
 
-        {/* Distance rail - aligned to result order */}
+        {/* Distance badges - absolutely positioned to align with place items */}
         {distances.length > 0 && (
-          <ol className="flex flex-col gap-2 pt-1">
-            {distances.map((d, i) => (
-              <li key={i}>
+          <div className="absolute right-2 top-0 bottom-0 w-16 pointer-events-none flex flex-col">
+            {isAligned && positions.length > 0 ? (
+              // Aligned positioning using detected/estimated place item positions
+              positions.map((pos) => (
                 <span
+                  key={pos.index}
                   className={cn(
+                    'absolute right-0',
                     'inline-flex items-center justify-center',
-                    'w-14 px-1.5 py-1.5 rounded-lg text-[10px] font-medium',
-                    'bg-white dark:bg-zinc-700 border border-zinc-100 dark:border-zinc-600',
-                    'text-zinc-500 dark:text-zinc-300',
-                    selectedIndex === i && 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
+                    'min-w-[56px] px-2 py-1.5 rounded-full text-[11px] font-semibold',
+                    'bg-zinc-800/90 dark:bg-zinc-200/95 backdrop-blur-sm',
+                    'text-white dark:text-zinc-900',
+                    'transition-all duration-200 ease-out',
+                    'shadow-lg',
+                    selectedIndex === pos.index && 'ring-2 ring-blue-400 dark:ring-blue-500 bg-blue-600 dark:bg-blue-400 scale-105'
                   )}
-                  title={`Result #${i + 1}`}
+                  style={{
+                    top: `${pos.top + (pos.height / 2)}px`,
+                    transform: 'translateY(-50%)'
+                  }}
+                  title={`Result #${pos.index + 1}: ${pos.distance}`}
+                >
+                  {pos.distance || '—'}
+                </span>
+              ))
+            ) : (
+              // Loading/fallback: simple evenly spaced layout
+              distances.map((d, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    'absolute right-0',
+                    'inline-flex items-center justify-center',
+                    'min-w-[56px] px-2 py-1.5 rounded-full text-[11px] font-semibold',
+                    'bg-zinc-800/80 dark:bg-zinc-200/80 backdrop-blur-sm',
+                    'text-white dark:text-zinc-900',
+                    'transition-all duration-200 ease-out',
+                    'shadow-lg opacity-70',
+                    selectedIndex === i && 'ring-2 ring-blue-400 dark:ring-blue-500 bg-blue-600 dark:bg-blue-400 opacity-100 scale-105'
+                  )}
+                  style={{
+                    top: `${80 + (i * 200)}px`,
+                    transform: 'translateY(-50%)'
+                  }}
+                  title={`Result #${i + 1}: ${d}`}
                 >
                   {d || '—'}
                 </span>
-              </li>
-            ))}
-          </ol>
+              ))
+            )}
+          </div>
         )}
       </div>
 
