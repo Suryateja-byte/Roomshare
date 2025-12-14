@@ -1,4 +1,8 @@
 {
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000",
+    "MAX_THINKING_TOKENS": "31999"
+  },
   "permissions": {
     "allow": [
       "Bash(npm run build:*)",
@@ -24,7 +28,10 @@
       "Bash(grep:*)",
       "Bash(powershell -Command \"Get-Process -Name node | Stop-Process -Force\")",
       "Bash(mkdir:*)",
-      "Bash(if not exist:*)"
+      "Bash(if not exist:*)",
+      "WebSearch",
+      "WebFetch(domain:developers.google.com)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []

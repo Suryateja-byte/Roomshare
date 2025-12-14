@@ -33,6 +33,12 @@ interface LocalMessage {
   nearbyPlacesData?: {
     queryText: string;
     normalizedIntent: NearbyIntentResult;
+    /** Pre-built object for NearbyPlacesCard - created once, reference preserved */
+    stableNormalizedIntent: {
+      mode: 'type' | 'text';
+      includedTypes?: string[];
+      textQuery?: string;
+    };
   };
 }
 
@@ -48,6 +54,12 @@ interface RenderItem {
   nearbyPlacesData?: {
     queryText: string;
     normalizedIntent: NearbyIntentResult;
+    /** Pre-built object for NearbyPlacesCard to avoid re-renders */
+    stableNormalizedIntent: {
+      mode: 'type' | 'text';
+      includedTypes?: string[];
+      textQuery?: string;
+    };
   };
 }
 
@@ -202,6 +214,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
         );
 
         // Add NearbyPlacesCard as local assistant response
+        // Create stableNormalizedIntent HERE so object reference is preserved across re-renders
         const nearbyMessage: LocalMessage = {
           id: generateMessageId(),
           role: 'assistant',
@@ -210,6 +223,11 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
           nearbyPlacesData: {
             queryText: trimmedMessage,
             normalizedIntent: intent,
+            stableNormalizedIntent: {
+              mode: intent.searchType,
+              includedTypes: intent.includedTypes,
+              textQuery: intent.textQuery,
+            },
           },
         };
         setLocalMessages((prev) => [...prev, nearbyMessage]);
@@ -267,6 +285,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
     }));
 
     // Convert local messages to RenderItem format
+    // Simply pass through nearbyPlacesData - stableNormalizedIntent is already created at message creation time
     const localItems: RenderItem[] = localMessages.map((msg) => ({
       id: msg.id,
       kind: msg.type,
@@ -328,11 +347,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                 latitude={latitude}
                 longitude={longitude}
                 queryText={item.nearbyPlacesData.queryText}
-                normalizedIntent={{
-                  mode: item.nearbyPlacesData.normalizedIntent.searchType,
-                  includedTypes: item.nearbyPlacesData.normalizedIntent.includedTypes,
-                  textQuery: item.nearbyPlacesData.normalizedIntent.textQuery,
-                }}
+                normalizedIntent={item.nearbyPlacesData.stableNormalizedIntent}
               />
             </div>
           ) : (

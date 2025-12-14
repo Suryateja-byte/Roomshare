@@ -2,11 +2,10 @@
 
 /// <reference path="../../types/google-places-ui-kit.d.ts" />
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { MapPin, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { loadPlacesUiKit } from '@/lib/googleMapsUiKitLoader';
-import { useDistanceOverlay } from '@/hooks/useDistanceOverlay';
+import { DistanceRail } from './DistanceRail';
 
 /**
  * NearbyPlacesCard - Renders Google Places UI Kit components.
@@ -41,38 +40,43 @@ const INITIAL_RADIUS = 1600; // 1.6km
 const EXPANDED_RADIUS = 5000; // 5km
 const MAX_RESULTS = 5;
 
-// --- Distance utilities ---
+/**
+ * Extract coordinates from a Google Maps location object immediately.
+ * This caches coordinates as plain objects before they can become stale.
+ */
+function extractCoordsFromLocation(location: any): { lat: number; lng: number } | null {
+  if (!location) return null;
 
-/** Normalize LatLng - handles both getter functions and plain objects */
-function normalizeLatLng(loc: unknown): { lat: number; lng: number } | null {
-  if (!loc || typeof loc !== 'object') return null;
-  const locObj = loc as Record<string, unknown>;
-  const lat = typeof locObj.lat === 'function' ? (locObj.lat as () => number)() : locObj.lat;
-  const lng = typeof locObj.lng === 'function' ? (locObj.lng as () => number)() : locObj.lng;
-  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
-  return { lat, lng };
-}
-
-/** Haversine formula for straight-line distance in meters */
-function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000; // Earth radius in meters
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-/** Format meters to human-readable distance */
-function formatDistance(meters: number): string {
-  const miles = meters / 1609.344;
-  if (miles < 0.1) {
-    const feet = meters * 3.28084;
-    return `${Math.round(feet)} ft`;
+  // Handle Google Maps LatLng objects (function getters)
+  if (typeof location.lat === 'function' && typeof location.lng === 'function') {
+    try {
+      const lat = Number(location.lat());
+      const lng = Number(location.lng());
+      if (isFinite(lat) && isFinite(lng) && (lat !== 0 || lng !== 0)) {
+        return { lat, lng };
+      }
+    } catch {
+      // Getter not ready yet - return null, DistanceRail will retry
+      return null;
+    }
+    return null;
   }
-  return `${miles.toFixed(1)} mi`;
+
+  // Handle plain {lat, lng} objects
+  if (typeof location.lat === 'number' && typeof location.lng === 'number') {
+    if (isFinite(location.lat) && isFinite(location.lng)) {
+      return { lat: location.lat, lng: location.lng };
+    }
+  }
+
+  // Handle {latitude, longitude} property names
+  if (typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+    if (isFinite(location.latitude) && isFinite(location.longitude)) {
+      return { lat: location.latitude, lng: location.longitude };
+    }
+  }
+
+  return null;
 }
 
 export function NearbyPlacesCard({
@@ -84,25 +88,19 @@ export function NearbyPlacesCard({
   isVisible = true,
 }: NearbyPlacesCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLElement | null>(null);
-  const requestRef = useRef<HTMLElement | null>(null);
-  const placesContainerRef = useRef<HTMLDivElement>(null);
+  const resultsRootRef = useRef<HTMLDivElement>(null);
+  const [placesLite, setPlacesLite] = useState<Array<{
+    key: string;
+    location: any;
+    coords: { lat: number; lng: number } | null;
+  }>>([]);
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'no-results'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [currentRadius, setCurrentRadius] = useState(INITIAL_RADIUS);
   const [hasExpandedOnce, setHasExpandedOnce] = useState(false);
-  const [distances, setDistances] = useState<string[]>([]);
-  const [selectedPlaceDistance, setSelectedPlaceDistance] = useState<string | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-
-  // Use distance overlay hook for aligned positioning
-  const { positions, isAligned } = useDistanceOverlay({
-    searchRef,
-    containerRef: placesContainerRef,
-    distances,
-    isReady: status === 'ready',
-  });
 
   // Load Places UI Kit on mount
   useEffect(() => {
@@ -143,78 +141,38 @@ export function NearbyPlacesCard({
     };
   }, [isVisible]);
 
-  // Configure the search request after UI Kit is ready
-  useEffect(() => {
-    if (status !== 'ready' || !requestRef.current) return;
-
-    const request = requestRef.current as HTMLElement & {
-      includedTypes?: string[];
-      textQuery?: string;
-      locationRestriction?: {
-        center: { lat: number; lng: number };
-        radius: number;
-      };
-      locationBias?: {
-        center: { lat: number; lng: number };
-        radius: number;
-      };
-      maxResultCount?: number;
-    };
-
-    try {
-      if (normalizedIntent.mode === 'type' && normalizedIntent.includedTypes) {
-        // Type-based Nearby Search
-        request.includedTypes = normalizedIntent.includedTypes;
-        request.locationRestriction = {
-          center: { lat: latitude, lng: longitude },
-          radius: currentRadius,
-        };
-      } else {
-        // Text-based Search
-        request.textQuery = normalizedIntent.textQuery || queryText;
-        request.locationBias = {
-          center: { lat: latitude, lng: longitude },
-          radius: currentRadius,
-        };
-      }
-
-      request.maxResultCount = MAX_RESULTS;
-    } catch (error) {
-      console.error('[NearbyPlacesCard] Failed to configure search request:', error);
-    }
-  }, [status, normalizedIntent, latitude, longitude, queryText, currentRadius]);
-
   // Handle search results
   const handleSearchLoad = useCallback(
     (event: Event) => {
       const searchElement = event.target as HTMLElement & {
-        places?: Array<{ location?: unknown }>;
+        places?: Array<{ id?: string; placeId?: string; resourceName?: string; location?: unknown }>;
       };
 
-      const places = searchElement?.places || [];
-      const resultCount = places.length;
+      const results = searchElement?.places || [];
+      const resultCount = results.length;
+
+      console.log('[NearbyPlacesCard] handleSearchLoad - places:', results, 'count:', resultCount);
+      if (results.length > 0) {
+        console.log('[NearbyPlacesCard] First place location:', results[0]?.location);
+      }
+
+      // Extract coordinates immediately while Google Maps objects are fresh
+      // This prevents stale reference issues when objects become invalid later
+      setPlacesLite(
+        results.map((p: any, i: number) => {
+          const key = String(p?.id ?? p?.placeId ?? p?.resourceName ?? i);
+          const location = p?.location;
+          const coords = extractCoordsFromLocation(location);
+          return { key, location, coords };
+        })
+      );
 
       // If no results and haven't expanded yet, try with larger radius
       if (resultCount === 0 && !hasExpandedOnce && currentRadius < EXPANDED_RADIUS) {
-        // Clear distances before radius expansion
-        setDistances([]);
-        setSelectedPlaceDistance(null);
-        setSelectedIndex(null);
         setHasExpandedOnce(true);
         setCurrentRadius(EXPANDED_RADIUS);
         return;
       }
-
-      // Compute distances for all results
-      const computedDistances = places.map((place) => {
-        const loc = normalizeLatLng(place.location);
-        if (!loc) return '';
-        const meters = haversineMeters(latitude, longitude, loc.lat, loc.lng);
-        return formatDistance(meters);
-      });
-      setDistances(computedDistances);
-      setSelectedPlaceDistance(null);
-      setSelectedIndex(null);
 
       if (resultCount === 0) {
         setStatus('no-results');
@@ -222,53 +180,99 @@ export function NearbyPlacesCard({
 
       onSearchComplete?.(resultCount);
     },
-    [latitude, longitude, hasExpandedOnce, currentRadius, onSearchComplete]
+    [hasExpandedOnce, currentRadius, onSearchComplete]
   );
 
-  // Handle place selection
-  const handlePlaceSelect = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (event: any) => {
-      // Tolerant access - UI Kit event structure varies
-      const place = event?.place || event?.detail?.place || event?.detail;
-      const loc = normalizeLatLng(place?.location);
+  // Create and configure Places UI Kit elements IMPERATIVELY
+  // This ensures locationRestriction is set BEFORE element is added to DOM
+  useLayoutEffect(() => {
+    if (status !== 'ready' || !searchContainerRef.current) return;
 
-      if (!loc) {
-        setSelectedPlaceDistance(null);
-        setSelectedIndex(null);
-        return;
+    const container = searchContainerRef.current;
+
+    // Clear previous elements
+    container.innerHTML = '';
+    searchRef.current = null;
+
+    // Create elements imperatively
+    const searchEl = document.createElement('gmp-place-search') as HTMLElement & {
+      selectable?: boolean;
+    };
+    searchEl.setAttribute('selectable', '');
+
+    const center = { lat: latitude, lng: longitude };
+
+    if (normalizedIntent.mode === 'type' && normalizedIntent.includedTypes) {
+      // Type-based Nearby Search
+      const requestEl = document.createElement('gmp-place-nearby-search-request') as HTMLElement & {
+        includedTypes?: string[];
+        locationRestriction?: unknown;
+        maxResultCount?: number;
+      };
+
+      // Set properties BEFORE adding to DOM
+      requestEl.includedTypes = normalizedIntent.includedTypes;
+      requestEl.maxResultCount = MAX_RESULTS;
+
+      // Use google.maps.Circle for locationRestriction
+      if (window.google?.maps?.Circle) {
+        requestEl.locationRestriction = new window.google.maps.Circle({
+          center,
+          radius: currentRadius,
+        });
+      } else {
+        requestEl.locationRestriction = { center, radius: currentRadius };
       }
 
-      // Find index by matching coordinates
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const searchElement = searchRef.current as any;
-      const places = searchElement?.places || [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const idx = places.findIndex((p: any) => {
-        const pLoc = normalizeLatLng(p.location);
-        return pLoc && Math.abs(pLoc.lat - loc.lat) < 0.0001 && Math.abs(pLoc.lng - loc.lng) < 0.0001;
-      });
-      setSelectedIndex(idx >= 0 ? idx : null);
+      searchEl.appendChild(requestEl);
+    } else {
+      // Text-based Search
+      const requestEl = document.createElement('gmp-place-text-search-request') as HTMLElement & {
+        textQuery?: string;
+        locationBias?: unknown;
+        maxResultCount?: number;
+      };
 
-      const meters = haversineMeters(latitude, longitude, loc.lat, loc.lng);
-      setSelectedPlaceDistance(formatDistance(meters));
-    },
-    [latitude, longitude]
-  );
+      // Set properties BEFORE adding to DOM
+      requestEl.textQuery = normalizedIntent.textQuery || queryText;
+      requestEl.maxResultCount = MAX_RESULTS;
 
-  // Attach event listeners to search element
-  useEffect(() => {
-    const searchElement = searchRef.current;
-    if (!searchElement || status !== 'ready') return;
+      // Use google.maps.Circle for locationBias
+      if (window.google?.maps?.Circle) {
+        requestEl.locationBias = new window.google.maps.Circle({
+          center,
+          radius: currentRadius,
+        });
+      } else {
+        requestEl.locationBias = { center, radius: currentRadius };
+      }
 
-    searchElement.addEventListener('gmp-load', handleSearchLoad);
-    searchElement.addEventListener('gmp-select', handlePlaceSelect);
+      searchEl.appendChild(requestEl);
+    }
+
+    // Add content element
+    const contentEl = document.createElement('gmp-place-all-content');
+    searchEl.appendChild(contentEl);
+
+    // Add event listener BEFORE adding to DOM
+    searchEl.addEventListener('gmp-load', handleSearchLoad);
+
+    // Store ref
+    searchRef.current = searchEl;
+
+    console.log('[NearbyPlacesCard] About to add element to DOM, searchRef.current:', searchRef.current);
+
+    // NOW add to DOM (after all properties are set)
+    container.appendChild(searchEl);
+
+    console.log('[NearbyPlacesCard] Element added to DOM');
 
     return () => {
-      searchElement.removeEventListener('gmp-load', handleSearchLoad);
-      searchElement.removeEventListener('gmp-select', handlePlaceSelect);
+      searchEl.removeEventListener('gmp-load', handleSearchLoad);
+      // Don't clear placesLite - let it persist until new results arrive
+      // This prevents badge flickering during effect re-runs
     };
-  }, [status, handleSearchLoad, handlePlaceSelect]);
+  }, [status, latitude, longitude, currentRadius, normalizedIntent, queryText, handleSearchLoad]);
 
   // Retry search
   const handleRetry = useCallback(() => {
@@ -280,7 +284,7 @@ export function NearbyPlacesCard({
     // Re-trigger load
     loadPlacesUiKit()
       .then(() => setStatus('ready'))
-      .catch((error) => {
+      .catch((error: Error) => {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to load');
         setStatus('error');
       });
@@ -348,14 +352,16 @@ export function NearbyPlacesCard({
     );
   }
 
-  // Render Places UI Kit
+  // Render Places UI Kit with distance rail
+  const origin = { lat: latitude, lng: longitude };
+
   return (
     <div
       ref={containerRef}
       className="bg-white dark:bg-zinc-800 rounded-[24px] shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700 overflow-hidden"
     >
-      {/* Header with selected distance pill */}
-      <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700 flex items-center justify-between">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700 flex items-center">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
             <MapPin className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
@@ -367,112 +373,27 @@ export function NearbyPlacesCard({
             <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">(expanded)</span>
           )}
         </div>
-
-        {/* Selected distance pill */}
-        {selectedPlaceDistance && (
-          <span className="text-xs font-bold bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-2.5 py-1 rounded-full animate-in fade-in slide-in-from-right-2">
-            {selectedPlaceDistance}
-          </span>
-        )}
       </div>
 
-      {/* Body: Places UI Kit with aligned distance overlay */}
-      <div className="relative p-3 bg-zinc-50/50 dark:bg-zinc-800/50">
-        {/* Places UI Kit Content */}
-        <div ref={placesContainerRef} className="min-w-0 pr-16">
-          {normalizedIntent.mode === 'type' && normalizedIntent.includedTypes ? (
-            <gmp-place-search
-              ref={(el: HTMLElement | null) => {
-                searchRef.current = el;
-              }}
-              selectable
-            >
-              <gmp-place-nearby-search-request
-                ref={(el: HTMLElement | null) => {
-                  requestRef.current = el;
-                }}
-                max-result-count={MAX_RESULTS}
-              />
-              <gmp-place-all-content />
-            </gmp-place-search>
-          ) : (
-            <gmp-place-search
-              ref={(el: HTMLElement | null) => {
-                searchRef.current = el;
-              }}
-              selectable
-            >
-              <gmp-place-text-search-request
-                ref={(el: HTMLElement | null) => {
-                  requestRef.current = el;
-                }}
-                text-query={normalizedIntent.textQuery || queryText}
-                max-result-count={MAX_RESULTS}
-              />
-              <gmp-place-all-content />
-            </gmp-place-search>
-          )}
+      {/* Body: Places UI Kit Content + Distance Rail */}
+      <div className="grid grid-cols-[minmax(0,1fr)_60px] sm:grid-cols-[minmax(0,1fr)_84px] gap-2 sm:gap-3 p-3 sm:p-4 items-stretch bg-zinc-50/50 dark:bg-zinc-800/50 relative">
+        {/* LEFT: Google UI */}
+        <div ref={resultsRootRef} className="min-w-0 relative">
+          <div ref={searchContainerRef} />
         </div>
 
-        {/* Distance badges - absolutely positioned to align with place items */}
-        {distances.length > 0 && (
-          <div className="absolute right-2 top-0 bottom-0 w-16 pointer-events-none flex flex-col">
-            {isAligned && positions.length > 0 ? (
-              // Aligned positioning using detected/estimated place item positions
-              positions.map((pos) => (
-                <span
-                  key={pos.index}
-                  className={cn(
-                    'absolute right-0',
-                    'inline-flex items-center justify-center',
-                    'min-w-[56px] px-2 py-1.5 rounded-full text-[11px] font-semibold',
-                    'bg-zinc-800/90 dark:bg-zinc-200/95 backdrop-blur-sm',
-                    'text-white dark:text-zinc-900',
-                    'transition-all duration-200 ease-out',
-                    'shadow-lg',
-                    selectedIndex === pos.index && 'ring-2 ring-blue-400 dark:ring-blue-500 bg-blue-600 dark:bg-blue-400 scale-105'
-                  )}
-                  style={{
-                    top: `${pos.top + (pos.height / 2)}px`,
-                    transform: 'translateY(-50%)'
-                  }}
-                  title={`Result #${pos.index + 1}: ${pos.distance}`}
-                >
-                  {pos.distance || '—'}
-                </span>
-              ))
-            ) : (
-              // Loading/fallback: simple evenly spaced layout
-              distances.map((d, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    'absolute right-0',
-                    'inline-flex items-center justify-center',
-                    'min-w-[56px] px-2 py-1.5 rounded-full text-[11px] font-semibold',
-                    'bg-zinc-800/80 dark:bg-zinc-200/80 backdrop-blur-sm',
-                    'text-white dark:text-zinc-900',
-                    'transition-all duration-200 ease-out',
-                    'shadow-lg opacity-70',
-                    selectedIndex === i && 'ring-2 ring-blue-400 dark:ring-blue-500 bg-blue-600 dark:bg-blue-400 opacity-100 scale-105'
-                  )}
-                  style={{
-                    top: `${80 + (i * 200)}px`,
-                    transform: 'translateY(-50%)'
-                  }}
-                  title={`Result #${i + 1}: ${d}`}
-                >
-                  {d || '—'}
-                </span>
-              ))
-            )}
-          </div>
-        )}
-      </div>
+        {/* RIGHT: Distance rail pinned to row centers */}
+        <DistanceRail
+          placeSearchRef={searchRef}
+          resultsRootRef={resultsRootRef}
+          places={placesLite}
+          origin={origin}
+        />
 
-      {/* Google Attribution - DO NOT REMOVE/ALTER/OBSCURE */}
-      <div className="px-4 py-2 border-t border-zinc-100 dark:border-zinc-700 bg-white dark:bg-zinc-800">
-        <gmp-place-attribution color-scheme="light" />
+        {/* Google Attribution - DO NOT REMOVE/ALTER/OBSCURE */}
+        <div className="col-span-2 pt-3">
+          <gmp-place-attribution color-scheme="light" />
+        </div>
       </div>
     </div>
   );

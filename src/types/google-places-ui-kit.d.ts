@@ -8,15 +8,78 @@
 
 import 'react';
 
+// Types for Google Places API
+interface PlacesSearchRequest {
+  fields: string[];
+  includedTypes?: string[];
+  textQuery?: string;
+  locationRestriction?: {
+    center: { lat: number; lng: number };
+    radius: number;
+  };
+  locationBias?: {
+    center: { lat: number; lng: number };
+    radius: number;
+  };
+  maxResultCount?: number;
+}
+
+interface GooglePlace {
+  id?: string;
+  displayName?: string;
+  formattedAddress?: string;
+  location?: { lat: () => number; lng: () => number };
+  rating?: number;
+  userRatingCount?: number;
+  primaryType?: string;
+  regularOpeningHours?: { isOpen?: () => boolean };
+  googleMapsURI?: string;
+}
+
+interface PlacesSearchResponse {
+  places: GooglePlace[];
+}
+
+// Circle class type for google.maps.Circle
+interface GoogleMapsCircle {
+  getCenter(): { lat: () => number; lng: () => number };
+  getRadius(): number;
+  setCenter(center: { lat: number; lng: number }): void;
+  setRadius(radius: number): void;
+}
+
+interface GoogleMapsCircleOptions {
+  center: { lat: number; lng: number };
+  radius: number;
+}
+
 // Google Maps Window extension
 declare global {
   interface Window {
     google?: {
       maps?: {
         importLibrary: (library: string) => Promise<unknown>;
-        places?: unknown;
+        places?: {
+          Place?: {
+            searchNearby: (request: PlacesSearchRequest) => Promise<PlacesSearchResponse>;
+            searchByText: (request: PlacesSearchRequest) => Promise<PlacesSearchResponse>;
+          };
+        };
+        LatLng?: new (lat: number, lng: number) => { lat: () => number; lng: () => number };
+        Circle?: new (options: GoogleMapsCircleOptions) => GoogleMapsCircle;
       };
     };
+  }
+
+  // Also declare the namespace for use in type annotations
+  namespace google.maps {
+    class Circle {
+      constructor(options: GoogleMapsCircleOptions);
+      getCenter(): { lat: () => number; lng: () => number };
+      getRadius(): number;
+      setCenter(center: { lat: number; lng: number }): void;
+      setRadius(radius: number): void;
+    }
   }
 }
 

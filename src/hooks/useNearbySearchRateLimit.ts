@@ -15,6 +15,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 
 const MAX_SEARCHES_PER_LISTING = 3;
 const DEBOUNCE_MS = 10000; // 10 seconds
+const SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes - reset counter after this period of inactivity
 
 interface RateLimitState {
   searchCount: number;
@@ -43,26 +44,38 @@ function getStorageKey(listingId: string): string {
 
 /**
  * Read rate limit state from sessionStorage.
+ * Automatically resets stale data (older than SESSION_EXPIRY_MS).
  */
 function readState(listingId: string): RateLimitState {
+  const freshState = { searchCount: 0, lastSearchTime: 0 };
+
   if (typeof window === 'undefined') {
-    return { searchCount: 0, lastSearchTime: 0 };
+    return freshState;
   }
 
   try {
     const stored = sessionStorage.getItem(getStorageKey(listingId));
     if (stored) {
       const parsed = JSON.parse(stored);
-      return {
-        searchCount: typeof parsed.searchCount === 'number' ? parsed.searchCount : 0,
-        lastSearchTime: typeof parsed.lastSearchTime === 'number' ? parsed.lastSearchTime : 0,
-      };
+      const searchCount = typeof parsed.searchCount === 'number' ? parsed.searchCount : 0;
+      const lastSearchTime = typeof parsed.lastSearchTime === 'number' ? parsed.lastSearchTime : 0;
+
+      // Check if the stored data is stale (older than SESSION_EXPIRY_MS)
+      // If so, reset the counter to allow fresh searches
+      const now = Date.now();
+      if (lastSearchTime > 0 && (now - lastSearchTime) > SESSION_EXPIRY_MS) {
+        // Data is stale - clear storage and return fresh state
+        sessionStorage.removeItem(getStorageKey(listingId));
+        return freshState;
+      }
+
+      return { searchCount, lastSearchTime };
     }
   } catch {
     // Ignore parse errors
   }
 
-  return { searchCount: 0, lastSearchTime: 0 };
+  return freshState;
 }
 
 /**
@@ -202,4 +215,5 @@ export function useNearbySearchRateLimit(
 export const RATE_LIMIT_CONFIG = {
   maxSearchesPerListing: MAX_SEARCHES_PER_LISTING,
   debounceMs: DEBOUNCE_MS,
+  sessionExpiryMs: SESSION_EXPIRY_MS,
 } as const;
