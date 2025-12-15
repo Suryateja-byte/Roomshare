@@ -83,6 +83,12 @@ describe('Chat Actions', () => {
 
     beforeEach(() => {
       ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
+      // Mock user.findUnique for email verification check
+      ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: 'user-123',
+        emailVerified: new Date(),
+        isSuspended: false,
+      })
     })
 
     it('returns error when not authenticated', async () => {

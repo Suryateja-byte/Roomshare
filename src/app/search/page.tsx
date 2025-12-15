@@ -1,8 +1,8 @@
 import { auth } from '@/auth';
-import { getListingsPaginated, getListings, getSavedListingIds, analyzeFilterImpact, SortOption } from '@/lib/data';
+import { getListingsPaginated, getMapListings, getSavedListingIds, analyzeFilterImpact, SortOption } from '@/lib/data';
 import { Suspense } from 'react';
 import SearchForm from '@/components/SearchForm';
-import MapComponent from '@/components/Map';
+import DynamicMap from '@/components/DynamicMap';
 import ListingCard from '@/components/listings/ListingCard';
 import Pagination from '@/components/Pagination';
 import SortSelect from '@/components/SortSelect';
@@ -181,9 +181,9 @@ export default async function SearchPage({
         sort: sortOption
     };
 
-    const [paginatedResult, allListings, savedListingIds] = await Promise.all([
+    const [paginatedResult, mapListings, savedListingIds] = await Promise.all([
         getListingsPaginated({ ...filterParams, page: requestedPage, limit: ITEMS_PER_PAGE }),
-        getListings(filterParams), // For the map to show all listings
+        getMapListings(filterParams), // Optimized for map - SQL-level bounds, minimal fields, LIMIT 200
         userId ? getSavedListingIds(userId) : Promise.resolve([])
     ]);
 
@@ -278,7 +278,7 @@ export default async function SearchPage({
         </div>
     );
 
-    const mapContent = <MapComponent listings={allListings} />;
+    const mapContent = <DynamicMap listings={mapListings} />;
 
     return (
         <div className="h-screen-safe flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-20">

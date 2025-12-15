@@ -9,6 +9,9 @@ jest.mock('@/lib/prisma', () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
     recentlyViewed: {
       upsert: jest.fn(),
       findMany: jest.fn(),
@@ -55,6 +58,11 @@ describe('listing-status actions', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
+    // Mock user.findUnique for suspension check
+    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-123',
+      isSuspended: false,
+    })
   })
 
   describe('updateListingStatus', () => {

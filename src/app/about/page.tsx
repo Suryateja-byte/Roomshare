@@ -1,12 +1,19 @@
 'use client';
 
 import React from 'react';
-import { ArrowLeft, Shield, Users, Heart, Sparkles } from 'lucide-react';
+import { Shield, Heart, Sparkles } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 
 // --- Components ---
 
-const ValueCard = ({ icon: Icon, title, description }: any) => (
+interface ValueCardProps {
+    icon: LucideIcon;
+    title: string;
+    description: string;
+}
+
+const ValueCard = ({ icon: Icon, title, description }: ValueCardProps) => (
     <div className="group p-8 bg-zinc-50 dark:bg-zinc-800 rounded-[2rem] hover:bg-zinc-900 dark:hover:bg-white hover:text-white dark:hover:text-zinc-900 transition-all duration-500 cursor-default">
         <div className="w-12 h-12 bg-white dark:bg-zinc-700 rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:bg-zinc-800 dark:group-hover:bg-zinc-200 transition-colors">
             <Icon className="w-6 h-6 text-zinc-900 dark:text-white group-hover:text-white dark:group-hover:text-zinc-900 transition-colors" strokeWidth={1.5} />
@@ -18,7 +25,13 @@ const ValueCard = ({ icon: Icon, title, description }: any) => (
     </div>
 );
 
-const TeamMember = ({ name, role, image }: any) => (
+interface TeamMemberProps {
+    name: string;
+    role: string;
+    image: string;
+}
+
+const TeamMember = ({ name, role, image }: TeamMemberProps) => (
     <div className="group">
         <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 mb-4">
             <img
@@ -47,11 +60,11 @@ export default function AboutPage() {
                         </div>
 
                         <h1 className="text-5xl md:text-7xl lg:text-8xl font-semibold tracking-tighter text-zinc-900 dark:text-white mb-10 leading-[0.95] animate-in fade-in slide-in-from-bottom-6 duration-1000">
-                            Shared living shouldn't be a compromise.
+                            Shared living shouldn&apos;t be a compromise.
                         </h1>
 
                         <p className="text-xl md:text-2xl text-zinc-500 dark:text-zinc-400 font-light max-w-3xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                            We're building a future where finding a home means finding your people.
+                            We&apos;re building a future where finding a home means finding your people.
                             Less transactional, more human.
                         </p>
                     </div>
@@ -76,13 +89,13 @@ export default function AboutPage() {
                         <div className="space-y-6 text-lg text-zinc-500 dark:text-zinc-400 font-light leading-relaxed max-w-2xl mx-auto">
                             <p>
                                 For years, finding a roommate meant scrolling through sketchy forums,
-                                dealing with ghosting, and hoping the stranger you moved in with wasn't a nightmare.
+                                dealing with ghosting, and hoping the stranger you moved in with wasn&apos;t a nightmare.
                             </p>
                             <p>
                                 We believed there had to be a better way. A way to prioritize <strong className="text-zinc-900 dark:text-white font-medium">safety</strong>, <strong className="text-zinc-900 dark:text-white font-medium">compatibility</strong>, and <strong className="text-zinc-900 dark:text-white font-medium">trust</strong> before you ever sign a lease.
                             </p>
                             <p>
-                                RoomShare isn't just about splitting rent. It's about curating environments where people thrive together.
+                                RoomShare isn&apos;t just about splitting rent. It&apos;s about curating environments where people thrive together.
                             </p>
                         </div>
                     </div>

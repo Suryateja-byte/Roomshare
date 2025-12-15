@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import {
     MapPin,
     ShieldCheck,
@@ -38,7 +39,13 @@ import ListingFreshnessCheck from '@/components/ListingFreshnessCheck';
 import UserAvatar from '@/components/UserAvatar';
 import VerifiedBadge from '@/components/verification/VerifiedBadge';
 import RoomPlaceholder from '@/components/listings/RoomPlaceholder';
-import NeighborhoodChat from '@/components/NeighborhoodChat';
+
+// Lazy-load NeighborhoodChat to avoid loading framer-motion + AI SDK on initial page load
+// This defers ~200KB+ of JS until after the page is interactive
+const NeighborhoodChat = dynamic(() => import('@/components/NeighborhoodChat'), {
+    ssr: false,
+    loading: () => null, // Chat widget appears after load, no placeholder needed
+});
 
 // Types
 interface Review {

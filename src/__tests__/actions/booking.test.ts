@@ -100,6 +100,12 @@ describe('createBooking', () => {
     jest.clearAllMocks()
       ; (auth as jest.Mock).mockResolvedValue(mockSession)
       ; (prisma.idempotencyKey.findUnique as jest.Mock).mockResolvedValue(null)
+      // Mock user.findUnique for suspension and email verification checks
+      ; (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: 'user-123',
+        isSuspended: false,
+        emailVerified: new Date(),
+      })
 
       // Mock transaction to execute the callback
       ; (prisma.$transaction as jest.Mock).mockImplementation(async (callback: any) => {

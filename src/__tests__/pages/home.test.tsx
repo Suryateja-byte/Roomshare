@@ -10,7 +10,7 @@ jest.mock('@/components/SearchForm', () => {
   }
 })
 
-jest.mock('@/components/ListingCard', () => {
+jest.mock('@/components/listings/ListingCard', () => {
   return function MockListingCard({ listing }: { listing: any }) {
     return <div data-testid="listing-card">{listing.title}</div>
   }

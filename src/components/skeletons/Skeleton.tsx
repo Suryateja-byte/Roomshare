@@ -103,12 +103,15 @@ export function ListItemSkeleton({ className = "" }: { className?: string }) {
   );
 }
 
+// Deterministic widths to avoid Math.random() during render
+const SKELETON_WIDTHS = [75, 60, 85, 70, 65, 80, 72, 68, 78, 62];
+
 export function TableRowSkeleton({ columns = 4, className = "" }: { columns?: number; className?: string }) {
   return (
     <tr className={className} aria-hidden="true" role="presentation">
       {Array.from({ length: columns }).map((_, i) => (
         <td key={i} className="p-3">
-          <Skeleton variant="text" width={`${60 + Math.random() * 30}%`} />
+          <Skeleton variant="text" width={`${SKELETON_WIDTHS[i % SKELETON_WIDTHS.length]}%`} />
         </td>
       ))}
     </tr>

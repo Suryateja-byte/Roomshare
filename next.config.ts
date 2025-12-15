@@ -3,6 +3,18 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   transpilePackages: ['react-map-gl'],
 
+  // Optimize barrel file imports for better tree-shaking
+  // Significantly reduces bundle size for icon libraries and UI component packages
+  experimental: {
+    optimizePackageImports: [
+      'lucide-react',
+      'framer-motion',
+      '@radix-ui/react-icons',
+      'date-fns',
+      '@heroicons/react',
+    ],
+  },
+
   // Image optimization configuration
   images: {
     formats: ["image/avif", "image/webp"],
@@ -22,6 +34,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "picsum.photos",
+      },
+      {
+        protocol: "https",
+        hostname: "i.pravatar.cc",
       },
     ],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],

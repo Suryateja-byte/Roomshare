@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
 
 import {
     Plus,
@@ -282,43 +281,39 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                                     />
                                 </button>
 
-                                {/* Dropdown Menu */}
-                                <AnimatePresence>
-                                    {isProfileOpen && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: -10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -10 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="absolute right-0 mt-3 w-72 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden origin-top-right ring-1 ring-black/5 z-sticky"
-                                        >
-                                            <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                                                <p className="font-semibold text-zinc-900 dark:text-white">{user.name}</p>
-                                                <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">{user.email}</p>
-                                            </div>
-                                            <div className="p-2 space-y-1">
-                                                <MenuItem icon={<User size={18} />} text="Profile" href="/profile" />
-                                                <MenuItem icon={<Calendar size={18} />} text="Bookings" href="/bookings" />
-                                                <MenuItem icon={<Heart size={18} />} text="Saved Listings" href="/saved" />
-                                                <MenuItem icon={<Clock size={18} />} text="Recently Viewed" href="/recently-viewed" />
-                                                <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
-                                                <MenuItem icon={<Settings size={18} />} text="Settings" href="/settings" />
-                                                <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
-                                                <ThemeToggle variant="menu-item" />
-                                                <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
-                                                <MenuItem
-                                                    icon={<LogOut size={18} />}
-                                                    text="Log out"
-                                                    danger
-                                                    onClick={() => {
-                                                        signOut();
-                                                        setIsProfileOpen(false);
-                                                    }}
-                                                />
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                {/* Dropdown Menu - CSS animated for performance */}
+                                <div
+                                    className={`absolute right-0 mt-3 w-72 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden origin-top-right ring-1 ring-black/5 z-sticky transition-all duration-200 ease-out ${
+                                        isProfileOpen
+                                            ? 'opacity-100 translate-y-0 visible'
+                                            : 'opacity-0 -translate-y-2 invisible pointer-events-none'
+                                    }`}
+                                >
+                                    <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                                        <p className="font-semibold text-zinc-900 dark:text-white">{user.name}</p>
+                                        <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">{user.email}</p>
+                                    </div>
+                                    <div className="p-2 space-y-1">
+                                        <MenuItem icon={<User size={18} />} text="Profile" href="/profile" />
+                                        <MenuItem icon={<Calendar size={18} />} text="Bookings" href="/bookings" />
+                                        <MenuItem icon={<Heart size={18} />} text="Saved Listings" href="/saved" />
+                                        <MenuItem icon={<Clock size={18} />} text="Recently Viewed" href="/recently-viewed" />
+                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
+                                        <MenuItem icon={<Settings size={18} />} text="Settings" href="/settings" />
+                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
+                                        <ThemeToggle variant="menu-item" />
+                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
+                                        <MenuItem
+                                            icon={<LogOut size={18} />}
+                                            text="Log out"
+                                            danger
+                                            onClick={() => {
+                                                signOut();
+                                                setIsProfileOpen(false);
+                                            }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2 ml-2">
@@ -351,18 +346,17 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                 </div>
             </div>
 
-            {/* Mobile Menu */}
-            <AnimatePresence>
-                {isMobileMenuOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="md:hidden bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-white/5 overflow-hidden"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Navigation menu"
-                    >
+            {/* Mobile Menu - CSS animated with grid for height:auto animation */}
+            <div
+                className={`md:hidden bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-white/5 overflow-hidden grid transition-all duration-300 ease-out ${
+                    isMobileMenuOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                }`}
+                role="dialog"
+                aria-modal={isMobileMenuOpen}
+                aria-label="Navigation menu"
+                aria-hidden={!isMobileMenuOpen}
+            >
+                <div className="overflow-hidden">
                         <div className="px-6 py-4 space-y-4">
                             {user ? (
                                 <div className="flex items-center gap-3 pb-4 border-b border-zinc-100 dark:border-zinc-800">
@@ -468,9 +462,8 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                                 </button>
                             )}
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                </div>
+            </div>
         </nav>
     );
 }

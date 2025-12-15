@@ -35,7 +35,7 @@ describe('Label', () => {
   it('has default styling', () => {
     render(<Label>Label</Label>)
     const label = screen.getByText('Label')
-    expect(label).toHaveClass('text-[11px]')
+    expect(label).toHaveClass('text-2xs')
     expect(label).toHaveClass('font-bold')
     expect(label).toHaveClass('uppercase')
   })

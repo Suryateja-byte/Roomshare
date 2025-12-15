@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { X, ChevronLeft, ChevronRight, ZoomIn, Grid3X3, ImageOff, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -9,13 +10,15 @@ interface ImageGalleryProps {
     title: string;
 }
 
-// Image component with error fallback
+// Image component with error fallback - uses next/image for optimization
 function ImageWithFallback({
     src,
     alt,
     className,
     onError,
     hasError,
+    sizes = "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+    priority = false,
     ...props
 }: {
     src: string;
@@ -23,6 +26,8 @@ function ImageWithFallback({
     className?: string;
     onError: () => void;
     hasError: boolean;
+    sizes?: string;
+    priority?: boolean;
     [key: string]: any;
 }) {
     if (hasError) {
@@ -35,12 +40,14 @@ function ImageWithFallback({
     }
 
     return (
-        <img
+        <Image
             src={src}
             alt={alt}
-            className={className}
+            fill
+            sizes={sizes}
+            priority={priority}
+            className={cn("object-cover", className)}
             onError={onError}
-            {...props}
         />
     );
 }
@@ -53,7 +60,9 @@ function GalleryItem({
     hasError,
     onError,
     overlay,
-    className
+    className,
+    priority = false,
+    sizes = "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
 }: {
     src: string;
     alt: string;
@@ -62,6 +71,8 @@ function GalleryItem({
     onError: () => void;
     overlay?: React.ReactNode;
     className?: string;
+    priority?: boolean;
+    sizes?: string;
 }) {
     return (
         <div
@@ -71,9 +82,11 @@ function GalleryItem({
             <ImageWithFallback
                 src={src}
                 alt={alt}
-                className="w-full h-full object-cover transition-transform duration-slow ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover/item:scale-[1.03]"
+                className="transition-transform duration-slow ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover/item:scale-[1.03]"
                 hasError={hasError}
                 onError={onError}
+                priority={priority}
+                sizes={sizes}
             />
             <div className="absolute inset-0 bg-black/5 group-hover/item:bg-black/0 transition-colors duration-500 ease-out" />
             {overlay}
@@ -177,6 +190,8 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                         hasError={brokenImages.has(0)}
                         onError={() => markImageBroken(0)}
                         className="w-full h-full"
+                        priority
+                        sizes="(max-width: 768px) 100vw, 100vw"
                     />
                 </div>
             );
@@ -193,6 +208,8 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                         hasError={brokenImages.has(0)}
                         onError={() => markImageBroken(0)}
                         className="h-full"
+                        priority
+                        sizes="(max-width: 768px) 100vw, 50vw"
                     />
                     <GalleryItem
                         src={images[1]}
@@ -201,6 +218,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                         hasError={brokenImages.has(1)}
                         onError={() => markImageBroken(1)}
                         className="h-full"
+                        sizes="(max-width: 768px) 100vw, 50vw"
                     />
                 </div>
             );
@@ -217,6 +235,8 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                         hasError={brokenImages.has(0)}
                         onError={() => markImageBroken(0)}
                         className="md:col-span-2 h-full"
+                        priority
+                        sizes="(max-width: 768px) 100vw, 66vw"
                     />
                     <div className="hidden md:flex flex-col gap-2 h-full">
                         <GalleryItem
@@ -226,6 +246,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                             hasError={brokenImages.has(1)}
                             onError={() => markImageBroken(1)}
                             className="h-full"
+                            sizes="33vw"
                         />
                         <GalleryItem
                             src={images[2]}
@@ -234,6 +255,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                             hasError={brokenImages.has(2)}
                             onError={() => markImageBroken(2)}
                             className="h-full"
+                            sizes="33vw"
                         />
                     </div>
                 </div>
@@ -251,6 +273,8 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                     hasError={brokenImages.has(0)}
                     onError={() => markImageBroken(0)}
                     className="md:col-span-2 h-full"
+                    priority
+                    sizes="(max-width: 768px) 100vw, 50vw"
                 />
 
                 {/* Side Images Grid */}
@@ -263,6 +287,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                         hasError={brokenImages.has(1)}
                         onError={() => markImageBroken(1)}
                         className="row-span-2"
+                        sizes="25vw"
                     />
                     {/* Top right */}
                     <GalleryItem
@@ -271,6 +296,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                         onClick={() => openLightbox(2)}
                         hasError={brokenImages.has(2)}
                         onError={() => markImageBroken(2)}
+                        sizes="25vw"
                     />
                     {/* Bottom right with "more" overlay */}
                     <GalleryItem
@@ -279,6 +305,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                         onClick={() => openLightbox(3)}
                         hasError={brokenImages.has(3)}
                         onError={() => markImageBroken(3)}
+                        sizes="25vw"
                         overlay={imageCount > 4 ? (
                             <div className="absolute inset-0 bg-black/50 hover:bg-black/40 transition-colors flex items-center justify-center">
                                 <span className="text-white font-medium text-sm border border-white/50 bg-black/20 backdrop-blur-md px-3 py-1 rounded-full">
@@ -364,21 +391,18 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                         {/* Image */}
                         <div
                             className={cn(
-                                "max-w-full max-h-full overflow-auto transition-transform duration-200",
-                                isZoomed ? "cursor-zoom-out" : "cursor-zoom-in"
+                                "relative w-full max-w-4xl h-[calc(100vh-180px)] transition-transform duration-200",
+                                isZoomed ? "cursor-zoom-out scale-150" : "cursor-zoom-in scale-100"
                             )}
                             onClick={toggleZoom}
                         >
                             <ImageWithFallback
                                 src={images[currentIndex]}
                                 alt={`${title} - Image ${currentIndex + 1}`}
-                                className={cn(
-                                    "max-h-[calc(100vh-180px)] object-contain transition-transform duration-200",
-                                    isZoomed ? "scale-150" : "scale-100"
-                                )}
-                                draggable={false}
+                                className="object-contain"
                                 hasError={brokenImages.has(currentIndex)}
                                 onError={() => markImageBroken(currentIndex)}
+                                sizes="100vw"
                             />
                         </div>
 
@@ -410,7 +434,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                                             setIsZoomed(false);
                                         }}
                                         className={cn(
-                                            "w-16 h-12 rounded-lg overflow-hidden flex-shrink-0 transition-all",
+                                            "relative w-16 h-12 rounded-lg overflow-hidden flex-shrink-0 transition-all",
                                             currentIndex === i
                                                 ? "ring-2 ring-white ring-offset-2 ring-offset-black"
                                                 : "opacity-50 hover:opacity-100"
@@ -419,9 +443,9 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                                         <ImageWithFallback
                                             src={img}
                                             alt={`Thumbnail ${i + 1}`}
-                                            className="w-full h-full object-cover"
                                             hasError={brokenImages.has(i)}
                                             onError={() => markImageBroken(i)}
+                                            sizes="64px"
                                         />
                                     </button>
                                 ))}

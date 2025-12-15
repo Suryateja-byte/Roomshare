@@ -40,7 +40,7 @@ const STATE_ABBREVIATIONS: Record<string, string> = {
 // Format location to avoid redundancy (e.g., "Irving, TX" not "Irving, TX, TX")
 function formatLocation(city: string, state: string): string {
     // Convert state to abbreviation if it's a full name
-    let stateAbbr = state.length === 2 ? state.toUpperCase() : (STATE_ABBREVIATIONS[state] || state);
+    const stateAbbr = state.length === 2 ? state.toUpperCase() : (STATE_ABBREVIATIONS[state] || state);
 
     // Clean city - remove any trailing state abbreviation if it matches
     let cleanCity = city.trim();
@@ -97,9 +97,6 @@ export default function ListingCard({ listing, isSaved, className }: ListingCard
 
     // Fallback for empty/null titles
     const displayTitle = listing.title?.trim() || 'Untitled Listing';
-
-    // Shadow classes extracted
-    const shadowClass = 'shadow-card-hover'; // Will be defined in global css
 
     return (
         <Link

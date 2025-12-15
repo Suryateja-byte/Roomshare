@@ -29,6 +29,9 @@ jest.mock('@/lib/prisma', () => ({
     booking: {
       findFirst: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
   },
 }))
 
@@ -62,6 +65,11 @@ describe('/api/reviews', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
+    // Mock user.findUnique for suspension check
+    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-123',
+      isSuspended: false,
+    })
   })
 
   describe('POST', () => {

@@ -212,7 +212,7 @@ const UNICODE_KEYWORDS: Record<string, string> = {
   '咖啡廳': 'cafe',
   '餐廳': 'restaurant',
   '超級市場': 'supermarket',
-  '健身中心': 'gym', // Traditional variant
+  // Note: '健身中心' removed - identical to simplified form (already at line 191)
   '地鐵站': 'subway station',
   '醫院': 'hospital',
   '藥店': 'pharmacy',

@@ -79,7 +79,7 @@ export async function sendNotificationEmail(
     data: Parameters<typeof emailTemplates[typeof type]>[0]
 ): Promise<{ success: boolean; error?: string }> {
     try {
-        // @ts-ignore - TypeScript has trouble with the dynamic template selection
+        // @ts-expect-error - TypeScript has trouble with the dynamic template selection
         const template = emailTemplates[type](data);
         return await sendEmail({
             to: email,

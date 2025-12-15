@@ -11,6 +11,9 @@ jest.mock('@/lib/prisma', () => ({
       create: jest.fn(),
       delete: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
   },
 }))
 
@@ -59,6 +62,11 @@ describe('saved-listings actions', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
+    // Mock user.findUnique for suspension check
+    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-123',
+      isSuspended: false,
+    })
   })
 
   describe('toggleSaveListing', () => {

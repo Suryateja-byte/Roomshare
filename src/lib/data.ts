@@ -557,6 +557,106 @@ export async function getListings(params: FilterParams = {}): Promise<ListingDat
     return results;
 }
 
+// Map-optimized listing interface (minimal fields for markers)
+export interface MapListingData {
+    id: string;
+    title: string;
+    price: number;
+    availableSlots: number;
+    ownerId: string;
+    images: string[];
+    location: {
+        lat: number;
+        lng: number;
+    };
+}
+
+// Maximum map markers to return (prevents UI performance issues)
+const MAX_MAP_MARKERS = 200;
+
+/**
+ * Optimized query for map markers - uses SQL-level bounds filtering
+ * and returns only the fields needed for map display.
+ *
+ * Performance improvements over getListings():
+ * - SQL-level bounds filtering with PostGIS ST_Intersects (uses spatial index)
+ * - Returns only 8 fields vs 20+ fields
+ * - LIMIT 200 at SQL level (not post-fetch)
+ * - ~70% smaller payload per listing
+ */
+export async function getMapListings(params: FilterParams = {}): Promise<MapListingData[]> {
+    const { minPrice, maxPrice, bounds } = params;
+
+    // Build WHERE conditions dynamically
+    const conditions: string[] = [
+        'l."availableSlots" > 0',
+        "l.status = 'ACTIVE'",
+        'ST_X(loc.coords::geometry) IS NOT NULL',
+        'ST_Y(loc.coords::geometry) IS NOT NULL',
+        'NOT (ST_X(loc.coords::geometry) = 0 AND ST_Y(loc.coords::geometry) = 0)',
+        'ST_Y(loc.coords::geometry) BETWEEN -90 AND 90',
+        'ST_X(loc.coords::geometry) BETWEEN -180 AND 180'
+    ];
+    const queryParams: any[] = [];
+    let paramIndex = 1;
+
+    // SQL-level bounds filtering using PostGIS spatial index
+    if (bounds) {
+        conditions.push(`ST_Intersects(loc.coords, ST_MakeEnvelope($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, 4326))`);
+        queryParams.push(bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat);
+    }
+
+    // SQL-level price filtering
+    if (minPrice !== undefined && minPrice !== null) {
+        conditions.push(`l.price >= $${paramIndex++}`);
+        queryParams.push(minPrice);
+    }
+    if (maxPrice !== undefined && maxPrice !== null) {
+        conditions.push(`l.price <= $${paramIndex++}`);
+        queryParams.push(maxPrice);
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    // Query with minimal fields for map markers
+    const query = `
+        SELECT
+            l.id,
+            l.title,
+            l.price,
+            l."availableSlots",
+            l."ownerId",
+            l.images,
+            ST_X(loc.coords::geometry) as lng,
+            ST_Y(loc.coords::geometry) as lat
+        FROM "Listing" l
+        JOIN "Location" loc ON l.id = loc."listingId"
+        WHERE ${whereClause}
+        ORDER BY l."createdAt" DESC
+        LIMIT ${MAX_MAP_MARKERS}
+    `;
+
+    try {
+        const listings = await prisma.$queryRawUnsafe<any[]>(query, ...queryParams);
+
+        return listings.map(l => ({
+            id: l.id,
+            title: l.title,
+            price: Number(l.price),
+            availableSlots: l.availableSlots,
+            ownerId: l.ownerId,
+            images: l.images || [],
+            location: {
+                lat: Number(l.lat) || 0,
+                lng: Number(l.lng) || 0
+            }
+        }));
+    } catch (error) {
+        console.error('Error fetching map listings:', error);
+        return [];
+    }
+}
+
 export async function getListingsPaginated(params: FilterParams = {}): Promise<PaginatedResult<ListingData>> {
     const { query, minPrice, maxPrice, amenities, moveInDate, leaseDuration, houseRules, roomType, languages, genderPreference, householdGender, bounds, sort = 'recommended', page = 1, limit = 12 } = params;
     const offset = (page - 1) * limit;

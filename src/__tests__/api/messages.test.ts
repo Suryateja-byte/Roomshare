@@ -13,6 +13,9 @@ jest.mock('@/lib/prisma', () => ({
       findMany: jest.fn(),
       create: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
   },
 }))
 
@@ -44,6 +47,11 @@ describe('Messages API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
+    // Mock user.findUnique for suspension check
+    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-123',
+      isSuspended: false,
+    })
   })
 
   describe('GET', () => {

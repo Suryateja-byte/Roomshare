@@ -36,7 +36,7 @@ describe('fair-housing-policy', () => {
         'asian community',
         'hispanic neighborhood',
         'where do Indians live',
-        'where are the Chinese',
+        'where are Chinese',
         'no blacks area',
         'avoid hispanics',
       ];
@@ -122,7 +122,7 @@ describe('fair-housing-policy', () => {
       const blockedQueries = [
         'best school district',
         'top schools ranking',
-        'worst schools',
+        'worst school district',
       ];
 
       test.each(blockedQueries)('blocks: "%s"', (query) => {

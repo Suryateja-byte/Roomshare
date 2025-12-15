@@ -11,6 +11,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import EmailVerificationWrapper from "@/components/EmailVerificationWrapper";
 import CustomScrollContainer from "@/components/ui/CustomScrollContainer";
+import { WebVitals } from "@/components/WebVitals";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -47,7 +48,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head />
+      <head>
+        {/* Preconnect to external origins for faster resource loading */}
+        {/* Mapbox - maps, tiles, and geocoding API */}
+        <link rel="preconnect" href="https://api.mapbox.com" />
+        <link rel="preconnect" href="https://events.mapbox.com" />
+        {/* Supabase - storage for listing images */}
+        <link rel="preconnect" href="https://qolpgfdmkqvxraafucvu.supabase.co" />
+        {/* Unsplash - fallback images */}
+        <link rel="preconnect" href="https://images.unsplash.com" />
+      </head>
       <body className={inter.className}>
         <Providers>
           <SkipLink />
@@ -67,6 +77,7 @@ export default function RootLayout({
           </CustomScrollContainer>
           <OfflineIndicator />
           <ServiceWorkerRegistration />
+          <WebVitals />
         </Providers>
       </body>
     </html>

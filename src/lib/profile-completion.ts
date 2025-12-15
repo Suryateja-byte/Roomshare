@@ -1,5 +1,3 @@
-import type { User } from '@prisma/client';
-
 export interface ProfileCompletion {
     percentage: number;
     missing: string[];

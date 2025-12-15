@@ -14,6 +14,9 @@ jest.mock('@/lib/prisma', () => ({
     listing: {
       update: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   },
@@ -101,6 +104,11 @@ describe('manage-booking actions', () => {
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
     ;(createNotification as jest.Mock).mockResolvedValue({ success: true })
     ;(sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({ success: true })
+    // Mock user.findUnique for suspension check
+    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-123',
+      isSuspended: false,
+    })
   })
 
   describe('updateBookingStatus', () => {

@@ -14,6 +14,7 @@ import type { LayerProps, GeoJSONSource } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Home, Loader2, MapPin, X } from 'lucide-react';
 import { Button } from './ui/button';
@@ -524,13 +525,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                             ? 'bg-zinc-900 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]'
                             : 'bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]'
                             }`}>
-                            {/* Image Thumbnail */}
+                            {/* Image Thumbnail - optimized with next/image */}
                             <div className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
                                 {selectedListing.images && selectedListing.images[0] ? (
-                                    <img
+                                    <Image
                                         src={selectedListing.images[0]}
                                         alt={selectedListing.title}
-                                        className="w-full h-full object-cover"
+                                        fill
+                                        sizes="280px"
+                                        className="object-cover"
                                     />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center">

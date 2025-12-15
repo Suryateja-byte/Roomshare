@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Map, List } from 'lucide-react';
 
 interface SearchViewToggleProps {
@@ -10,13 +10,22 @@ interface SearchViewToggleProps {
 
 export default function SearchViewToggle({ children, mapComponent }: SearchViewToggleProps) {
   const [showMap, setShowMap] = useState(false);
+  // Track if map has ever been shown - prevents unloading when toggling back to list
+  const [hasShownMapMobile, setHasShownMapMobile] = useState(false);
+
+  const handleToggle = useCallback(() => {
+    if (!showMap && !hasShownMapMobile) {
+      setHasShownMapMobile(true);
+    }
+    setShowMap(!showMap);
+  }, [showMap, hasShownMapMobile]);
 
   return (
     <>
       {/* Mobile View Toggle Button - Fixed at bottom */}
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
         <button
-          onClick={() => setShowMap(!showMap)}
+          onClick={handleToggle}
           className="flex items-center gap-2 px-5 py-3 bg-zinc-900 text-white rounded-full shadow-lg shadow-zinc-900/25 hover:bg-zinc-800 transition-colors touch-target"
           aria-label={showMap ? 'Show list view' : 'Show map view'}
         >
@@ -41,9 +50,9 @@ export default function SearchViewToggle({ children, mapComponent }: SearchViewT
           {children}
         </div>
 
-        {/* Map View */}
+        {/* Map View - Only render after user first requests map (saves 944KB on mobile initial load) */}
         <div className={`w-full h-full ${showMap ? 'block' : 'hidden'}`}>
-          {mapComponent}
+          {hasShownMapMobile && mapComponent}
         </div>
       </div>
 

@@ -548,14 +548,16 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
       // When LLM calls nearbyPlaceSearch tool, render result as NearbyPlacesCard
       if (msg.parts) {
         for (const part of msg.parts) {
+          // Type guard: part.result is typed as {} by AI SDK, cast to check action property
+          const partResult = 'result' in part ? (part.result as { action?: string } | null) : null;
           if (
             part.type === 'tool-invocation' &&
             'toolName' in part &&
             part.toolName === 'nearbyPlaceSearch' &&
-            'result' in part &&
-            part.result?.action === 'NEARBY_UI_KIT'
+            partResult?.action === 'NEARBY_UI_KIT'
           ) {
-            const result = part.result as {
+            // Use partResult which already has the type assertion applied
+            const result = partResult as {
               action: string;
               query: string;
               searchType: 'type' | 'text';

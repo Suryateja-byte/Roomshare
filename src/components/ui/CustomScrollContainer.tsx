@@ -15,6 +15,8 @@ const CustomScrollContainer = ({ children, className = "" }: CustomScrollContain
     const [thumbHeight, setThumbHeight] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
+    const [isScrollable, setIsScrollable] = useState(false);
+    const [containerHeight, setContainerHeight] = useState(0);
     const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Calculate thumb size based on content ratio
@@ -27,6 +29,8 @@ const CustomScrollContainer = ({ children, className = "" }: CustomScrollContain
         // Minimum thumb height of 40px, max of 120px
         const newThumbHeight = Math.max(40, Math.min(120, ratio * clientHeight));
         setThumbHeight(newThumbHeight);
+        setContainerHeight(clientHeight);
+        setIsScrollable(scrollHeight > clientHeight);
     }, []);
 
     // Show scrollbar and auto-hide after delay
@@ -131,21 +135,10 @@ const CustomScrollContainer = ({ children, className = "" }: CustomScrollContain
         };
     }, [handleScroll, updateThumbHeight]);
 
-    // Calculate thumb position
-    const getThumbPosition = () => {
-        const container = containerRef.current;
-        if (!container) return 0;
-
-        const availableHeight = container.clientHeight - thumbHeight;
-        return scrollProgress * availableHeight;
-    };
-
-    // Check if scrollbar is needed (content is scrollable)
-    const isScrollable = () => {
-        const container = containerRef.current;
-        if (!container) return false;
-        return container.scrollHeight > container.clientHeight;
-    };
+    // Calculate thumb position using state values (avoid ref access during render)
+    const thumbPosition = containerHeight > 0
+        ? scrollProgress * (containerHeight - thumbHeight)
+        : 0;
 
     return (
         <div className="relative w-full h-screen overflow-hidden bg-background">
@@ -164,7 +157,7 @@ const CustomScrollContainer = ({ children, className = "" }: CustomScrollContain
             </div>
 
             {/* Custom Scrollbar - Positioned inside container */}
-            {isScrollable() && (
+            {isScrollable && (
                 <div
                     className={`
                         absolute top-0 right-1 bottom-0 w-2 z-50
@@ -180,7 +173,7 @@ const CustomScrollContainer = ({ children, className = "" }: CustomScrollContain
                         onMouseEnter={() => showScrollbar()}
                         style={{
                             height: thumbHeight,
-                            transform: `translateY(${getThumbPosition()}px)`,
+                            transform: `translateY(${thumbPosition}px)`,
                         }}
                         className={`
                             absolute right-0 w-1.5 rounded-full
