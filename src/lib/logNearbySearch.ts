@@ -1,137 +1,150 @@
 /**
- * Logging for nearby search triggers.
+ * Client-side metrics logging.
  *
- * COMPLIANCE NOTES:
- * - NO place names, addresses, or ratings are logged
- * - Only trigger metadata: user, session, listing, intent type
- * - Fire-and-forget: does not block UI
- * - If storing lat/lng, must enforce 30-day deletion (not implemented here)
+ * IMPORTANT: No Node crypto import - uses globalThis.crypto for browser.
+ * HMAC computation happens server-side via /api/metrics.
+ *
+ * PRIVACY NOTES:
+ * - Client sends raw listingId to /api/metrics
+ * - Server computes HMAC, discards raw listingId
+ * - No user text, intent, or category is ever sent
  */
 
-export interface NearbySearchLogParams {
-  /** User ID if authenticated */
-  userId?: string;
-  /** Session ID for anonymous tracking */
-  sessionId: string;
-  /** Listing ID where the search was triggered */
+export interface ClientMetricsParams {
+  /** Listing ID (will be HMAC'd server-side) */
   listingId: string;
-  /** The normalized intent (e.g., "gym", "indian grocery") */
-  intent: string;
-  /** Type of search performed */
-  searchType: 'type' | 'text';
-  /** Optional: was the search blocked by policy */
-  blocked?: boolean;
-  /** Optional: block reason category */
-  blockReason?: string;
+  /** Route that triggered the metric */
+  route: 'nearby' | 'llm';
+  /** Whether the request was blocked by policy */
+  isBlocked: boolean;
+  /** Search type (only for allowed requests) */
+  searchType?: 'type' | 'text';
+  /** Included place types (only for allowed requests) */
+  includedTypes?: string[];
+  /** Result count (only for allowed requests) */
+  resultCount?: number;
 }
 
 /**
- * Generate a session ID for anonymous tracking.
+ * Generate session ID using browser crypto (NOT Node crypto).
  * Stored in sessionStorage for the duration of the browser session.
  */
 export function getOrCreateSessionId(): string {
   if (typeof window === 'undefined') {
-    return 'server-side';
+    return 'server';
   }
 
-  const STORAGE_KEY = 'nearby-search-session-id';
+  const STORAGE_KEY = 'session-random';
 
   try {
     let sessionId = sessionStorage.getItem(STORAGE_KEY);
     if (!sessionId) {
-      sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      // Use globalThis.crypto for browser, with fallback
+      if (globalThis.crypto?.randomUUID) {
+        sessionId = globalThis.crypto.randomUUID();
+      } else {
+        // Fallback for older browsers
+        sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      }
       sessionStorage.setItem(STORAGE_KEY, sessionId);
     }
     return sessionId;
   } catch {
     // Storage not available
-    return `temp_${Date.now()}`;
+    return `temp-${Date.now()}`;
   }
 }
 
 /**
- * Log a nearby search trigger.
+ * Send metrics to server endpoint.
+ * Server computes HMAC - client NEVER sees LOG_HMAC_SECRET.
+ * Fire-and-forget: does not block UI.
  *
- * This is a fire-and-forget function - it does not block the UI
- * and failures are silently ignored.
- *
- * Currently logs to console in development. Can be extended to
- * log to Supabase or other analytics services in production.
- *
- * @param params - The search parameters to log
+ * @param params - The metrics parameters to log
  */
-export async function logNearbySearch(params: NearbySearchLogParams): Promise<void> {
-  const { userId, sessionId, listingId, intent, searchType, blocked, blockReason } = params;
+export async function logSafeMetrics(params: ClientMetricsParams): Promise<void> {
+  const { listingId, route, isBlocked, searchType, includedTypes, resultCount } = params;
 
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    userId: userId || 'anonymous',
-    sessionId,
-    listingId,
-    intent,
-    searchType,
-    blocked: blocked || false,
-    blockReason: blockReason || null,
+  const payload = {
+    listingId, // Server will HMAC this, then discard
+    sid: getOrCreateSessionId(),
+    route,
+    blocked: isBlocked,
+    // Only include non-sensitive fields for allowed requests
+    ...(searchType && !isBlocked && { type: searchType }),
+    ...(includedTypes && !isBlocked && { types: includedTypes }),
+    ...(resultCount !== undefined && !isBlocked && { count: resultCount }),
   };
 
-  // Development logging
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[NearbySearch]', logEntry);
+  // Fire-and-forget
+  try {
+    fetch('/api/metrics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => {
+      // Silently ignore failures
+    });
+  } catch {
+    // Silently ignore
   }
-
-  // Production logging to Supabase could be added here
-  // Example (not implemented to avoid requiring additional setup):
-  //
-  // try {
-  //   await fetch('/api/log-nearby-search', {
-  //     method: 'POST',
-  //     headers: { 'Content-Type': 'application/json' },
-  //     body: JSON.stringify(logEntry),
-  //   });
-  // } catch {
-  //   // Silently ignore logging failures
-  // }
 }
 
 /**
- * Log a blocked search (Fair Housing policy violation).
+ * Log a blocked request (Fair Housing policy violation).
+ * Only logs that a block occurred - NO category or user text.
+ *
+ * @param listingId - The listing ID where the block occurred
+ * @param route - The route that was blocked ('nearby' or 'llm')
  */
-export async function logBlockedSearch(
+export async function logBlockedRequest(
   listingId: string,
-  intent: string,
-  blockReason: string,
-  userId?: string
+  route: 'nearby' | 'llm'
 ): Promise<void> {
-  const sessionId = getOrCreateSessionId();
-
-  await logNearbySearch({
-    userId,
-    sessionId,
+  await logSafeMetrics({
     listingId,
-    intent,
-    searchType: 'text', // Blocked searches don't have a search type
-    blocked: true,
-    blockReason,
+    route,
+    isBlocked: true,
   });
 }
 
 /**
- * Log a successful search trigger.
+ * Log a successful/allowed search trigger.
+ *
+ * @param listingId - The listing ID where the search was triggered
+ * @param searchType - The type of search ('type' or 'text')
+ * @param includedTypes - Optional array of place types searched
+ * @param resultCount - Optional count of results returned
  */
-export async function logSearchTrigger(
+export async function logAllowedSearch(
   listingId: string,
-  intent: string,
   searchType: 'type' | 'text',
-  userId?: string
+  includedTypes?: string[],
+  resultCount?: number
 ): Promise<void> {
-  const sessionId = getOrCreateSessionId();
-
-  await logNearbySearch({
-    userId,
-    sessionId,
+  await logSafeMetrics({
     listingId,
-    intent,
+    route: 'nearby',
+    isBlocked: false,
     searchType,
-    blocked: false,
+    includedTypes,
+    resultCount,
+  });
+}
+
+/**
+ * Log an LLM chat interaction.
+ *
+ * @param listingId - The listing ID where the chat occurred
+ * @param isBlocked - Whether the request was blocked
+ */
+export async function logLLMInteraction(
+  listingId: string,
+  isBlocked: boolean
+): Promise<void> {
+  await logSafeMetrics({
+    listingId,
+    route: 'llm',
+    isBlocked,
   });
 }

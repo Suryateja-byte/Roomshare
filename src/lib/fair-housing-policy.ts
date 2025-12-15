@@ -146,11 +146,7 @@ export function checkFairHousingPolicy(query: string): PolicyCheckResult {
 
   for (const { pattern, category } of BLOCKED_PATTERNS) {
     if (pattern.test(normalizedQuery)) {
-      // Log for monitoring (category only, not the full query for privacy)
-      if (typeof console !== 'undefined') {
-        console.log(`[FairHousingPolicy] Blocked query category: ${category}`);
-      }
-
+      // No logging here - logging happens via /api/metrics with privacy protections
       return {
         allowed: false,
         blockedReason: category,

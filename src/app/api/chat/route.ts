@@ -1,59 +1,225 @@
 import { streamText, tool, zodSchema, stepCountIs, type CoreMessage, type UIMessage } from 'ai';
 import { createGroq } from '@ai-sdk/groq';
 import { z } from 'zod';
+import { checkChatRateLimit } from '@/lib/rate-limit-redis';
+import { getClientIP } from '@/lib/rate-limit';
+import { checkFairHousingPolicy, POLICY_REFUSAL_MESSAGE } from '@/lib/fair-housing-policy';
 
 /**
  * Neighborhood Chat API Route
+ *
+ * SECURITY STACK (in order):
+ * 1. Origin/Host enforcement (exact match from env allowlist)
+ * 2. Content-Type: application/json enforcement
+ * 3. Rate limit check (Redis-backed, burst + sustained)
+ * 4. Body size guard (via request.text(), NOT Content-Length)
+ * 5. Parse JSON from raw text
+ * 6. Strict schema validation
+ * 7. Coordinate validation (with range check)
+ * 8. Extract latest user text
+ * 9. Fair Housing gate (provider-independent)
+ * 10. Call LLM / stream
  *
  * MIGRATION NOTE:
  * The findPlaces tool that called Google Places API has been removed.
  * Nearby place searches are now handled client-side using Google Places UI Kit.
  * See: src/components/chat/NearbyPlacesCard.tsx
- *
- * This route now includes a nearbyPlaceSearch tool that returns a structured
- * NEARBY_UI_KIT action for cases where nearby intent slips past client-side detection.
- * The client interprets this action and renders the NearbyPlacesCard component.
  */
 
+// CRITICAL: Force Node.js runtime for crypto compatibility
+export const runtime = 'nodejs';
+
+// ============ ORIGIN/HOST ENFORCEMENT ============
+
+function getAllowedOrigins(): string[] {
+  const origins = process.env.ALLOWED_ORIGINS || '';
+  const parsed = origins.split(',').map((o) => o.trim()).filter(Boolean);
+  if (process.env.NODE_ENV === 'development') {
+    parsed.push('http://localhost:3000');
+  }
+  return parsed;
+}
+
+function getAllowedHosts(): string[] {
+  const hosts = process.env.ALLOWED_HOSTS || '';
+  const parsed = hosts.split(',').map((h) => h.trim()).filter(Boolean);
+  if (process.env.NODE_ENV === 'development') {
+    parsed.push('localhost:3000', 'localhost');
+  }
+  return parsed;
+}
+
+// Exact origin matching (not startsWith)
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return false;
+  return getAllowedOrigins().includes(origin);
+}
+
+function isHostAllowed(host: string | null): boolean {
+  if (!host) return false;
+  const allowed = getAllowedHosts();
+  const hostWithoutPort = host.split(':')[0];
+  return allowed.some((h) => h === host || h === hostWithoutPort);
+}
+
+// ============ COORDINATE VALIDATION ============
+
+function validateCoordinates(
+  lat: unknown,
+  lng: unknown
+): { valid: boolean; lat?: number; lng?: number } {
+  if (typeof lat !== 'number' || typeof lng !== 'number') {
+    return { valid: false };
+  }
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { valid: false };
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return { valid: false };
+  }
+  return { valid: true, lat, lng };
+}
+
+// ============ STRICT CHAT PAYLOAD VALIDATION ============
+
+const MAX_MESSAGES = 50; // Prevent payload amplification
+const MAX_USER_TEXT_LENGTH = 2000; // Cap user text length
+const MAX_BODY_SIZE = 100_000; // 100KB max body size
+const VALID_ROLES = new Set(['user', 'assistant']);
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: unknown;
+  parts?: Array<{ type: string; text?: string; [key: string]: unknown }>;
+}
+
+interface ChatPayload {
+  messages: ChatMessage[];
+  latitude: number;
+  longitude: number;
+}
+
+function extractTextFromContent(content: unknown): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .filter(
+        (part): part is { type: 'text'; text: string } =>
+          part && typeof part === 'object' && part.type === 'text' && typeof part.text === 'string'
+      )
+      .map((part) => part.text)
+      .join(' ');
+  }
+  return '';
+}
+
+function validateChatPayload(
+  body: unknown
+): { valid: true; payload: ChatPayload } | { valid: false } {
+  if (!body || typeof body !== 'object') {
+    return { valid: false };
+  }
+
+  const obj = body as Record<string, unknown>;
+
+  // Validate messages array
+  if (!Array.isArray(obj.messages)) {
+    return { valid: false };
+  }
+
+  // Cap messages count (prevents payload amplification)
+  if (obj.messages.length > MAX_MESSAGES) {
+    return { valid: false };
+  }
+
+  // Validate each message
+  const validatedMessages: ChatMessage[] = [];
+  for (const msg of obj.messages) {
+    if (!msg || typeof msg !== 'object') {
+      return { valid: false };
+    }
+    const m = msg as Record<string, unknown>;
+
+    // Role must be user or assistant
+    if (!VALID_ROLES.has(m.role as string)) {
+      return { valid: false };
+    }
+
+    // For user messages, validate text content length
+    if (m.role === 'user' && m.content) {
+      const textContent = extractTextFromContent(m.content);
+      if (textContent.length > MAX_USER_TEXT_LENGTH) {
+        return { valid: false };
+      }
+    }
+
+    // Preserve both content and parts (AI SDK may send parts without content)
+    validatedMessages.push({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+      ...(Array.isArray(m.parts) && { parts: m.parts as ChatMessage['parts'] }),
+    });
+  }
+
+  // Validate latitude and longitude exist (coordinate range checked separately)
+  if (typeof obj.latitude !== 'number' || typeof obj.longitude !== 'number') {
+    return { valid: false };
+  }
+
+  // Drop/ignore unexpected fields - only return validated fields
+  return {
+    valid: true,
+    payload: {
+      messages: validatedMessages,
+      latitude: obj.latitude,
+      longitude: obj.longitude,
+    },
+  };
+}
+
+// ============ MESSAGE CONVERSION ============
+
 // Extract text content from UI message parts
-function getTextContent(msg: UIMessage): string {
-  if (!msg.parts) return '';
-  return msg.parts
-    .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
-    .map((part) => part.text)
-    .join('');
+function getTextContent(msg: UIMessage | ChatMessage): string {
+  // Try content first (ChatMessage format)
+  if ('content' in msg && msg.content !== undefined && msg.content !== null) {
+    const text = extractTextFromContent(msg.content);
+    if (text) return text;
+  }
+  // Fallback to parts (UIMessage format) - AI SDK may send parts without content
+  if ('parts' in msg && Array.isArray(msg.parts)) {
+    return (msg.parts as Array<{ type: string; text?: string }>)
+      .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+      .map((part) => part.text)
+      .join('');
+  }
+  return '';
 }
 
 // Convert UI messages to CoreMessage format for Groq
-function convertToSimpleMessages(messages: UIMessage[]): CoreMessage[] {
+function convertToSimpleMessages(messages: ChatMessage[]): CoreMessage[] {
   const result: CoreMessage[] = [];
 
   for (const msg of messages) {
-    if (msg.role === 'user') {
-      const content = getTextContent(msg);
-      if (content) {
-        result.push({ role: 'user', content });
-      }
-    } else if (msg.role === 'assistant') {
-      const content = getTextContent(msg);
-      if (content) {
-        result.push({ role: 'assistant', content });
-      }
+    const content = getTextContent(msg);
+    if (content) {
+      result.push({ role: msg.role, content });
     }
   }
 
   return result;
 }
 
-// Configure Groq provider
+// ============ GROQ CONFIGURATION ============
+
 const groq = createGroq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-/**
- * Valid place types for nearby search.
- * Maps common terms to Google Places API types.
- */
+// ============ PLACE TYPE MAPPING ============
+
 const PLACE_TYPE_MAP: Record<string, string[]> = {
   gym: ['gym'],
   fitness: ['gym'],
@@ -73,46 +239,139 @@ const PLACE_TYPE_MAP: Record<string, string[]> = {
   laundry: ['laundry'],
 };
 
-/**
- * Determines the search type and included types for a query.
- */
 function determineSearchParams(query: string): {
   searchType: 'type' | 'text';
   includedTypes?: string[];
 } {
   const lowerQuery = query.toLowerCase().trim();
 
-  // Check if query matches a known place type
   for (const [keyword, types] of Object.entries(PLACE_TYPE_MAP)) {
     if (lowerQuery.includes(keyword)) {
       return { searchType: 'type', includedTypes: types };
     }
   }
 
-  // Default to text search for specific/unknown queries
   return { searchType: 'text' };
 }
 
+// ============ MAIN HANDLER ============
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { messages, latitude, longitude } = body;
+    // 1. ORIGIN/HOST ENFORCEMENT (exact match)
+    const origin = request.headers.get('origin');
+    const host = request.headers.get('host');
 
-    // Validate coordinates
-    if (
-      typeof latitude !== 'number' ||
-      typeof longitude !== 'number' ||
-      isNaN(latitude) ||
-      isNaN(longitude)
-    ) {
+    // In production, enforce origin/host
+    if (process.env.NODE_ENV === 'production') {
+      if (origin && !isOriginAllowed(origin)) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!origin && !isHostAllowed(host)) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // 2. CONTENT-TYPE ENFORCEMENT
+    const contentType = request.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      return new Response(JSON.stringify({ error: 'Invalid content type' }), {
+        status: 415,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 3. RATE LIMIT (Redis-backed, burst + sustained)
+    const clientIP = getClientIP(request);
+    const rateLimitResult = await checkChatRateLimit(clientIP);
+
+    if (!rateLimitResult.success) {
+      return new Response(JSON.stringify({ error: 'Too many requests' }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(rateLimitResult.retryAfter || 60),
+        },
+      });
+    }
+
+    // 4. BODY SIZE GUARD - DO NOT trust Content-Length!
+    const raw = await request.text();
+    if (raw.length > MAX_BODY_SIZE) {
+      return new Response(JSON.stringify({ error: 'Request too large' }), {
+        status: 413,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 5. PARSE JSON from raw text - return 400 NOT 500
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 6. STRICT SCHEMA VALIDATION
+    const validation = validateChatPayload(body);
+    if (!validation.valid) {
+      return new Response(JSON.stringify({ error: 'Invalid payload' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const { messages, latitude, longitude } = validation.payload;
+
+    // 7. COORDINATE VALIDATION (with range check)
+    const coordResult = validateCoordinates(latitude, longitude);
+    if (!coordResult.valid) {
       return new Response(JSON.stringify({ error: 'Invalid coordinates' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // Convert UI messages to simple format for Groq
-    const simpleMessages = convertToSimpleMessages(messages as UIMessage[]);
+    // 8. EXTRACT LATEST USER TEXT (already bounded by validation)
+    const lastUserMessage = messages.slice().reverse().find((m) => m.role === 'user');
+    const userText = lastUserMessage ? getTextContent(lastUserMessage) : '';
+
+    // 9. FAIR HOUSING GATE (provider-independent, before any model call)
+    if (userText) {
+      const policyCheck = checkFairHousingPolicy(userText);
+
+      if (!policyCheck.allowed) {
+        // Generic refusal - do NOT return category
+        return new Response(
+          JSON.stringify({
+            error: 'request_blocked',
+            message: POLICY_REFUSAL_MESSAGE,
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // 10. CALL LLM
+    const simpleMessages = convertToSimpleMessages(messages);
+
+    // Safety check: ensure we have at least one message
+    if (simpleMessages.length === 0) {
+      console.error('[Chat] No valid messages after conversion. Message count:', messages.length);
+      return new Response(JSON.stringify({ error: 'No valid messages' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     const result = streamText({
       model: groq('llama-3.1-8b-instant'),
@@ -138,7 +397,9 @@ Be friendly and concise. Focus on being helpful without making up specific infor
             z.object({
               query: z
                 .string()
-                .describe('The type of place or specific query (e.g., "gym", "indian grocery", "Starbucks")'),
+                .describe(
+                  'The type of place or specific query (e.g., "gym", "indian grocery", "Starbucks")'
+                ),
             })
           ),
           execute: async ({ query }: { query: string }) => {
@@ -151,7 +412,7 @@ Be friendly and concise. Focus on being helpful without making up specific infor
               searchType,
               includedTypes,
               // The client will use these coordinates to configure the search
-              coordinates: { lat: latitude, lng: longitude },
+              coordinates: { lat: coordResult.lat, lng: coordResult.lng },
             };
           },
         }),
@@ -162,7 +423,8 @@ Be friendly and concise. Focus on being helpful without making up specific infor
 
     return result.toUIMessageStreamResponse();
   } catch (error) {
-    console.error('Chat API error:', error);
+    // Log error without user content - sanitize for privacy
+    console.error('[Chat] API error:', error instanceof Error ? error.message : 'Unknown error');
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

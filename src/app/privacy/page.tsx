@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Shield, Lock, Eye, FileText, Mail } from 'lucide-react';
+import { ArrowLeft, Shield, Lock, Eye, FileText, Mail, MapPin } from 'lucide-react';
 
 // --- Table of Contents Data ---
 const SECTIONS = [
@@ -9,9 +9,10 @@ const SECTIONS = [
     { id: 'collection', label: '2. Information We Collect' },
     { id: 'usage', label: '3. How We Use Data' },
     { id: 'sharing', label: '4. Sharing & Disclosure' },
-    { id: 'security', label: '5. Data Security' },
-    { id: 'rights', label: '6. Your Rights' },
-    { id: 'contact', label: '7. Contact Us' },
+    { id: 'third-party', label: '5. Third-Party Services' },
+    { id: 'security', label: '6. Data Security' },
+    { id: 'rights', label: '7. Your Rights' },
+    { id: 'contact', label: '8. Contact Us' },
 ];
 
 export default function PrivacyPage() {
@@ -62,7 +63,7 @@ export default function PrivacyPage() {
                     <p className="text-lg text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
                         We believe in trust and transparency. This document outlines how we collect, use, and protect your personal data when you use RoomShare.
                     </p>
-                    <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 mt-8 uppercase tracking-widest">Last Updated: December 6, 2024</p>
+                    <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 mt-8 uppercase tracking-widest">Last Updated: December 14, 2025</p>
                 </div>
             </div>
 
@@ -151,9 +152,37 @@ export default function PrivacyPage() {
                         </p>
                     </section>
 
+                    <section id="third-party" className="mb-16 scroll-mt-32">
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-6 flex items-center gap-3">
+                            <MapPin className="w-6 h-6 text-zinc-400 dark:text-zinc-500" /> 5. Third-Party Services
+                        </h2>
+                        <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-8 border border-zinc-100 dark:border-zinc-800">
+                            <h3 className="font-semibold text-zinc-900 dark:text-white text-base mb-3">Google Maps Platform</h3>
+                            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+                                Our neighborhood exploration feature uses the Google Maps Platform to help you discover nearby places such as restaurants, gyms, and transit stations. When you use this feature:
+                            </p>
+                            <ul className="list-disc pl-5 space-y-2 text-zinc-600 dark:text-zinc-400 marker:text-zinc-300 dark:marker:text-zinc-600 mb-4">
+                                <li>Your approximate location (derived from the listing you&apos;re viewing) is sent to Google to retrieve nearby place information.</li>
+                                <li>Google may collect usage data in accordance with their privacy practices.</li>
+                                <li>We do not store or cache place data beyond your current session.</li>
+                                <li>No coordinate data is extracted or used for any purpose other than displaying nearby places.</li>
+                            </ul>
+                            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                                By using this feature, you also agree to Google&apos;s{' '}
+                                <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="text-zinc-900 dark:text-white underline underline-offset-2 hover:no-underline">
+                                    Terms of Service
+                                </a>{' '}
+                                and{' '}
+                                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-zinc-900 dark:text-white underline underline-offset-2 hover:no-underline">
+                                    Privacy Policy
+                                </a>.
+                            </p>
+                        </div>
+                    </section>
+
                     <section id="security" className="mb-16 scroll-mt-32">
                         <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Lock className="w-6 h-6 text-zinc-400 dark:text-zinc-500" /> 5. Data Security
+                            <Lock className="w-6 h-6 text-zinc-400 dark:text-zinc-500" /> 6. Data Security
                         </h2>
                         <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
                             We have put in place appropriate security measures to prevent your personal data from being accidentally lost, used or accessed in an unauthorized way, altered or disclosed. In addition, we limit access to your personal data to those employees, agents, contractors and other third parties who have a business need to know.
@@ -161,14 +190,14 @@ export default function PrivacyPage() {
                     </section>
 
                     <section id="rights" className="mb-16 scroll-mt-32">
-                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-4">6. Your Rights</h2>
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-4">7. Your Rights</h2>
                         <p className="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
                             Under certain circumstances, you have rights under data protection laws in relation to your personal data, including the right to request access, correction, erasure, restriction, transfer, to object to processing, to portability of data and (where the lawful ground of processing is consent) to withdraw consent.
                         </p>
                     </section>
 
                     <section id="contact" className="scroll-mt-32">
-                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-6">7. Contact Us</h2>
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-6">8. Contact Us</h2>
                         <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-3xl p-8 md:p-10 relative overflow-hidden">
                             <div className="relative z-10">
                                 <h3 className="text-xl font-bold mb-2">Have questions?</h3>

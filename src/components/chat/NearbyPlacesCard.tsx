@@ -36,6 +36,12 @@ export interface NearbyPlacesCardProps {
   onSearchSuccess?: () => void;
   /** Optional: whether the card is currently visible (for lazy loading) */
   isVisible?: boolean;
+  /** C2 FIX: Whether search can be performed (rate limit check) */
+  canSearch?: boolean;
+  /** C2 FIX: Number of remaining searches for this listing */
+  remainingSearches?: number;
+  /** P2-C3 FIX: Whether multiple brands were detected in query */
+  multiBrandDetected?: boolean;
 }
 
 const INITIAL_RADIUS = 1600; // 1.6km
@@ -52,6 +58,9 @@ export function NearbyPlacesCard({
   onSearchComplete,
   onSearchSuccess,
   isVisible = true,
+  canSearch = true,  // C2 FIX: Default to true for backwards compatibility
+  remainingSearches,
+  multiBrandDetected = false,  // P2-C3 FIX: Multi-brand warning
 }: NearbyPlacesCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -59,13 +68,25 @@ export function NearbyPlacesCard({
   // B6 FIX: Timeout ref for Places API search
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'no-results'>('loading');
+  // C2 FIX: If rate limited (canSearch explicitly false), show rate limit error immediately
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'no-results' | 'rate-limited'>(
+    canSearch === false ? 'rate-limited' : 'loading'
+  );
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [currentRadius, setCurrentRadius] = useState(INITIAL_RADIUS);
   const [hasExpandedOnce, setHasExpandedOnce] = useState(false);
 
   // Load Places UI Kit on mount
+  // P0-B27 FIX: Check canSearch BEFORE initializing - don't bypass rate limit
   useEffect(() => {
+    // P0-B27 FIX: If rate limited, don't even try to load Places API
+    // This sync is needed because canSearch prop can change after initial render
+    if (!canSearch) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStatus('rate-limited');
+      return;
+    }
+
     if (!isVisible) return;
 
     let isMounted = true;
@@ -101,7 +122,7 @@ export function NearbyPlacesCard({
     return () => {
       isMounted = false;
     };
-  }, [isVisible]);
+  }, [isVisible, canSearch]);
 
   // Handle search results - NO coordinate extraction
   const handleSearchLoad = useCallback(
@@ -265,12 +286,39 @@ export function NearbyPlacesCard({
   }, []);
 
   // Render loading state
+  // C13 FIX: Enhanced skeleton UI during Google Maps script load
   if (status === 'loading') {
     return (
-      <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-6 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700">
-        <div className="flex items-center gap-3">
-          <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
-          <span className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">Searching nearby...</span>
+      <div className="bg-white dark:bg-zinc-800 rounded-[24px] shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700 overflow-hidden">
+        {/* Header skeleton */}
+        <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-700 animate-pulse" />
+            <div className="flex-1">
+              <div className="h-4 w-32 bg-zinc-100 dark:bg-zinc-700 rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+        {/* Content skeleton - mimics place list items */}
+        <div className="p-4 bg-zinc-50/50 dark:bg-zinc-800/50 space-y-3">
+          {/* Place item skeletons */}
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-start gap-3 p-2">
+              {/* Place icon placeholder */}
+              <div className="w-10 h-10 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                {/* Place name */}
+                <div className="h-4 w-3/4 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse" />
+                {/* Place details */}
+                <div className="h-3 w-1/2 bg-zinc-100 dark:bg-zinc-700/50 rounded animate-pulse" />
+              </div>
+            </div>
+          ))}
+          {/* Loading indicator */}
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Searching nearby...</span>
+          </div>
         </div>
       </div>
     );
@@ -304,8 +352,34 @@ export function NearbyPlacesCard({
     );
   }
 
+  // C2 FIX: Render rate limited state (when LLM tool invoked but rate limit exceeded)
+  if (status === 'rate-limited') {
+    return (
+      <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-5 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-amber-100 dark:border-amber-900/50">
+        <div className="flex items-start gap-3">
+          <div className="w-6 h-6 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+              Search limit reached
+            </p>
+            <p className="text-xs text-amber-600/80 dark:text-amber-400/70 mt-1">
+              You&apos;ve used all {remainingSearches === 0 ? 'your' : ''} nearby searches for this listing.
+              Try asking the AI about the neighborhood instead!
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Render no results state
+  // C8 FIX: Show actual search radius and indicate if search was expanded
   if (status === 'no-results') {
+    const radiusKm = (currentRadius / 1000).toFixed(1);
+    const wasExpanded = hasExpandedOnce || currentRadius > INITIAL_RADIUS;
+
     return (
       <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-5 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700">
         <div className="flex items-start gap-3">
@@ -317,8 +391,8 @@ export function NearbyPlacesCard({
               No places found nearby
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              We couldn&apos;t find any &quot;{queryText}&quot; within {EXPANDED_RADIUS / 1000}km of
-              this listing.
+              We couldn&apos;t find any &quot;{queryText}&quot; within {radiusKm}km of this listing
+              {wasExpanded && ' (we expanded the search area)'}. Try a different search term.
             </p>
           </div>
         </div>
@@ -331,11 +405,18 @@ export function NearbyPlacesCard({
     <div
       ref={containerRef}
       className="bg-white dark:bg-zinc-800 rounded-[24px] shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700 overflow-hidden"
+      // P3-B21 FIX: Accessibility - describe card purpose
+      role="region"
+      aria-label={`Nearby places search results for ${queryText}`}
     >
       {/* Header - P2-01 FIX: Show query context for clarity */}
-      <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700">
+      {/* P3-B21 FIX: Added aria-label for header */}
+      <header className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700" aria-label="Search results header">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+          <div
+            className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"
+            aria-hidden="true"
+          >
             <MapPin className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
           </div>
           <div className="flex flex-col min-w-0">
@@ -352,7 +433,15 @@ export function NearbyPlacesCard({
             )}
           </div>
         </div>
-      </div>
+        {/* P2-C3 FIX: Multi-brand warning */}
+        {multiBrandDetected && (
+          <div className="mt-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg">
+            <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
+              <strong>Note:</strong> Results may not include all brands mentioned. Try searching for each brand separately for best results.
+            </p>
+          </div>
+        )}
+      </header>
 
       {/* Body: Places UI Kit Content */}
       <div className="p-3 sm:p-4 bg-zinc-50/50 dark:bg-zinc-800/50">

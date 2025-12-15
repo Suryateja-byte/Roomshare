@@ -268,14 +268,9 @@ interface RateLimitState {
 │     └──────────────────────────────────────────────────────────┘    │
 │                                                                      │
 │  3. HANDLE SEARCH RESULTS (gmp-load event)                          │
-│     - Extract places array from searchElement.places                │
-│     - Extract coordinates immediately (before objects become stale) │
+│     - Count results from searchElement.places                       │
 │     - If 0 results AND radius < 5km → expand search radius          │
-│     - Store in placesLite state for DistanceRail                    │
-│                                                                      │
-│  4. RENDER DISTANCE BADGES (DistanceRail component)                 │
-│     - Calculates haversine distances from listing origin            │
-│     - Positions badges next to each result row                      │
+│     - NO coordinate extraction (Google ToS compliance)              │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -287,48 +282,7 @@ interface RateLimitState {
 
 ---
 
-### 6. Distance Rail (`DistanceRail.tsx`)
-
-**Location:** `src/components/chat/DistanceRail.tsx`
-
-**Purpose:** Displays distance badges next to each place result.
-
-**How It Works:**
-
-```
-┌────────────────────────────────────────────────────────────┐
-│ DISTANCE CALCULATION                                        │
-├────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Input:                                                     │
-│  - origin: { lat, lng } (listing coordinates)               │
-│  - places: Array<{ key, location, coords }>                 │
-│                                                             │
-│  Process:                                                   │
-│  1. For each place, get coordinates (multi-tier resolution):│
-│     a. Use pre-extracted coords from parent (place.coords)  │
-│     b. Use locally cached coords (from previous extraction) │
-│     c. Try to extract from location reference               │
-│                                                             │
-│  2. Calculate distance using Haversine formula:             │
-│     haversineMeters(origin, placeCoords)                    │
-│                                                             │
-│  3. Format distance:                                        │
-│     - Under 0.1 mi → Show in feet (e.g., "450 ft")         │
-│     - Under 10 mi  → Show 1 decimal (e.g., "2.3 mi")       │
-│     - Over 10 mi   → Show rounded (e.g., "15 mi")          │
-│                                                             │
-│  4. Position badges vertically aligned with result rows    │
-│                                                             │
-└────────────────────────────────────────────────────────────┘
-```
-
-**Shadow DOM Traversal:**
-Google's UI Kit uses Shadow DOM. The component traverses open shadow roots to find result row elements for positioning.
-
----
-
-### 7. Google Maps UI Kit Loader (`googleMapsUiKitLoader.ts`)
+### 6. Google Maps UI Kit Loader (`googleMapsUiKitLoader.ts`)
 
 **Location:** `src/lib/googleMapsUiKitLoader.ts`
 
@@ -350,7 +304,7 @@ await window.google.maps.importLibrary('places');
 
 ---
 
-### 8. LLM Backend (`/api/chat/route.ts`)
+### 7. LLM Backend (`/api/chat/route.ts`)
 
 **Location:** `src/app/api/chat/route.ts`
 
@@ -386,7 +340,7 @@ nearbyPlaceSearch: tool({
 
 ---
 
-### 9. Search Logging (`logNearbySearch.ts`)
+### 8. Search Logging (`logNearbySearch.ts`)
 
 **Location:** `src/lib/logNearbySearch.ts`
 
@@ -517,32 +471,16 @@ const nearbyMessage: LocalMessage = {
 │  │  3. Google Places UI Kit fetches and renders results            │        │
 │  │                                                                  │        │
 │  │  4. On 'gmp-load' event:                                        │        │
-│  │     - Extract coordinates from results                          │        │
-│  │     - Store in placesLite state                                 │        │
+│  │     - Count results (NO coordinate extraction - ToS compliant)  │        │
 │  │     - If 0 results → expand to 5km radius                       │        │
-│  └─────────────────────────────────────────────────────────────────┘        │
-│       │                                                                      │
-│       ▼                                                                      │
-│  ┌─────────────────────────────────────────────────────────────────┐        │
-│  │ DistanceRail renders alongside results                           │        │
-│  │                                                                  │        │
-│  │  For each place:                                                │        │
-│  │  1. Get coordinates (cached or extracted)                       │        │
-│  │  2. Calculate haversine distance from listing                   │        │
-│  │  3. Format: "0.3 mi" or "450 ft"                                │        │
-│  │  4. Position badge next to result row                           │        │
-│  │                                                                  │        │
 │  └─────────────────────────────────────────────────────────────────┘        │
 │                                                                              │
 │  FINAL OUTPUT:                                                              │
 │  ┌─────────────────────────────────────────────────┐                        │
 │  │ 📍 Nearby Results                               │                        │
 │  │ ─────────────────────────────────────────────── │                        │
-│  │ [Planet Fitness - Downtown]        │ 0.3 mi    │                        │
-│  │ [24 Hour Fitness]                  │ 0.8 mi    │                        │
-│  │ [CrossFit Central]                 │ 1.2 mi    │                        │
-│  │ [Anytime Fitness]                  │ 1.5 mi    │                        │
-│  │ [Gold's Gym]                       │ 2.1 mi    │                        │
+│  │ [Google Places UI Kit renders results]          │                        │
+│  │ [with name, address, rating, photos]            │                        │
 │  │ ─────────────────────────────────────────────── │                        │
 │  │ 🔲 Google Attribution                           │                        │
 │  └─────────────────────────────────────────────────┘                        │
@@ -580,5 +518,3 @@ const nearbyMessage: LocalMessage = {
 - [ ] Rate Limit: Make 3 searches → 4th should be blocked
 - [ ] Debounce: Search twice quickly → Second should show "wait" message
 - [ ] Session Expiry: Wait 30+ minutes → Counter should reset
-- [ ] Distance Units: Check distances show in miles/feet (not km)
-- [ ] Multiple Cards: Add multiple searches → Previous cards shouldn't reload

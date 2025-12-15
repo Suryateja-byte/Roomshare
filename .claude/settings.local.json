@@ -31,7 +31,12 @@
       "Bash(if not exist:*)",
       "WebSearch",
       "WebFetch(domain:developers.google.com)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

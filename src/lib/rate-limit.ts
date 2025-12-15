@@ -117,17 +117,22 @@ export const RATE_LIMITS = {
 
 /**
  * Get client IP from request headers (Vercel compatible)
+ *
+ * SECURITY: x-real-ip is set by Vercel's edge and cannot be spoofed.
+ * x-forwarded-for CAN be spoofed by clients, so only trust it in dev.
  */
 export function getClientIP(request: Request): string {
-    // Vercel/Cloudflare/AWS headers
-    const forwarded = request.headers.get('x-forwarded-for');
-    if (forwarded) {
-        return forwarded.split(',')[0].trim();
-    }
-
+    // On Vercel, x-real-ip is set by the edge and cannot be spoofed
+    // ALWAYS prefer it over x-forwarded-for which can be manipulated
     const realIP = request.headers.get('x-real-ip');
     if (realIP) {
         return realIP;
+    }
+
+    // Fallback for non-Vercel environments (local dev only)
+    const forwarded = request.headers.get('x-forwarded-for');
+    if (forwarded && process.env.NODE_ENV === 'development') {
+        return forwarded.split(',')[0].trim();
     }
 
     // Fallback

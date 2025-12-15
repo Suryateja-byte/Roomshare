@@ -1,16 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Scale, Gavel, AlertCircle, FileCheck } from 'lucide-react';
+import { ArrowLeft, Scale, Gavel, AlertCircle, FileCheck, MapPin } from 'lucide-react';
 
 const SECTIONS = [
     { id: 'acceptance', label: '1. Acceptance of Terms' },
     { id: 'account', label: '2. User Accounts' },
     { id: 'conduct', label: '3. User Conduct' },
     { id: 'content', label: '4. User Content' },
-    { id: 'termination', label: '5. Termination' },
-    { id: 'liability', label: '6. Limitation of Liability' },
-    { id: 'changes', label: '7. Changes to Terms' },
+    { id: 'third-party', label: '5. Third-Party Services' },
+    { id: 'termination', label: '6. Termination' },
+    { id: 'liability', label: '7. Limitation of Liability' },
+    { id: 'changes', label: '8. Changes to Terms' },
 ];
 
 export default function TermsPage() {
@@ -60,7 +61,7 @@ export default function TermsPage() {
                     <p className="text-lg text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
                         Please read these terms carefully. By using RoomShare, you agree to be bound by these conditions.
                     </p>
-                    <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 mt-8 uppercase tracking-widest">Effective Date: December 6, 2024</p>
+                    <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 mt-8 uppercase tracking-widest">Effective Date: December 14, 2025</p>
                 </div>
             </div>
 
@@ -143,9 +144,36 @@ export default function TermsPage() {
                         </p>
                     </section>
 
+                    <section id="third-party" className="mb-16 scroll-mt-32">
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-6 flex items-center gap-3">
+                            <MapPin className="w-6 h-6 text-zinc-400 dark:text-zinc-500" /> 5. Third-Party Services
+                        </h2>
+                        <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-8 border border-zinc-100 dark:border-zinc-800">
+                            <h4 className="font-semibold text-zinc-900 dark:text-white text-base mb-3">Google Maps Platform</h4>
+                            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+                                RoomShare integrates with Google Maps Platform to provide neighborhood exploration features. By using these features, you agree to be bound by Google&apos;s Terms of Service.
+                            </p>
+                            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+                                When you use the neighborhood exploration feature:
+                            </p>
+                            <ul className="list-disc pl-5 space-y-2 text-zinc-600 dark:text-zinc-400 marker:text-zinc-300 dark:marker:text-zinc-600 mb-4">
+                                <li>Location data is sent to Google to retrieve nearby place information.</li>
+                                <li>You agree to comply with Google&apos;s acceptable use policies.</li>
+                                <li>Google may display their own attribution and branding as required by their terms.</li>
+                            </ul>
+                            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                                You must also comply with Google&apos;s{' '}
+                                <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="text-zinc-900 dark:text-white underline underline-offset-2 hover:no-underline">
+                                    Terms of Service
+                                </a>{' '}
+                                when using these features.
+                            </p>
+                        </div>
+                    </section>
+
                     <section id="termination" className="mb-16 scroll-mt-32">
                         <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Gavel className="w-6 h-6 text-zinc-400 dark:text-zinc-500" /> 5. Termination
+                            <Gavel className="w-6 h-6 text-zinc-400 dark:text-zinc-500" /> 6. Termination
                         </h2>
                         <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
                             We may terminate or suspend your account and bar access to the Service immediately, without prior notice or liability, under our sole discretion, for any reason whatsoever and without limitation, including but not limited to a breach of the Terms.
@@ -153,14 +181,14 @@ export default function TermsPage() {
                     </section>
 
                     <section id="liability" className="mb-16 scroll-mt-32">
-                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-4">6. Limitation of Liability</h2>
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-4">7. Limitation of Liability</h2>
                         <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
                             In no event shall RoomShare, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses.
                         </p>
                     </section>
 
                     <section id="changes" className="scroll-mt-32">
-                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-6">7. Changes to Terms</h2>
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-6">8. Changes to Terms</h2>
                         <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-8 border border-zinc-100 dark:border-zinc-800 flex gap-4">
                             <FileCheck className="w-8 h-8 text-zinc-900 dark:text-white shrink-0" />
                             <div>

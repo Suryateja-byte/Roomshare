@@ -517,6 +517,7 @@ export default function ListingPageClient({
             {/* Neighborhood AI Chat Widget */}
             {coordinates && (
                 <NeighborhoodChat
+                    listingId={listing.id}
                     latitude={coordinates.lat}
                     longitude={coordinates.lng}
                 />

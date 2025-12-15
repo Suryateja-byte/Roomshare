@@ -40,6 +40,8 @@ interface LocalMessage {
       includedTypes?: string[];
       textQuery?: string;
     };
+    /** P2-C3 FIX: Whether multiple brands were detected */
+    multiBrandDetected?: boolean;
   };
 }
 
@@ -62,7 +64,11 @@ interface RenderItem {
       includedTypes?: string[];
       textQuery?: string;
     };
+    /** P2-C3 FIX: Whether multiple brands were detected */
+    multiBrandDetected?: boolean;
   };
+  /** C2 FIX: Whether this nearby-places card came from LLM tool invocation */
+  fromLlmTool?: boolean;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -76,6 +82,31 @@ const MAX_INPUT_LENGTH = 500;
 
 // B7 FIX: Timeout for LLM streaming responses
 const LLM_TIMEOUT_MS = 30000; // 30 seconds
+
+// C11 FIX: Module-level cache for stableNormalizedIntent objects
+// This maintains reference stability across re-renders without triggering
+// lint warnings about ref access during render
+// P3-B29 FIX: Added LRU eviction to prevent memory leak
+const INTENT_CACHE_MAX_SIZE = 100;
+const intentCache = new Map<string, {
+  mode: 'type' | 'text';
+  includedTypes?: string[];
+  textQuery?: string;
+}>();
+
+// P3-B29 FIX: LRU eviction helper - removes oldest entries when cache exceeds max size
+function addToIntentCache(key: string, value: { mode: 'type' | 'text'; includedTypes?: string[]; textQuery?: string }) {
+  // If key exists, delete it first so it moves to end (most recently used)
+  if (intentCache.has(key)) {
+    intentCache.delete(key);
+  }
+  // Evict oldest entries if at capacity
+  while (intentCache.size >= INTENT_CACHE_MAX_SIZE) {
+    const oldestKey = intentCache.keys().next().value;
+    if (oldestKey) intentCache.delete(oldestKey);
+  }
+  intentCache.set(key, value);
+}
 
 // Helper to extract text content from a UIMessage
 function getMessageContent(msg: UIMessage): string {
@@ -94,13 +125,23 @@ function generateMessageId(): string {
 // Helper to determine error type from useChat error
 function getErrorInfo(error: Error | undefined): {
   isRateLimit: boolean;
+  isFairHousing: boolean;
   retryAfter?: number;
   message: string;
 } {
-  if (!error) return { isRateLimit: false, message: '' };
+  if (!error) return { isRateLimit: false, isFairHousing: false, message: '' };
 
   // AI SDK wraps fetch errors - check for status code patterns
   const errorMsg = error.message?.toLowerCase() || '';
+
+  // C4 FIX: Check for 403 Fair Housing policy refusal
+  if (errorMsg.includes('403') || errorMsg.includes('request_blocked') || errorMsg.includes('fair housing')) {
+    return {
+      isRateLimit: false,
+      isFairHousing: true,
+      message: "I can't help with questions about neighborhood demographics, school rankings, or safety statistics to comply with Fair Housing guidelines. Try asking about nearby amenities instead!",
+    };
+  }
 
   // Check for 429 status or "too many" in error message
   if (errorMsg.includes('429') || errorMsg.includes('too many')) {
@@ -109,12 +150,13 @@ function getErrorInfo(error: Error | undefined): {
     const retryAfter = retryMatch ? parseInt(retryMatch[1], 10) : 60;
     return {
       isRateLimit: true,
+      isFairHousing: false,
       retryAfter,
       message: `You've reached the message limit. Please try again in ${retryAfter} seconds.`,
     };
   }
 
-  return { isRateLimit: false, message: 'Connection failed. Tap to retry.' };
+  return { isRateLimit: false, isFairHousing: false, message: 'Connection failed. Tap to retry.' };
 }
 
 export default function NeighborhoodChat({ latitude, longitude, listingId }: NeighborhoodChatProps) {
@@ -128,6 +170,14 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
   const llmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // C12 FIX: Ref to scrollable container for device rotation scroll preservation
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // P2-B23 FIX: Offline detection state (initialize with actual state)
+  const [isOffline, setIsOffline] = useState(() =>
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
+  // P2-B20 FIX: AbortController for stream cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Use coordinates as listing identifier for rate limiting if listingId not provided
   const rateLimitKey = listingId || `${latitude.toFixed(4)}_${longitude.toFixed(4)}`;
@@ -198,6 +248,107 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
+  // P2-B23 FIX: Offline detection - event listeners only (initial state set in useState)
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // P2-B20 FIX: Cancel stream when chat closes
+  useEffect(() => {
+    if (!isOpen && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, [isOpen]);
+
+  // P2-B22 FIX: Prevent pull-to-refresh on mobile when chat is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      // Store initial touch Y position
+      const touch = e.touches[0];
+      scrollContainer.dataset.touchStartY = String(touch.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      const startY = Number(scrollContainer.dataset.touchStartY || 0);
+      const deltaY = touch.clientY - startY;
+
+      // If at top of scroll and pulling down, prevent default
+      if (scrollContainer.scrollTop <= 0 && deltaY > 0) {
+        e.preventDefault();
+      }
+    };
+
+    scrollContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+    scrollContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+    return () => {
+      scrollContainer.removeEventListener('touchstart', handleTouchStart);
+      scrollContainer.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [isOpen]);
+
+  // C12 FIX: Preserve scroll position on device rotation/resize
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    // Store scroll ratio (position relative to total scrollable height)
+    let scrollRatio = 0;
+
+    const handleResizeStart = () => {
+      if (!scrollContainer) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+      const maxScroll = scrollHeight - clientHeight;
+      scrollRatio = maxScroll > 0 ? scrollTop / maxScroll : 1;
+    };
+
+    const handleResizeEnd = () => {
+      if (!scrollContainer) return;
+      // Restore scroll position after resize settles
+      requestAnimationFrame(() => {
+        const { scrollHeight, clientHeight } = scrollContainer;
+        const maxScroll = scrollHeight - clientHeight;
+        scrollContainer.scrollTop = scrollRatio * maxScroll;
+      });
+    };
+
+    // Use ResizeObserver for more reliable detection
+    const resizeObserver = new ResizeObserver(() => {
+      handleResizeEnd();
+    });
+
+    // Track scroll position continuously
+    const handleScroll = () => {
+      handleResizeStart();
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    resizeObserver.observe(scrollContainer);
+
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+      resizeObserver.disconnect();
+    };
+  }, [isOpen]);
+
   // B7 FIX: LLM streaming timeout effect
   useEffect(() => {
     // Start timeout when LLM is processing
@@ -206,8 +357,6 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
       if (llmTimeoutRef.current) {
         clearTimeout(llmTimeoutRef.current);
       }
-      // Reset timeout state when starting new request
-      setLlmTimedOut(false);
 
       llmTimeoutRef.current = setTimeout(() => {
         console.error('[NeighborhoodChat] LLM streaming timed out after', LLM_TIMEOUT_MS, 'ms');
@@ -322,12 +471,16 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
               includedTypes: intent.includedTypes,
               textQuery: intent.textQuery,
             },
+            // P2-C3 FIX: Pass multi-brand detection flag for warning display
+            multiBrandDetected: intent.multiBrandDetected,
           },
         };
         setLocalMessages((prev) => [...prev, nearbyMessage]);
         setIsProcessingLocally(false);
       } else {
         // Step 3b: Not a nearby query - send to LLM (useChat handles user + assistant messages)
+        // Reset timeout state before new request
+        setLlmTimedOut(false);
         await sendMessage({ text: trimmedMessage });
       }
     },
@@ -410,8 +563,23 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
               coordinates: { lat: number; lng: number };
             };
 
+            // C11 FIX: Use deterministic cache key to maintain reference stability
+            const cacheKey = `${msg.id}_tool_${'toolCallId' in part ? part.toolCallId : 'unknown'}`;
+
+            // Get or create cached stableNormalizedIntent (module-level cache)
+            let stableIntent = intentCache.get(cacheKey);
+            if (!stableIntent) {
+              stableIntent = {
+                mode: result.searchType,
+                includedTypes: result.includedTypes,
+                textQuery: result.searchType === 'text' ? result.query : undefined,
+              };
+              // P3-B29 FIX: Use LRU-aware cache function
+              addToIntentCache(cacheKey, stableIntent);
+            }
+
             aiItems.push({
-              id: `${msg.id}_tool_${'toolCallId' in part ? part.toolCallId : 'unknown'}`,
+              id: cacheKey,
               kind: 'nearby-places' as const,
               role: 'assistant',
               // Place tool result slightly after the message (timestamp + 0.5)
@@ -424,12 +592,11 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                   includedTypes: result.includedTypes,
                   normalizedQuery: result.query,
                 },
-                stableNormalizedIntent: {
-                  mode: result.searchType,
-                  includedTypes: result.includedTypes,
-                  textQuery: result.searchType === 'text' ? result.query : undefined,
-                },
+                // C11 FIX: Use cached object to maintain reference stability
+                stableNormalizedIntent: stableIntent,
               },
+              // C2 FIX: Mark LLM tool invocations for rate limit checking
+              fromLlmTool: true,
             });
           }
         }
@@ -491,6 +658,12 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                 normalizedIntent={item.nearbyPlacesData.stableNormalizedIntent}
                 // P1-03 FIX: Only increment rate limit count on successful search
                 onSearchSuccess={incrementCount}
+                // C2 FIX: Pass rate limit state for LLM tool invocations
+                // Local messages already checked canSearch before adding, but LLM tools bypass that
+                canSearch={item.fromLlmTool ? canSearch : true}
+                remainingSearches={item.fromLlmTool ? remainingSearches : undefined}
+                // P2-C3 FIX: Pass multi-brand detection for warning display
+                multiBrandDetected={item.nearbyPlacesData.multiBrandDetected}
               />
             </div>
           ) : (
@@ -573,7 +746,13 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
             {/* Minimal Header */}
             <div className="px-6 pt-6 pb-2 flex items-center justify-between z-30">
               <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" />
+                {/* P2-B23 FIX: Show offline/online status indicator */}
+                <div className={cn(
+                  'w-2 h-2 rounded-full transition-colors',
+                  isOffline
+                    ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]'
+                    : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]'
+                )} />
                 <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 tracking-tight">Concierge</span>
               </div>
 
@@ -584,9 +763,18 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
               )}
             </div>
 
+            {/* P2-B23 FIX: Offline banner */}
+            {isOffline && (
+              <div className="mx-6 mb-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-300 text-center z-30">
+                You&apos;re offline. Some features may be unavailable.
+              </div>
+            )}
+
             {/* Messages Area */}
             {/* B8 FIX: Added role="log" and aria-live for screen reader accessibility */}
+            {/* C12 FIX: Added ref for scroll position preservation on device rotation */}
             <div
+              ref={scrollContainerRef}
               className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain"
               role="log"
               aria-live="polite"
@@ -646,6 +834,11 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                     >
                       {errorInfo.isRateLimit ? (
                         <div className="text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full">
+                          {errorInfo.message}
+                        </div>
+                      ) : errorInfo.isFairHousing ? (
+                        // C4 FIX: Fair Housing policy errors - no retry button (not transient)
+                        <div className="text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-2xl max-w-[280px] text-center leading-relaxed">
                           {errorInfo.message}
                         </div>
                       ) : (
