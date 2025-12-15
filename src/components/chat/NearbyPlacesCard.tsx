@@ -2,10 +2,9 @@
 
 /// <reference path="../../types/google-places-ui-kit.d.ts" />
 
-import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MapPin, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { loadPlacesUiKit } from '@/lib/googleMapsUiKitLoader';
-import { DistanceRail } from './DistanceRail';
 
 /**
  * NearbyPlacesCard - Renders Google Places UI Kit components.
@@ -15,6 +14,7 @@ import { DistanceRail } from './DistanceRail';
  * - Do NOT extract place data and render in custom UI
  * - Do NOT remove/alter/obscure Google attributions
  * - Do NOT store place names/addresses/ratings
+ * - Do NOT extract coordinates from place.location (ToS violation)
  */
 
 export interface NearbyPlacesCardProps {
@@ -32,6 +32,8 @@ export interface NearbyPlacesCardProps {
   };
   /** Callback when search completes */
   onSearchComplete?: (resultCount: number) => void;
+  /** P1-03 FIX: Callback when search succeeds (resultCount > 0) - for rate limit */
+  onSearchSuccess?: () => void;
   /** Optional: whether the card is currently visible (for lazy loading) */
   isVisible?: boolean;
 }
@@ -39,45 +41,8 @@ export interface NearbyPlacesCardProps {
 const INITIAL_RADIUS = 1600; // 1.6km
 const EXPANDED_RADIUS = 5000; // 5km
 const MAX_RESULTS = 5;
-
-/**
- * Extract coordinates from a Google Maps location object immediately.
- * This caches coordinates as plain objects before they can become stale.
- */
-function extractCoordsFromLocation(location: any): { lat: number; lng: number } | null {
-  if (!location) return null;
-
-  // Handle Google Maps LatLng objects (function getters)
-  if (typeof location.lat === 'function' && typeof location.lng === 'function') {
-    try {
-      const lat = Number(location.lat());
-      const lng = Number(location.lng());
-      if (isFinite(lat) && isFinite(lng) && (lat !== 0 || lng !== 0)) {
-        return { lat, lng };
-      }
-    } catch {
-      // Getter not ready yet - return null, DistanceRail will retry
-      return null;
-    }
-    return null;
-  }
-
-  // Handle plain {lat, lng} objects
-  if (typeof location.lat === 'number' && typeof location.lng === 'number') {
-    if (isFinite(location.lat) && isFinite(location.lng)) {
-      return { lat: location.lat, lng: location.lng };
-    }
-  }
-
-  // Handle {latitude, longitude} property names
-  if (typeof location.latitude === 'number' && typeof location.longitude === 'number') {
-    if (isFinite(location.latitude) && isFinite(location.longitude)) {
-      return { lat: location.latitude, lng: location.longitude };
-    }
-  }
-
-  return null;
-}
+// B6 FIX: Timeout for Places API search
+const SEARCH_TIMEOUT_MS = 15000; // 15 seconds
 
 export function NearbyPlacesCard({
   latitude,
@@ -85,17 +50,14 @@ export function NearbyPlacesCard({
   queryText,
   normalizedIntent,
   onSearchComplete,
+  onSearchSuccess,
   isVisible = true,
 }: NearbyPlacesCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLElement | null>(null);
-  const resultsRootRef = useRef<HTMLDivElement>(null);
-  const [placesLite, setPlacesLite] = useState<Array<{
-    key: string;
-    location: any;
-    coords: { lat: number; lng: number } | null;
-  }>>([]);
+  // B6 FIX: Timeout ref for Places API search
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'no-results'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -141,31 +103,23 @@ export function NearbyPlacesCard({
     };
   }, [isVisible]);
 
-  // Handle search results
+  // Handle search results - NO coordinate extraction
   const handleSearchLoad = useCallback(
     (event: Event) => {
+      // B6 FIX: Clear timeout when search completes
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+
       const searchElement = event.target as HTMLElement & {
-        places?: Array<{ id?: string; placeId?: string; resourceName?: string; location?: unknown }>;
+        places?: Array<{ id?: string }>;  // ONLY id, nothing else
       };
 
       const results = searchElement?.places || [];
       const resultCount = results.length;
 
-      console.log('[NearbyPlacesCard] handleSearchLoad - places:', results, 'count:', resultCount);
-      if (results.length > 0) {
-        console.log('[NearbyPlacesCard] First place location:', results[0]?.location);
-      }
-
-      // Extract coordinates immediately while Google Maps objects are fresh
-      // This prevents stale reference issues when objects become invalid later
-      setPlacesLite(
-        results.map((p: any, i: number) => {
-          const key = String(p?.id ?? p?.placeId ?? p?.resourceName ?? i);
-          const location = p?.location;
-          const coords = extractCoordsFromLocation(location);
-          return { key, location, coords };
-        })
-      );
+      // NO coordinate extraction - just count results
 
       // If no results and haven't expanded yet, try with larger radius
       if (resultCount === 0 && !hasExpandedOnce && currentRadius < EXPANDED_RADIUS) {
@@ -176,16 +130,20 @@ export function NearbyPlacesCard({
 
       if (resultCount === 0) {
         setStatus('no-results');
+      } else {
+        // P1-03 FIX: Only call onSearchSuccess when we have results
+        onSearchSuccess?.();
       }
 
       onSearchComplete?.(resultCount);
     },
-    [hasExpandedOnce, currentRadius, onSearchComplete]
+    [hasExpandedOnce, currentRadius, onSearchComplete, onSearchSuccess]
   );
 
   // Create and configure Places UI Kit elements IMPERATIVELY
   // This ensures locationRestriction is set BEFORE element is added to DOM
-  useLayoutEffect(() => {
+  // B2 FIX: Changed from useLayoutEffect to useEffect with proper cleanup
+  useEffect(() => {
     if (status !== 'ready' || !searchContainerRef.current) return;
 
     const container = searchContainerRef.current;
@@ -260,17 +218,33 @@ export function NearbyPlacesCard({
     // Store ref
     searchRef.current = searchEl;
 
-    console.log('[NearbyPlacesCard] About to add element to DOM, searchRef.current:', searchRef.current);
-
     // NOW add to DOM (after all properties are set)
     container.appendChild(searchEl);
 
-    console.log('[NearbyPlacesCard] Element added to DOM');
+    // B6 FIX: Set timeout for Places API search
+    // P1-05 FIX: Improved timeout error message with more context
+    searchTimeoutRef.current = setTimeout(() => {
+      console.error('[NearbyPlacesCard] Places API search timed out after', SEARCH_TIMEOUT_MS, 'ms');
+      const timeoutSec = Math.round(SEARCH_TIMEOUT_MS / 1000);
+      setErrorMessage(
+        `Search for "${queryText}" timed out after ${timeoutSec}s. This may be due to a slow connection. Please try again.`
+      );
+      setStatus('error');
+    }, SEARCH_TIMEOUT_MS);
 
+    // B2 FIX: Proper cleanup - remove listener, clear container, null ref
+    // B6 FIX: Also clear timeout
     return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
       searchEl.removeEventListener('gmp-load', handleSearchLoad);
-      // Don't clear placesLite - let it persist until new results arrive
-      // This prevents badge flickering during effect re-runs
+      // Clear container to prevent DOM leaks
+      if (container) {
+        container.innerHTML = '';
+      }
+      searchRef.current = null;
     };
   }, [status, latitude, longitude, currentRadius, normalizedIntent, queryText, handleSearchLoad]);
 
@@ -352,47 +326,42 @@ export function NearbyPlacesCard({
     );
   }
 
-  // Render Places UI Kit with distance rail
-  const origin = { lat: latitude, lng: longitude };
-
+  // Render Places UI Kit - simplified layout without distance rail
   return (
     <div
       ref={containerRef}
       className="bg-white dark:bg-zinc-800 rounded-[24px] shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700 overflow-hidden"
     >
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700 flex items-center">
+      {/* Header - P2-01 FIX: Show query context for clarity */}
+      <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+          <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
             <MapPin className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
           </div>
-          <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 tracking-tight">
-            Nearby Results
-          </span>
-          {currentRadius > INITIAL_RADIUS && (
-            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">(expanded)</span>
-          )}
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 tracking-tight truncate">
+              {/* P2-01 FIX: Show what was searched for */}
+              {normalizedIntent.includedTypes && normalizedIntent.includedTypes.length > 1
+                ? `Nearby ${normalizedIntent.includedTypes.map(t => t.replace(/_/g, ' ')).join(', ')}`
+                : `Nearby "${queryText}"`}
+            </span>
+            {currentRadius > INITIAL_RADIUS && (
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 tracking-wide">
+                Expanded search radius ({(currentRadius / 1000).toFixed(1)}km)
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Body: Places UI Kit Content + Distance Rail */}
-      <div className="grid grid-cols-[minmax(0,1fr)_60px] sm:grid-cols-[minmax(0,1fr)_84px] gap-2 sm:gap-3 p-3 sm:p-4 items-stretch bg-zinc-50/50 dark:bg-zinc-800/50 relative">
-        {/* LEFT: Google UI */}
-        <div ref={resultsRootRef} className="min-w-0 relative">
-          <div ref={searchContainerRef} />
-        </div>
+      {/* Body: Places UI Kit Content */}
+      <div className="p-3 sm:p-4 bg-zinc-50/50 dark:bg-zinc-800/50">
+        {/* Google UI */}
+        <div ref={searchContainerRef} />
 
-        {/* RIGHT: Distance rail pinned to row centers */}
-        <DistanceRail
-          placeSearchRef={searchRef}
-          resultsRootRef={resultsRootRef}
-          places={placesLite}
-          origin={origin}
-        />
-
-        {/* Google Attribution - DO NOT REMOVE/ALTER/OBSCURE */}
-        <div className="col-span-2 pt-3">
-          <gmp-place-attribution color-scheme="light" />
+        {/* Google Attribution - auto-detects theme, NO hardcoded color-scheme */}
+        <div className="pt-3">
+          <gmp-place-attribution />
         </div>
       </div>
     </div>

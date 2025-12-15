@@ -29,6 +29,10 @@ interface UseNearbySearchRateLimitReturn {
   remainingSearches: number;
   /** Whether currently in debounce period */
   isDebounceBusy: boolean;
+  /** P1-04 FIX: Milliseconds remaining in debounce period (for countdown display) */
+  debounceRemainingMs: number;
+  /** P1-03 FIX: Start debounce timer only (call when search initiated) */
+  startDebounce: () => void;
   /** Increment the search count (call after successful search) */
   incrementCount: () => void;
   /** Reset the rate limit for this listing */
@@ -122,7 +126,13 @@ export function useNearbySearchRateLimit(
 
   // Track debounce status
   const [isDebounceBusy, setIsDebounceBusy] = useState(false);
+  // P1-04 FIX: Track milliseconds remaining in debounce for countdown display
+  const [debounceRemainingMs, setDebounceRemainingMs] = useState(0);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // P1-04 FIX: Ref for countdown interval
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // P1-04 FIX: Ref to track debounce end time for accurate countdown
+  const debounceEndTimeRef = useRef<number>(0);
 
   // Sync state from sessionStorage when listingId changes
   useEffect(() => {
@@ -142,16 +152,45 @@ export function useNearbySearchRateLimit(
 
       // Set timer to clear debounce
       const remainingDebounce = DEBOUNCE_MS - timeSinceLastSearch;
+
+      // P1-04 FIX: Start countdown for remaining debounce time
+      const endTime = now + remainingDebounce;
+      debounceEndTimeRef.current = endTime;
+      setDebounceRemainingMs(remainingDebounce);
+
+      // P1-04 FIX: Start countdown interval
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+      countdownIntervalRef.current = setInterval(() => {
+        const remaining = Math.max(0, debounceEndTimeRef.current - Date.now());
+        setDebounceRemainingMs(remaining);
+        if (remaining <= 0 && countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+      }, 100);
+
       debounceTimerRef.current = setTimeout(() => {
         setIsDebounceBusy(false);
+        setDebounceRemainingMs(0);
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
       }, remainingDebounce);
     } else {
       setIsDebounceBusy(false);
+      setDebounceRemainingMs(0);
     }
 
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+      }
+      // P1-04 FIX: Clean up countdown interval
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
       }
     };
   }, [listingId]);
@@ -160,19 +199,50 @@ export function useNearbySearchRateLimit(
   const remainingSearches = Math.max(0, MAX_SEARCHES_PER_LISTING - state.searchCount);
   const canSearch = remainingSearches > 0 && !isDebounceBusy;
 
-  // Increment search count
-  const incrementCount = useCallback(() => {
-    const now = Date.now();
-    const newState: RateLimitState = {
-      searchCount: state.searchCount + 1,
-      lastSearchTime: now,
-    };
+  // P1-04 FIX: Helper to start countdown interval
+  const startCountdown = useCallback((endTime: number) => {
+    // Clear any existing interval
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
 
-    setState(newState);
-    writeState(listingId, newState);
+    // Set initial remaining time
+    const initialRemaining = Math.max(0, endTime - Date.now());
+    setDebounceRemainingMs(initialRemaining);
 
-    // Start debounce period
+    // Start interval to update countdown every 100ms
+    countdownIntervalRef.current = setInterval(() => {
+      const remaining = Math.max(0, endTime - Date.now());
+      setDebounceRemainingMs(remaining);
+
+      // Clear interval when done
+      if (remaining <= 0) {
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+      }
+    }, 100);
+  }, []);
+
+  // P1-04 FIX: Helper to stop countdown
+  const stopCountdown = useCallback(() => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setDebounceRemainingMs(0);
+  }, []);
+
+  // P1-03 FIX: Separate debounce from count increment
+  // Start debounce timer only (call when search is initiated)
+  const startDebounce = useCallback(() => {
     setIsDebounceBusy(true);
+
+    // P1-04 FIX: Track end time and start countdown
+    const endTime = Date.now() + DEBOUNCE_MS;
+    debounceEndTimeRef.current = endTime;
+    startCountdown(endTime);
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -180,8 +250,26 @@ export function useNearbySearchRateLimit(
 
     debounceTimerRef.current = setTimeout(() => {
       setIsDebounceBusy(false);
+      stopCountdown();
     }, DEBOUNCE_MS);
-  }, [listingId, state.searchCount]);
+  }, [startCountdown, stopCountdown]);
+
+  // Increment search count only (call after successful search)
+  // B18 FIX: Use functional update to avoid stale closure issues with rapid increments
+  const incrementCount = useCallback(() => {
+    const now = Date.now();
+
+    setState((prev) => {
+      const newState: RateLimitState = {
+        searchCount: prev.searchCount + 1,
+        lastSearchTime: now,
+      };
+      // Write to storage inside functional update to ensure consistency
+      writeState(listingId, newState);
+      return newState;
+    });
+    // P1-03 FIX: Debounce is now handled by startDebounce(), not here
+  }, [listingId]); // B18 FIX: Removed state.searchCount from deps - using functional update
 
   // Reset rate limit for this listing
   const reset = useCallback(() => {
@@ -193,10 +281,18 @@ export function useNearbySearchRateLimit(
     setState(newState);
     writeState(listingId, newState);
     setIsDebounceBusy(false);
+    // P1-04 FIX: Reset countdown state
+    setDebounceRemainingMs(0);
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
+    }
+
+    // P1-04 FIX: Stop countdown interval
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
     }
   }, [listingId]);
 
@@ -204,6 +300,9 @@ export function useNearbySearchRateLimit(
     canSearch,
     remainingSearches,
     isDebounceBusy,
+    // P1-04 FIX: Expose countdown value for UI display
+    debounceRemainingMs,
+    startDebounce,
     incrementCount,
     reset,
   };

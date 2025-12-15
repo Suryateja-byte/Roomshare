@@ -11,7 +11,7 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import { detectNearbyIntent, type NearbyIntentResult } from '@/lib/nearby-intent';
 import { checkFairHousingPolicy, POLICY_REFUSAL_MESSAGE } from '@/lib/fair-housing-policy';
 import { useNearbySearchRateLimit, RATE_LIMIT_CONFIG } from '@/hooks/useNearbySearchRateLimit';
-import { logSearchTrigger, logBlockedSearch } from '@/lib/logNearbySearch';
+import { logAllowedSearch, logBlockedRequest } from '@/lib/logNearbySearch';
 import NearbyPlacesCard from '@/components/chat/NearbyPlacesCard';
 
 interface NeighborhoodChatProps {
@@ -27,7 +27,8 @@ interface NeighborhoodChatProps {
 interface LocalMessage {
   id: string;
   role: 'user' | 'assistant';
-  type: 'nearby-places' | 'policy-refusal' | 'rate-limit' | 'debounce';
+  // P0-02 FIX: Added 'user-echo' type for echoing user messages in nearby path
+  type: 'nearby-places' | 'policy-refusal' | 'rate-limit' | 'debounce' | 'user-echo';
   createdAt: number;
   content?: string;
   nearbyPlacesData?: {
@@ -47,7 +48,8 @@ interface LocalMessage {
  */
 interface RenderItem {
   id: string;
-  kind: 'ai-text' | 'nearby-places' | 'policy-refusal' | 'rate-limit' | 'debounce';
+  // P0-02 FIX: Added 'user-echo' kind for nearby path user messages
+  kind: 'ai-text' | 'nearby-places' | 'policy-refusal' | 'rate-limit' | 'debounce' | 'user-echo';
   role: 'user' | 'assistant';
   createdAt: number;
   content?: string;
@@ -72,6 +74,9 @@ const SUGGESTED_QUESTIONS = [
 
 const MAX_INPUT_LENGTH = 500;
 
+// B7 FIX: Timeout for LLM streaming responses
+const LLM_TIMEOUT_MS = 30000; // 30 seconds
+
 // Helper to extract text content from a UIMessage
 function getMessageContent(msg: UIMessage): string {
   if (!msg.parts) return '';
@@ -86,18 +91,49 @@ function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 }
 
+// Helper to determine error type from useChat error
+function getErrorInfo(error: Error | undefined): {
+  isRateLimit: boolean;
+  retryAfter?: number;
+  message: string;
+} {
+  if (!error) return { isRateLimit: false, message: '' };
+
+  // AI SDK wraps fetch errors - check for status code patterns
+  const errorMsg = error.message?.toLowerCase() || '';
+
+  // Check for 429 status or "too many" in error message
+  if (errorMsg.includes('429') || errorMsg.includes('too many')) {
+    // Try to extract retry-after from error if available
+    const retryMatch = errorMsg.match(/retry.?after[:\s]*(\d+)/i);
+    const retryAfter = retryMatch ? parseInt(retryMatch[1], 10) : 60;
+    return {
+      isRateLimit: true,
+      retryAfter,
+      message: `You've reached the message limit. Please try again in ${retryAfter} seconds.`,
+    };
+  }
+
+  return { isRateLimit: false, message: 'Connection failed. Tap to retry.' };
+}
+
 export default function NeighborhoodChat({ latitude, longitude, listingId }: NeighborhoodChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   // Local messages: only for widgets (nearby-places) and system messages (policy, rate-limit)
   const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
   const [isProcessingLocally, setIsProcessingLocally] = useState(false);
+  // B7 FIX: LLM streaming timeout state
+  const [llmTimedOut, setLlmTimedOut] = useState(false);
+  const llmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Use coordinates as listing identifier for rate limiting if listingId not provided
   const rateLimitKey = listingId || `${latitude.toFixed(4)}_${longitude.toFixed(4)}`;
-  const { canSearch, remainingSearches, isDebounceBusy, incrementCount } =
+  // P1-03 FIX: Added startDebounce for spam protection, incrementCount for success tracking
+  // P1-04 FIX: Added debounceRemainingMs for countdown display
+  const { canSearch, remainingSearches, isDebounceBusy, debounceRemainingMs, startDebounce, incrementCount } =
     useNearbySearchRateLimit(rateLimitKey);
 
   // Create transport with memoization
@@ -130,7 +166,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
       },
     ],
     onError: (err) => {
-      console.error('Chat error:', err);
+      console.error('Chat error:', err.message, err);
     },
   });
 
@@ -148,6 +184,55 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
     }
   }, [aiMessages, localMessages, isOpen, scrollToBottom]);
 
+  // P2-04 FIX: Close chat on Escape key press
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen]);
+
+  // B7 FIX: LLM streaming timeout effect
+  useEffect(() => {
+    // Start timeout when LLM is processing
+    if (status === 'streaming' || status === 'submitted') {
+      // Clear any existing timeout first
+      if (llmTimeoutRef.current) {
+        clearTimeout(llmTimeoutRef.current);
+      }
+      // Reset timeout state when starting new request
+      setLlmTimedOut(false);
+
+      llmTimeoutRef.current = setTimeout(() => {
+        console.error('[NeighborhoodChat] LLM streaming timed out after', LLM_TIMEOUT_MS, 'ms');
+        setLlmTimedOut(true);
+      }, LLM_TIMEOUT_MS);
+    }
+
+    // Clear timeout when LLM completes or errors
+    if (status === 'ready' || status === 'error') {
+      if (llmTimeoutRef.current) {
+        clearTimeout(llmTimeoutRef.current);
+        llmTimeoutRef.current = null;
+      }
+      // Don't reset llmTimedOut here - let it persist until next request
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (llmTimeoutRef.current) {
+        clearTimeout(llmTimeoutRef.current);
+        llmTimeoutRef.current = null;
+      }
+    };
+  }, [status]);
+
   // Handle message submission with intent routing
   const handleMessage = useCallback(
     async (messageText: string) => {
@@ -157,12 +242,8 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
       // Step 1: Check Fair Housing policy gate BEFORE anything else
       const policyCheck = checkFairHousingPolicy(trimmedMessage);
       if (!policyCheck.allowed) {
-        // Log blocked search
-        await logBlockedSearch(
-          rateLimitKey,
-          trimmedMessage,
-          policyCheck.blockedReason || 'unknown'
-        );
+        // Log blocked request (no user text or category sent)
+        await logBlockedRequest(rateLimitKey, 'nearby');
 
         // Add policy refusal as local message (user message shown via AI SDK would be confusing)
         const refusalMessage: LocalMessage = {
@@ -180,19 +261,10 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
       const intent = detectNearbyIntent(trimmedMessage);
 
       if (intent.isNearbyQuery) {
-        // Step 3a: Check rate limit for nearby queries
-        if (!canSearch) {
-          const rateLimitMessage: LocalMessage = {
-            id: generateMessageId(),
-            role: 'assistant',
-            type: 'rate-limit',
-            createdAt: Date.now(),
-            content: `You've reached the search limit for this listing. Please explore other features or contact the host for more information.`,
-          };
-          setLocalMessages((prev) => [...prev, rateLimitMessage]);
-          return;
-        }
+        // B1 FIX: Set processing flag at start of nearby path
+        setIsProcessingLocally(true);
 
+        // Step 3a: Check debounce FIRST (before canSearch, since canSearch includes !isDebounceBusy)
         if (isDebounceBusy) {
           const debounceMessage: LocalMessage = {
             id: generateMessageId(),
@@ -202,16 +274,38 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
             content: 'Please wait a moment before searching again.',
           };
           setLocalMessages((prev) => [...prev, debounceMessage]);
+          setIsProcessingLocally(false);
           return;
         }
 
-        // Increment rate limit and log
-        incrementCount();
-        await logSearchTrigger(
-          rateLimitKey,
-          intent.normalizedQuery || trimmedMessage,
-          intent.searchType
-        );
+        // Step 3b: Check rate limit (only reached when not debouncing)
+        if (!canSearch) {
+          const rateLimitMessage: LocalMessage = {
+            id: generateMessageId(),
+            role: 'assistant',
+            type: 'rate-limit',
+            createdAt: Date.now(),
+            content: `You've reached the search limit for this listing. Please explore other features or contact the host for more information.`,
+          };
+          setLocalMessages((prev) => [...prev, rateLimitMessage]);
+          setIsProcessingLocally(false);
+          return;
+        }
+
+        // P1-03 FIX: Start debounce immediately (prevents spam), but don't increment count yet
+        // Count will be incremented only on successful search via onSearchSuccess callback
+        startDebounce();
+        await logAllowedSearch(rateLimitKey, intent.searchType, intent.includedTypes);
+
+        // P0-02 FIX: Echo user message first so user sees their query
+        const userEchoMessage: LocalMessage = {
+          id: generateMessageId(),
+          role: 'user',
+          type: 'user-echo',
+          createdAt: Date.now(),
+          content: trimmedMessage,
+        };
+        setLocalMessages((prev) => [...prev, userEchoMessage]);
 
         // Add NearbyPlacesCard as local assistant response
         // Create stableNormalizedIntent HERE so object reference is preserved across re-renders
@@ -231,9 +325,9 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
           },
         };
         setLocalMessages((prev) => [...prev, nearbyMessage]);
+        setIsProcessingLocally(false);
       } else {
         // Step 3b: Not a nearby query - send to LLM (useChat handles user + assistant messages)
-        setIsProcessingLocally(false);
         await sendMessage({ text: trimmedMessage });
       }
     },
@@ -241,7 +335,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
       isLoading,
       canSearch,
       isDebounceBusy,
-      incrementCount,
+      startDebounce,
       rateLimitKey,
       sendMessage,
     ]
@@ -271,21 +365,80 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
     await handleMessage(message);
   };
 
+  // B3 FIX: Use fixed base timestamp for consistent ordering
+  // AI messages use BASE + index, local messages use Date.now()
+  // This ensures proper interleaving when sorted by createdAt
+  const AI_MESSAGE_BASE_TIMESTAMP = 1000000000000; // Sep 2001 epoch - always < Date.now()
+
   // Combine AI messages and local messages for rendering
   const renderItems = useMemo((): RenderItem[] => {
+    const aiItems: RenderItem[] = [];
+
     // Convert AI messages to RenderItem format
-    const aiItems: RenderItem[] = (aiMessages as UIMessage[]).map((msg, index) => ({
-      id: msg.id,
-      kind: 'ai-text' as const,
-      role: msg.role as 'user' | 'assistant',
-      // Use index-based createdAt for AI messages to preserve order
-      // Initial greeting (id='1') gets timestamp 0 to always be first
-      createdAt: msg.id === '1' ? 0 : index,
-      content: getMessageContent(msg),
-    }));
+    // Use BASE + index to preserve relative order while allowing local messages to interleave
+    (aiMessages as UIMessage[]).forEach((msg, index) => {
+      const textContent = getMessageContent(msg);
+      const timestamp = msg.id === '1' ? 0 : AI_MESSAGE_BASE_TIMESTAMP + index;
+
+      // Add text content as ai-text item
+      if (textContent) {
+        aiItems.push({
+          id: msg.id,
+          kind: 'ai-text' as const,
+          role: msg.role as 'user' | 'assistant',
+          createdAt: timestamp,
+          content: textContent,
+        });
+      }
+
+      // P0-01 FIX: Check for tool-invocation parts with NEARBY_UI_KIT action
+      // When LLM calls nearbyPlaceSearch tool, render result as NearbyPlacesCard
+      if (msg.parts) {
+        for (const part of msg.parts) {
+          if (
+            part.type === 'tool-invocation' &&
+            'toolName' in part &&
+            part.toolName === 'nearbyPlaceSearch' &&
+            'result' in part &&
+            part.result?.action === 'NEARBY_UI_KIT'
+          ) {
+            const result = part.result as {
+              action: string;
+              query: string;
+              searchType: 'type' | 'text';
+              includedTypes?: string[];
+              coordinates: { lat: number; lng: number };
+            };
+
+            aiItems.push({
+              id: `${msg.id}_tool_${'toolCallId' in part ? part.toolCallId : 'unknown'}`,
+              kind: 'nearby-places' as const,
+              role: 'assistant',
+              // Place tool result slightly after the message (timestamp + 0.5)
+              createdAt: timestamp + 0.5,
+              nearbyPlacesData: {
+                queryText: result.query,
+                normalizedIntent: {
+                  isNearbyQuery: true,
+                  searchType: result.searchType,
+                  includedTypes: result.includedTypes,
+                  normalizedQuery: result.query,
+                },
+                stableNormalizedIntent: {
+                  mode: result.searchType,
+                  includedTypes: result.includedTypes,
+                  textQuery: result.searchType === 'text' ? result.query : undefined,
+                },
+              },
+            });
+          }
+        }
+      }
+    });
 
     // Convert local messages to RenderItem format
-    // Simply pass through nearbyPlacesData - stableNormalizedIntent is already created at message creation time
+    // Local messages use Date.now() which is always > AI_MESSAGE_BASE_TIMESTAMP
+    // This means local messages will appear after all AI messages that existed when they were created
     const localItems: RenderItem[] = localMessages.map((msg) => ({
       id: msg.id,
       kind: msg.type,
@@ -295,28 +448,15 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
       nearbyPlacesData: msg.nearbyPlacesData,
     }));
 
-    // For AI messages, we preserve their array order (insertion order)
-    // Local messages are appended at the end based on their createdAt
-    // This works because local messages are only added when AI is not handling the message
-    const result: RenderItem[] = [];
+    // Combine all items
+    const result: RenderItem[] = [...aiItems, ...localItems];
 
-    // Add all AI messages first (they maintain their own order)
-    result.push(...aiItems);
-
-    // Add local messages at positions based on their createdAt relative to AI message count
-    // Since local messages are independent actions, they should appear after the relevant AI context
-    localItems.forEach((localItem) => {
-      result.push(localItem);
-    });
-
-    // Sort by createdAt, with AI messages getting priority for same-ish timestamps
+    // Sort by createdAt - greeting first, then chronological order
     return result.sort((a, b) => {
       // Initial greeting always first
       if (a.id === '1') return -1;
       if (b.id === '1') return 1;
 
-      // AI messages with index-based createdAt will naturally come first
-      // Local messages with Date.now() createdAt will be sorted after
       return a.createdAt - b.createdAt;
     });
   }, [aiMessages, localMessages]);
@@ -341,13 +481,16 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
         )}
       >
         <div className={cn('max-w-[88%] flex flex-col', isUser ? 'items-end' : 'items-start')}>
+          {/* B12 FIX: Use min() to prevent mobile overflow */}
           {item.kind === 'nearby-places' && item.nearbyPlacesData ? (
-            <div className="w-full min-w-[300px]">
+            <div className="w-full min-w-[min(300px,100%)]">
               <NearbyPlacesCard
                 latitude={latitude}
                 longitude={longitude}
                 queryText={item.nearbyPlacesData.queryText}
                 normalizedIntent={item.nearbyPlacesData.stableNormalizedIntent}
+                // P1-03 FIX: Only increment rate limit count on successful search
+                onSearchSuccess={incrementCount}
               />
             </div>
           ) : (
@@ -363,7 +506,14 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                   : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-[24px] rounded-tl-md shadow-sm border border-zinc-100 dark:border-zinc-700'
               )}
             >
-              {item.content}
+              {/* P1-04 FIX: Show live countdown for debounce messages */}
+              {item.kind === 'debounce' && isDebounceBusy && debounceRemainingMs > 0 ? (
+                <span>
+                  Please wait {Math.ceil(debounceRemainingMs / 1000)}s before searching again.
+                </span>
+              ) : (
+                item.content
+              )}
             </div>
           )}
         </div>
@@ -435,7 +585,13 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain">
+            {/* B8 FIX: Added role="log" and aria-live for screen reader accessibility */}
+            <div
+              className="flex-1 min-h-0 overflow-y-auto px-6 py-4 overscroll-contain"
+              role="log"
+              aria-live="polite"
+              aria-label="Chat messages"
+            >
               <div className="min-h-full flex flex-col justify-end pt-12 pb-4">
                 {/* Date separator */}
                 <div className="w-full flex justify-center mb-8">
@@ -445,22 +601,26 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                 {renderItems.map((item) => renderMessage(item))}
 
                 {/* Loading indicator (typing) */}
+                {/* B11 FIX: Added role="status" and aria-label for screen reader accessibility */}
                 {isLoading && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="flex justify-start"
+                    role="status"
+                    aria-label="Loading response"
                   >
                     <div className="bg-white/50 dark:bg-zinc-800/50 border border-zinc-100/50 dark:border-zinc-700/50 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm flex gap-1 items-center">
-                      <div className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                      <div className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                      <div className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce" />
+                      <div className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]" aria-hidden="true" />
+                      <div className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]" aria-hidden="true" />
+                      <div className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce" aria-hidden="true" />
+                      <span className="sr-only">Assistant is typing</span>
                     </div>
                   </motion.div>
                 )}
 
-                {/* Error message with retry */}
-                {error && (
+                {/* B7 FIX: Timeout error with retry */}
+                {llmTimedOut && !error && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -468,12 +628,37 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                   >
                     <button
                       onClick={retryLastMessage}
-                      className="text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 font-medium bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full transition-colors"
+                      className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full transition-colors"
                     >
-                      Connection failed. Tap to retry.
+                      Response timed out. Tap to retry.
                     </button>
                   </motion.div>
                 )}
+
+                {/* Error message with retry */}
+                {error && (() => {
+                  const errorInfo = getErrorInfo(error);
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex justify-center mb-4"
+                    >
+                      {errorInfo.isRateLimit ? (
+                        <div className="text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full">
+                          {errorInfo.message}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={retryLastMessage}
+                          className="text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 font-medium bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full transition-colors"
+                        >
+                          {errorInfo.message}
+                        </button>
+                      )}
+                    </motion.div>
+                  );
+                })()}
 
                 <div ref={messagesEndRef} />
               </div>
@@ -498,7 +683,9 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                         'text-zinc-600 dark:text-zinc-300',
                         'border border-zinc-100 dark:border-zinc-700 shadow-sm',
                         'transition-all duration-300 hover:shadow-md hover:scale-[1.02]',
-                        'flex items-center gap-2'
+                        'flex items-center gap-2',
+                        // B10 FIX: Keyboard focus indicators
+                        'focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:outline-none'
                       )}
                     >
                       <span>{q.emoji}</span>
