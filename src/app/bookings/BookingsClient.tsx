@@ -27,6 +27,7 @@ import { updateBookingStatus, BookingStatus } from '@/app/actions/manage-booking
 import UserAvatar from '@/components/UserAvatar';
 import BookingCalendar from '@/components/BookingCalendar';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { parseISODateAsLocal } from '@/lib/utils';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -40,11 +41,11 @@ import {
 
 type Booking = {
     id: string;
-    startDate: Date;
-    endDate: Date;
+    startDate: Date | string; // Can be Date or ISO string from server
+    endDate: Date | string; // Can be Date or ISO string from server
     status: BookingStatus;
     totalPrice: number;
-    createdAt: Date;
+    createdAt: Date | string; // Can be Date or ISO string from server
     listing: {
         id: string;
         title: string;
@@ -107,8 +108,8 @@ function StatusBadge({ status }: { status: BookingStatus }) {
     );
 }
 
-function formatDate(date: Date) {
-    return new Date(date).toLocaleDateString('en-US', {
+function formatDate(date: Date | string) {
+    return parseISODateAsLocal(date).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric'
@@ -507,8 +508,8 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                         <BookingCalendar
                             bookings={bookings.received.map(b => ({
                                 id: b.id,
-                                startDate: new Date(b.startDate),
-                                endDate: new Date(b.endDate),
+                                startDate: b.startDate, // BookingCalendar now handles Date | string
+                                endDate: b.endDate, // BookingCalendar now handles Date | string
                                 status: b.status,
                                 tenant: {
                                     id: b.tenant?.id || '',

@@ -5,6 +5,7 @@ import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import type { SearchFilters } from '@/lib/search-utils';
 import type { Prisma } from '@prisma/client';
+import { logger } from '@/lib/logger';
 
 type AlertFrequency = 'INSTANT' | 'DAILY' | 'WEEKLY';
 
@@ -45,8 +46,12 @@ export async function saveSearch(input: SaveSearchInput) {
         revalidatePath('/saved-searches');
 
         return { success: true, searchId: savedSearch.id };
-    } catch (error) {
-        console.error('Error saving search:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to save search', {
+            action: 'saveSearch',
+            searchName: input.name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to save search' };
     }
 }
@@ -64,8 +69,11 @@ export async function getMySavedSearches() {
         });
 
         return searches;
-    } catch (error) {
-        console.error('Error fetching saved searches:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to fetch saved searches', {
+            action: 'getMySavedSearches',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return [];
     }
 }
@@ -87,8 +95,12 @@ export async function deleteSavedSearch(searchId: string) {
         revalidatePath('/saved-searches');
 
         return { success: true };
-    } catch (error) {
-        console.error('Error deleting saved search:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to delete saved search', {
+            action: 'deleteSavedSearch',
+            searchId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to delete saved search' };
     }
 }
@@ -111,8 +123,13 @@ export async function toggleSearchAlert(searchId: string, enabled: boolean) {
         revalidatePath('/saved-searches');
 
         return { success: true };
-    } catch (error) {
-        console.error('Error toggling search alert:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to toggle search alert', {
+            action: 'toggleSearchAlert',
+            searchId,
+            alertEnabled: enabled,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to update alert setting' };
     }
 }
@@ -135,8 +152,12 @@ export async function updateSavedSearchName(searchId: string, name: string) {
         revalidatePath('/saved-searches');
 
         return { success: true };
-    } catch (error) {
-        console.error('Error updating saved search name:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to update saved search name', {
+            action: 'updateSavedSearchName',
+            searchId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to update search name' };
     }
 }

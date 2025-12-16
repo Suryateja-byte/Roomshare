@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 export interface Bounds {
   ne_lat: number;
@@ -49,8 +50,12 @@ export async function getListingsInBounds(bounds: Bounds): Promise<MapListing[]>
     `;
 
     return listings;
-  } catch (error) {
-    console.error('Error fetching listings in bounds:', error);
+  } catch (error: unknown) {
+    logger.sync.error('Failed to fetch listings in bounds', {
+      action: 'getListingsInBounds',
+      bounds: { ne_lat, ne_lng, sw_lat, sw_lng },
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return [];
   }
 }

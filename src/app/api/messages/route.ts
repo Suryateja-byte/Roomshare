@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { checkSuspension } from '@/app/actions/suspension';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {
     try {
@@ -76,8 +77,11 @@ export async function GET(request: Request) {
             return NextResponse.json(formattedConversations);
         }
 
-    } catch (error) {
-        console.error('Error fetching messages:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to fetch messages', {
+            action: 'getMessages',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
@@ -133,8 +137,11 @@ export async function POST(request: Request) {
 
         return NextResponse.json(message, { status: 201 });
 
-    } catch (error) {
-        console.error('Error sending message:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to send message', {
+            action: 'sendMessage',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

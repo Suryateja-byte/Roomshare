@@ -476,7 +476,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 {/* Filters Toggle */}
                 {!isCompact && (
                     <>
-                        <div className="hidden md:flex items-center self-stretch" aria-hidden="true">
+                        <div className="hidden md:flex items-center self-stretch mx-2" aria-hidden="true">
                             <div className="w-px h-10 bg-zinc-200 dark:bg-zinc-700"></div>
                         </div>
                         <Button
@@ -484,7 +484,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             variant="filter"
                             onClick={() => setShowFilters(!showFilters)}
                             data-active={activeFilterCount > 0}
-                            className={`hidden sm:flex items-center gap-2 rounded-full h-10 px-4 transition-all duration-200 ${showFilters ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : ''}`}
+                            className={`hidden sm:flex items-center gap-2 rounded-full h-10 px-5 transition-all duration-200 ${showFilters ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : ''}`}
                             aria-expanded={showFilters}
                             aria-controls="search-filters"
                         >

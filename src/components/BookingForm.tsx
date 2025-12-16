@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { createBooking, BookingResult } from '@/app/actions/booking';
@@ -8,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, LogIn, AlertTriangle, RefreshCw, CheckCircle, XCircle, WifiOff, Calendar, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { parseLocalDate, parseISODateAsLocal } from '@/lib/utils';
 
 type ListingStatus = 'ACTIVE' | 'PAUSED' | 'RENTED';
 
@@ -131,8 +133,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
     // Calculate booking duration and validate client-side
     const bookingInfo = useMemo(() => {
         if (!startDate || !endDate) return null;
-        const start = new Date(startDate);
-        const end = new Date(endDate);
+        const start = parseLocalDate(startDate);
+        const end = parseLocalDate(endDate);
         const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
         const totalPrice = Math.round((price / 30) * diffDays * 100) / 100;
         return { diffDays, totalPrice, isValid: diffDays >= MIN_BOOKING_DAYS && end > start };
@@ -141,8 +143,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
     // Check if a date range overlaps with any booked dates
     const checkDateOverlap = useCallback((start: Date, end: Date): { overlaps: boolean; conflictingBooking?: BookedDateRange } => {
         for (const booking of bookedDates) {
-            const bookedStart = new Date(booking.startDate);
-            const bookedEnd = new Date(booking.endDate);
+            const bookedStart = parseISODateAsLocal(booking.startDate);
+            const bookedEnd = parseISODateAsLocal(booking.endDate);
             // Check if ranges overlap
             if (start < bookedEnd && end > bookedStart) {
                 return { overlaps: true, conflictingBooking: booking };
@@ -154,8 +156,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
     // Check if selected dates have any conflicts
     const dateConflict = useMemo(() => {
         if (!startDate || !endDate) return null;
-        const start = new Date(startDate);
-        const end = new Date(endDate);
+        const start = parseLocalDate(startDate);
+        const end = parseLocalDate(endDate);
         return checkDateOverlap(start, end);
     }, [startDate, endDate, checkDateOverlap]);
 
@@ -199,8 +201,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
         }
 
         // Client-side validation
-        const start = new Date(startDate);
-        const end = new Date(endDate);
+        const start = parseLocalDate(startDate);
+        const end = parseLocalDate(endDate);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -274,8 +276,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
 
             const result: BookingResult = await createBooking(
                 listingId,
-                new Date(startDate),
-                new Date(endDate),
+                parseLocalDate(startDate),
+                parseLocalDate(endDate),
                 price,
                 idempotencyKeyRef.current
             );
@@ -446,8 +448,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     </div>
                     <div className="space-y-2 max-h-32 overflow-y-auto">
                         {bookedDates.map((booking, index) => {
-                            const start = new Date(booking.startDate);
-                            const end = new Date(booking.endDate);
+                            const start = parseISODateAsLocal(booking.startDate);
+                            const end = parseISODateAsLocal(booking.endDate);
                             return (
                                 <div
                                     key={index}
@@ -662,9 +664,9 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 )}
             </div>
 
-            {/* Confirmation Modal */}
-            {showConfirmModal && bookingInfo && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Confirmation Modal - Using Portal to escape sticky container stacking context */}
+            {showConfirmModal && bookingInfo && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
                     {/* Backdrop - disabled during loading to prevent accidental dismissal */}
                     <div
                         className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isLoading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
@@ -683,7 +685,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm text-zinc-500 dark:text-zinc-400">Check-in</span>
                                     <span className="text-sm font-semibold text-zinc-900 dark:text-white">
-                                        {new Date(startDate).toLocaleDateString('en-US', {
+                                        {parseLocalDate(startDate).toLocaleDateString('en-US', {
                                             weekday: 'short',
                                             month: 'short',
                                             day: 'numeric',
@@ -694,7 +696,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm text-zinc-500 dark:text-zinc-400">Check-out</span>
                                     <span className="text-sm font-semibold text-zinc-900 dark:text-white">
-                                        {new Date(endDate).toLocaleDateString('en-US', {
+                                        {parseLocalDate(endDate).toLocaleDateString('en-US', {
                                             weekday: 'short',
                                             month: 'short',
                                             day: 'numeric',
@@ -768,7 +770,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                             </Button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

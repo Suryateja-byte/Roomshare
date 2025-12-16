@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { createNotification } from './notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from './suspension';
+import { logger } from '@/lib/logger';
 
 export type BookingStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
 
@@ -201,8 +202,13 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
         revalidatePath(`/listings/${booking.listing.id}`);
 
         return { success: true };
-    } catch (error) {
-        console.error('Error updating booking status:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to update booking status', {
+            action: 'updateBookingStatus',
+            bookingId,
+            targetStatus: status,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to update booking status' };
     }
 }
@@ -253,8 +259,11 @@ export async function getMyBookings() {
             receivedBookings,
             error: null
         };
-    } catch (error) {
-        console.error('Error fetching bookings:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to fetch bookings', {
+            action: 'getMyBookings',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to fetch bookings', sentBookings: [], receivedBookings: [] };
     }
 }

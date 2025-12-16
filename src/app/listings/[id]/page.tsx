@@ -135,10 +135,10 @@ export default async function ListingPage({ params }: PageProps) {
         await trackListingView(listing.id);
     }
 
-    // Format booked dates for client
+    // Format booked dates for client - using YYYY-MM-DD to avoid timezone issues
     const bookedDates = acceptedBookings.map(b => ({
-        startDate: b.startDate.toISOString(),
-        endDate: b.endDate.toISOString(),
+        startDate: b.startDate.toISOString().split('T')[0],
+        endDate: b.endDate.toISOString().split('T')[0],
     }));
 
     return (

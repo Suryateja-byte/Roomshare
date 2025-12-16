@@ -3,7 +3,7 @@
 import * as React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, parseLocalDate } from '@/lib/utils';
 
 interface DatePickerProps {
     value?: string;
@@ -31,16 +31,16 @@ export function DatePicker({
     const [open, setOpen] = React.useState(false);
     const [viewDate, setViewDate] = React.useState(() => {
         if (value) {
-            return new Date(value);
+            return parseLocalDate(value);
         }
         return new Date();
     });
 
-    const selectedDate = value ? new Date(value) : null;
+    const selectedDate = value ? parseLocalDate(value) : null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const minDateObj = minDate ? new Date(minDate) : null;
+    const minDateObj = minDate ? parseLocalDate(minDate) : null;
     if (minDateObj) {
         minDateObj.setHours(0, 0, 0, 0);
     }
@@ -100,7 +100,11 @@ export function DatePicker({
     };
 
     const handleDateSelect = (date: Date) => {
-        const formattedDate = date.toISOString().split('T')[0];
+        // Use local date parts to avoid timezone conversion issues with toISOString()
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const formattedDate = `${year}-${month}-${day}`;
         onChange(formattedDate);
         setOpen(false);
     };
@@ -127,7 +131,7 @@ export function DatePicker({
     };
 
     const formatDisplayDate = (dateStr: string) => {
-        const date = new Date(dateStr);
+        const date = parseLocalDate(dateStr);
         return date.toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',

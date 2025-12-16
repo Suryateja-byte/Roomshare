@@ -2,11 +2,12 @@
 
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Clock, User, Home, Loader2 } from 'lucide-react';
+import { parseISODateAsLocal } from '@/lib/utils';
 
 interface Booking {
     id: string;
-    startDate: Date;
-    endDate: Date;
+    startDate: Date | string; // Can be Date or ISO string from server
+    endDate: Date | string; // Can be Date or ISO string from server
     status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
     tenant: {
         id: string;
@@ -70,8 +71,8 @@ export default function BookingCalendar({ bookings, onBookingClick, isLoading = 
     const getBookingsForDate = (day: number) => {
         const date = new Date(year, month, day);
         return bookings.filter(booking => {
-            const start = new Date(booking.startDate);
-            const end = new Date(booking.endDate);
+            const start = parseISODateAsLocal(booking.startDate);
+            const end = parseISODateAsLocal(booking.endDate);
             return date >= start && date <= end;
         });
     };
@@ -252,7 +253,7 @@ export default function BookingCalendar({ bookings, onBookingClick, isLoading = 
                                             </div>
                                             <div className="flex items-center gap-2 text-xs opacity-75 mt-1">
                                                 <Clock className="w-3 h-3" />
-                                                {new Date(booking.startDate).toLocaleDateString()} - {new Date(booking.endDate).toLocaleDateString()}
+                                                {parseISODateAsLocal(booking.startDate).toLocaleDateString()} - {parseISODateAsLocal(booking.endDate).toLocaleDateString()}
                                             </div>
                                         </button>
                                     ))}
