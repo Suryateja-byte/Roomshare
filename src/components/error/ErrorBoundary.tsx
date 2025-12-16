@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, type ReactNode, type ErrorInfo } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -24,7 +25,18 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Error caught by ErrorBoundary:", error, errorInfo);
+    // Report to Sentry with component stack
+    Sentry.withScope((scope) => {
+      scope.setExtra("componentStack", errorInfo.componentStack);
+      scope.setTag("errorBoundary", "custom");
+      Sentry.captureException(error);
+    });
+
+    // Also log locally for development
+    if (process.env.NODE_ENV === "development") {
+      console.error("Error caught by ErrorBoundary:", error, errorInfo);
+    }
+
     this.props.onError?.(error, errorInfo);
   }
 

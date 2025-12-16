@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
+import { logger } from '@/lib/logger';
 
 export type BlockStatus = 'blocker' | 'blocked' | null;
 
@@ -42,8 +43,11 @@ export async function blockUser(userId: string) {
         revalidatePath('/settings');
 
         return { success: true };
-    } catch (error) {
-        console.error('Error blocking user:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to block user', {
+            action: 'blockUser',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to block user' };
     }
 }
@@ -68,8 +72,11 @@ export async function unblockUser(userId: string) {
         revalidatePath('/settings');
 
         return { success: true };
-    } catch (error) {
-        console.error('Error unblocking user:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to unblock user', {
+            action: 'unblockUser',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to unblock user' };
     }
 }
@@ -101,8 +108,11 @@ export async function getBlockedUsers() {
             user: record.blocked,
             blockedAt: record.createdAt
         }));
-    } catch (error) {
-        console.error('Error fetching blocked users:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to fetch blocked users', {
+            action: 'getBlockedUsers',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return [];
     }
 }
@@ -125,8 +135,11 @@ export async function isBlocked(userId: string): Promise<boolean> {
         });
 
         return !!block;
-    } catch (error) {
-        console.error('Error checking block status:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to check block status', {
+            action: 'isBlocked',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return false;
     }
 }
@@ -167,8 +180,11 @@ export async function getBlockStatus(userId: string): Promise<BlockStatus> {
         }
 
         return null;
-    } catch (error) {
-        console.error('Error getting block status:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to get block status', {
+            action: 'getBlockStatus',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return null;
     }
 }

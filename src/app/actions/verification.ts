@@ -5,6 +5,7 @@ import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { sendNotificationEmail } from '@/lib/email';
 import { logAdminAction } from '@/lib/audit';
+import { logger } from '@/lib/logger';
 
 export type DocumentType = 'passport' | 'driver_license' | 'national_id';
 
@@ -81,8 +82,11 @@ export async function submitVerificationRequest(input: SubmitVerificationInput) 
         revalidatePath('/verify');
 
         return { success: true, requestId: request.id };
-    } catch (error) {
-        console.error('Error submitting verification request:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to submit verification request', {
+            action: 'submitVerificationRequest',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to submit verification request' };
     }
 }
@@ -148,8 +152,11 @@ export async function getMyVerificationStatus() {
         }
 
         return { status: 'not_started' as const };
-    } catch (error) {
-        console.error('Error getting verification status:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to get verification status', {
+            action: 'getMyVerificationStatus',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { status: 'error' as const };
     }
 }
@@ -188,8 +195,11 @@ export async function getPendingVerifications() {
         });
 
         return { requests };
-    } catch (error) {
-        console.error('Error fetching pending verifications:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to fetch pending verifications', {
+            action: 'getPendingVerifications',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to fetch verifications', requests: [] };
     }
 }
@@ -264,8 +274,11 @@ export async function approveVerification(requestId: string) {
         revalidatePath('/admin/verifications');
 
         return { success: true };
-    } catch (error) {
-        console.error('Error approving verification:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to approve verification', {
+            action: 'approveVerification',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to approve verification' };
     }
 }
@@ -338,8 +351,11 @@ export async function rejectVerification(requestId: string, reason: string) {
         revalidatePath('/verify');
 
         return { success: true };
-    } catch (error) {
-        console.error('Error rejecting verification:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to reject verification', {
+            action: 'rejectVerification',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to reject verification' };
     }
 }
@@ -363,8 +379,11 @@ export async function cancelVerificationRequest() {
         revalidatePath('/profile');
 
         return { success: true };
-    } catch (error) {
-        console.error('Error cancelling verification request:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to cancel verification request', {
+            action: 'cancelVerificationRequest',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to cancel verification request' };
     }
 }

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import * as Sentry from '@sentry/nextjs';
 
 export default function Error({
     error,
@@ -12,7 +13,19 @@ export default function Error({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error(error);
+        // Report to Sentry with digest for server-side correlation
+        Sentry.withScope((scope) => {
+            if (error.digest) {
+                scope.setTag('errorDigest', error.digest);
+            }
+            scope.setTag('errorBoundary', 'nextjs-global');
+            Sentry.captureException(error);
+        });
+
+        // Log in development for debugging
+        if (process.env.NODE_ENV === 'development') {
+            console.error('Global error boundary caught:', error);
+        }
     }, [error]);
 
     return (

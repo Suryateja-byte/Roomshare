@@ -7,6 +7,7 @@ import { geocodeAddress } from '@/lib/geocoding';
 import { createListingSchema } from '@/lib/schemas';
 import { triggerInstantAlerts } from '@/lib/search-alerts';
 import { checkSuspension, checkEmailVerified } from './suspension';
+import { logger } from '@/lib/logger';
 
 export type CreateListingState = {
     success: boolean;
@@ -92,9 +93,7 @@ export async function createListing(prevState: CreateListingState, formData: For
         }
 
         // 4. Create Listing and Location in a transaction
-        console.log('Starting transaction...');
         const listing = await prisma.$transaction(async (tx) => {
-            console.log('Creating listing record...');
             const newListing = await tx.listing.create({
                 data: {
                     title,
@@ -107,9 +106,7 @@ export async function createListing(prevState: CreateListingState, formData: For
                     ownerId: userId,
                 },
             });
-            console.log('Listing created:', newListing.id);
 
-            console.log('Creating location record...');
             const location = await tx.location.create({
                 data: {
                     listingId: newListing.id,
@@ -119,27 +116,33 @@ export async function createListing(prevState: CreateListingState, formData: For
                     zip,
                 },
             });
-            console.log('Location created:', location.id);
 
             // Update with PostGIS geometry
             const point = `POINT(${coords.lng} ${coords.lat})`;
-            console.log('Updating PostGIS geometry with point:', point);
             try {
                 await tx.$executeRaw`
                     UPDATE "Location"
                     SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
                     WHERE id = ${location.id}
                 `;
-                console.log('PostGIS update successful');
             } catch (geoError) {
-                console.error('PostGIS update failed:', geoError);
+                logger.sync.error('PostGIS geometry update failed', {
+                    action: 'createListing',
+                    step: 'postgis_update',
+                    error: geoError instanceof Error ? geoError.message : 'Unknown error',
+                });
                 throw new Error('Failed to update location coordinates.');
             }
 
             return newListing;
         });
 
-        console.log('Transaction completed successfully.');
+        await logger.info('Listing created successfully', {
+            action: 'createListing',
+            listingId: listing.id.slice(0, 8) + '...',
+            city,
+            state,
+        });
 
         // ASYNC: Trigger instant alerts in background - non-blocking for better UX and scalability
         // This follows best practices: sync risks cascading failures, async improves resilience
@@ -154,14 +157,22 @@ export async function createListing(prevState: CreateListingState, formData: For
             leaseDuration: null, // Not included in basic create form
             amenities: listing.amenities,
             houseRules: listing.houseRules
-        }).catch(err => console.error('[INSTANT ALERTS] Failed to trigger:', err));
+        }).catch(err => {
+            logger.sync.warn('Instant alerts trigger failed', {
+                action: 'createListing',
+                step: 'instant_alerts',
+                error: err instanceof Error ? err.message : 'Unknown error',
+            });
+        });
 
         return { success: true, data: listing };
 
-    } catch (error: any) {
-        console.error('Error creating listing (FULL ERROR):', error);
-        console.error('Error stack:', error.stack);
-        // Return the actual error message for debugging purposes (in production we might want to hide this)
-        return { success: false, error: `Server Error: ${error.message || 'Unknown error'}` };
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.sync.error('Failed to create listing', {
+            action: 'createListing',
+            error: errorMessage,
+        });
+        return { success: false, error: `Server Error: ${errorMessage}` };
     }
 }

@@ -4,6 +4,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { revalidatePath } from 'next/cache';
+import { logger } from '@/lib/logger';
 
 export interface NotificationPreferences {
     emailBookingRequests: boolean;
@@ -60,8 +61,11 @@ export async function updateNotificationPreferences(
 
         revalidatePath('/settings');
         return { success: true };
-    } catch (error) {
-        console.error('Error updating notification preferences:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to update notification preferences', {
+            action: 'updateNotificationPreferences',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { success: false, error: 'Failed to update preferences' };
     }
 }
@@ -101,8 +105,11 @@ export async function changePassword(
         });
 
         return { success: true };
-    } catch (error) {
-        console.error('Error changing password:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to change password', {
+            action: 'changePassword',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { success: false, error: 'Failed to change password' };
     }
 }
@@ -120,8 +127,11 @@ export async function deleteAccount(): Promise<{ success: boolean; error?: strin
         });
 
         return { success: true };
-    } catch (error) {
-        console.error('Error deleting account:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to delete account', {
+            action: 'deleteAccount',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { success: false, error: 'Failed to delete account' };
     }
 }

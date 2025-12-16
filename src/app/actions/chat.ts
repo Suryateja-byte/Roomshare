@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { checkSuspension, checkEmailVerified } from './suspension';
+import { logger } from '@/lib/logger';
 
 export async function startConversation(listingId: string) {
     const session = await auth();
@@ -230,7 +231,11 @@ export async function getMessages(conversationId: string) {
         data: { read: true },
     });
 
-    console.log(`[Mark as Read] User ${userId} in conversation ${conversationId.substring(0, 8)}... - Marked ${updateResult.count} messages as read`);
+    await logger.debug('Messages marked as read', {
+        action: 'getMessages',
+        conversationId: conversationId.slice(0, 8) + '...',
+        markedCount: updateResult.count,
+    });
 
     return await prisma.message.findMany({
         where: {
@@ -278,12 +283,6 @@ export async function getUnreadMessageCount() {
         },
     });
 
-    console.log(`[Unread Count] User: ${session.user.id}`);
-    console.log(`[Unread Count] Found ${unreadMessages.length} unread messages:`);
-    unreadMessages.forEach((msg, idx) => {
-        console.log(`  ${idx + 1}. Message ${msg.id.substring(0, 8)}... from ${msg.sender.name} (${msg.sender.id.substring(0, 8)}...) - Conv: ${msg.conversation.id.substring(0, 8)}... - Read: ${msg.read}`);
-    });
-
     return unreadMessages.length;
 }
 
@@ -321,11 +320,17 @@ export async function markAllMessagesAsRead() {
             data: { read: true }
         });
 
-        console.log(`[Mark All Read] User ${session.user.id} - Marked ${result.count} messages as read`);
+        await logger.debug('All messages marked as read', {
+            action: 'markAllMessagesAsRead',
+            markedCount: result.count,
+        });
 
         return { success: true, count: result.count };
-    } catch (error) {
-        console.error('[MARK ALL READ] Error:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to mark all messages as read', {
+            action: 'markAllMessagesAsRead',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to mark all messages as read' };
     }
 }
@@ -368,8 +373,11 @@ export async function deleteMessage(messageId: string): Promise<{ success: boole
         });
 
         return { success: true };
-    } catch (error) {
-        console.error('[DELETE MESSAGE] Error:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to delete message', {
+            action: 'deleteMessage',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { success: false, error: 'Failed to delete message' };
     }
 }
@@ -413,8 +421,11 @@ export async function deleteConversation(conversationId: string): Promise<{ succ
         });
 
         return { success: true };
-    } catch (error) {
-        console.error('[DELETE CONVERSATION] Error:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to delete conversation', {
+            action: 'deleteConversation',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { success: false, error: 'Failed to delete conversation' };
     }
 }
@@ -446,8 +457,11 @@ export async function setTypingStatus(conversationId: string, isTyping: boolean)
         });
 
         return { success: true };
-    } catch (error) {
-        console.error('[SET TYPING STATUS] Error:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to set typing status', {
+            action: 'setTypingStatus',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to set typing status' };
     }
 }
@@ -483,8 +497,11 @@ export async function getTypingStatus(conversationId: string) {
                 name: ts.user.name
             }))
         };
-    } catch (error) {
-        console.error('[GET TYPING STATUS] Error:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to get typing status', {
+            action: 'getTypingStatus',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { typingUsers: [] };
     }
 }
@@ -539,8 +556,11 @@ export async function pollMessages(conversationId: string, lastMessageId?: strin
             typingUsers,
             hasNewMessages: messages.length > 0
         };
-    } catch (error) {
-        console.error('[POLL MESSAGES] Error:', error);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to poll messages', {
+            action: 'pollMessages',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { messages: [], typingUsers: [], hasNewMessages: false };
     }
 }

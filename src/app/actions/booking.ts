@@ -9,6 +9,7 @@ import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { createBookingSchema } from '@/lib/schemas';
 import { z } from 'zod';
 import { checkSuspension, checkEmailVerified } from './suspension';
+import { logger } from '@/lib/logger';
 
 // Booking result type for structured error handling
 export type BookingResult = {
@@ -53,7 +54,6 @@ export async function createBooking(
 
             if (existingKey && existingKey.expiresAt > new Date()) {
                 // Return cached result - this is a duplicate request
-                console.log(`Returning cached result for idempotency key: ${idempotencyKey}`);
                 return existingKey.resultData as BookingResult;
             }
 
@@ -63,9 +63,13 @@ export async function createBooking(
                     where: { key: idempotencyKey }
                 });
             }
-        } catch (error) {
+        } catch (error: unknown) {
             // Log but don't fail - idempotency is a safety net, not critical path
-            console.error('Idempotency key check failed:', error);
+            logger.sync.warn('Idempotency key check failed', {
+                action: 'createBooking',
+                step: 'idempotency_check',
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
         }
     }
 
@@ -327,23 +331,34 @@ export async function createBooking(
                             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
                         }
                     });
-                } catch (keyError) {
+                } catch (keyError: unknown) {
                     // If key already exists (race condition), that's fine - result is already stored
-                    console.log('Idempotency key storage skipped (may already exist):', keyError);
+                    logger.sync.debug('Idempotency key storage skipped', {
+                        action: 'createBooking',
+                        step: 'idempotency_store',
+                        error: keyError instanceof Error ? keyError.message : 'Unknown error',
+                    });
                 }
             }
 
             return successResult;
-        } catch (error) {
+        } catch (error: unknown) {
             // Check for serialization failure (P2034) - retry with exponential backoff
             const prismaError = error as { code?: string };
             if (prismaError.code === 'P2034' && attempt < MAX_RETRIES) {
-                console.log(`Booking serialization conflict, retrying (attempt ${attempt}/${MAX_RETRIES})...`);
+                logger.sync.debug('Booking serialization conflict, retrying', {
+                    action: 'createBooking',
+                    attempt,
+                    maxRetries: MAX_RETRIES,
+                });
                 await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
                 continue; // Retry the transaction
             }
 
-            console.error('Error creating booking:', error);
+            logger.sync.error('Failed to create booking', {
+                action: 'createBooking',
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
             return { success: false, error: 'Failed to create booking. Please try again.' };
         }
     }
