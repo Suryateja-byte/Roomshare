@@ -1,3 +1,8 @@
+import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
+
+// Timeout for geocoding requests (10 seconds)
+const GEOCODING_TIMEOUT_MS = 10000;
+
 export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -11,7 +16,7 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${token}&limit=1`;
 
         console.log("Attempting to geocode address:", address);
-        const response = await fetch(url);
+        const response = await fetchWithTimeout(url, { timeout: GEOCODING_TIMEOUT_MS });
 
         if (!response.ok) {
             console.error(`Geocoding API error: ${response.status} ${response.statusText}`);
@@ -32,7 +37,11 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
         return null;
 
     } catch (error) {
-        console.error("Error geocoding address:", error);
+        if (error instanceof FetchTimeoutError) {
+            console.error(`Geocoding request timed out after ${GEOCODING_TIMEOUT_MS}ms for address:`, address);
+        } else {
+            console.error("Error geocoding address:", error);
+        }
         return null;
     }
 }

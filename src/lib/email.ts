@@ -5,6 +5,10 @@
 
 import { emailTemplates } from './email-templates';
 import { prisma } from '@/lib/prisma';
+import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
+
+// Timeout for email API requests (15 seconds - emails can be slow)
+const EMAIL_TIMEOUT_MS = 15000;
 
 // Notification preference keys that map to email types
 interface NotificationPreferences {
@@ -37,7 +41,7 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
     }
 
     try {
-        const response = await fetch('https://api.resend.com/emails', {
+        const response = await fetchWithTimeout('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${RESEND_API_KEY}`,
@@ -57,6 +61,7 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
                 // Disable tracking features that wrap links
                 tags: [{ name: 'category', value: 'transactional' }],
             }),
+            timeout: EMAIL_TIMEOUT_MS,
         });
 
         if (!response.ok) {
@@ -67,6 +72,10 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
 
         return { success: true };
     } catch (error) {
+        if (error instanceof FetchTimeoutError) {
+            console.error(`Email request timed out after ${EMAIL_TIMEOUT_MS}ms to:`, to);
+            return { success: false, error: `Email request timed out after ${EMAIL_TIMEOUT_MS}ms` };
+        }
         console.error('Error sending email:', error);
         return { success: false, error: String(error) };
     }

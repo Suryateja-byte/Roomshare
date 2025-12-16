@@ -31,9 +31,9 @@ describe('geocodeAddress', () => {
     const result = await geocodeAddress('123 Main St, San Francisco, CA')
 
     expect(result).toEqual({ lat: 37.7749, lng: -122.4194 })
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('api.mapbox.com/geocoding/v5/mapbox.places')
-    )
+    // Check that fetch was called with correct URL (fetchWithTimeout passes options as second arg)
+    const calledUrl = mockFetch.mock.calls[0][0]
+    expect(calledUrl).toContain('api.mapbox.com/geocoding/v5/mapbox.places')
   })
 
   it('should return null when no Mapbox token', async () => {
@@ -88,9 +88,9 @@ describe('geocodeAddress', () => {
 
     await geocodeAddress('123 Main St, Apt #5')
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining(encodeURIComponent('123 Main St, Apt #5'))
-    )
+    // Check that fetch was called with properly encoded URL (fetchWithTimeout passes options as second arg)
+    const calledUrl = mockFetch.mock.calls[0][0]
+    expect(calledUrl).toContain(encodeURIComponent('123 Main St, Apt #5'))
   })
 
   it('should handle response with missing features', async () => {

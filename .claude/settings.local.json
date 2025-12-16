@@ -39,7 +39,10 @@
       "Bash(git add:*)",
       "Bash(npm ci:*)",
       "Bash(npm audit:*)",
-      "Bash(du:*)"
+      "Bash(du:*)",
+      "Bash(npm view:*)",
+      "Bash(tree:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": []

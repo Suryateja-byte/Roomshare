@@ -1,10 +1,18 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// Log configuration status at startup
 if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Missing Supabase environment variables. Real-time features may not work.');
+    if (process.env.NODE_ENV === 'production') {
+        console.error('[SUPABASE] Missing environment variables - real-time features disabled', {
+            hasUrl: !!supabaseUrl,
+            hasKey: !!supabaseAnonKey,
+        });
+    } else {
+        console.warn('[SUPABASE] Missing environment variables. Real-time features may not work.');
+    }
 }
 
 export const supabase = (supabaseUrl && supabaseAnonKey)
@@ -16,6 +24,9 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
         }
     })
     : null;
+
+// Track whether Supabase is available
+export const isSupabaseAvailable = !!supabase;
 
 // Helper to create a chat room channel with broadcast and presence
 export function createChatChannel(conversationId: string): RealtimeChannel | null {
@@ -42,8 +53,11 @@ export async function broadcastTyping(
             event: 'typing',
             payload: { userId, userName, isTyping }
         });
-    } catch {
-        // Channel not yet subscribed, silently ignore
+    } catch (error) {
+        // Log in development for debugging, silent in production
+        if (process.env.NODE_ENV !== 'production') {
+            console.debug('[SUPABASE] Channel not ready for broadcast:', error);
+        }
     }
 }
 
