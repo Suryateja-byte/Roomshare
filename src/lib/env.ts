@@ -39,6 +39,28 @@ const serverEnvSchema = z.object({
   VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
 
+  // Security: Cron authentication (required in production)
+  CRON_SECRET: z.string()
+    .min(32, 'CRON_SECRET must be at least 32 characters')
+    .optional()
+    .refine(
+      (val) => !val || !val.includes('change-in-production'),
+      'CRON_SECRET must not contain placeholder values'
+    ),
+
+  // Security: Origin enforcement (comma-separated URLs)
+  ALLOWED_ORIGINS: z.string().optional(),
+  ALLOWED_HOSTS: z.string().optional(),
+
+  // Privacy: Metrics HMAC
+  LOG_HMAC_SECRET: z.string().min(32, 'LOG_HMAC_SECRET must be at least 32 characters').optional(),
+
+  // Google Places (server-side, IP-restricted key)
+  GOOGLE_PLACES_API_KEY: z.string().optional(),
+
+  // Supabase service key (server-side)
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+
   // Node environment
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
@@ -112,4 +134,10 @@ export const features = {
   realtime: !!(clientEnv.NEXT_PUBLIC_SUPABASE_URL && clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY),
   errorTracking: !!serverEnv.SENTRY_DSN,
   maps: !!clientEnv.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+  // Security features
+  cronAuth: !!serverEnv.CRON_SECRET,
+  originEnforcement: !!(serverEnv.ALLOWED_ORIGINS || serverEnv.ALLOWED_HOSTS),
+  metricsHmac: !!serverEnv.LOG_HMAC_SECRET,
+  googlePlaces: !!serverEnv.GOOGLE_PLACES_API_KEY,
+  supabaseStorage: !!serverEnv.SUPABASE_SERVICE_ROLE_KEY,
 } as const;

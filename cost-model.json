@@ -1,0 +1,632 @@
+{
+  "metadata": {
+    "reportName": "RoomShare Website Monthly Cost Report",
+    "generatedAt": "2025-12-16T00:00:00Z",
+    "analysisMethod": "static_code_analysis",
+    "repository": "roomshare",
+    "framework": "Next.js 16",
+    "hostingPlatform": "Vercel"
+  },
+  "services": [
+    {
+      "id": "vercel",
+      "name": "Vercel",
+      "purpose": "Hosting, Serverless Functions, Cron Jobs",
+      "billingModel": "subscription_plus_usage",
+      "environmentVariables": ["VERCEL", "CRON_SECRET"],
+      "codeReferences": [
+        "vercel.json",
+        "next.config.ts",
+        "sentry.server.config.ts:17"
+      ],
+      "pricingSource": {
+        "url": "https://vercel.com/pricing",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "plans": [
+          {
+            "name": "Hobby",
+            "price": 0,
+            "currency": "USD",
+            "period": "month",
+            "includes": {
+              "bandwidth": "100GB",
+              "functions": "100K invocations",
+              "note": "Personal use only, no commercial"
+            }
+          },
+          {
+            "name": "Pro",
+            "price": 20,
+            "currency": "USD",
+            "period": "month",
+            "includes": {
+              "bandwidth": "1TB",
+              "edgeRequests": "10M",
+              "functionInvocations": "1M"
+            }
+          }
+        ],
+        "overages": [
+          { "metric": "bandwidth", "unit": "GB", "price": 0.15 },
+          { "metric": "functionInvocations", "unit": "1M", "price": 2.00 }
+        ]
+      },
+      "freeTier": {
+        "available": true,
+        "limits": {
+          "bandwidth": "100GB",
+          "commercial": false
+        }
+      }
+    },
+    {
+      "id": "supabase_database",
+      "name": "PostgreSQL (Supabase)",
+      "purpose": "Primary Database with PostGIS",
+      "billingModel": "subscription_plus_usage",
+      "environmentVariables": ["DATABASE_URL", "DIRECT_URL"],
+      "codeReferences": [
+        "prisma/schema.prisma",
+        "src/lib/prisma.ts",
+        "src/app/actions/*.ts"
+      ],
+      "pricingSource": {
+        "url": "https://supabase.com/pricing",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "plans": [
+          {
+            "name": "Free",
+            "price": 0,
+            "currency": "USD",
+            "period": "month",
+            "includes": {
+              "storage": "500MB",
+              "bandwidth": "5GB"
+            }
+          },
+          {
+            "name": "Pro",
+            "price": 25,
+            "currency": "USD",
+            "period": "month",
+            "includes": {
+              "storage": "8GB",
+              "bandwidth": "250GB"
+            }
+          }
+        ],
+        "overages": [
+          { "metric": "storage", "unit": "GB", "price": 0.125 },
+          { "metric": "bandwidth", "unit": "GB", "price": 0.09 }
+        ]
+      },
+      "freeTier": {
+        "available": true,
+        "limits": {
+          "storage": "500MB",
+          "bandwidth": "5GB/month"
+        }
+      }
+    },
+    {
+      "id": "supabase_storage",
+      "name": "Supabase Storage",
+      "purpose": "Image Storage (profiles, listings)",
+      "billingModel": "subscription_plus_usage",
+      "environmentVariables": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ],
+      "codeReferences": [
+        "src/app/api/upload/route.ts",
+        "src/lib/supabase.ts"
+      ],
+      "codeConstraints": {
+        "maxFileSize": "5MB",
+        "allowedTypes": ["image/jpeg", "image/png", "image/webp", "image/gif"],
+        "bucket": "images",
+        "paths": ["profiles/{userId}/*", "listings/{userId}/*"]
+      },
+      "pricingSource": {
+        "url": "https://supabase.com/pricing",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "plans": [
+          { "name": "Free", "storage": "1GB", "bandwidth": "2GB/month", "price": 0 },
+          { "name": "Pro", "storage": "100GB", "bandwidth": "200GB/month", "price": 25 }
+        ],
+        "overages": [
+          { "metric": "storage", "unit": "GB", "price": 0.021 },
+          { "metric": "bandwidth", "unit": "GB", "price": 0.09 }
+        ]
+      },
+      "freeTier": {
+        "available": true,
+        "limits": { "storage": "1GB", "bandwidth": "2GB/month" }
+      }
+    },
+    {
+      "id": "supabase_realtime",
+      "name": "Supabase Realtime",
+      "purpose": "Chat messaging, typing indicators, presence",
+      "billingModel": "subscription_plus_usage",
+      "environmentVariables": ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+      "codeReferences": [
+        "src/lib/supabase.ts:18-26",
+        "src/app/messages/[id]/ChatWindow.tsx"
+      ],
+      "codeConstraints": {
+        "eventsPerSecond": 10
+      },
+      "pricingSource": {
+        "url": "https://supabase.com/pricing",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "plans": [
+          { "name": "Free", "messages": "2M/month", "price": 0 },
+          { "name": "Pro", "messages": "5M/month", "price": 25 }
+        ],
+        "overages": [
+          { "metric": "messages", "unit": "1M", "price": 2.50 }
+        ]
+      },
+      "freeTier": {
+        "available": true,
+        "limits": { "messages": "2M/month" }
+      }
+    },
+    {
+      "id": "mapbox_maps",
+      "name": "Mapbox GL JS",
+      "purpose": "Interactive map rendering",
+      "billingModel": "usage_based",
+      "environmentVariables": ["NEXT_PUBLIC_MAPBOX_TOKEN"],
+      "codeReferences": [
+        "src/components/Map.tsx",
+        "src/components/DynamicMap.tsx"
+      ],
+      "pricingSource": {
+        "url": "https://www.mapbox.com/pricing",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "tiers": [
+          { "from": 0, "to": 50000, "pricePerThousand": 0, "label": "Free" },
+          { "from": 50001, "to": 100000, "pricePerThousand": 0.50 },
+          { "from": 100001, "to": 200000, "pricePerThousand": 0.40 }
+        ]
+      },
+      "freeTier": {
+        "available": true,
+        "limits": { "mapLoads": "50,000/month" }
+      }
+    },
+    {
+      "id": "mapbox_geocoding",
+      "name": "Mapbox Geocoding API",
+      "purpose": "Convert addresses to coordinates",
+      "billingModel": "usage_based",
+      "environmentVariables": ["NEXT_PUBLIC_MAPBOX_TOKEN"],
+      "codeReferences": [
+        "src/lib/geocoding.ts",
+        "src/components/LocationSearchInput.tsx"
+      ],
+      "apiEndpoint": "https://api.mapbox.com/geocoding/v5/mapbox.places/",
+      "pricingSource": {
+        "url": "https://www.mapbox.com/pricing",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "tiers": [
+          { "from": 0, "to": 100000, "pricePerThousand": 0, "label": "Free" },
+          { "from": 100001, "to": null, "pricePerThousand": 0.75 }
+        ]
+      },
+      "freeTier": {
+        "available": true,
+        "limits": { "requests": "100,000/month" }
+      }
+    },
+    {
+      "id": "google_places_uikit",
+      "name": "Google Places UI Kit",
+      "purpose": "Nearby place search (client-side)",
+      "billingModel": "usage_based",
+      "environmentVariables": ["NEXT_PUBLIC_GOOGLE_MAPS_UIKIT_KEY"],
+      "codeReferences": [
+        "src/lib/googleMapsUiKitLoader.ts",
+        "src/components/chat/NearbyPlacesCard.tsx"
+      ],
+      "pricingSource": {
+        "url": "https://developers.google.com/maps/documentation/places/web-service/usage-and-billing",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "perThousandRequests": 1.00,
+        "currency": "USD",
+        "note": "Significantly cheaper than regular Places API ($17-32/1K)"
+      },
+      "freeTier": {
+        "available": false,
+        "googleCloudCredits": "$200 monthly free credit available"
+      }
+    },
+    {
+      "id": "groq",
+      "name": "Groq LLM API",
+      "purpose": "AI chat assistant for neighborhood queries",
+      "billingModel": "usage_based",
+      "environmentVariables": ["GROQ_API_KEY"],
+      "codeReferences": [
+        "src/app/api/chat/route.ts:217-219",
+        "src/app/api/chat/route.ts:377"
+      ],
+      "modelUsed": "llama-3.1-8b-instant",
+      "rateLimits": {
+        "burst": { "requests": 5, "window": "1 minute" },
+        "sustained": { "requests": 30, "window": "1 hour" }
+      },
+      "messageConstraints": {
+        "maxMessages": 50,
+        "maxUserTextLength": 2000,
+        "maxBodySize": 100000
+      },
+      "pricingSource": {
+        "url": "https://groq.com/pricing/",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "inputTokens": { "perMillion": 0.05, "currency": "USD" },
+        "outputTokens": { "perMillion": 0.08, "currency": "USD" }
+      },
+      "freeTier": {
+        "available": true,
+        "limits": { "note": "Generous free tier, rate limited" }
+      }
+    },
+    {
+      "id": "upstash_redis",
+      "name": "Upstash Redis",
+      "purpose": "Distributed rate limiting",
+      "billingModel": "usage_based",
+      "environmentVariables": ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+      "codeReferences": ["src/lib/rate-limit-redis.ts"],
+      "algorithm": "sliding_window",
+      "limitersConfigured": [
+        { "name": "chatBurst", "limit": 5, "window": "1m" },
+        { "name": "chatSustained", "limit": 30, "window": "1h" },
+        { "name": "metricsBurst", "limit": 100, "window": "1m" },
+        { "name": "metricsSustained", "limit": 500, "window": "1h" }
+      ],
+      "pricingSource": {
+        "url": "https://upstash.com/pricing/redis",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "plans": [
+          { "name": "Free", "commands": "500K/month", "bandwidth": "200GB", "price": 0 }
+        ],
+        "overages": [
+          { "metric": "commands", "unit": "100K", "price": 0.20 }
+        ]
+      },
+      "freeTier": {
+        "available": true,
+        "limits": { "commands": "500K/month", "bandwidth": "200GB" }
+      }
+    },
+    {
+      "id": "resend",
+      "name": "Resend",
+      "purpose": "Transactional email delivery",
+      "billingModel": "subscription_plus_usage",
+      "environmentVariables": ["RESEND_API_KEY", "FROM_EMAIL"],
+      "codeReferences": ["src/lib/email.ts"],
+      "apiEndpoint": "https://api.resend.com/emails",
+      "emailTypes": [
+        "bookingRequest", "bookingAccepted", "bookingRejected", "bookingCancelled",
+        "newMessage", "newReview", "searchAlert", "marketing"
+      ],
+      "pricingSource": {
+        "url": "https://resend.com/pricing",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "plans": [
+          { "name": "Free", "emails": 3000, "price": 0 },
+          { "name": "Pro", "emails": 50000, "price": 20 }
+        ],
+        "overages": [
+          { "metric": "emails", "unit": "1", "price": 0.00028 }
+        ]
+      },
+      "freeTier": {
+        "available": true,
+        "limits": { "emails": "3,000/month" }
+      }
+    },
+    {
+      "id": "sentry",
+      "name": "Sentry",
+      "purpose": "Error tracking and performance monitoring",
+      "billingModel": "subscription",
+      "environmentVariables": [
+        "NEXT_PUBLIC_SENTRY_DSN",
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT"
+      ],
+      "codeReferences": [
+        "sentry.server.config.ts",
+        "sentry.client.config.ts",
+        "sentry.edge.config.ts",
+        "instrumentation.ts"
+      ],
+      "configuration": {
+        "tracesSampleRate": {
+          "production": 0.1,
+          "development": 1.0
+        }
+      },
+      "pricingSource": {
+        "url": "https://sentry.io/pricing/",
+        "retrievedAt": "2025-12-16"
+      },
+      "pricing": {
+        "plans": [
+          { "name": "Developer", "errors": 5000, "price": 0 },
+          { "name": "Team", "errors": 50000, "price": 26 },
+          { "name": "Business", "errors": 100000, "price": 80 }
+        ]
+      },
+      "freeTier": {
+        "available": true,
+        "limits": { "errors": "5,000/month" }
+      }
+    },
+    {
+      "id": "google_oauth",
+      "name": "Google OAuth",
+      "purpose": "User authentication",
+      "billingModel": "free",
+      "environmentVariables": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+      "codeReferences": ["src/auth.ts"],
+      "pricing": {
+        "price": 0,
+        "note": "Free, no usage limits"
+      },
+      "freeTier": {
+        "available": true,
+        "limits": "unlimited"
+      }
+    }
+  ],
+  "usageModel": {
+    "perActionEstimates": [
+      { "action": "signUp", "services": ["oauth", "database", "email"], "estimatedCost": 0.0003 },
+      { "action": "createListing", "services": ["database", "geocoding", "storage"], "estimatedCost": 0.001 },
+      { "action": "viewListing", "services": ["database", "mapLoad"], "estimatedCost": 0.00002 },
+      { "action": "search", "services": ["database", "mapLoad", "geocoding"], "estimatedCost": 0.0001 },
+      { "action": "sendMessage", "services": ["database", "realtime", "email"], "estimatedCost": 0.0001 },
+      { "action": "aiChat", "services": ["groq"], "estimatedCost": 0.00004, "note": "~500 tokens" },
+      { "action": "nearbyPlaces", "services": ["googlePlacesUIKit"], "estimatedCost": 0.001 }
+    ],
+    "assumptions": {
+      "averageImageSizeKB": 500,
+      "imagesPerListing": 5,
+      "tokensPerChatSession": 500,
+      "messagesPerConversation": 10
+    }
+  },
+  "tiers": [
+    {
+      "name": "Starter",
+      "mau": 100,
+      "usageEstimates": {
+        "pageViewsPerUserMonth": 20,
+        "listingsCreated": 5,
+        "messagesSent": 50,
+        "aiChatSessions": 20,
+        "nearbySearches": 10,
+        "emailsSent": 50,
+        "geocodingRequests": 10,
+        "mapLoads": 200,
+        "storageGB": 0.1,
+        "dbSizeGB": 0.1
+      },
+      "costRange": {
+        "low": 0,
+        "typical": 20,
+        "high": 25,
+        "currency": "USD",
+        "period": "month"
+      },
+      "breakdown": {
+        "vercel": { "plan": "Hobby/Pro", "cost": "0-20" },
+        "supabase": { "plan": "Free", "cost": 0 },
+        "mapbox": { "plan": "Free", "cost": 0 },
+        "googlePlaces": { "usage": 10, "cost": 0.01 },
+        "groq": { "plan": "Free", "cost": 0 },
+        "upstash": { "plan": "Free", "cost": 0 },
+        "resend": { "plan": "Free", "cost": 0 },
+        "sentry": { "plan": "Developer", "cost": 0 }
+      }
+    },
+    {
+      "name": "Growth",
+      "mau": 1000,
+      "usageEstimates": {
+        "pageViewsPerUserMonth": 15,
+        "listingsCreated": 30,
+        "messagesSent": 400,
+        "aiChatSessions": 150,
+        "nearbySearches": 80,
+        "emailsSent": 400,
+        "geocodingRequests": 60,
+        "mapLoads": 1500,
+        "storageGB": 0.5,
+        "dbSizeGB": 0.3
+      },
+      "costRange": {
+        "low": 25,
+        "typical": 45,
+        "high": 75,
+        "currency": "USD",
+        "period": "month"
+      },
+      "breakdown": {
+        "vercel": { "plan": "Pro", "cost": 20 },
+        "supabase": { "plan": "Free→Pro", "cost": "0-25" },
+        "mapbox": { "plan": "Free", "cost": 0 },
+        "googlePlaces": { "usage": 80, "cost": 0.08 },
+        "groq": { "plan": "Free", "cost": 0 },
+        "upstash": { "plan": "Free", "cost": 0 },
+        "resend": { "plan": "Free", "cost": 0 },
+        "sentry": { "plan": "Developer", "cost": 0 }
+      }
+    },
+    {
+      "name": "Scale",
+      "mau": 10000,
+      "usageEstimates": {
+        "pageViewsPerUserMonth": 10,
+        "listingsCreated": 200,
+        "messagesSent": 3000,
+        "aiChatSessions": 1000,
+        "nearbySearches": 500,
+        "emailsSent": 3000,
+        "geocodingRequests": 400,
+        "mapLoads": 10000,
+        "storageGB": 3,
+        "dbSizeGB": 1
+      },
+      "costRange": {
+        "low": 75,
+        "typical": 145,
+        "high": 250,
+        "currency": "USD",
+        "period": "month"
+      },
+      "breakdown": {
+        "vercel": { "plan": "Pro", "cost": "20-40" },
+        "supabase": { "plan": "Pro", "cost": "25-35" },
+        "mapbox": { "plan": "Free", "cost": 0 },
+        "googlePlaces": { "usage": 500, "cost": 0.50 },
+        "groq": { "plan": "Free/Low", "cost": 0.04 },
+        "upstash": { "plan": "Free", "cost": 0 },
+        "resend": { "plan": "Free/Pro", "cost": "0-20" },
+        "sentry": { "plan": "Team", "cost": 26 }
+      }
+    },
+    {
+      "name": "Enterprise",
+      "mau": 100000,
+      "usageEstimates": {
+        "pageViewsPerUserMonth": 8,
+        "listingsCreated": 1000,
+        "messagesSent": 20000,
+        "aiChatSessions": 5000,
+        "nearbySearches": 2500,
+        "emailsSent": 20000,
+        "geocodingRequests": 2000,
+        "mapLoads": 60000,
+        "storageGB": 20,
+        "dbSizeGB": 5
+      },
+      "costRange": {
+        "low": 300,
+        "typical": 600,
+        "high": 1200,
+        "currency": "USD",
+        "period": "month"
+      },
+      "breakdown": {
+        "vercel": { "plan": "Pro", "cost": "50-150" },
+        "supabase": { "plan": "Pro+", "cost": "50-100" },
+        "mapbox": { "plan": "Pay-go", "usage": 60000, "cost": 5 },
+        "googlePlaces": { "usage": 2500, "cost": 2.50 },
+        "groq": { "plan": "Pay-go", "tokens": "2.5M", "cost": 0.20 },
+        "upstash": { "plan": "Pay-go", "cost": "0-1" },
+        "resend": { "plan": "Pro+", "cost": "20-30" },
+        "sentry": { "plan": "Team/Business", "cost": "26-80" }
+      }
+    }
+  ],
+  "fixedVsVariable": {
+    "fixedCosts": {
+      "description": "Monthly subscriptions regardless of usage",
+      "byTier": {
+        "starter": { "low": 0, "high": 20 },
+        "growth": { "low": 20, "high": 45 },
+        "scale": { "low": 71, "high": 91 },
+        "enterprise": { "low": 91, "high": 145 }
+      },
+      "services": ["vercel_pro", "supabase_pro", "resend_pro", "sentry_team"]
+    },
+    "variableCosts": [
+      { "service": "vercel", "metric": "bandwidth", "unit": "GB", "price": 0.15 },
+      { "service": "vercel", "metric": "functionInvocations", "unit": "1M", "price": 2.00 },
+      { "service": "supabase", "metric": "dbStorage", "unit": "GB", "price": 0.125 },
+      { "service": "supabase", "metric": "fileStorage", "unit": "GB", "price": 0.021 },
+      { "service": "supabase", "metric": "bandwidth", "unit": "GB", "price": 0.09 },
+      { "service": "mapbox", "metric": "mapLoads", "unit": "1K", "price": 0.50 },
+      { "service": "mapbox", "metric": "geocoding", "unit": "1K", "price": 0.75 },
+      { "service": "googlePlaces", "metric": "requests", "unit": "1K", "price": 1.00 },
+      { "service": "groq", "metric": "inputTokens", "unit": "1M", "price": 0.05 },
+      { "service": "groq", "metric": "outputTokens", "unit": "1M", "price": 0.08 },
+      { "service": "upstash", "metric": "commands", "unit": "100K", "price": 0.20 },
+      { "service": "resend", "metric": "emails", "unit": "1", "price": 0.00028 }
+    ]
+  },
+  "optimizationRecommendations": [
+    {
+      "category": "quick_wins",
+      "recommendations": [
+        "Stay within free tiers as long as possible",
+        "Compress images before upload (5MB limit is generous)",
+        "Rate limiting is already implemented - prevents abuse",
+        "Consider client-side map tile caching"
+      ]
+    },
+    {
+      "category": "at_scale",
+      "recommendations": [
+        "Monitor database size; implement connection pooling",
+        "Batch geocoding requests; cache results in database",
+        "Google Places UI Kit is already cost-efficient (client-side only)",
+        "Implement LLM response caching for common questions",
+        "Sentry sampling at 10% in production is optimal"
+      ]
+    }
+  ],
+  "riskAssessment": {
+    "costSpikeRisks": [
+      { "risk": "Map load abuse", "likelihood": "low", "impact": "medium", "mitigation": "Rate limiting, auth required" },
+      { "risk": "AI chat abuse", "likelihood": "low", "impact": "low", "mitigation": "Redis rate limits (5/min, 30/hr)" },
+      { "risk": "Storage abuse", "likelihood": "low", "impact": "medium", "mitigation": "File size limits, auth required" },
+      { "risk": "Email spam", "likelihood": "low", "impact": "medium", "mitigation": "Transactional only, auth required" }
+    ],
+    "vendorLockIn": [
+      { "service": "Vercel", "risk": "medium", "migrationDifficulty": "moderate", "note": "Next.js is portable" },
+      { "service": "Supabase", "risk": "medium", "migrationDifficulty": "moderate", "note": "Standard PostgreSQL" },
+      { "service": "Mapbox", "risk": "low", "migrationDifficulty": "easy", "alternative": "MapLibre" },
+      { "service": "Groq", "risk": "low", "migrationDifficulty": "easy", "note": "OpenAI-compatible API" },
+      { "service": "Resend", "risk": "low", "migrationDifficulty": "easy", "note": "Standard SMTP" }
+    ]
+  },
+  "alertThresholds": [
+    { "service": "mapbox_maps", "freeLimit": 50000, "alertAt": 40000 },
+    { "service": "mapbox_geocoding", "freeLimit": 100000, "alertAt": 80000 },
+    { "service": "supabase_storage", "freeLimit": "1GB", "alertAt": "800MB" },
+    { "service": "resend", "freeLimit": 3000, "alertAt": 2500 },
+    { "service": "sentry", "freeLimit": 5000, "alertAt": 4000 },
+    { "service": "upstash", "freeLimit": 500000, "alertAt": 400000 }
+  ]
+}

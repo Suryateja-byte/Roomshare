@@ -87,10 +87,21 @@ export async function getSavedListings() {
     try {
         const saved = await prisma.savedListing.findMany({
             where: { userId: session.user.id },
-            include: {
+            select: {
+                createdAt: true,
                 listing: {
-                    include: {
-                        location: true,
+                    select: {
+                        id: true,
+                        title: true,
+                        description: true,
+                        price: true,
+                        images: true,
+                        location: {
+                            select: {
+                                city: true,
+                                state: true
+                            }
+                        },
                         owner: {
                             select: { id: true, name: true, image: true }
                         }
@@ -101,7 +112,13 @@ export async function getSavedListings() {
         });
 
         return saved.map(s => ({
-            ...s.listing,
+            id: s.listing.id,
+            title: s.listing.title,
+            description: s.listing.description,
+            price: s.listing.price,
+            images: s.listing.images || [],
+            location: s.listing.location,
+            owner: s.listing.owner,
             savedAt: s.createdAt
         }));
     } catch (error) {

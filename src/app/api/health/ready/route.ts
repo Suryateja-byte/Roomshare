@@ -1,14 +1,27 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isInShutdownMode } from '@/lib/shutdown';
 
 /**
  * Readiness probe - confirms the application can serve traffic
  * Checks database connectivity and critical dependencies
  *
  * Use this for load balancer readiness checks and k8s readiness probes.
- * Returns 503 if any critical dependency is unavailable.
+ * Returns 503 if any critical dependency is unavailable or if shutting down.
  */
 export async function GET() {
+  // If shutting down, return 503 to stop receiving new traffic
+  if (isInShutdownMode()) {
+    return NextResponse.json(
+      {
+        status: 'draining',
+        message: 'Application is shutting down',
+        timestamp: new Date().toISOString(),
+      },
+      { status: 503 }
+    );
+  }
+
   const checks: Record<string, { status: 'ok' | 'error'; latency?: number; error?: string }> = {};
   let healthy = true;
 

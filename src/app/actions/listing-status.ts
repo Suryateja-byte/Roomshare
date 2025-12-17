@@ -134,10 +134,22 @@ export async function getRecentlyViewed(limit: number = 10) {
             where: { userId: session.user.id },
             orderBy: { viewedAt: 'desc' },
             take: limit,
-            include: {
+            select: {
+                viewedAt: true,
                 listing: {
-                    include: {
-                        location: true,
+                    select: {
+                        id: true,
+                        title: true,
+                        description: true,
+                        price: true,
+                        images: true,
+                        status: true,
+                        location: {
+                            select: {
+                                city: true,
+                                state: true
+                            }
+                        },
                         owner: {
                             select: { id: true, name: true, image: true, isVerified: true }
                         }
@@ -149,7 +161,13 @@ export async function getRecentlyViewed(limit: number = 10) {
         return recentlyViewed
             .filter(rv => rv.listing.status === 'ACTIVE')
             .map(rv => ({
-                ...rv.listing,
+                id: rv.listing.id,
+                title: rv.listing.title,
+                description: rv.listing.description,
+                price: rv.listing.price,
+                images: rv.listing.images || [],
+                location: rv.listing.location,
+                owner: rv.listing.owner,
                 viewedAt: rv.viewedAt
             }));
     } catch (error) {

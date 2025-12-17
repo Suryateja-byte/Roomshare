@@ -5,7 +5,27 @@ export async function GET(request: NextRequest) {
     try {
         // Verify the request is from Vercel Cron
         const authHeader = request.headers.get('authorization');
-        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        const cronSecret = process.env.CRON_SECRET;
+
+        // Defense in depth: validate secret configuration
+        if (!cronSecret || cronSecret.length < 32) {
+            console.error('[Cron] CRON_SECRET not configured or too short (min 32 chars)');
+            return NextResponse.json(
+                { error: 'Server configuration error' },
+                { status: 500 }
+            );
+        }
+
+        // Reject placeholder values
+        if (cronSecret.includes('change-in-production') || cronSecret.startsWith('your-') || cronSecret.startsWith('generate-')) {
+            console.error('[Cron] CRON_SECRET contains placeholder value');
+            return NextResponse.json(
+                { error: 'Server configuration error' },
+                { status: 500 }
+            );
+        }
+
+        if (authHeader !== `Bearer ${cronSecret}`) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }

@@ -42,7 +42,13 @@
       "Bash(du:*)",
       "Bash(npm view:*)",
       "Bash(tree:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "WebFetch(domain:sentry.io)",
+      "WebFetch(domain:www.mapbox.com)",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:upstash.com)",
+      "WebFetch(domain:resend.com)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

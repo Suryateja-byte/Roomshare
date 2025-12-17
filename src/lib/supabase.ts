@@ -46,7 +46,8 @@ export async function broadcastTyping(
     userName: string,
     isTyping: boolean
 ): Promise<void> {
-    if (!channel) return;
+    // Defensive check: ensure channel exists AND has send method
+    if (!channel || typeof channel.send !== 'function') return;
     try {
         await channel.send({
             type: 'broadcast',

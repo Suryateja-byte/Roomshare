@@ -1,7 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Clock, Search, MapPin, Heart } from 'lucide-react';
+import Image from 'next/image';
+import { Clock, Search, MapPin, Home } from 'lucide-react';
+
+// Placeholder images for when listing has no images
+const PLACEHOLDER_IMAGES = [
+    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1484154218962-a1c002085d2f?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1502005229766-528352261b79?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80"
+];
 
 interface RecentListing {
     id: string;
@@ -21,6 +33,8 @@ interface RecentlyViewedClientProps {
 }
 
 export default function RecentlyViewedClient({ initialListings }: RecentlyViewedClientProps) {
+    const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
     const formatTimeAgo = (date: Date) => {
         const now = new Date();
         const diff = now.getTime() - new Date(date).getTime();
@@ -81,19 +95,36 @@ export default function RecentlyViewedClient({ initialListings }: RecentlyViewed
                                 className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden group hover:shadow-md transition-all"
                             >
                                 {/* Image */}
-                                <div className="relative aspect-[4/3] bg-zinc-100 dark:bg-zinc-800">
-                                    {listing.images && listing.images.length > 0 ? (
-                                        <img
-                                            src={listing.images[0]}
-                                            alt={listing.title}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                            <Heart className="w-12 h-12 text-zinc-200 dark:text-zinc-700" />
-                                        </div>
-                                    )}
-                                    <div className="absolute top-3 right-3 px-2 py-1 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded-full text-xs text-zinc-600 dark:text-zinc-300 flex items-center gap-1">
+                                <div className="relative aspect-[4/3] bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                                    {(() => {
+                                        const hasImage = listing.images && listing.images.length > 0 && listing.images[0];
+                                        const hasError = imageErrors[listing.id];
+                                        const placeholderIndex = listing.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % PLACEHOLDER_IMAGES.length;
+                                        const imageUrl = hasImage && !hasError ? listing.images[0] : PLACEHOLDER_IMAGES[placeholderIndex];
+                                        const showPlaceholder = !hasImage || hasError;
+
+                                        return (
+                                            <>
+                                                <Image
+                                                    src={imageUrl}
+                                                    alt={listing.title}
+                                                    fill
+                                                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                                    onError={() => setImageErrors(prev => ({ ...prev, [listing.id]: true }))}
+                                                />
+                                                {showPlaceholder && (
+                                                    <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-150 dark:from-zinc-800 dark:to-zinc-850 flex flex-col items-center justify-center">
+                                                        <div className="w-14 h-14 rounded-2xl bg-zinc-200/80 dark:bg-zinc-700/80 flex items-center justify-center mb-2">
+                                                            <Home className="w-7 h-7 text-zinc-400 dark:text-zinc-500" strokeWidth={1.5} />
+                                                        </div>
+                                                        <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wider">No Photos</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                    <div className="absolute top-3 right-3 px-2 py-1 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded-full text-xs text-zinc-600 dark:text-zinc-300 flex items-center gap-1 z-10">
                                         <Clock className="w-3 h-3" />
                                         {formatTimeAgo(listing.viewedAt)}
                                     </div>
