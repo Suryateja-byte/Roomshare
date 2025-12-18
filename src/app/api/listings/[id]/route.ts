@@ -5,6 +5,7 @@ import { geocodeAddress } from '@/lib/geocoding';
 import { createClient } from '@supabase/supabase-js';
 import { householdLanguagesSchema } from '@/lib/schemas';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
+import { isValidLanguageCode } from '@/lib/languages';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -207,7 +208,9 @@ export async function PATCH(
                     price: priceNum,
                     amenities: amenities ? amenities.split(',').map((s: string) => s.trim()) : [],
                     houseRules: houseRules ? houseRules.split(',').map((s: string) => s.trim()) : [],
-                    householdLanguages: Array.isArray(householdLanguages) ? householdLanguages : [],
+                    householdLanguages: Array.isArray(householdLanguages)
+                        ? householdLanguages.map((l: string) => l.trim().toLowerCase()).filter(isValidLanguageCode)
+                        : [],
                     genderPreference: genderPreference || null,
                     householdGender: householdGender || null,
                     leaseDuration: leaseDuration || null,

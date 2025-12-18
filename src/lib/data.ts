@@ -588,7 +588,7 @@ const MAX_MAP_MARKERS = 200;
  * - ~70% smaller payload per listing
  */
 export async function getMapListings(params: FilterParams = {}): Promise<MapListingData[]> {
-    const { minPrice, maxPrice, bounds } = params;
+    const { minPrice, maxPrice, bounds, languages } = params;
 
     // Build WHERE conditions dynamically
     const conditions: string[] = [
@@ -617,6 +617,15 @@ export async function getMapListings(params: FilterParams = {}): Promise<MapList
     if (maxPrice !== undefined && maxPrice !== null) {
         conditions.push(`l.price <= $${paramIndex++}`);
         queryParams.push(maxPrice);
+    }
+
+    // Languages filter (SQL level with GIN index) - OR logic
+    if (languages?.length) {
+        const normalized = languages.map(l => l.trim().toLowerCase()).filter(Boolean);
+        if (normalized.length > 0) {
+            conditions.push(`l."household_languages" && $${paramIndex++}::text[]`);
+            queryParams.push(normalized);
+        }
     }
 
     const whereClause = conditions.join(' AND ');
@@ -745,6 +754,16 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
     if (householdGender) {
         conditions.push(`LOWER(l."householdGender") = LOWER($${paramIndex++})`);
         queryParams.push(householdGender);
+    }
+
+    // Languages filter (SQL level with GIN index) - OR logic
+    // Pass ONE array param - simpler, fewer bugs, uses GIN index
+    if (languages?.length) {
+        const normalized = languages.map(l => l.trim().toLowerCase()).filter(Boolean);
+        if (normalized.length > 0) {
+            conditions.push(`l."household_languages" && $${paramIndex++}::text[]`);
+            queryParams.push(normalized);
+        }
     }
 
     const whereClause = conditions.join(' AND ');
@@ -877,22 +896,13 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
         );
     }
 
-    // Apply languages filter in JS (OR logic - show listings where household speaks ANY selected language)
-    if (languages && languages.length > 0) {
-        const languagesLower = languages.map(l => l.toLowerCase());
-        results = results.filter(listing =>
-            languagesLower.some(lang =>
-                listing.householdLanguages.some((ll: string) => ll.toLowerCase() === lang)
-            )
-        );
-    }
+    // Note: Languages filter is now at SQL level (uses GIN index on household_languages)
+    // Amenities and house rules still use JS filtering for now
 
-    // Note: When amenities/houseRules/languages filters are applied, the total count may be inaccurate
-    // This is a trade-off for performance. For accurate count with array filters,
-    // we'd need to fetch all and count in JS, which defeats the purpose.
-    // In practice, these filters rarely remove many results.
-    const filteredTotal = (amenities?.length || houseRules?.length || languages?.length)
-        ? Math.min(total, results.length + offset) // Approximate
+    // Note: When amenities/houseRules filters are applied in JS, the total count may be inaccurate
+    // This is a trade-off for performance. Languages filter is now SQL-level so count is accurate.
+    const filteredTotal = (amenities?.length || houseRules?.length)
+        ? Math.min(total, results.length + offset) // Approximate for JS-filtered arrays
         : total;
 
     const totalPages = Math.ceil(filteredTotal / limit);

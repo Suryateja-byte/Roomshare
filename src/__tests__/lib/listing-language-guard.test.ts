@@ -1,7 +1,9 @@
 import {
   checkListingLanguageCompliance,
   LANGUAGE_EXCLUSION_PATTERN_COUNT,
+  LANGUAGE_WORD_COUNT,
 } from '@/lib/listing-language-guard';
+import { SUPPORTED_LANGUAGES } from '@/lib/languages';
 
 describe('listing-language-guard', () => {
   describe('checkListingLanguageCompliance', () => {
@@ -192,6 +194,78 @@ describe('listing-language-guard', () => {
           const result = checkListingLanguageCompliance(`${lang} only household`);
           expect(result.allowed).toBe(false);
         }
+      });
+
+      it('covers all SUPPORTED_LANGUAGES', () => {
+        // Every language in SUPPORTED_LANGUAGES should be blocked when used with "only"
+        Object.values(SUPPORTED_LANGUAGES).forEach((langName) => {
+          const result = checkListingLanguageCompliance(
+            `${langName} only household`
+          );
+          expect(result.allowed).toBe(false);
+        });
+      });
+
+      it('has sufficient language word count for 54 languages', () => {
+        // Should have at least 54 unique words (one per language, plus multi-word names)
+        expect(LANGUAGE_WORD_COUNT).toBeGreaterThanOrEqual(54);
+      });
+    });
+
+    describe('hyphenated patterns', () => {
+      it('blocks hyphenated "<language>-only" patterns', () => {
+        const hyphenatedPatterns = [
+          'English-only household',
+          'Spanish-only speakers please',
+          'Hindi-only environment',
+          'This is a Telugu-only home',
+          'Mandarin-only household wanted',
+        ];
+
+        hyphenatedPatterns.forEach((desc) => {
+          const result = checkListingLanguageCompliance(desc);
+          expect(result.allowed).toBe(false);
+        });
+      });
+
+      it('blocks hyphenated "only-<language>" patterns', () => {
+        const hyphenatedPatterns = [
+          'only-English speakers',
+          'only-Spanish household',
+        ];
+
+        hyphenatedPatterns.forEach((desc) => {
+          const result = checkListingLanguageCompliance(desc);
+          expect(result.allowed).toBe(false);
+        });
+      });
+    });
+
+    describe('generic phrase false positive prevention', () => {
+      it('does not false-positive on "language only" without specific language', () => {
+        const genericPhrases = [
+          'We use one language only for communication',
+          'Language only matters for household activities',
+        ];
+
+        genericPhrases.forEach((desc) => {
+          const result = checkListingLanguageCompliance(desc);
+          expect(result.allowed).toBe(true);
+        });
+      });
+
+      it('does not false-positive on generic communication phrases', () => {
+        const genericPhrases = [
+          'We communicate clearly',
+          'Good communication is important',
+          'Communication is key in our household',
+          'We value open communication',
+        ];
+
+        genericPhrases.forEach((desc) => {
+          const result = checkListingLanguageCompliance(desc);
+          expect(result.allowed).toBe(true);
+        });
       });
     });
 

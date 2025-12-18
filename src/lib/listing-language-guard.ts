@@ -11,7 +11,12 @@
  * NOTE: This is intentionally minimal - we don't want false positives
  * that block legitimate descriptions. The language selection UI is the
  * proper way to indicate household languages.
+ *
+ * DYNAMIC PATTERN GENERATION: Patterns are built from the canonical
+ * SUPPORTED_LANGUAGES list to ensure all 54 languages are covered.
  */
+
+import { SUPPORTED_LANGUAGES, LEGACY_NAME_TO_CODE } from '@/lib/languages';
 
 export interface LanguageComplianceResult {
   allowed: boolean;
@@ -19,27 +24,91 @@ export interface LanguageComplianceResult {
 }
 
 /**
+ * Generate comprehensive list of language names for pattern matching.
+ * Only excludes GENERIC tokens (not actual language names like "chinese").
+ */
+function generateLanguageWordList(): string[] {
+  const languageWords = new Set<string>();
+
+  // Only exclude truly generic tokens - NOT actual language names
+  const EXCLUDED_WORDS = new Set([
+    'language',
+    'languages',
+    'speaker',
+    'speakers',
+    'speaking',
+  ]);
+
+  // Add all display names from SUPPORTED_LANGUAGES
+  Object.values(SUPPORTED_LANGUAGES).forEach((name) => {
+    const lowerName = name.toLowerCase();
+    languageWords.add(lowerName);
+    // Split multi-word names (e.g., "Mandarin Chinese")
+    lowerName.split(/\s+/).forEach((word) => {
+      if (word.length > 3 && !EXCLUDED_WORDS.has(word)) {
+        languageWords.add(word);
+      }
+    });
+  });
+
+  // Add legacy name keys (e.g., "Mandarin" -> "zh")
+  Object.keys(LEGACY_NAME_TO_CODE).forEach((name) => {
+    const lowerName = name.toLowerCase();
+    languageWords.add(lowerName);
+  });
+
+  // Sort by length descending for proper regex alternation
+  // (longer matches should be tried first to avoid partial matches)
+  return Array.from(languageWords).sort((a, b) => b.length - a.length);
+}
+
+const LANGUAGE_WORDS = generateLanguageWordList();
+
+/**
+ * Build a regex pattern using the generated language word list.
+ * Escapes special regex characters in language names.
+ */
+function buildLanguagePattern(template: (langs: string) => string): RegExp {
+  const escapedLangs = LANGUAGE_WORDS.map((lang) =>
+    lang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  ).join('|');
+  return new RegExp(template(escapedLangs), 'i');
+}
+
+/**
  * Patterns that indicate discriminatory language requirements in listings.
- * These are narrow and specific to avoid false positives.
+ * Dynamically generated from the canonical SUPPORTED_LANGUAGES list.
+ *
+ * Supports both space and hyphen separators (e.g., "English only" and "English-only")
  */
 const LANGUAGE_EXCLUSION_PATTERNS: RegExp[] = [
-  // "<language> only" patterns
-  /\b(english|spanish|chinese|mandarin|hindi|arabic|french|german|japanese|korean|vietnamese|tagalog|telugu|tamil|bengali|punjabi|gujarati|marathi|urdu)\s+only\b/i,
+  // "<language> only" or "<language>-only" patterns
+  buildLanguagePattern((langs) => `\\b(${langs})(?:\\s|-)+only\\b`),
 
-  // "only <language>" patterns
-  /\bonly\s+(english|spanish|chinese|mandarin|hindi|arabic|french|german|japanese|korean|vietnamese|tagalog|telugu|tamil|bengali|punjabi|gujarati|marathi|urdu)\b/i,
+  // "only <language>" or "only-<language>" patterns
+  buildLanguagePattern((langs) => `\\bonly(?:\\s|-)+(${langs})\\b`),
 
   // "no <language> speakers" patterns
-  /\bno\s+(english|spanish|chinese|mandarin|hindi|arabic|french|german|japanese|korean|vietnamese|tagalog|telugu|tamil|bengali|punjabi|gujarati|marathi|urdu)\s*(speakers?|speaking)?\b/i,
+  buildLanguagePattern(
+    (langs) => `\\bno\\s+(${langs})\\s*(speakers?|speaking)?\\b`
+  ),
 
   // "must speak <language>" patterns (strict requirement)
-  /\b(must|required?\s+to|have\s+to)\s+(speak|know|be\s+fluent\s+in)\s+(english|spanish|chinese|mandarin|hindi|arabic|french|german)\b/i,
+  buildLanguagePattern(
+    (langs) =>
+      `\\b(must|required?\\s+to|have\\s+to)\\s+(speak|know|be\\s+fluent\\s+in)\\s+(${langs})\\b`
+  ),
 
   // "<language> required" patterns
-  /\b(english|spanish|chinese|mandarin|hindi)\s+(is\s+)?(required|mandatory|necessary)\b/i,
+  buildLanguagePattern(
+    (langs) => `\\b(${langs})\\s+(is\\s+)?(required|mandatory|necessary)\\b`
+  ),
 
   // "fluent <language> required" patterns
-  /\b(fluent|native)\s+(english|spanish|chinese|mandarin|hindi)\s+(only|required|speakers?\s+only)\b/i,
+  buildLanguagePattern(
+    (langs) =>
+      `\\b(fluent|native)\\s+(${langs})\\s+(only|required|speakers?\\s+only)\\b`
+  ),
 ];
 
 /**
@@ -83,6 +152,11 @@ export function checkListingLanguageCompliance(
 }
 
 /**
- * List of patterns for testing purposes
+ * Number of patterns for testing purposes
  */
 export const LANGUAGE_EXCLUSION_PATTERN_COUNT = LANGUAGE_EXCLUSION_PATTERNS.length;
+
+/**
+ * Number of unique language words covered by patterns (for testing)
+ */
+export const LANGUAGE_WORD_COUNT = LANGUAGE_WORDS.length;

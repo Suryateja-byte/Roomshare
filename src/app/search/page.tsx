@@ -58,6 +58,7 @@ export default async function SearchPage({
         moveInDate?: string;
         leaseDuration?: string;
         houseRules?: string | string[];
+        languages?: string | string[];
         roomType?: string;
         minLat?: string;
         maxLat?: string;
@@ -69,7 +70,7 @@ export default async function SearchPage({
         sort?: string;
     }>;
 }) {
-    const { q, minPrice, maxPrice, amenities, moveInDate, leaseDuration, houseRules, roomType, minLat, maxLat, minLng, maxLng, lat, lng, page, sort } = await searchParams;
+    const { q, minPrice, maxPrice, amenities, moveInDate, leaseDuration, houseRules, languages, roomType, minLat, maxLat, minLng, maxLng, lat, lng, page, sort } = await searchParams;
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -131,6 +132,18 @@ export default async function SearchPage({
     const amenitiesList = typeof amenities === 'string' ? [amenities] : amenities;
     const houseRulesList = typeof houseRules === 'string' ? [houseRules] : houseRules;
 
+    // Parse languages: support both ?languages=en,te AND ?languages=en&languages=te
+    // Includes deduplication to avoid ['en','en','te']
+    const languagesList = (() => {
+        const list = typeof languages === 'string'
+            ? languages.split(',')
+            : Array.isArray(languages)
+                ? languages.flatMap(v => String(v).split(','))
+                : [];
+        const normalized = list.map(s => s.trim().toLowerCase()).filter(Boolean);
+        return Array.from(new Set(normalized)); // Dedupe
+    })();
+
     // Calculate bounds from either explicit bounds or from center coordinates
     let bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number } | undefined;
 
@@ -176,6 +189,7 @@ export default async function SearchPage({
         moveInDate: validMoveInDate,
         leaseDuration,
         houseRules: houseRulesList,
+        languages: languagesList.length > 0 ? languagesList : undefined,
         roomType,
         bounds,
         sort: sortOption

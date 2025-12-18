@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { householdLanguagesSchema } from '@/lib/schemas';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
+import { isValidLanguageCode } from '@/lib/languages';
 
 export async function GET(request: Request) {
     // P2-3: Add rate limiting to prevent scraping
@@ -144,7 +145,9 @@ export async function POST(request: Request) {
                     images: images || [],
                     amenities: amenities ? amenities.split(',').map((s: string) => s.trim()) : [],
                     houseRules: houseRules ? houseRules.split(',').map((s: string) => s.trim()) : [],
-                    householdLanguages: Array.isArray(householdLanguages) ? householdLanguages : [],
+                    householdLanguages: Array.isArray(householdLanguages)
+                        ? householdLanguages.map((l: string) => l.trim().toLowerCase()).filter(isValidLanguageCode)
+                        : [],
                     genderPreference: genderPreference || null,
                     householdGender: householdGender || null,
                     leaseDuration,
