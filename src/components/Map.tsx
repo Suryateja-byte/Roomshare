@@ -132,6 +132,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [areTilesLoading, setAreTilesLoading] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
     const mapRef = useRef<any>(null);
@@ -364,6 +365,20 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         };
     }, []);
 
+    // Clear searching state when listings update from SSR
+    useEffect(() => {
+        setIsSearching(false);
+    }, [listings]);
+
+    // Cleanup debounce timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimer.current) {
+                clearTimeout(debounceTimer.current);
+            }
+        };
+    }, []);
+
     const handleMoveEnd = (e: ViewStateChangeEvent) => {
         // Update unclustered listings for rendering individual markers
         updateUnclusteredListings();
@@ -394,6 +409,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             params.set('minLat', minLat.toString());
             params.set('maxLat', maxLat.toString());
 
+            setIsSearching(true);
             router.push(`/search?${params.toString()}`);
         }, 500); // 500ms debounce
     };
@@ -430,6 +446,14 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" />
                         <span className="text-sm text-zinc-600 dark:text-zinc-300">Loading tiles...</span>
                     </div>
+                </div>
+            )}
+
+            {/* Search-as-move loading indicator */}
+            {isSearching && isMapLoaded && !areTilesLoading && (
+                <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10 pointer-events-none">
+                    <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" />
+                    <span className="text-sm text-zinc-600 dark:text-zinc-300">Searching area...</span>
                 </div>
             )}
 

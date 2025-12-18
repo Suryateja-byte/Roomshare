@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { getListingsInBounds, MapListing } from '@/app/actions/get-listings';
 import { useDebounce } from 'use-debounce';
 import { Loader2, Home, X, MapPin } from 'lucide-react';
+import { useAbortableServerAction } from '@/hooks/useAbortableServerAction';
 
 interface MarkerPosition {
     listing: MapListing;
@@ -189,29 +190,36 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
         setUnclusteredListings(unique);
     }, [useClustering, listingsLookup]);
 
+    // Use abortable server action to prevent race conditions on rapid map movement
+    const { execute: fetchListingsAction, isLoading: isFetchingListings, cancel: cancelFetch } =
+        useAbortableServerAction({
+            action: getListingsInBounds,
+            onSuccess: (newListings) => setListings(newListings),
+            onError: (err) => console.error('Failed to fetch listings:', err),
+        });
+
     // Fetch listings when the map moves (debounced)
     useEffect(() => {
-        const fetchListings = async () => {
-            if (!mapRef.current) return;
+        if (!mapRef.current) return;
 
-            const map = mapRef.current.getMap();
-            const bounds = map.getBounds();
+        const map = mapRef.current.getMap();
+        const bounds = map.getBounds();
 
-            const ne = bounds.getNorthEast();
-            const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
 
-            const newListings = await getListingsInBounds({
-                ne_lat: ne.lat,
-                ne_lng: ne.lng,
-                sw_lat: sw.lat,
-                sw_lng: sw.lng,
-            });
+        fetchListingsAction({
+            ne_lat: ne.lat,
+            ne_lng: ne.lng,
+            sw_lat: sw.lat,
+            sw_lng: sw.lng,
+        });
+    }, [debouncedViewState, fetchListingsAction]);
 
-            setListings(newListings);
-        };
-
-        fetchListings();
-    }, [debouncedViewState]);
+    // Cancel pending fetch requests on unmount
+    useEffect(() => {
+        return () => cancelFetch();
+    }, [cancelFetch]);
 
     // Initialize view state from initial listings if available
     useEffect(() => {
@@ -300,6 +308,14 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                         <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" />
                         <span className="text-sm text-zinc-600 dark:text-zinc-300">Loading tiles...</span>
                     </div>
+                </div>
+            )}
+
+            {/* Data loading indicator - shows when fetching listings after map movement */}
+            {isFetchingListings && isMapLoaded && !areTilesLoading && (
+                <div className="absolute top-4 right-4 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10">
+                    <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" />
+                    <span className="text-sm text-zinc-600 dark:text-zinc-300">Updating listings...</span>
                 </div>
             )}
 

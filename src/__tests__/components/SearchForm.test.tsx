@@ -350,11 +350,16 @@ describe('SearchForm', () => {
       await user.click(screen.getByRole('button', { name: /filters/i }))
       jest.runAllTimers()
 
+      // Initially, English is in "Available languages" with aria-pressed="false"
       const englishButton = screen.getByRole('button', { name: 'English' })
       expect(englishButton).toHaveAttribute('aria-pressed', 'false')
 
       await user.click(englishButton)
-      expect(englishButton).toHaveAttribute('aria-pressed', 'true')
+
+      // After clicking, the button moves to "Selected languages" section with aria-pressed="true"
+      // We need to re-query since it's a different DOM element now
+      const selectedEnglishButton = screen.getByRole('button', { name: /English/i })
+      expect(selectedEnglishButton).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('toggleLanguage removes language when already selected', async () => {
@@ -362,13 +367,20 @@ describe('SearchForm', () => {
       await user.click(screen.getByRole('button', { name: /filters/i }))
       jest.runAllTimers()
 
+      // Click to select English - it moves to "Selected languages" section
       const englishButton = screen.getByRole('button', { name: 'English' })
-
       await user.click(englishButton)
-      expect(englishButton).toHaveAttribute('aria-pressed', 'true')
 
-      await user.click(englishButton)
-      expect(englishButton).toHaveAttribute('aria-pressed', 'false')
+      // Re-query: button is now in "Selected languages" with aria-pressed="true"
+      const selectedEnglishButton = screen.getByRole('button', { name: /English/i })
+      expect(selectedEnglishButton).toHaveAttribute('aria-pressed', 'true')
+
+      // Click to deselect - it moves back to "Available languages" section
+      await user.click(selectedEnglishButton)
+
+      // Re-query: button is back in "Available languages" with aria-pressed="false"
+      const availableEnglishButton = screen.getByRole('button', { name: 'English' })
+      expect(availableEnglishButton).toHaveAttribute('aria-pressed', 'false')
     })
   })
 

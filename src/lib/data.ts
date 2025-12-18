@@ -588,7 +588,7 @@ const MAX_MAP_MARKERS = 200;
  * - ~70% smaller payload per listing
  */
 export async function getMapListings(params: FilterParams = {}): Promise<MapListingData[]> {
-    const { minPrice, maxPrice, bounds, languages } = params;
+    const { minPrice, maxPrice, bounds, languages, amenities, houseRules } = params;
 
     // Build WHERE conditions dynamically
     const conditions: string[] = [
@@ -625,6 +625,26 @@ export async function getMapListings(params: FilterParams = {}): Promise<MapList
         if (normalized.length > 0) {
             conditions.push(`l."household_languages" && $${paramIndex++}::text[]`);
             queryParams.push(normalized);
+        }
+    }
+
+    // Amenities filter (SQL level) - AND logic: must have ALL selected amenities
+    // NULL safety: filter out NULL values from unnest to prevent LOWER(NULL) issues
+    if (amenities?.length) {
+        const normalizedAmenities = amenities.map(a => a.trim().toLowerCase()).filter(Boolean);
+        if (normalizedAmenities.length > 0) {
+            conditions.push(`ARRAY(SELECT LOWER(x) FROM unnest(l.amenities) AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`);
+            queryParams.push(normalizedAmenities);
+        }
+    }
+
+    // House rules filter (SQL level) - AND logic: must have ALL selected house rules
+    // NULL safety: filter out NULL values from unnest to prevent LOWER(NULL) issues
+    if (houseRules?.length) {
+        const normalizedRules = houseRules.map(r => r.trim().toLowerCase()).filter(Boolean);
+        if (normalizedRules.length > 0) {
+            conditions.push(`ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`);
+            queryParams.push(normalizedRules);
         }
     }
 
@@ -766,6 +786,26 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
         }
     }
 
+    // Amenities filter (SQL level) - AND logic: must have ALL selected amenities
+    // Uses case-insensitive array containment with NULL safety
+    if (amenities?.length) {
+        const normalizedAmenities = amenities.map(a => a.trim().toLowerCase()).filter(Boolean);
+        if (normalizedAmenities.length > 0) {
+            conditions.push(`ARRAY(SELECT LOWER(x) FROM unnest(l.amenities) AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`);
+            queryParams.push(normalizedAmenities);
+        }
+    }
+
+    // House rules filter (SQL level) - AND logic: must have ALL selected house rules
+    // Uses case-insensitive array containment with NULL safety
+    if (houseRules?.length) {
+        const normalizedRules = houseRules.map(r => r.trim().toLowerCase()).filter(Boolean);
+        if (normalizedRules.length > 0) {
+            conditions.push(`ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`);
+            queryParams.push(normalizedRules);
+        }
+    }
+
     const whereClause = conditions.join(' AND ');
 
     // Build ORDER BY clause based on sort option
@@ -880,36 +920,16 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
         }
     }));
 
-    // Apply amenities filter in JS (arrays are complex to filter in SQL)
-    if (amenities && amenities.length > 0) {
-        const amenitiesLower = amenities.map(a => a.toLowerCase());
-        results = results.filter(l =>
-            amenitiesLower.every(a => l.amenities.some((la: string) => la.toLowerCase() === a))
-        );
-    }
+    // All filters are now applied at SQL level for accurate pagination counts:
+    // - Languages: GIN index with && operator (OR logic)
+    // - Amenities: Case-insensitive array containment with @> operator (AND logic)
+    // - House rules: Case-insensitive array containment with @> operator (AND logic)
 
-    // Apply house rules filter in JS
-    if (houseRules && houseRules.length > 0) {
-        const rulesLower = houseRules.map(r => r.toLowerCase());
-        results = results.filter(l =>
-            rulesLower.every(r => l.houseRules.some((hr: string) => hr.toLowerCase() === r))
-        );
-    }
-
-    // Note: Languages filter is now at SQL level (uses GIN index on household_languages)
-    // Amenities and house rules still use JS filtering for now
-
-    // Note: When amenities/houseRules filters are applied in JS, the total count may be inaccurate
-    // This is a trade-off for performance. Languages filter is now SQL-level so count is accurate.
-    const filteredTotal = (amenities?.length || houseRules?.length)
-        ? Math.min(total, results.length + offset) // Approximate for JS-filtered arrays
-        : total;
-
-    const totalPages = Math.ceil(filteredTotal / limit);
+    const totalPages = Math.ceil(total / limit);
 
     return {
         items: results,
-        total: filteredTotal,
+        total,
         page,
         limit,
         totalPages
