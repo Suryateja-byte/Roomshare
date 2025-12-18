@@ -24,7 +24,9 @@ jest.mock('@/lib/geocoding', () => ({
 }))
 
 import { createListing } from '@/app/actions/create-listing'
-// Note: updateListing does not exist in the source file
+// Note: updateListing does not exist in the source file - placeholder for skipped tests
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const updateListing: any = () => Promise.resolve({})
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { revalidatePath } from 'next/cache'
@@ -55,7 +57,7 @@ describe('createListing', () => {
     const formData = new FormData()
     formData.append('title', 'Test')
 
-    const result = await createListing({}, formData)
+    const result = await createListing({ success: false }, formData)
     // When not authenticated, it still returns validation errors (not auth error)
     // since validation happens before auth check in some implementations
     expect(result.success).toBe(false)
@@ -65,7 +67,7 @@ describe('createListing', () => {
     const formData = new FormData()
     // Missing required fields
 
-    const result = await createListing({}, formData)
+    const result = await createListing({ success: false }, formData)
 
     // The result has 'fields' with validation errors, not 'errors'
     expect(result.success).toBe(false)
@@ -84,7 +86,7 @@ describe('createListing', () => {
     formData.append('roomType', 'PRIVATE')
     formData.append('images', '[]')
 
-    await createListing({}, formData)
+    await createListing({ success: false }, formData)
 
     expect(prisma.listing.create).toHaveBeenCalled()
   })
@@ -101,7 +103,7 @@ describe('createListing', () => {
     formData.append('roomType', 'PRIVATE')
     formData.append('images', '[]')
 
-    await createListing({}, formData)
+    await createListing({ success: false }, formData)
 
     expect(geocodeAddress).toHaveBeenCalled()
   })

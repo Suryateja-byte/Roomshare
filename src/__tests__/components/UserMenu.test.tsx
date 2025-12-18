@@ -21,6 +21,8 @@ describe('UserMenu', () => {
     name: 'John Doe',
     email: 'john@example.com',
     image: null,
+    emailVerified: null as Date | null,
+    isAdmin: false,
   }
 
   beforeEach(() => {

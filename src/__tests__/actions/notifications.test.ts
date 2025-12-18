@@ -71,8 +71,8 @@ describe('Notifications Actions', () => {
   describe('createNotification', () => {
     it('creates notification successfully', async () => {
       ;(prisma.notification.create as jest.Mock).mockResolvedValue({
-        id: 'notif-new',
         ...mockNotifications[0],
+        id: 'notif-new',
       })
 
       const result = await createNotification({

@@ -214,9 +214,12 @@ function convertToSimpleMessages(messages: ChatMessage[]): CoreMessage[] {
 
 // ============ GROQ CONFIGURATION ============
 
-const groq = createGroq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+// P1-12 FIX: Validate GROQ_API_KEY exists before creating client
+const groqApiKey = process.env.GROQ_API_KEY;
+
+const groq = groqApiKey
+  ? createGroq({ apiKey: groqApiKey })
+  : null;
 
 // ============ PLACE TYPE MAPPING ============
 
@@ -369,6 +372,14 @@ export async function POST(request: Request) {
       console.error('[Chat] No valid messages after conversion. Message count:', messages.length);
       return new Response(JSON.stringify({ error: 'No valid messages' }), {
         status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // P1-12 FIX: Check if AI chat is available (GROQ_API_KEY configured)
+    if (!groq) {
+      return new Response(JSON.stringify({ error: 'Chat service temporarily unavailable' }), {
+        status: 503,
         headers: { 'Content-Type': 'application/json' },
       });
     }

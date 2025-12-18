@@ -8,6 +8,8 @@ export const mockUser = {
   name: 'Test User',
   email: 'test@example.com',
   image: '/avatar.jpg',
+  emailVerified: null as Date | null,
+  isAdmin: false,
 }
 
 export const mockSession = {

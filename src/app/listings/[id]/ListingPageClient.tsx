@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getAmenityIcon } from '@/lib/amenityIcons';
+import { getLanguageName } from '@/lib/languages';
 
 // Import existing functional components
 import ImageGallery from '@/components/ImageGallery';
@@ -73,7 +74,7 @@ interface ListingPageClientProps {
         price: number;
         images: string[];
         amenities: string[];
-        languages: string[];
+        householdLanguages: string[];
         totalSlots: number;
         availableSlots: number;
         status: string;
@@ -324,7 +325,7 @@ export default function ListingPageClient({
                             )}
 
                             {/* Household Details */}
-                            {(listing.languages.length > 0 || listing.genderPreference || listing.householdGender) && (
+                            {(listing.householdLanguages.length > 0 || listing.genderPreference || listing.householdGender) && (
                                 <div className="space-y-6">
                                     <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Household Details</h2>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -351,18 +352,18 @@ export default function ListingPageClient({
                                             </div>
                                         )}
                                     </div>
-                                    {listing.languages.length > 0 && (
+                                    {listing.householdLanguages.length > 0 && (
                                         <div>
                                             <p className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-3">
                                                 Languages Spoken
                                             </p>
                                             <div className="flex flex-wrap gap-2">
-                                                {listing.languages.map((lang, i) => (
+                                                {listing.householdLanguages.map((lang, i) => (
                                                     <span
                                                         key={i}
                                                         className="px-4 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-full text-sm font-medium border border-zinc-200 dark:border-zinc-700"
                                                     >
-                                                        {lang}
+                                                        {getLanguageName(lang)}
                                                     </span>
                                                 ))}
                                             </div>

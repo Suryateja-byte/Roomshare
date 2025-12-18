@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { withRateLimit } from '@/lib/with-rate-limit';
 
 const resetPasswordSchema = z.object({
     token: z.string().min(1, 'Token is required'),
@@ -9,6 +10,10 @@ const resetPasswordSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+    // P1-2 FIX: Add rate limiting to prevent token brute-forcing
+    const rateLimitResponse = await withRateLimit(request, { type: 'resetPassword' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const body = await request.json();
 
@@ -88,6 +93,10 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint to verify token validity
 export async function GET(request: NextRequest) {
+    // P1-2 FIX: Add rate limiting to prevent token enumeration
+    const rateLimitResponse = await withRateLimit(request, { type: 'resetPassword' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
 

@@ -31,6 +31,7 @@ jest.mock('next/server', () => ({
 
 import { POST, GET } from '@/app/api/auth/reset-password/route'
 import { prisma } from '@/lib/prisma'
+import type { NextRequest } from 'next/server'
 
 describe('Reset Password API', () => {
   beforeEach(() => {
@@ -42,7 +43,7 @@ describe('Reset Password API', () => {
       new Request('http://localhost:3000/api/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify(body),
-      })
+      }) as unknown as NextRequest
 
     it('resets password successfully with valid token', async () => {
       const validToken = {
@@ -187,7 +188,7 @@ describe('Reset Password API', () => {
       const url = token
         ? `http://localhost:3000/api/auth/reset-password?token=${token}`
         : 'http://localhost:3000/api/auth/reset-password'
-      return new Request(url, { method: 'GET' })
+      return new Request(url, { method: 'GET' }) as unknown as NextRequest
     }
 
     it('returns valid true for valid token', async () => {

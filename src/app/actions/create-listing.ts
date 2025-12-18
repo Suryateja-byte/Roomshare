@@ -9,12 +9,26 @@ import { triggerInstantAlerts } from '@/lib/search-alerts';
 import { checkSuspension, checkEmailVerified } from './suspension';
 import { logger } from '@/lib/logger';
 
+// P1-15 FIX: Define proper type for listing data returned to client
+export type CreateListingData = {
+    id: string;
+    title: string;
+    description: string | null;
+    price: number;
+    amenities: string[];
+    houseRules: string[];
+    totalSlots: number;
+    availableSlots: number;
+    ownerId: string;
+    createdAt: Date;
+};
+
 export type CreateListingState = {
     success: boolean;
     error?: string;
     code?: string;
     fields?: Record<string, string>;
-    data?: any; // Using any for now to avoid circular dependency issues with Prisma types on the client if not careful, but ideally should be Listing
+    data?: CreateListingData;
 };
 
 export async function createListing(prevState: CreateListingState, formData: FormData): Promise<CreateListingState> {

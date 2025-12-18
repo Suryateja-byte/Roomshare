@@ -167,7 +167,7 @@ describe('upload API route', () => {
     })
 
     it('should use listings folder for listing type', () => {
-      const type = 'listing'
+      const type = 'listing' as 'profile' | 'listing'
       const folder = type === 'profile' ? 'profiles' : 'listings'
       expect(folder).toBe('listings')
     })
@@ -194,14 +194,14 @@ describe('upload API route', () => {
   describe('authentication requirements', () => {
     it('should require authenticated session for POST', () => {
       // POST route checks session?.user?.id
-      const session = null
+      const session = null as { user?: { id?: string } } | null
       const isAuthenticated = session?.user?.id != null
       expect(isAuthenticated).toBe(false)
     })
 
     it('should require authenticated session for DELETE', () => {
       // DELETE route checks session?.user?.id
-      const session = { user: {} }
+      const session: { user: { id?: string } } = { user: {} }
       const isAuthenticated = session?.user?.id != null
       expect(isAuthenticated).toBe(false)
     })

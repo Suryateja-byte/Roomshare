@@ -208,13 +208,23 @@ describe('saved-listings actions', () => {
 
       expect(prisma.savedListing.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          include: {
+          select: {
+            createdAt: true,
             listing: {
-              include: {
-                location: true,
-                owner: { select: { id: true, name: true, image: true } },
-              },
-            },
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                price: true,
+                images: true,
+                location: {
+                  select: { city: true, state: true }
+                },
+                owner: {
+                  select: { id: true, name: true, image: true }
+                }
+              }
+            }
           },
         })
       )

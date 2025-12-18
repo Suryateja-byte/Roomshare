@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, Home } from 'lucide-react';
+import { Star, Home, Globe } from 'lucide-react';
 import FavoriteButton from '../FavoriteButton';
 import { cn } from '@/lib/utils';
+import { getLanguageName } from '@/lib/languages';
 
 export interface Listing {
     id: string;
@@ -17,6 +18,7 @@ export interface Listing {
         state: string;
     };
     amenities: string[];
+    householdLanguages?: string[];
     availableSlots: number;
     images?: string[];
     avgRating?: number;
@@ -171,13 +173,28 @@ export default function ListingCard({ listing, isSaved, className }: ListingCard
                     </p>
 
                     {/* Amenities */}
-                    <div className="flex flex-wrap gap-1.5 mb-4">
+                    <div className="flex flex-wrap gap-1.5 mb-2">
                         {listing.amenities.slice(0, 3).map((amenity, i) => (
                             <span key={i} className="text-2xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded font-medium border border-zinc-200 dark:border-zinc-700">
                                 {amenity}
                             </span>
                         ))}
                     </div>
+
+                    {/* Languages spoken */}
+                    {listing.householdLanguages && listing.householdLanguages.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                            <Globe className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                            {listing.householdLanguages.slice(0, 2).map((code, i) => (
+                                <span key={i} className="text-2xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded font-medium">
+                                    {getLanguageName(code)}
+                                </span>
+                            ))}
+                            {listing.householdLanguages.length > 2 && (
+                                <span className="text-2xs text-zinc-400 dark:text-zinc-500">+{listing.householdLanguages.length - 2}</span>
+                            )}
+                        </div>
+                    )}
 
                     {/* Price Row - Clean, no button */}
                     <div className="mt-auto">

@@ -235,11 +235,14 @@ describe('rate-limit', () => {
     const originalNodeEnv = process.env.NODE_ENV
 
     afterEach(() => {
-      process.env.NODE_ENV = originalNodeEnv
+      // Restore original NODE_ENV using delete + assign pattern
+      delete (process.env as { NODE_ENV?: string }).NODE_ENV
+      ;(process.env as { NODE_ENV?: string }).NODE_ENV = originalNodeEnv
     })
 
     it('extracts IP from x-forwarded-for header in development mode', () => {
-      process.env.NODE_ENV = 'development'
+      delete (process.env as { NODE_ENV?: string }).NODE_ENV
+      ;(process.env as { NODE_ENV?: string }).NODE_ENV = 'development'
       const request = new Request('http://localhost', {
         headers: { 'x-forwarded-for': '192.168.1.1, 10.0.0.1' },
       })
@@ -250,7 +253,8 @@ describe('rate-limit', () => {
     })
 
     it('extracts first IP from comma-separated list in development mode', () => {
-      process.env.NODE_ENV = 'development'
+      delete (process.env as { NODE_ENV?: string }).NODE_ENV
+      ;(process.env as { NODE_ENV?: string }).NODE_ENV = 'development'
       const request = new Request('http://localhost', {
         headers: { 'x-forwarded-for': '8.8.8.8, 192.168.1.1, 10.0.0.1' },
       })
@@ -279,7 +283,8 @@ describe('rate-limit', () => {
     })
 
     it('trims whitespace from IP in development mode', () => {
-      process.env.NODE_ENV = 'development'
+      delete (process.env as { NODE_ENV?: string }).NODE_ENV
+      ;(process.env as { NODE_ENV?: string }).NODE_ENV = 'development'
       const request = new Request('http://localhost', {
         headers: { 'x-forwarded-for': '  192.168.1.1  , 10.0.0.1' },
       })

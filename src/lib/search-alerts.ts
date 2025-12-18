@@ -161,23 +161,40 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
                         result.details.push(`Failed to send email for ${savedSearch.id}: ${emailResult.error}`);
                     }
 
-                    // Create in-app notification
-                    await prisma.notification.create({
-                        data: {
-                            userId: savedSearch.user.id,
-                            type: 'SEARCH_ALERT',
-                            title: 'New listings match your search!',
-                            message: `${newListingsCount} new listing${newListingsCount > 1 ? 's' : ''} match your saved search "${savedSearch.name}"`,
-                            link: `/search?${buildSearchParams(filters)}`
-                        }
+                    // P0 FIX: Use Promise.allSettled for batch resilience
+                    // Ensures notification creation and lastAlertAt update are both attempted
+                    // even if one fails, preventing inconsistent state
+                    const [notificationResult, updateResult] = await Promise.allSettled([
+                        prisma.notification.create({
+                            data: {
+                                userId: savedSearch.user.id,
+                                type: 'SEARCH_ALERT',
+                                title: 'New listings match your search!',
+                                message: `${newListingsCount} new listing${newListingsCount > 1 ? 's' : ''} match your saved search "${savedSearch.name}"`,
+                                link: `/search?${buildSearchParams(filters)}`
+                            }
+                        }),
+                        prisma.savedSearch.update({
+                            where: { id: savedSearch.id },
+                            data: { lastAlertAt: now }
+                        })
+                    ]);
+
+                    // Log any partial failures for debugging
+                    if (notificationResult.status === 'rejected') {
+                        result.details.push(`Warning: notification creation failed for ${savedSearch.id}: ${notificationResult.reason}`);
+                    }
+                    if (updateResult.status === 'rejected') {
+                        result.details.push(`Warning: lastAlertAt update failed for ${savedSearch.id}: ${updateResult.reason}`);
+                    }
+                } else {
+                    // P0 FIX: Still update lastAlertAt even when no new listings
+                    // Prevents re-processing the same time window repeatedly
+                    await prisma.savedSearch.update({
+                        where: { id: savedSearch.id },
+                        data: { lastAlertAt: now }
                     });
                 }
-
-                // Update lastAlertAt
-                await prisma.savedSearch.update({
-                    where: { id: savedSearch.id },
-                    data: { lastAlertAt: now }
-                });
 
             } catch (error) {
                 result.errors++;
@@ -332,22 +349,32 @@ export async function triggerInstantAlerts(newListing: NewListingForAlert): Prom
                     continue;
                 }
 
-                // Create in-app notification
-                await prisma.notification.create({
-                    data: {
-                        userId: savedSearch.user.id,
-                        type: 'SEARCH_ALERT',
-                        title: 'New listing matches your search!',
-                        message: `"${newListing.title}" in ${newListing.city} - $${newListing.price}/mo`,
-                        link: `/listings/${newListing.id}`
-                    }
-                });
+                // P0 FIX: Use Promise.allSettled for batch resilience
+                // Ensures notification creation and lastAlertAt update are both attempted
+                // even if one fails, preventing inconsistent state
+                const [notificationResult, updateResult] = await Promise.allSettled([
+                    prisma.notification.create({
+                        data: {
+                            userId: savedSearch.user.id,
+                            type: 'SEARCH_ALERT',
+                            title: 'New listing matches your search!',
+                            message: `"${newListing.title}" in ${newListing.city} - $${newListing.price}/mo`,
+                            link: `/listings/${newListing.id}`
+                        }
+                    }),
+                    prisma.savedSearch.update({
+                        where: { id: savedSearch.id },
+                        data: { lastAlertAt: new Date() }
+                    })
+                ]);
 
-                // Update lastAlertAt
-                await prisma.savedSearch.update({
-                    where: { id: savedSearch.id },
-                    data: { lastAlertAt: new Date() }
-                });
+                // Log any partial failures for debugging
+                if (notificationResult.status === 'rejected') {
+                    console.error(`[INSTANT ALERTS] Notification creation failed for ${savedSearch.id}:`, notificationResult.reason);
+                }
+                if (updateResult.status === 'rejected') {
+                    console.error(`[INSTANT ALERTS] lastAlertAt update failed for ${savedSearch.id}:`, updateResult.reason);
+                }
 
                 sent++;
                 console.log(`[INSTANT ALERTS] Alert sent for search "${savedSearch.name}"`);

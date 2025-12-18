@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
 import { createClient } from '@supabase/supabase-js';
+import { householdLanguagesSchema } from '@/lib/schemas';
+import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -124,7 +126,6 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        console.log('=== PATCH LISTING - Starting');
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -132,11 +133,10 @@ export async function PATCH(
 
         const { id } = await params;
         const body = await request.json();
-        console.log('=== Request body:', JSON.stringify(body, null, 2));
 
-        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, languages, genderPreference, householdGender, images } = body;
+        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, householdLanguages, genderPreference, householdGender, images } = body;
 
-        // Ch listing exists and user is the owner
+        // Check listing exists and user is the owner
         const listing = await prisma.listing.findUnique({
             where: { id },
             include: { location: true }
@@ -148,6 +148,22 @@ export async function PATCH(
 
         if (listing.ownerId !== session.user.id) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        // Validate language codes
+        if (householdLanguages && householdLanguages.length > 0) {
+            const langResult = householdLanguagesSchema.safeParse(householdLanguages);
+            if (!langResult.success) {
+                return NextResponse.json({ error: 'Invalid language codes' }, { status: 400 });
+            }
+        }
+
+        // Check description for discriminatory language patterns
+        if (description) {
+            const complianceCheck = checkListingLanguageCompliance(description);
+            if (!complianceCheck.allowed) {
+                return NextResponse.json({ error: complianceCheck.message }, { status: 400 });
+            }
         }
 
         // Validate numeric fields
@@ -162,8 +178,6 @@ export async function PATCH(
             return NextResponse.json({ error: 'Invalid total slots value' }, { status: 400 });
         }
 
-        console.log('=== Validations passed');
-
         // Check if address changed
         const addressChanged = listing.location &&
             (listing.location.address !== address ||
@@ -171,26 +185,19 @@ export async function PATCH(
                 listing.location.state !== state ||
                 listing.location.zip !== zip);
 
-        console.log('=== Address changed:', addressChanged);
-
         // Geocode BEFORE transaction if address changed
         let coords = null;
         if (addressChanged && listing.location) {
-            console.log('=== Geocoding new address...');
             const fullAddress = `${address}, ${city}, ${state} ${zip}`;
             coords = await geocodeAddress(fullAddress);
 
             if (!coords) {
-                console.log('=== Geocoding failed');
                 return NextResponse.json({ error: 'Could not geocode new address' }, { status: 400 });
             }
-            console.log('=== Geocoding successful');
         }
 
-        console.log('=== Starting transaction...');
         // Update in transaction
         const result = await prisma.$transaction(async (tx) => {
-            console.log('=== Updating listing...');
             // Update listing
             const updatedListing = await tx.listing.update({
                 where: { id },
@@ -200,7 +207,7 @@ export async function PATCH(
                     price: priceNum,
                     amenities: amenities ? amenities.split(',').map((s: string) => s.trim()) : [],
                     houseRules: houseRules ? houseRules.split(',').map((s: string) => s.trim()) : [],
-                    languages: Array.isArray(languages) ? languages : [],
+                    householdLanguages: Array.isArray(householdLanguages) ? householdLanguages : [],
                     genderPreference: genderPreference || null,
                     householdGender: householdGender || null,
                     leaseDuration: leaseDuration || null,
@@ -211,11 +218,9 @@ export async function PATCH(
                     ...(Array.isArray(images) && { images }),
                 }
             });
-            console.log('=== Listing updated');
 
             // Update location if it exists and address changed
             if (addressChanged && listing.location && coords) {
-                console.log('=== Updating location...');
                 await tx.location.update({
                     where: { id: listing.location.id },
                     data: {
@@ -232,18 +237,15 @@ export async function PATCH(
                     SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
                     WHERE id = ${listing.location.id}
                 `;
-                console.log('=== Location updated');
             }
 
             return updatedListing;
         });
 
-        console.log('=== Transaction completed successfully');
         return NextResponse.json(result, { status: 200 });
     } catch (error) {
-        console.error('=== ERROR updating listing:', error);
+        console.error('Error updating listing:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('=== Error details:', errorMessage);
         return NextResponse.json({
             error: 'Internal Server Error',
             details: process.env.NODE_ENV === 'development' ? errorMessage : undefined

@@ -1,10 +1,11 @@
 'use client';
 
-import Map, { Marker, Popup, Source, Layer, ViewStateChangeEvent, MapLayerMouseEvent } from 'react-map-gl';
+import ReactMapGL, { Marker, Popup, Source, Layer, ViewStateChangeEvent, MapLayerMouseEvent } from 'react-map-gl';
 import type { LayerProps, GeoJSONSource } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { getListingsInBounds, MapListing } from '@/app/actions/get-listings';
 import { useDebounce } from 'use-debounce';
@@ -113,6 +114,13 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
     // Use clustering only when there are many listings
     const useClustering = listings.length >= CLUSTER_THRESHOLD;
 
+    // P1-19 FIX: Create lookup map to avoid JSON.parse on every map move
+    const listingsLookup = useMemo(() => {
+        const lookup = new Map<string, MapListing>();
+        listings.forEach(listing => lookup.set(listing.id, listing));
+        return lookup;
+    }, [listings]);
+
     // Convert listings to GeoJSON for Mapbox clustering
     const geojsonData = useMemo(() => ({
         type: 'FeatureCollection' as const,
@@ -166,17 +174,10 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
             filter: ['!', ['has', 'point_count']]
         });
 
-        const unclustered = features.map((f: any) => ({
-            id: f.properties.id,
-            title: f.properties.title,
-            price: f.properties.price,
-            availableSlots: f.properties.availableSlots,
-            ownerId: f.properties.ownerId,
-            amenities: JSON.parse(f.properties.amenities || '[]'),
-            images: JSON.parse(f.properties.images || '[]'),
-            lat: f.properties.lat,
-            lng: f.properties.lng
-        }));
+        // P1-19 FIX: Use lookup map instead of JSON.parse on every map move
+        const unclustered = features
+            .map((f: { properties: { id: string } }) => listingsLookup.get(f.properties.id))
+            .filter((listing: MapListing | undefined): listing is MapListing => listing !== undefined);
 
         const seen = new Set<string>();
         const unique = unclustered.filter((l: MapListing) => {
@@ -186,7 +187,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
         });
 
         setUnclusteredListings(unique);
-    }, [useClustering]);
+    }, [useClustering, listingsLookup]);
 
     // Fetch listings when the map moves (debounced)
     useEffect(() => {
@@ -302,7 +303,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                 </div>
             )}
 
-            <Map
+            <ReactMapGL
                 ref={mapRef}
                 mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
                 {...viewState}
@@ -393,10 +394,12 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                             {/* Image Thumbnail */}
                             <div className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
                                 {selectedListing.images && selectedListing.images[0] ? (
-                                    <img
+                                    <Image
                                         src={selectedListing.images[0]}
                                         alt={selectedListing.title}
-                                        className="w-full h-full object-cover"
+                                        fill
+                                        sizes="280px"
+                                        className="object-cover"
                                     />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center">
@@ -462,7 +465,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                         </div>
                     </Popup>
                 )}
-            </Map>
+            </ReactMapGL>
             {!process.env.NEXT_PUBLIC_MAPBOX_TOKEN && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white z-50 pointer-events-none">
                     <div className="bg-destructive p-4 rounded-lg">

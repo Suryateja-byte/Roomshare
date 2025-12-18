@@ -343,9 +343,13 @@ export async function createBooking(
 
             return successResult;
         } catch (error: unknown) {
+            // P1-16 FIX: Use type guard for Prisma error checking
+            const isPrismaError = (err: unknown): err is { code: string } => {
+                return typeof err === 'object' && err !== null && 'code' in err && typeof (err as { code: unknown }).code === 'string';
+            };
+
             // Check for serialization failure (P2034) - retry with exponential backoff
-            const prismaError = error as { code?: string };
-            if (prismaError.code === 'P2034' && attempt < MAX_RETRIES) {
+            if (isPrismaError(error) && error.code === 'P2034' && attempt < MAX_RETRIES) {
                 logger.sync.debug('Booking serialization conflict, retrying', {
                     action: 'createBooking',
                     attempt,

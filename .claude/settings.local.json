@@ -48,7 +48,14 @@
       "WebFetch(domain:supabase.com)",
       "WebFetch(domain:upstash.com)",
       "WebFetch(domain:resend.com)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(taskkill:*)",
+      "Bash(lsof:*)",
+      "Bash(fuser:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "mcp__playwright__browser_console_messages"
     ],
     "deny": [],
     "ask": []

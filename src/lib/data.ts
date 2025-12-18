@@ -10,7 +10,8 @@ export interface ListingData {
     totalSlots: number;
     amenities: string[];
     houseRules: string[];
-    languages: string[];
+    householdLanguages: string[];
+    primaryHomeLanguage?: string;
     genderPreference?: string;
     householdGender?: string;
     leaseDuration?: string;
@@ -166,7 +167,7 @@ export function filterByHouseRules<T extends { houseRules: string[] }>(
 }
 
 // Filter by languages (OR logic - show if household speaks ANY selected language)
-export function filterByLanguages<T extends { languages: string[] }>(
+export function filterByLanguages<T extends { householdLanguages: string[] }>(
     listings: T[],
     languages?: string[]
 ): T[] {
@@ -174,7 +175,7 @@ export function filterByLanguages<T extends { languages: string[] }>(
     const languagesLower = languages.map(l => l.toLowerCase());
     return listings.filter(listing =>
         languagesLower.some(lang =>
-            listing.languages.some((ll: string) => ll.toLowerCase() === lang)
+            listing.householdLanguages.some((ll: string) => ll.toLowerCase() === lang)
         )
     );
 }
@@ -341,7 +342,8 @@ export async function getListings(params: FilterParams = {}): Promise<ListingDat
           l."totalSlots",
           l.amenities,
           l."houseRules",
-          l.languages,
+          l."household_languages",
+          l."primary_home_language",
           l."genderPreference",
           l."householdGender",
           l."leaseDuration",
@@ -382,7 +384,8 @@ export async function getListings(params: FilterParams = {}): Promise<ListingDat
         totalSlots: l.totalSlots,
         amenities: l.amenities || [],
         houseRules: l.houseRules || [],
-        languages: l.languages || [],
+        householdLanguages: l.household_languages || [],
+        primaryHomeLanguage: l.primary_home_language,
         genderPreference: l.genderPreference,
         householdGender: l.householdGender,
         leaseDuration: l.leaseDuration,
@@ -481,7 +484,7 @@ export async function getListings(params: FilterParams = {}): Promise<ListingDat
         const languagesLower = languages.map(l => l.toLowerCase());
         results = results.filter(listing =>
             languagesLower.some(lang =>
-                listing.languages.some((ll: string) => ll.toLowerCase() === lang)
+                listing.householdLanguages.some((ll: string) => ll.toLowerCase() === lang)
             )
         );
     }
@@ -787,7 +790,8 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
             l."totalSlots",
             l.amenities,
             l."houseRules",
-            l.languages,
+            l."household_languages",
+            l."primary_home_language",
             l."genderPreference",
             l."householdGender",
             l."leaseDuration",
@@ -835,7 +839,8 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
         totalSlots: l.totalSlots,
         amenities: l.amenities || [],
         houseRules: l.houseRules || [],
-        languages: l.languages || [],
+        householdLanguages: l.household_languages || [],
+        primaryHomeLanguage: l.primary_home_language,
         genderPreference: l.genderPreference,
         householdGender: l.householdGender,
         leaseDuration: l.leaseDuration,
@@ -877,7 +882,7 @@ export async function getListingsPaginated(params: FilterParams = {}): Promise<P
         const languagesLower = languages.map(l => l.toLowerCase());
         results = results.filter(listing =>
             languagesLower.some(lang =>
-                listing.languages.some((ll: string) => ll.toLowerCase() === lang)
+                listing.householdLanguages.some((ll: string) => ll.toLowerCase() === lang)
             )
         );
     }
@@ -1033,7 +1038,8 @@ export async function getSavedListings(userId: string): Promise<ListingData[]> {
         totalSlots: number;
         amenities: string[];
         houseRules: string[];
-        languages: string[];
+        household_languages: string[];
+        primary_home_language: string | null;
         genderPreference: string | null;
         householdGender: string | null;
         leaseDuration: string | null;
@@ -1057,7 +1063,8 @@ export async function getSavedListings(userId: string): Promise<ListingData[]> {
             l."totalSlots",
             l.amenities,
             l."houseRules",
-            l.languages,
+            l."household_languages",
+            l."primary_home_language",
             l."genderPreference",
             l."householdGender",
             l."leaseDuration",
@@ -1094,7 +1101,8 @@ export async function getSavedListings(userId: string): Promise<ListingData[]> {
             totalSlots: l.totalSlots,
             amenities: l.amenities || [],
             houseRules: l.houseRules || [],
-            languages: l.languages || [],
+            householdLanguages: l.household_languages || [],
+            primaryHomeLanguage: l.primary_home_language ?? undefined,
             genderPreference: l.genderPreference ?? undefined,
             householdGender: l.householdGender ?? undefined,
             leaseDuration: l.leaseDuration ?? undefined,

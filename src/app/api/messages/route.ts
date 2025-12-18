@@ -3,8 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { checkSuspension } from '@/app/actions/suspension';
 import { logger } from '@/lib/logger';
+import { withRateLimit } from '@/lib/with-rate-limit';
 
 export async function GET(request: Request) {
+    // P2-06 FIX: Add rate limiting to prevent abuse/scraping
+    const rateLimitResponse = await withRateLimit(request, { type: 'messages' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
@@ -88,6 +93,10 @@ export async function GET(request: Request) {
 
 
 export async function POST(request: Request) {
+    // P1-4 FIX: Add rate limiting to prevent message spam
+    const rateLimitResponse = await withRateLimit(request, { type: 'sendMessage' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
@@ -118,22 +127,24 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        const message = await prisma.message.create({
-            data: {
-                senderId: userId,
-                conversationId,
-                content,
-            },
-            include: {
-                sender: { select: { id: true, name: true, image: true } },
-            }
-        });
-
-        // Update conversation timestamp
-        await prisma.conversation.update({
-            where: { id: conversationId },
-            data: { updatedAt: new Date() },
-        });
+        // P1-21 FIX: Parallelize independent database operations
+        const [message] = await Promise.all([
+            prisma.message.create({
+                data: {
+                    senderId: userId,
+                    conversationId,
+                    content,
+                },
+                include: {
+                    sender: { select: { id: true, name: true, image: true } },
+                }
+            }),
+            // Update conversation timestamp in parallel
+            prisma.conversation.update({
+                where: { id: conversationId },
+                data: { updatedAt: new Date() },
+            })
+        ]);
 
         return NextResponse.json(message, { status: 201 });
 

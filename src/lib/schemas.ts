@@ -1,4 +1,33 @@
 import { z } from 'zod';
+import { isValidLanguageCode } from './languages';
+
+/**
+ * Language code validation schema
+ * Validates that a string is a valid ISO 639-1 language code from our supported list
+ */
+export const languageCodeSchema = z.string().refine(
+    isValidLanguageCode,
+    { message: 'Invalid language code' }
+);
+
+/**
+ * Household languages array validation
+ * For "Languages spoken in the house" field
+ * - Max 20 languages (reasonable limit)
+ * - Each must be a valid language code
+ */
+export const householdLanguagesSchema = z.array(languageCodeSchema)
+    .max(20, 'Maximum 20 languages allowed')
+    .default([]);
+
+/**
+ * Optional primary home language validation
+ * Single language code or null
+ */
+export const primaryHomeLanguageSchema = z.string()
+    .refine(isValidLanguageCode, { message: 'Invalid language code' })
+    .nullable()
+    .optional();
 
 export const createListingSchema = z.object({
     title: z.string().min(1, "Title is required").max(100, "Title must be 100 characters or less"),

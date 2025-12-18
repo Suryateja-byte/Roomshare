@@ -172,8 +172,8 @@ describe('Input', () => {
     })
 
     it('allows focusing via ref', () => {
-      const ref = { current: null } as React.RefObject<HTMLInputElement>
-      render(<Input ref={ref as any} />)
+      const ref = { current: null as HTMLInputElement | null }
+      render(<Input ref={ref} />)
 
       ref.current?.focus()
 

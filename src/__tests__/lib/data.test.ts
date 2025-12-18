@@ -60,7 +60,7 @@ function createMockListing(overrides: Partial<ListingWithMetadata> = {}): Listin
     totalSlots: 3,
     amenities: ['WiFi', 'Parking'],
     houseRules: ['No Smoking', 'No Pets'],
-    languages: ['English', 'Spanish'],
+    householdLanguages: ['en', 'es'],
     genderPreference: 'NO_PREFERENCE',
     householdGender: 'MIXED',
     leaseDuration: '6 months',
@@ -789,10 +789,10 @@ describe('filterByHouseRules', () => {
 
 describe('filterByLanguages', () => {
   const listings = [
-    createMockListing({ id: '1', languages: ['English', 'Spanish'] }),
-    createMockListing({ id: '2', languages: ['English', 'Mandarin'] }),
-    createMockListing({ id: '3', languages: ['French', 'German'] }),
-    createMockListing({ id: '4', languages: [] }),
+    createMockListing({ id: '1', householdLanguages: ['en', 'es'] }),
+    createMockListing({ id: '2', householdLanguages: ['en', 'zh'] }),
+    createMockListing({ id: '3', householdLanguages: ['fr', 'de'] }),
+    createMockListing({ id: '4', householdLanguages: [] }),
   ]
 
   it('returns all listings when no languages filter', () => {
@@ -804,27 +804,27 @@ describe('filterByLanguages', () => {
   })
 
   it('filters by single language', () => {
-    const result = filterByLanguages(listings, ['English'])
+    const result = filterByLanguages(listings, ['en'])
     expect(result.map(l => l.id)).toEqual(['1', '2'])
   })
 
   it('uses OR logic (any language matches)', () => {
-    const result = filterByLanguages(listings, ['Spanish', 'Mandarin'])
+    const result = filterByLanguages(listings, ['es', 'zh'])
     expect(result.map(l => l.id)).toEqual(['1', '2'])
   })
 
   it('is case-insensitive', () => {
-    const result = filterByLanguages(listings, ['ENGLISH', 'spanish'])
+    const result = filterByLanguages(listings, ['EN', 'ES'])
     expect(result.map(l => l.id)).toEqual(['1', '2'])
   })
 
   it('returns empty when no listing speaks any language', () => {
-    const result = filterByLanguages(listings, ['Japanese'])
+    const result = filterByLanguages(listings, ['ja'])
     expect(result).toHaveLength(0)
   })
 
   it('includes listing if they speak any of the selected languages', () => {
-    const result = filterByLanguages(listings, ['English', 'French'])
+    const result = filterByLanguages(listings, ['en', 'fr'])
     expect(result.map(l => l.id)).toEqual(['1', '2', '3'])
   })
 })

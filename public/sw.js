@@ -1,8 +1,11 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = "roomshare-v1";
-const STATIC_CACHE = "roomshare-static-v1";
-const DYNAMIC_CACHE = "roomshare-dynamic-v1";
+// P2-08 FIX: Import version from build-generated file for automatic cache invalidation
+importScripts('./sw-version.js');
+
+const CACHE_NAME = "roomshare-v" + (self.__SW_VERSION__ || "1");
+const STATIC_CACHE = "roomshare-static-v" + (self.__SW_VERSION__ || "1");
+const DYNAMIC_CACHE = "roomshare-dynamic-v" + (self.__SW_VERSION__ || "1");
 
 // Assets to cache immediately on install
 const STATIC_ASSETS = [

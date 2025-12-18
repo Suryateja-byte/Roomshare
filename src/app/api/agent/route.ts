@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withRateLimit } from '@/lib/with-rate-limit';
 
 interface AgentRequest {
   question: string;
@@ -21,6 +22,10 @@ function isValidCoordinate(lat: number, lng: number): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  // P1-7 FIX: Add rate limiting to prevent agent abuse
+  const rateLimitResponse = await withRateLimit(request, { type: 'agent' });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const body = (await request.json()) as AgentRequest;
     const { question, lat, lng } = body;
@@ -88,10 +93,11 @@ export async function POST(request: NextRequest) {
 
       if (!n8nResponse.ok) {
         console.error(`n8n webhook error: ${n8nResponse.status}`);
-        return NextResponse.json(
-          { error: 'Failed to process request' },
-          { status: 502 }
-        );
+        // P1-24 FIX: Return graceful fallback with helpful message
+        return NextResponse.json({
+          answer: "I'm having trouble connecting to my knowledge service right now. Please try again in a moment, or feel free to explore the listing details and neighborhood information available on the page.",
+          fallback: true
+        });
       }
 
       const data = await n8nResponse.json();
@@ -103,13 +109,20 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeoutId);
 
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        return NextResponse.json(
-          { error: 'Request timeout' },
-          { status: 504 }
-        );
+        // P1-24 FIX: Return graceful fallback on timeout
+        return NextResponse.json({
+          answer: "The request took too long to process. Please try asking a simpler question, or check the listing details directly for the information you need.",
+          fallback: true
+        });
       }
 
-      throw fetchError;
+      // P1-11 FIX: Handle fetch errors properly instead of re-throwing
+      // P1-24 FIX: Return graceful fallback on connection failure
+      console.error('Agent webhook fetch error:', fetchError instanceof Error ? fetchError.message : 'Unknown error');
+      return NextResponse.json({
+        answer: "I'm temporarily unable to process your question. Please try again shortly, or browse the available listing information on this page.",
+        fallback: true
+      });
     }
   } catch (error) {
     console.error('Agent API error:', error);

@@ -10,6 +10,19 @@ jest.mock('@/app/actions/chat', () => ({
   getUnreadMessageCount: jest.fn(),
 }))
 
+jest.mock('@/lib/with-rate-limit', () => ({
+  withRateLimit: jest.fn().mockResolvedValue(null),
+}))
+
+jest.mock('@/lib/logger', () => ({
+  logger: {
+    sync: {
+      debug: jest.fn(),
+      error: jest.fn(),
+    },
+  },
+}))
+
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (data: unknown, init?: { status?: number }) => ({
@@ -24,6 +37,9 @@ import { GET } from '@/app/api/messages/unread/route'
 import { auth } from '@/auth'
 import { getUnreadMessageCount } from '@/app/actions/chat'
 
+// Helper to create mock request
+const createMockRequest = () => new Request('http://localhost/api/messages/unread')
+
 describe('Messages Unread API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -35,7 +51,7 @@ describe('Messages Unread API', () => {
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
     ;(getUnreadMessageCount as jest.Mock).mockResolvedValue(5)
 
-    const response = await GET()
+    const response = await GET(createMockRequest())
     const data = await response.json()
 
     expect(response.status).toBe(200)
@@ -48,7 +64,7 @@ describe('Messages Unread API', () => {
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
     ;(getUnreadMessageCount as jest.Mock).mockResolvedValue(0)
 
-    const response = await GET()
+    const response = await GET(createMockRequest())
     const data = await response.json()
 
     expect(response.status).toBe(200)
@@ -58,7 +74,7 @@ describe('Messages Unread API', () => {
   it('returns 401 when user is not authenticated', async () => {
     ;(auth as jest.Mock).mockResolvedValue(null)
 
-    const response = await GET()
+    const response = await GET(createMockRequest())
     const data = await response.json()
 
     expect(response.status).toBe(401)
@@ -68,7 +84,7 @@ describe('Messages Unread API', () => {
   it('returns 401 when session has no user id', async () => {
     ;(auth as jest.Mock).mockResolvedValue({ user: {} })
 
-    const response = await GET()
+    const response = await GET(createMockRequest())
     const data = await response.json()
 
     expect(response.status).toBe(401)
@@ -81,7 +97,7 @@ describe('Messages Unread API', () => {
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
     ;(getUnreadMessageCount as jest.Mock).mockRejectedValue(new Error('DB Error'))
 
-    const response = await GET()
+    const response = await GET(createMockRequest())
     const data = await response.json()
 
     expect(response.status).toBe(500)
@@ -94,7 +110,7 @@ describe('Messages Unread API', () => {
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
     ;(getUnreadMessageCount as jest.Mock).mockResolvedValue(10)
 
-    await GET()
+    await GET(createMockRequest())
 
     expect(getUnreadMessageCount).toHaveBeenCalled()
   })
@@ -102,7 +118,7 @@ describe('Messages Unread API', () => {
   it('does not call getUnreadMessageCount when not authenticated', async () => {
     ;(auth as jest.Mock).mockResolvedValue(null)
 
-    await GET()
+    await GET(createMockRequest())
 
     expect(getUnreadMessageCount).not.toHaveBeenCalled()
   })
@@ -113,7 +129,7 @@ describe('Messages Unread API', () => {
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
     ;(getUnreadMessageCount as jest.Mock).mockResolvedValue(999)
 
-    const response = await GET()
+    const response = await GET(createMockRequest())
     const data = await response.json()
 
     expect(response.status).toBe(200)

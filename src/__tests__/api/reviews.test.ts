@@ -47,6 +47,11 @@ jest.mock('@/lib/email', () => ({
   sendNotificationEmailWithPreference: jest.fn(),
 }))
 
+// P1-5: Mock rate limiting to return null (allow request)
+jest.mock('@/lib/with-rate-limit', () => ({
+  withRateLimit: jest.fn().mockResolvedValue(null),
+}))
+
 import { POST, GET } from '@/app/api/reviews/route'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
@@ -213,12 +218,19 @@ describe('/api/reviews', () => {
         })
       })
 
+      // P1-22: Notifications are now fire-and-forget (non-blocking)
+      // Need to flush the microtask queue to allow async IIFE to execute
+      const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0))
+
       it('sends notification to listing owner', async () => {
         await POST(createRequest({
           listingId: 'listing-123',
           rating: 5,
           comment: 'Great!',
         }))
+
+        // Wait for fire-and-forget notification to execute
+        await flushPromises()
 
         expect(createNotification).toHaveBeenCalledWith({
           userId: 'owner-456',
@@ -235,6 +247,9 @@ describe('/api/reviews', () => {
           rating: 5,
           comment: 'Great!',
         }))
+
+        // Wait for fire-and-forget notification to execute
+        await flushPromises()
 
         expect(sendNotificationEmailWithPreference).toHaveBeenCalledWith(
           'newReview',
@@ -260,6 +275,9 @@ describe('/api/reviews', () => {
           rating: 5,
           comment: 'Great!',
         }))
+
+        // Wait for fire-and-forget notification to complete
+        await flushPromises()
 
         expect(createNotification).not.toHaveBeenCalled()
         expect(sendNotificationEmailWithPreference).not.toHaveBeenCalled()

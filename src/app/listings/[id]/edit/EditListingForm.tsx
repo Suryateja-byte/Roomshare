@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
+import { SUPPORTED_LANGUAGES, getLanguageName, type LanguageCode } from '@/lib/languages';
 import {
     Select,
     SelectContent,
@@ -13,7 +14,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Home, MapPin, List, ArrowLeft, FileText, CheckCircle, RefreshCcw, AlertCircle } from 'lucide-react';
+import { Loader2, Home, MapPin, List, ArrowLeft, FileText, CheckCircle, RefreshCcw, AlertCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
 import {
@@ -50,7 +51,7 @@ interface Listing {
     price: number;
     amenities: string[];
     houseRules: string[];
-    languages: string[];
+    householdLanguages: string[];
     genderPreference: string | null;
     householdGender: string | null;
     leaseDuration: string | null;
@@ -105,7 +106,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-    const [selectedLanguages, setSelectedLanguages] = useState<string[]>(listing.languages || []);
+    const [selectedLanguages, setSelectedLanguages] = useState<string[]>(listing.householdLanguages || []);
     const [formModified, setFormModified] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
     const [showDraftBanner, setShowDraftBanner] = useState(false);
@@ -213,7 +214,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
         setRoomType(persistedData.roomType || listing.roomType || '');
         setGenderPreference(persistedData.genderPreference || listing.genderPreference || '');
         setHouseholdGender(persistedData.householdGender || listing.householdGender || '');
-        setSelectedLanguages(persistedData.selectedLanguages || listing.languages || []);
+        setSelectedLanguages(persistedData.selectedLanguages || listing.householdLanguages || []);
 
         // Restore images (they're already uploaded to Supabase)
         if (persistedData.images && persistedData.images.length > 0) {
@@ -277,10 +278,21 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
         handleFormChangeWithSave();
     };
 
-    const LANGUAGES = [
-        'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
-        'Arabic', 'Portuguese', 'Russian', 'Japanese', 'German'
-    ];
+    // Language search filter state
+    const [languageSearch, setLanguageSearch] = useState('');
+
+    // Get all language codes from canonical list
+    const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
+
+    // Filter languages based on search
+    const filteredLanguages = useMemo(() => {
+        if (!languageSearch.trim()) return LANGUAGE_CODES;
+        const search = languageSearch.toLowerCase();
+        return LANGUAGE_CODES.filter(code =>
+            getLanguageName(code).toLowerCase().includes(search) ||
+            code.toLowerCase().includes(search)
+        );
+    }, [languageSearch]);
 
     const toggleLanguage = (lang: string) => {
         setFormModified(true);
@@ -331,7 +343,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                 },
                 body: JSON.stringify({
                     ...data,
-                    languages: selectedLanguages,
+                    householdLanguages: selectedLanguages,
                     moveInDate: moveInDate || undefined,
                     leaseDuration: leaseDuration || undefined,
                     roomType: roomType || undefined,
@@ -669,23 +681,55 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                     </div>
 
                     <div>
-                        <Label>Languages Spoken</Label>
-                        <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-3">Select languages spoken in the household</p>
-                        <div className="flex flex-wrap gap-2">
-                            {LANGUAGES.map((lang) => (
+                        <Label>Languages Spoken in the House</Label>
+                        <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-3">Select languages spoken by household members</p>
+
+                        {/* Selected languages shown at top */}
+                        {selectedLanguages.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-zinc-200 dark:border-zinc-700">
+                                {selectedLanguages.map((code) => (
+                                    <button
+                                        key={code}
+                                        type="button"
+                                        onClick={() => toggleLanguage(code)}
+                                        disabled={loading}
+                                        className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {getLanguageName(code)}
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Search input */}
+                        <Input
+                            type="text"
+                            placeholder="Search languages..."
+                            value={languageSearch}
+                            onChange={(e) => setLanguageSearch(e.target.value)}
+                            className="mb-3"
+                            disabled={loading}
+                        />
+
+                        {/* Language chips */}
+                        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                            {filteredLanguages.filter(code => !selectedLanguages.includes(code)).map((code) => (
                                 <button
-                                    key={lang}
+                                    key={code}
                                     type="button"
-                                    onClick={() => toggleLanguage(lang)}
+                                    onClick={() => toggleLanguage(code)}
                                     disabled={loading}
-                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${selectedLanguages.includes(lang)
-                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
-                                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-                                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                                    className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    {lang}
+                                    {getLanguageName(code)}
                                 </button>
                             ))}
+                            {filteredLanguages.filter(code => !selectedLanguages.includes(code)).length === 0 && (
+                                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                                    {languageSearch ? 'No languages found' : 'All languages selected'}
+                                </p>
+                            )}
                         </div>
                     </div>
 

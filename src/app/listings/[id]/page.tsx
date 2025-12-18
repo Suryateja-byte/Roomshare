@@ -150,7 +150,7 @@ export default async function ListingPage({ params }: PageProps) {
                 price: listing.price,
                 images: listing.images,
                 amenities: listing.amenities,
-                languages: listing.languages,
+                householdLanguages: listing.householdLanguages,
                 totalSlots: listing.totalSlots,
                 availableSlots: listing.availableSlots,
                 status: listing.status,

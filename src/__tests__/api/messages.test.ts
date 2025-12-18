@@ -35,6 +35,11 @@ jest.mock('next/server', () => ({
   },
 }))
 
+// P1-4: Mock rate limiting to return null (allow request)
+jest.mock('@/lib/with-rate-limit', () => ({
+  withRateLimit: jest.fn().mockResolvedValue(null),
+}))
+
 import { GET, POST } from '@/app/api/messages/route'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'

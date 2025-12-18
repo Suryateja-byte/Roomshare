@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { withRateLimit } from '@/lib/with-rate-limit';
+import { z } from 'zod';
+
+// P2-4: Zod schema for request validation
+const toggleFavoriteSchema = z.object({
+    listingId: z.string().min(1, 'listingId is required').max(100),
+});
 
 export async function POST(request: Request) {
+    // P2-4: Add rate limiting to prevent abuse
+    const rateLimitResponse = await withRateLimit(request, { type: 'toggleFavorite' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
@@ -10,11 +21,17 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { listingId } = body;
 
-        if (!listingId) {
-            return NextResponse.json({ error: 'Missing listingId' }, { status: 400 });
+        // P2-4: Zod validation
+        const parsed = toggleFavoriteSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: 'Invalid request', details: parsed.error.flatten().fieldErrors },
+                { status: 400 }
+            );
         }
+
+        const { listingId } = parsed.data;
 
         const userId = session.user.id;
 

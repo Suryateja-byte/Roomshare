@@ -27,6 +27,21 @@ jest.mock('@/lib/data', () => ({
   getListings: jest.fn(),
 }))
 
+// P2-3: Mock rate limiting to return null (allow request)
+jest.mock('@/lib/with-rate-limit', () => ({
+  withRateLimit: jest.fn().mockResolvedValue(null),
+}))
+
+jest.mock('@/lib/logger', () => ({
+  logger: {
+    info: jest.fn().mockResolvedValue(undefined),
+    warn: jest.fn().mockResolvedValue(undefined),
+    sync: {
+      error: jest.fn(),
+    },
+  },
+}))
+
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (data: any, init?: { status?: number }) => {

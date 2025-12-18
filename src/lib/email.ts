@@ -10,6 +10,31 @@ import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
 // Timeout for email API requests (15 seconds - emails can be slow)
 const EMAIL_TIMEOUT_MS = 15000;
 
+// P1-23 FIX: Email retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 1000; // 1s, 2s, 4s with exponential backoff
+
+// Helper to determine if an error is retryable
+function isRetryableError(error: unknown, response?: Response): boolean {
+    // Timeout errors are retryable
+    if (error instanceof FetchTimeoutError) return true;
+
+    // Network errors are retryable
+    if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('network'))) {
+        return true;
+    }
+
+    // 5xx server errors are retryable, 4xx client errors are not
+    if (response && response.status >= 500) return true;
+
+    return false;
+}
+
+// Helper for exponential backoff delay
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Notification preference keys that map to email types
 interface NotificationPreferences {
     emailBookingRequests?: boolean;
@@ -31,7 +56,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Use Resend's testing domain by default (can only send to your own email in test mode)
 const FROM_EMAIL = process.env.FROM_EMAIL || 'RoomShare <onboarding@resend.dev>';
 
-// Email sending function
+// Email sending function with retry logic
 export async function sendEmail({ to, subject, html, text }: EmailOptions): Promise<{ success: boolean; error?: string }> {
     if (!RESEND_API_KEY) {
         console.warn('RESEND_API_KEY not configured. Email not sent:', { to, subject });
@@ -40,45 +65,78 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
         return { success: true }; // Return success in dev mode
     }
 
-    try {
-        const response = await fetchWithTimeout('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${RESEND_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                from: FROM_EMAIL,
-                to,
-                subject,
-                html,
-                text: text || html.replace(/<[^>]*>/g, ''),
-                // Disable click tracking to prevent Resend from wrapping links
-                // This fixes issues with resend-clicks.com connection errors
+    let lastError: string | undefined;
+
+    // P1-23 FIX: Implement retry with exponential backoff
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+            const response = await fetchWithTimeout('https://api.resend.com/emails', {
+                method: 'POST',
                 headers: {
-                    'X-Entity-Ref-ID': new Date().getTime().toString(),
+                    'Authorization': `Bearer ${RESEND_API_KEY}`,
+                    'Content-Type': 'application/json',
                 },
-                // Disable tracking features that wrap links
-                tags: [{ name: 'category', value: 'transactional' }],
-            }),
-            timeout: EMAIL_TIMEOUT_MS,
-        });
+                body: JSON.stringify({
+                    from: FROM_EMAIL,
+                    to,
+                    subject,
+                    html,
+                    text: text || html.replace(/<[^>]*>/g, ''),
+                    // Disable click tracking to prevent Resend from wrapping links
+                    // This fixes issues with resend-clicks.com connection errors
+                    headers: {
+                        'X-Entity-Ref-ID': new Date().getTime().toString(),
+                    },
+                    // Disable tracking features that wrap links
+                    tags: [{ name: 'category', value: 'transactional' }],
+                }),
+                timeout: EMAIL_TIMEOUT_MS,
+            });
 
-        if (!response.ok) {
-            const error = await response.text();
-            console.error('Failed to send email:', error);
-            return { success: false, error };
-        }
+            if (!response.ok) {
+                const errorText = await response.text();
 
-        return { success: true };
-    } catch (error) {
-        if (error instanceof FetchTimeoutError) {
-            console.error(`Email request timed out after ${EMAIL_TIMEOUT_MS}ms to:`, to);
-            return { success: false, error: `Email request timed out after ${EMAIL_TIMEOUT_MS}ms` };
+                // Don't retry 4xx client errors (validation failures, etc.)
+                if (response.status >= 400 && response.status < 500) {
+                    console.error('Failed to send email (non-retryable):', errorText);
+                    return { success: false, error: errorText };
+                }
+
+                // 5xx errors are retryable
+                if (isRetryableError(null, response) && attempt < MAX_RETRIES - 1) {
+                    const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+                    console.warn(`Email send failed (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms...`);
+                    await sleep(delay);
+                    lastError = errorText;
+                    continue;
+                }
+
+                console.error('Failed to send email:', errorText);
+                return { success: false, error: errorText };
+            }
+
+            return { success: true };
+        } catch (error) {
+            const errorMessage = error instanceof FetchTimeoutError
+                ? `Email request timed out after ${EMAIL_TIMEOUT_MS}ms`
+                : String(error);
+
+            // Check if error is retryable
+            if (isRetryableError(error) && attempt < MAX_RETRIES - 1) {
+                const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+                console.warn(`Email send error (attempt ${attempt + 1}/${MAX_RETRIES}): ${errorMessage}, retrying in ${delay}ms...`);
+                await sleep(delay);
+                lastError = errorMessage;
+                continue;
+            }
+
+            console.error('Error sending email:', error);
+            return { success: false, error: errorMessage };
         }
-        console.error('Error sending email:', error);
-        return { success: false, error: String(error) };
     }
+
+    // This should only be reached if all retries failed
+    return { success: false, error: lastError || 'Failed after multiple retries' };
 }
 
 // Helper to send notification email based on type
@@ -139,10 +197,17 @@ export async function sendNotificationEmailWithPreference(
                 select: { notificationPreferences: true }
             });
 
-            const prefs = user?.notificationPreferences as NotificationPreferences | null;
+            // P0 FIX: Safely cast preferences with defensive defaults
+            // Handle case where notificationPreferences is null, undefined, or malformed JSON
+            const rawPrefs = user?.notificationPreferences;
+            const prefs: Partial<NotificationPreferences> =
+                (typeof rawPrefs === 'object' && rawPrefs !== null)
+                    ? (rawPrefs as Partial<NotificationPreferences>)
+                    : {};
 
             // If preference is explicitly set to false, skip sending
-            if (prefs && prefs[prefKey] === false) {
+            // Default behavior (undefined/missing key) = enabled (send email)
+            if (prefs[prefKey] === false) {
                 console.log(`[EMAIL] Skipped ${type} email to ${userId} - user preference disabled`);
                 return { success: true, skipped: true };
             }

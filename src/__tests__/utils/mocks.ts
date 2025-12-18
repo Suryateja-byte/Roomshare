@@ -1,7 +1,31 @@
 // Mock implementations for testing
 
+// Prisma mock type definition
+type PrismaMockType = {
+  user: Record<string, jest.Mock>
+  listing: Record<string, jest.Mock>
+  location: Record<string, jest.Mock>
+  booking: Record<string, jest.Mock>
+  conversation: Record<string, jest.Mock>
+  message: Record<string, jest.Mock>
+  review: Record<string, jest.Mock>
+  reviewResponse: Record<string, jest.Mock>
+  savedListing: Record<string, jest.Mock>
+  savedSearch: Record<string, jest.Mock>
+  notification: Record<string, jest.Mock>
+  verificationRequest: Record<string, jest.Mock>
+  report: Record<string, jest.Mock>
+  recentlyViewed: Record<string, jest.Mock>
+  blockedUser: Record<string, jest.Mock>
+  rateLimitEntry: Record<string, jest.Mock>
+  auditLog: Record<string, jest.Mock>
+  $queryRaw: jest.Mock
+  $queryRawUnsafe: jest.Mock
+  $transaction: jest.Mock
+}
+
 // Prisma mock
-export const prismaMock = {
+export const prismaMock: PrismaMockType = {
   user: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
@@ -148,9 +172,9 @@ export const mockSearchParams = new URLSearchParams()
 // Reset all mocks helper
 export const resetAllMocks = () => {
   jest.clearAllMocks()
-  Object.values(prismaMock).forEach((model) => {
+  Object.values(prismaMock).forEach((model: unknown) => {
     if (typeof model === 'object' && model !== null) {
-      Object.values(model).forEach((method) => {
+      Object.values(model as Record<string, unknown>).forEach((method: unknown) => {
         if (typeof method === 'function' && 'mockClear' in method) {
           (method as jest.Mock).mockClear()
         }

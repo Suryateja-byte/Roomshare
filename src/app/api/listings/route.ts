@@ -4,8 +4,15 @@ import { geocodeAddress } from '@/lib/geocoding';
 import { auth } from '@/auth';
 import { getListings } from '@/lib/data';
 import { logger } from '@/lib/logger';
+import { withRateLimit } from '@/lib/with-rate-limit';
+import { householdLanguagesSchema } from '@/lib/schemas';
+import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 
 export async function GET(request: Request) {
+    // P2-3: Add rate limiting to prevent scraping
+    const rateLimitResponse = await withRateLimit(request, { type: 'listingsRead' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     const startTime = Date.now();
     try {
         const { searchParams } = new URL(request.url);
@@ -21,7 +28,11 @@ export async function GET(request: Request) {
             durationMs: Date.now() - startTime,
         });
 
-        return NextResponse.json(listings);
+        // P2-7: Add Cache-Control headers for client-side caching
+        // Short TTL since listings can change frequently (new bookings, price updates)
+        const response = NextResponse.json(listings);
+        response.headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+        return response;
     } catch (error) {
         logger.sync.error('Error fetching listings', {
             route: '/api/listings',
@@ -34,6 +45,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+    // P1-3 FIX: Add rate limiting to prevent spam listings
+    const rateLimitResponse = await withRateLimit(request, { type: 'createListing' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     const startTime = Date.now();
     try {
         const body = await request.json();
@@ -46,7 +61,7 @@ export async function POST(request: Request) {
             imageCount: body.images?.length || 0,
         });
 
-        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, images, languages, genderPreference, householdGender } = body;
+        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, images, householdLanguages, genderPreference, householdGender } = body;
 
         // Basic validation
         if (!title || !price || !address || !city || !state || !zip) {
@@ -67,6 +82,30 @@ export async function POST(request: Request) {
 
         if (isNaN(totalSlotsNum) || totalSlotsNum <= 0) {
             return NextResponse.json({ error: 'Invalid total slots value' }, { status: 400 });
+        }
+
+        // Validate language codes
+        if (householdLanguages && householdLanguages.length > 0) {
+            const langResult = householdLanguagesSchema.safeParse(householdLanguages);
+            if (!langResult.success) {
+                await logger.warn('Invalid language codes in listing creation', {
+                    route: '/api/listings',
+                    method: 'POST',
+                });
+                return NextResponse.json({ error: 'Invalid language codes' }, { status: 400 });
+            }
+        }
+
+        // Check description for discriminatory language patterns
+        if (description) {
+            const complianceCheck = checkListingLanguageCompliance(description);
+            if (!complianceCheck.allowed) {
+                await logger.warn('Listing description failed compliance check', {
+                    route: '/api/listings',
+                    method: 'POST',
+                });
+                return NextResponse.json({ error: complianceCheck.message }, { status: 400 });
+            }
         }
 
         // Geocode address (log only city/state, not full address)
@@ -105,7 +144,7 @@ export async function POST(request: Request) {
                     images: images || [],
                     amenities: amenities ? amenities.split(',').map((s: string) => s.trim()) : [],
                     houseRules: houseRules ? houseRules.split(',').map((s: string) => s.trim()) : [],
-                    languages: Array.isArray(languages) ? languages : [],
+                    householdLanguages: Array.isArray(householdLanguages) ? householdLanguages : [],
                     genderPreference: genderPreference || null,
                     householdGender: householdGender || null,
                     leaseDuration,

@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, X, Clock, SlidersHorizontal, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { FocusTrap } from '@/components/ui/FocusTrap';
 import LocationSearchInput from '@/components/LocationSearchInput';
 import { DatePicker } from '@/components/ui/date-picker';
+import { SUPPORTED_LANGUAGES, getLanguageName, type LanguageCode } from '@/lib/languages';
 import {
     Select,
     SelectContent,
@@ -68,10 +70,21 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const [genderPreference, setGenderPreference] = useState(searchParams.get('genderPreference') || '');
     const [householdGender, setHouseholdGender] = useState(searchParams.get('householdGender') || '');
 
-    const LANGUAGES = [
-        'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
-        'Arabic', 'Portuguese', 'Russian', 'Japanese', 'German'
-    ];
+    // Language search filter state
+    const [languageSearch, setLanguageSearch] = useState('');
+
+    // Get all language codes from canonical list
+    const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
+
+    // Filter languages based on search
+    const filteredLanguages = useMemo(() => {
+        if (!languageSearch.trim()) return LANGUAGE_CODES;
+        const search = languageSearch.toLowerCase();
+        return LANGUAGE_CODES.filter(code =>
+            getLanguageName(code).toLowerCase().includes(search) ||
+            code.toLowerCase().includes(search)
+        );
+    }, [languageSearch]);
 
     // Debounce and submission state to prevent race conditions
     const [isSearching, setIsSearching] = useState(false);
@@ -669,24 +682,58 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
                                 {/* Languages */}
                                 <fieldset className="space-y-3">
-                                    <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Languages Spoken</legend>
-                                    <div className="flex flex-wrap gap-2" role="group" aria-label="Select languages">
-                                        {LANGUAGES.map(lang => (
+                                    <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Can Communicate In</legend>
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 -mt-1">Show listings where household speaks any of these</p>
+
+                                    {/* Selected languages shown at top */}
+                                    {languages.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-700" role="group" aria-label="Selected languages">
+                                            {languages.map(code => (
+                                                <Button
+                                                    key={code}
+                                                    type="button"
+                                                    variant="filter"
+                                                    onClick={() => toggleLanguage(code)}
+                                                    data-active={true}
+                                                    aria-pressed={true}
+                                                    className="rounded-full h-auto py-2 px-3 text-sm font-medium"
+                                                >
+                                                    {getLanguageName(code)}
+                                                    <X className="w-3.5 h-3.5 ml-1.5" />
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Search input */}
+                                    <Input
+                                        type="text"
+                                        placeholder="Search languages..."
+                                        value={languageSearch}
+                                        onChange={(e) => setLanguageSearch(e.target.value)}
+                                        className="h-9"
+                                    />
+
+                                    {/* Language chips */}
+                                    <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto" role="group" aria-label="Available languages">
+                                        {filteredLanguages.filter(code => !languages.includes(code)).map(code => (
                                             <Button
-                                                key={lang}
+                                                key={code}
                                                 type="button"
                                                 variant="filter"
-                                                onClick={() => toggleLanguage(lang)}
-                                                data-active={languages.includes(lang)}
-                                                aria-pressed={languages.includes(lang)}
-                                                className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${languages.includes(lang) ? 'scale-[1.02]' : 'hover:scale-[1.02]'}`}
+                                                onClick={() => toggleLanguage(code)}
+                                                data-active={false}
+                                                aria-pressed={false}
+                                                className="rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 hover:scale-[1.02]"
                                             >
-                                                {lang}
-                                                {languages.includes(lang) && (
-                                                    <X className="w-3.5 h-3.5 ml-1.5" />
-                                                )}
+                                                {getLanguageName(code)}
                                             </Button>
                                         ))}
+                                        {filteredLanguages.filter(code => !languages.includes(code)).length === 0 && (
+                                            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                                                {languageSearch ? 'No languages found' : 'All languages selected'}
+                                            </p>
+                                        )}
                                     </div>
                                 </fieldset>
 

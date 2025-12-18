@@ -68,10 +68,19 @@ export async function trackPresence(
     userId: string,
     userName: string
 ): Promise<void> {
-    if (!channel) return;
-    await channel.track({
-        online_at: new Date().toISOString(),
-        user_id: userId,
-        user_name: userName
-    });
+    // P0 FIX: Defensive check and error handling for presence tracking
+    if (!channel || typeof channel.track !== 'function') return;
+    try {
+        await channel.track({
+            online_at: new Date().toISOString(),
+            user_id: userId,
+            user_name: userName
+        });
+    } catch (error) {
+        // Log in development for debugging, silent in production
+        // Presence is non-critical - don't crash the app
+        if (process.env.NODE_ENV !== 'production') {
+            console.debug('[SUPABASE] Presence tracking failed:', error);
+        }
+    }
 }

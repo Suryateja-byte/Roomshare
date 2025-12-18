@@ -32,6 +32,11 @@ jest.mock('@/auth', () => ({
   auth: jest.fn(),
 }))
 
+// P2-4: Mock rate limiting to return null (allow request)
+jest.mock('@/lib/with-rate-limit', () => ({
+  withRateLimit: jest.fn().mockResolvedValue(null),
+}))
+
 import { POST } from '@/app/api/favorites/route'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
@@ -82,7 +87,8 @@ describe('POST /api/favorites', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Missing listingId')
+      expect(data.error).toBe('Invalid request')
+      expect(data.details).toBeDefined()
     })
 
     it('returns 400 when listingId is empty', async () => {
@@ -90,6 +96,7 @@ describe('POST /api/favorites', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
+      expect(data.error).toBe('Invalid request')
     })
   })
 

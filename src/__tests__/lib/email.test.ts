@@ -15,23 +15,23 @@ jest.mock('@/lib/prisma', () => ({
 }))
 
 const mockEmailTemplates = {
-  welcome: jest.fn(() => ({
+  welcome: jest.fn((_data?: Record<string, unknown>) => ({
     subject: 'Welcome to RoomShare',
     html: '<p>Welcome!</p>',
   })),
-  bookingRequest: jest.fn(() => ({
+  bookingRequest: jest.fn((_data?: Record<string, unknown>) => ({
     subject: 'New Booking Request',
     html: '<p>You have a new booking request</p>',
   })),
-  bookingAccepted: jest.fn(() => ({
+  bookingAccepted: jest.fn((_data?: Record<string, unknown>) => ({
     subject: 'Booking Accepted',
     html: '<p>Your booking was accepted</p>',
   })),
-  newMessage: jest.fn(() => ({
+  newMessage: jest.fn((_data?: Record<string, unknown>) => ({
     subject: 'New Message',
     html: '<p>You have a new message</p>',
   })),
-  newReview: jest.fn(() => ({
+  newReview: jest.fn((_data?: Record<string, unknown>) => ({
     subject: 'New Review',
     html: '<p>You have a new review</p>',
   })),
@@ -129,7 +129,7 @@ describe('email utilities', () => {
     })
 
     it('should send when preference is not set (default behavior)', () => {
-      const prefs = { emailMarketing: false } // Only marketing is false
+      const prefs: { emailMarketing: boolean; emailBookingRequests?: boolean } = { emailMarketing: false } // Only marketing is false
       // emailBookingRequests is not set, so it defaults to true behavior
       expect(prefs.emailBookingRequests).toBeUndefined()
     })

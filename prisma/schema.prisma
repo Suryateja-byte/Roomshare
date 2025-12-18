@@ -99,11 +99,12 @@ model Listing {
   images         String[]         @default([])
   amenities      String[]
   houseRules     String[]
-  leaseDuration    String?
-  roomType         String?
-  languages        String[]  @default([])
-  genderPreference String?
-  householdGender  String?
+  leaseDuration         String?
+  roomType              String?
+  householdLanguages    String[]  @default([]) @map("household_languages")
+  primaryHomeLanguage   String?   @map("primary_home_language")
+  genderPreference      String?
+  householdGender       String?
   totalSlots       Int
   availableSlots Int
   moveInDate     DateTime?
@@ -240,6 +241,10 @@ model Message {
   deletedBy      String?      // User who deleted (for audit)
   sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  // P2-16: Composite index for efficient message retrieval by conversation
+  // Queries like: SELECT * FROM Message WHERE conversationId = ? ORDER BY createdAt
+  @@index([conversationId, createdAt])
 }
 
 model RecentlyViewed {

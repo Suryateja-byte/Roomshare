@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createClient } from '@supabase/supabase-js';
+import { withRateLimit } from '@/lib/with-rate-limit';
 
 // Initialize Supabase client with service role for storage operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,6 +40,10 @@ const MIME_TO_EXTENSION: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
+    // P1-6 FIX: Add rate limiting to prevent storage abuse
+    const rateLimitResponse = await withRateLimit(request, { type: 'upload' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         // Check authentication
         const session = await auth();

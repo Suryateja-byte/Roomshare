@@ -4,8 +4,13 @@ import { auth } from '@/auth';
 import { createNotification } from '@/app/actions/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from '@/app/actions/suspension';
+import { withRateLimit } from '@/lib/with-rate-limit';
 
 export async function POST(request: Request) {
+    // P1-5 FIX: Add rate limiting to prevent review spam
+    const rateLimitResponse = await withRateLimit(request, { type: 'createReview' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
@@ -38,12 +43,21 @@ export async function POST(request: Request) {
 
         // Check for existing review (duplicate prevention)
         if (listingId) {
-            const existingReview = await prisma.review.findFirst({
-                where: {
-                    authorId: session.user.id,
-                    listingId
-                }
-            });
+            // P1-20 FIX: Parallelize independent queries
+            const [existingReview, hasBooking] = await Promise.all([
+                prisma.review.findFirst({
+                    where: {
+                        authorId: session.user.id,
+                        listingId
+                    }
+                }),
+                prisma.booking.findFirst({
+                    where: {
+                        listingId,
+                        tenantId: session.user.id,
+                    },
+                })
+            ]);
 
             if (existingReview) {
                 return NextResponse.json(
@@ -53,13 +67,6 @@ export async function POST(request: Request) {
             }
 
             // Require booking history before allowing review (prevents fake reviews)
-            const hasBooking = await prisma.booking.findFirst({
-                where: {
-                    listingId,
-                    tenantId: session.user.id,
-                },
-            });
-
             if (!hasBooking) {
                 return NextResponse.json(
                     { error: 'You must have a booking to review this listing' },
@@ -103,38 +110,47 @@ export async function POST(request: Request) {
             }
         });
 
-        // Send notification to listing owner
+        // P1-22 FIX: Send notification in background (non-blocking)
+        // Return response immediately, fire-and-forget notifications
         if (listingId) {
-            const listing = await prisma.listing.findUnique({
-                where: { id: listingId },
-                include: {
-                    owner: {
-                        select: { id: true, name: true, email: true }
-                    }
-                }
-            });
-
-            if (listing && listing.ownerId !== session.user.id) {
-                // Create in-app notification
-                await createNotification({
-                    userId: listing.ownerId,
-                    type: 'NEW_REVIEW',
-                    title: 'New Review',
-                    message: `${review.author.name || 'Someone'} left a ${rating}-star review on "${listing.title}"`,
-                    link: `/listings/${listingId}`
-                });
-
-                // Send email (respecting user preferences)
-                if (listing.owner.email) {
-                    await sendNotificationEmailWithPreference('newReview', listing.ownerId, listing.owner.email, {
-                        hostName: listing.owner.name || 'Host',
-                        reviewerName: review.author.name || 'A user',
-                        listingTitle: listing.title,
-                        rating,
-                        listingId
+            // Async notification - don't await
+            (async () => {
+                try {
+                    const listing = await prisma.listing.findUnique({
+                        where: { id: listingId },
+                        include: {
+                            owner: {
+                                select: { id: true, name: true, email: true }
+                            }
+                        }
                     });
+
+                    if (listing && listing.ownerId !== session.user.id) {
+                        // Create in-app notification
+                        await createNotification({
+                            userId: listing.ownerId,
+                            type: 'NEW_REVIEW',
+                            title: 'New Review',
+                            message: `${review.author.name || 'Someone'} left a ${rating}-star review on "${listing.title}"`,
+                            link: `/listings/${listingId}`
+                        });
+
+                        // Send email (respecting user preferences)
+                        if (listing.owner.email) {
+                            await sendNotificationEmailWithPreference('newReview', listing.ownerId, listing.owner.email, {
+                                hostName: listing.owner.name || 'Host',
+                                reviewerName: review.author.name || 'A user',
+                                listingTitle: listing.title,
+                                rating,
+                                listingId
+                            });
+                        }
+                    }
+                } catch (notificationError) {
+                    // Log but don't fail - review was already created successfully
+                    console.error('Failed to send review notification:', notificationError);
                 }
-            }
+            })();
         }
 
         return NextResponse.json(review);

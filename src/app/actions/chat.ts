@@ -182,23 +182,29 @@ export async function getConversations() {
         orderBy: { updatedAt: 'desc' },
     });
 
-    // Get unread counts for each conversation
-    const conversationsWithUnread = await Promise.all(
-        conversations.map(async (conv) => {
-            const unreadCount = await prisma.message.count({
-                where: {
-                    conversationId: conv.id,
-                    senderId: { not: session.user.id },
-                    read: false,
-                    deletedAt: null,
-                },
-            });
-            return {
-                ...conv,
-                unreadCount,
-            };
+    // P2-07 FIX: Get unread counts in single query using groupBy (2 queries instead of N+1)
+    const conversationIds = conversations.map(c => c.id);
+    const unreadCounts = conversationIds.length > 0
+        ? await prisma.message.groupBy({
+            by: ['conversationId'],
+            where: {
+                conversationId: { in: conversationIds },
+                senderId: { not: session.user.id },
+                read: false,
+                deletedAt: null,
+            },
+            _count: true,
         })
-    );
+        : [];
+
+    // Create lookup map for O(1) access
+    const unreadMap = new Map(unreadCounts.map(c => [c.conversationId, c._count]));
+
+    // Map conversations with unread counts
+    const conversationsWithUnread = conversations.map((conv) => ({
+        ...conv,
+        unreadCount: unreadMap.get(conv.id) || 0,
+    }));
 
     return conversationsWithUnread;
 }
@@ -517,18 +523,23 @@ export async function pollMessages(conversationId: string, lastMessageId?: strin
         // Get typing status
         const { typingUsers } = await getTypingStatus(conversationId);
 
+        // P1-14 FIX: Validate lastMessageId before using in query
+        let lastMessageTime: Date | null = null;
+        if (lastMessageId) {
+            const lastMessage = await prisma.message.findUnique({
+                where: { id: lastMessageId },
+                select: { createdAt: true }
+            });
+            lastMessageTime = lastMessage?.createdAt || null;
+        }
+
         // Get new messages since last check
         const messages = await prisma.message.findMany({
             where: {
                 conversationId,
                 deletedAt: null,
-                ...(lastMessageId ? {
-                    createdAt: {
-                        gt: (await prisma.message.findUnique({
-                            where: { id: lastMessageId },
-                            select: { createdAt: true }
-                        }))?.createdAt || new Date(0)
-                    }
+                ...(lastMessageTime ? {
+                    createdAt: { gt: lastMessageTime }
                 } : {})
             },
             orderBy: { createdAt: 'asc' },

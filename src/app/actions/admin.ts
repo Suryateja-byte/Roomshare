@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { ListingStatus, ReportStatus } from '@prisma/client';
@@ -45,7 +46,8 @@ export async function getUsers(options?: {
     const skip = (page - 1) * limit;
 
     try {
-        const where: any = {};
+        // P1-8 FIX: Use proper Prisma type instead of any
+        const where: Prisma.UserWhereInput = {};
 
         if (options?.search) {
             where.OR = [
@@ -215,7 +217,8 @@ export async function getListingsForAdmin(options?: {
     const skip = (page - 1) * limit;
 
     try {
-        const where: any = {};
+        // P1-8 FIX: Use proper Prisma type instead of any
+        const where: Prisma.ListingWhereInput = {};
 
         if (options?.search) {
             where.OR = [
@@ -426,7 +429,8 @@ export async function getReports(options?: {
     const skip = (page - 1) * limit;
 
     try {
-        const where: any = {};
+        // P1-8 FIX: Use proper Prisma type instead of any
+        const where: Prisma.ReportWhereInput = {};
 
         if (options?.status) {
             where.status = options.status;

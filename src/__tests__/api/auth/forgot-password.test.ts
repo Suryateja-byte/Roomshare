@@ -36,6 +36,7 @@ import { POST } from '@/app/api/auth/forgot-password/route'
 import { prisma } from '@/lib/prisma'
 import { sendNotificationEmail } from '@/lib/email'
 import { withRateLimit } from '@/lib/with-rate-limit'
+import type { NextRequest } from 'next/server'
 
 describe('Forgot Password API', () => {
   beforeEach(() => {
@@ -46,7 +47,7 @@ describe('Forgot Password API', () => {
     new Request('http://localhost:3000/api/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify(body),
-    })
+    }) as unknown as NextRequest
 
   it('sends reset email for existing user', async () => {
     const mockUser = { id: 'user-123', name: 'Test User', email: 'test@example.com' }

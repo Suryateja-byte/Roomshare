@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIP, type RATE_LIMITS } from './rate-limit';
+import { getRequestId } from './request-context';
 
 type RateLimitKey = keyof typeof RATE_LIMITS;
 
@@ -47,6 +48,7 @@ export async function withRateLimit(
     const result = await checkRateLimit(identifier, endpointName, config);
 
     if (!result.success) {
+        // P2-05 FIX: Include x-request-id for complete request tracing on 429 responses
         return NextResponse.json(
             {
                 error: 'Too many requests',
@@ -59,7 +61,8 @@ export async function withRateLimit(
                     'Retry-After': String(result.retryAfter || 60),
                     'X-RateLimit-Limit': String(config.limit),
                     'X-RateLimit-Remaining': '0',
-                    'X-RateLimit-Reset': result.resetAt.toISOString()
+                    'X-RateLimit-Reset': result.resetAt.toISOString(),
+                    'x-request-id': getRequestId(),
                 }
             }
         );

@@ -27,6 +27,7 @@ jest.mock('@/lib/prisma', () => ({
       create: jest.fn(),
       updateMany: jest.fn(),
       count: jest.fn(),
+      groupBy: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -235,12 +236,16 @@ describe('Chat Actions', () => {
         },
       ]
       ;(prisma.conversation.findMany as jest.Mock).mockResolvedValue(mockConversations)
-      ;(prisma.message.count as jest.Mock).mockResolvedValue(0)
+      // P2-07: Now using groupBy instead of count for N+1 fix
+      ;(prisma.message.groupBy as jest.Mock).mockResolvedValue([
+        { conversationId: 'conv-1', _count: 2 },
+        { conversationId: 'conv-2', _count: 0 },
+      ])
 
       const result = await getConversations()
 
       expect(result).toEqual([
-        { ...mockConversations[0], unreadCount: 0 },
+        { ...mockConversations[0], unreadCount: 2 },
         { ...mockConversations[1], unreadCount: 0 },
       ])
       expect(prisma.conversation.findMany).toHaveBeenCalledWith(

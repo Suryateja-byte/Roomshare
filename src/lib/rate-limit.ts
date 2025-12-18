@@ -113,6 +113,18 @@ export const RATE_LIMITS = {
     upload: { limit: 20, windowMs: 60 * 60 * 1000 },            // 20 per hour
     messages: { limit: 60, windowMs: 60 * 60 * 1000 },          // 60 per hour
     listings: { limit: 10, windowMs: 24 * 60 * 60 * 1000 },     // 10 per day
+    // P1 fixes: Additional rate limits for unprotected endpoints
+    verifyEmail: { limit: 10, windowMs: 60 * 60 * 1000 },       // 10 per hour
+    resetPassword: { limit: 5, windowMs: 60 * 60 * 1000 },      // 5 per hour
+    createListing: { limit: 5, windowMs: 24 * 60 * 60 * 1000 }, // 5 per day
+    sendMessage: { limit: 100, windowMs: 60 * 60 * 1000 },      // 100 per hour
+    createReview: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
+    agent: { limit: 20, windowMs: 60 * 60 * 1000 },             // 20 per hour
+    // P2 fixes: Rate limits for scraping protection and abuse prevention
+    listingsRead: { limit: 100, windowMs: 60 * 60 * 1000 },     // 100 per hour (scraping protection)
+    unreadCount: { limit: 60, windowMs: 60 * 1000 },            // 60 per minute (frequent polling)
+    toggleFavorite: { limit: 60, windowMs: 60 * 60 * 1000 },    // 60 per hour
+    createReport: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
 } as const;
 
 /**

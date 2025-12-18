@@ -140,7 +140,8 @@ describe('UserAvatar', () => {
     it('image has correct classes', () => {
       render(<UserAvatar image="/avatar.jpg" />)
       const img = screen.getByRole('img')
-      expect(img).toHaveClass('w-full', 'h-full', 'object-cover')
+      // P1-18: Next.js Image uses fill prop so only object-cover is needed
+      expect(img).toHaveClass('object-cover')
     })
   })
 

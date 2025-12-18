@@ -29,10 +29,20 @@ export default function ListingFreshnessCheck({
 
                 if (!isMounted) return;
 
-                if (response.status === 404) {
+                // Only process JSON responses - HTML responses indicate routing issues
+                const contentType = response.headers.get('content-type');
+                if (!contentType?.includes('application/json')) {
+                    // Router returned HTML 404 page, not our API response
+                    // Silently ignore - don't show misleading "deleted" banner
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (response.status === 404 && data.error === 'Listing not found') {
+                    // Confirmed from our API that listing was deleted
                     setIsDeleted(true);
                 } else if (response.ok) {
-                    const data = await response.json();
                     // Check if listing was paused or deactivated
                     if (data.status === 'PAUSED' || data.status === 'RENTED') {
                         setIsUnavailable(true);
@@ -41,8 +51,9 @@ export default function ListingFreshnessCheck({
                         setIsDeleted(false);
                     }
                 }
+                // Silently ignore 401/403/500 - don't show misleading banners
             } catch (error) {
-                // Network error - don't show banner, just log
+                // Network or JSON parse error - don't show banner, just log
                 console.error('Failed to check listing freshness:', error);
             }
         };

@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# build-generated service worker version (P2-08)
+public/sw-version.js
+
 # production
 /build
 

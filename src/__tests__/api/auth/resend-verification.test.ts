@@ -41,6 +41,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { sendNotificationEmail } from '@/lib/email'
 import { withRateLimit } from '@/lib/with-rate-limit'
+import type { NextRequest } from 'next/server'
 
 describe('Resend Verification API', () => {
   beforeEach(() => {
@@ -50,7 +51,7 @@ describe('Resend Verification API', () => {
   const createRequest = () =>
     new Request('http://localhost:3000/api/auth/resend-verification', {
       method: 'POST',
-    })
+    }) as unknown as NextRequest
 
   it('sends verification email for authenticated user with unverified email', async () => {
     const mockSession = { user: { email: 'test@example.com' } }

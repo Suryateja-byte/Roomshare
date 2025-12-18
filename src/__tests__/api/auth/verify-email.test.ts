@@ -35,6 +35,7 @@ jest.mock('next/server', () => ({
 
 import { GET } from '@/app/api/auth/verify-email/route'
 import { prisma } from '@/lib/prisma'
+import type { NextRequest } from 'next/server'
 
 describe('Verify Email API', () => {
   beforeEach(() => {
@@ -45,7 +46,7 @@ describe('Verify Email API', () => {
     const url = token
       ? `http://localhost:3000/api/auth/verify-email?token=${token}`
       : 'http://localhost:3000/api/auth/verify-email'
-    return new Request(url, { method: 'GET' })
+    return new Request(url, { method: 'GET' }) as unknown as NextRequest
   }
 
   it('verifies email successfully with valid token', async () => {

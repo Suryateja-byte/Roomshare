@@ -16,7 +16,7 @@ interface Listing {
     totalSlots: number;
     amenities: string[];
     houseRules: string[];
-    languages: string[];
+    householdLanguages: string[];
     genderPreference?: string;
     householdGender?: string;
     leaseDuration?: string;
@@ -127,6 +127,7 @@ export default function FeaturedListingsClient({ listings }: FeaturedListingsCli
                                         state: listing.location.state,
                                     },
                                     amenities: listing.amenities,
+                                    householdLanguages: listing.householdLanguages,
                                     availableSlots: listing.availableSlots,
                                     images: listing.images,
                                     avgRating: listing.avgRating,

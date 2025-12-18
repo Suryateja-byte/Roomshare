@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 interface UserAvatarProps {
@@ -14,13 +15,27 @@ const sizeClasses = {
     xl: 'w-16 h-16',
 };
 
+// P1-18 FIX: Map size to pixel values for next/image sizes attribute
+const sizePx = {
+    sm: 32,
+    md: 40,
+    lg: 48,
+    xl: 64,
+};
+
 export default function UserAvatar({ image, name, size = 'md', className }: UserAvatarProps) {
     const sizeClass = sizeClasses[size];
 
     if (image) {
         return (
-            <div className={cn('rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-700', sizeClass, className)}>
-                <img src={image} alt={name || 'User'} className="w-full h-full object-cover" />
+            <div className={cn('rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-700 relative', sizeClass, className)}>
+                <Image
+                    src={image}
+                    alt={name || 'User'}
+                    fill
+                    sizes={`${sizePx[size]}px`}
+                    className="object-cover"
+                />
             </div>
         );
     }

@@ -141,3 +141,32 @@ export const features = {
   googlePlaces: !!serverEnv.GOOGLE_PLACES_API_KEY,
   supabaseStorage: !!serverEnv.SUPABASE_SERVICE_ROLE_KEY,
 } as const;
+
+// P1-25 FIX: Log startup warnings for missing optional services
+// This helps operators understand which features are disabled
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+  const warnings: string[] = [];
+
+  if (!features.aiChat) {
+    warnings.push('GROQ_API_KEY not configured - AI chat feature disabled');
+  }
+  if (!features.email) {
+    warnings.push('RESEND_API_KEY not configured - email notifications disabled');
+  }
+  if (!features.errorTracking) {
+    warnings.push('SENTRY_DSN not configured - error tracking disabled');
+  }
+  if (!features.redis) {
+    warnings.push('Redis not configured - using database-backed rate limiting (slower)');
+  }
+  if (!features.geocoding) {
+    warnings.push('MAPBOX_ACCESS_TOKEN not configured - geocoding disabled');
+  }
+  if (!features.cronAuth) {
+    warnings.push('CRON_SECRET not configured - cron endpoints unprotected');
+  }
+
+  if (warnings.length > 0) {
+    console.warn('[ENV] Optional services not configured:\n  - ' + warnings.join('\n  - '));
+  }
+}
