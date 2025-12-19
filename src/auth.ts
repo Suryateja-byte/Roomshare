@@ -26,6 +26,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     session: {
         strategy: "jwt",
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+        updateAge: 24 * 60 * 60,   // Refresh token once per day
     },
     // Note: In NextAuth v5 (Auth.js), account linking is handled by the adapter
     // The Prisma adapter will auto-link accounts when email matches
@@ -43,24 +45,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return session
         },
         async jwt({ token, user, account, trigger }) {
+            // Only set initial values when user signs in
             if (user) {
                 token.sub = user.id
                 token.emailVerified = user.emailVerified
                 token.isAdmin = user.isAdmin
                 token.image = user.image
+                token.name = user.name
             }
-            // Refresh user data from database on update or periodically
-            // This ensures profile picture changes are reflected in the session
-            if (token.sub) {
-                const dbUser = await prisma.user.findUnique({
-                    where: { id: token.sub },
-                    select: { emailVerified: true, isAdmin: true, image: true, name: true }
-                })
-                if (dbUser) {
-                    token.emailVerified = dbUser.emailVerified
-                    token.isAdmin = dbUser.isAdmin
-                    token.image = dbUser.image
-                    token.name = dbUser.name
+
+            // Only refresh from DB when explicitly triggered (e.g., after profile update)
+            // OR on first sign-in (when account exists)
+            // This prevents database queries on every single request which can cause
+            // session invalidation during rapid OAuth flows
+            if (trigger === "update" || account) {
+                try {
+                    const dbUser = await prisma.user.findUnique({
+                        where: { id: token.sub as string },
+                        select: { emailVerified: true, isAdmin: true, image: true, name: true }
+                    })
+                    if (dbUser) {
+                        token.emailVerified = dbUser.emailVerified
+                        token.isAdmin = dbUser.isAdmin
+                        token.image = dbUser.image
+                        token.name = dbUser.name
+                    }
+                } catch (error) {
+                    console.error("JWT callback DB error:", error)
+                    // Don't invalidate session on DB errors - keep existing token values
                 }
             }
             return token

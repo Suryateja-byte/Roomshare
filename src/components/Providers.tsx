@@ -1,17 +1,19 @@
 'use client';
 
 import { SessionProvider } from 'next-auth/react';
+import { Session } from 'next-auth';
 import { Toaster } from 'sonner';
 import { ReactNode } from 'react';
 import { ThemeProvider } from './ThemeProvider';
 
 interface ProvidersProps {
   children: ReactNode;
+  session?: Session | null;
 }
 
-export default function Providers({ children }: ProvidersProps) {
+export default function Providers({ children, session }: ProvidersProps) {
   return (
-    <SessionProvider>
+    <SessionProvider session={session} refetchOnWindowFocus={false}>
       <ThemeProvider>
         {children}
         <Toaster position="top-center" richColors />

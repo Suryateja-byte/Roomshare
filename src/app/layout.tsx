@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { auth } from "@/auth";
 import Navbar from "@/components/Navbar";
 import NavbarWrapper from "@/components/NavbarWrapper";
 import Footer from "@/components/Footer";
@@ -41,11 +42,15 @@ import MainLayout from "@/components/MainLayout";
 
 // ... existing imports
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Fetch session server-side to initialize SessionProvider with session
+  // This prevents hydration mismatch where client briefly sees no session
+  const session = await auth();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -59,7 +64,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://images.unsplash.com" />
       </head>
       <body className={inter.className}>
-        <Providers>
+        <Providers session={session}>
           <SkipLink />
           <CustomScrollContainer>
             <div className="flex flex-col min-h-screen">
