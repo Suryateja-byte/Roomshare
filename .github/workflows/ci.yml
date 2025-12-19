@@ -34,8 +34,9 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
 
-  test:
-    name: Test
+  # Unit tests - fast, isolated tests
+  test-unit:
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,17 +45,106 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - run: npm test -- --coverage --ci
+      - run: npx jest --ci --coverage --testPathPattern="src/__tests__/(lib|hooks|utils)/" --testPathIgnorePatterns="filter-regression"
       - uses: codecov/codecov-action@v4
         if: always()
         with:
           files: ./coverage/lcov.info
+          flags: unit
           fail_ci_if_error: false
+
+  # Component and page tests
+  test-components:
+    name: Component Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npx jest --ci --coverage --testPathPattern="src/__tests__/(components|pages)/"
+      - uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage/lcov.info
+          flags: components
+          fail_ci_if_error: false
+
+  # API and action tests
+  test-api:
+    name: API & Action Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npx jest --ci --coverage --testPathPattern="src/__tests__/(api|actions)/"
+      - uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage/lcov.info
+          flags: api
+          fail_ci_if_error: false
+
+  # Filter system tests - integration, property-based, and E2E
+  test-filters:
+    name: Filter System Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Run filter schema tests
+        run: npx jest --ci src/__tests__/lib/filter-schema.test.ts
+      - name: Run pairwise integration tests
+        run: npx jest --ci src/__tests__/integration/
+      - name: Run property-based tests
+        run: npx jest --ci src/__tests__/property/
+      - name: Run E2E filter tests
+        run: npx jest --ci src/__tests__/e2e/
+
+  # Filter regression validation - ensures filter behavior hasn't changed
+  test-filter-regression:
+    name: Filter Regression Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Run regression framework tests
+        run: npx jest --ci src/__tests__/lib/filter-regression.test.ts
+      - name: Validate critical filter scenarios
+        run: node scripts/validate-filter-scenarios.js
+
+  # Performance and safety tests - run separately to avoid CI timeout
+  test-performance:
+    name: Performance & Safety Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Run performance tests
+        run: npx jest --ci src/__tests__/performance/ --testTimeout=60000
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test-unit, test-components, test-api, test-filters, test-filter-regression, test-performance]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
