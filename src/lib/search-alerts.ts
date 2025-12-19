@@ -1,18 +1,7 @@
 import { prisma } from './prisma';
 import { sendNotificationEmail } from './email';
 import { Prisma } from '@prisma/client';
-
-interface SearchFilters {
-    query?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    amenities?: string[];
-    moveInDate?: string;
-    leaseDuration?: string;
-    houseRules?: string[];
-    roomType?: string;
-    city?: string;
-}
+import { buildSearchUrl, type SearchFilters } from './search-utils';
 
 // Type for new listing data used in instant alerts
 export interface NewListingForAlert {
@@ -26,6 +15,10 @@ export interface NewListingForAlert {
     leaseDuration: string | null;
     amenities: string[];
     houseRules: string[];
+    householdLanguages?: string[];
+    genderPreference?: string | null;
+    householdGender?: string | null;
+    moveInDate?: Date | string | null;
 }
 
 interface ProcessResult {
@@ -34,6 +27,11 @@ interface ProcessResult {
     errors: number;
     details: string[];
 }
+
+const parseDateOnly = (value: string): Date => {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+};
 
 export async function processSearchAlerts(): Promise<ProcessResult> {
     const result: ProcessResult = {
@@ -119,11 +117,35 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
                 if (filters.leaseDuration) {
                     whereClause.leaseDuration = filters.leaseDuration;
                 }
+                if (filters.moveInDate) {
+                    const targetDate = parseDateOnly(filters.moveInDate);
+                    const existingAnd = Array.isArray(whereClause.AND)
+                        ? whereClause.AND
+                        : whereClause.AND ? [whereClause.AND] : [];
+                    whereClause.AND = [
+                        ...existingAnd,
+                        {
+                            OR: [
+                                { moveInDate: null },
+                                { moveInDate: { lte: targetDate } }
+                            ]
+                        }
+                    ];
+                }
                 if (filters.amenities && filters.amenities.length > 0) {
                     whereClause.amenities = { hasEvery: filters.amenities };
                 }
                 if (filters.houseRules && filters.houseRules.length > 0) {
                     whereClause.houseRules = { hasEvery: filters.houseRules };
+                }
+                if (filters.languages && filters.languages.length > 0) {
+                    whereClause.householdLanguages = { hasSome: filters.languages };
+                }
+                if (filters.genderPreference) {
+                    whereClause.genderPreference = filters.genderPreference;
+                }
+                if (filters.householdGender) {
+                    whereClause.householdGender = filters.householdGender;
                 }
                 if (filters.query) {
                     whereClause.OR = [
@@ -171,7 +193,7 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
                                 type: 'SEARCH_ALERT',
                                 title: 'New listings match your search!',
                                 message: `${newListingsCount} new listing${newListingsCount > 1 ? 's' : ''} match your saved search "${savedSearch.name}"`,
-                                link: `/search?${buildSearchParams(filters)}`
+                                link: buildSearchUrl(filters)
                             }
                         }),
                         prisma.savedSearch.update({
@@ -211,21 +233,6 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
     }
 }
 
-function buildSearchParams(filters: SearchFilters): string {
-    const params = new URLSearchParams();
-
-    if (filters.query) params.set('q', filters.query);
-    if (filters.minPrice) params.set('minPrice', filters.minPrice.toString());
-    if (filters.maxPrice) params.set('maxPrice', filters.maxPrice.toString());
-    if (filters.roomType) params.set('roomType', filters.roomType);
-    if (filters.leaseDuration) params.set('leaseDuration', filters.leaseDuration);
-    if (filters.city) params.set('city', filters.city);
-    if (filters.amenities) params.set('amenities', filters.amenities.join(','));
-    if (filters.houseRules) params.set('houseRules', filters.houseRules.join(','));
-
-    return params.toString();
-}
-
 /**
  * Check if a listing matches the saved search filters
  */
@@ -253,32 +260,66 @@ function matchesFilters(listing: NewListingForAlert, filters: SearchFilters): bo
         return false;
     }
 
-    // Amenities filter (all required amenities must be present)
+    // Move-in date filter (listing available by target date)
+    if (filters.moveInDate) {
+        const targetDate = parseDateOnly(filters.moveInDate);
+        const listingDate = listing.moveInDate ? new Date(listing.moveInDate) : null;
+        if (listingDate && listingDate > targetDate) {
+            return false;
+        }
+    }
+
+    // Amenities filter (all required amenities must be present - exact match)
     if (filters.amenities && filters.amenities.length > 0) {
+        const listingAmenitiesLower = listing.amenities.map(a => a.toLowerCase());
         const hasAllAmenities = filters.amenities.every(
-            amenity => listing.amenities.some(
-                listingAmenity => listingAmenity.toLowerCase().includes(amenity.toLowerCase())
-            )
+            amenity => listingAmenitiesLower.includes(amenity.toLowerCase())
         );
         if (!hasAllAmenities) return false;
     }
 
-    // House rules filter (all required rules must be present)
+    // House rules filter (all required rules must be present - exact match)
     if (filters.houseRules && filters.houseRules.length > 0) {
+        const listingRulesLower = listing.houseRules.map(r => r.toLowerCase());
         const hasAllRules = filters.houseRules.every(
-            rule => listing.houseRules.some(
-                listingRule => listingRule.toLowerCase().includes(rule.toLowerCase())
-            )
+            rule => listingRulesLower.includes(rule.toLowerCase())
         );
         if (!hasAllRules) return false;
     }
 
-    // Query filter (search in title and description)
+    // Languages filter (OR logic)
+    if (filters.languages && filters.languages.length > 0) {
+        const listingLanguages = listing.householdLanguages || [];
+        const matchesLanguage = filters.languages.some(
+            lang => listingLanguages.some(
+                listingLang => listingLang.toLowerCase() === lang.toLowerCase()
+            )
+        );
+        if (!matchesLanguage) return false;
+    }
+
+    // Gender preference filter
+    if (filters.genderPreference) {
+        if (!listing.genderPreference || listing.genderPreference.toLowerCase() !== filters.genderPreference.toLowerCase()) {
+            return false;
+        }
+    }
+
+    // Household gender filter
+    if (filters.householdGender) {
+        if (!listing.householdGender || listing.householdGender.toLowerCase() !== filters.householdGender.toLowerCase()) {
+            return false;
+        }
+    }
+
+    // Query filter (search in title, description, city, and state)
     if (filters.query) {
         const query = filters.query.toLowerCase();
         const matchesTitle = listing.title.toLowerCase().includes(query);
         const matchesDescription = listing.description.toLowerCase().includes(query);
-        if (!matchesTitle && !matchesDescription) return false;
+        const matchesCity = listing.city.toLowerCase().includes(query);
+        const matchesState = listing.state.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesDescription && !matchesCity && !matchesState) return false;
     }
 
     return true;

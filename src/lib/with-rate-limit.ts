@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { checkRateLimit, getClientIP, type RATE_LIMITS } from './rate-limit';
+import { checkRateLimit, getClientIP, getClientIPFromHeaders, type RATE_LIMITS } from './rate-limit';
 import { getRequestId } from './request-context';
 
 type RateLimitKey = keyof typeof RATE_LIMITS;
@@ -84,4 +84,47 @@ export function addRateLimitHeaders(
     response.headers.set('X-RateLimit-Remaining', String(remaining));
     response.headers.set('X-RateLimit-Reset', resetAt.toISOString());
     return response;
+}
+
+export interface ServerComponentRateLimitResult {
+    allowed: boolean;
+    remaining: number;
+    retryAfter?: number;
+}
+
+/**
+ * Check rate limit for Server Components (which can't access Request object)
+ * Uses Headers object from next/headers instead.
+ *
+ * @example
+ * import { headers } from 'next/headers';
+ *
+ * export default async function SearchPage() {
+ *   const headersList = await headers();
+ *   const rateLimit = await checkServerComponentRateLimit(headersList, 'search', '/search');
+ *   if (!rateLimit.allowed) {
+ *     return <RateLimitError retryAfter={rateLimit.retryAfter} />;
+ *   }
+ *   // Your page logic...
+ * }
+ */
+export async function checkServerComponentRateLimit(
+    headersList: Headers,
+    type: RateLimitKey,
+    endpoint: string
+): Promise<ServerComponentRateLimitResult> {
+    // Import here to avoid circular dependency
+    const { RATE_LIMITS } = await import('./rate-limit');
+    const config = RATE_LIMITS[type];
+
+    // Get identifier from headers
+    const identifier = getClientIPFromHeaders(headersList);
+
+    const result = await checkRateLimit(identifier, endpoint, config);
+
+    return {
+        allowed: result.success,
+        remaining: result.remaining,
+        retryAfter: result.retryAfter,
+    };
 }

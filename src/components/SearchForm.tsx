@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { FocusTrap } from '@/components/ui/FocusTrap';
 import LocationSearchInput from '@/components/LocationSearchInput';
 import { DatePicker } from '@/components/ui/date-picker';
-import { SUPPORTED_LANGUAGES, getLanguageName, type LanguageCode } from '@/lib/languages';
+import { SUPPORTED_LANGUAGES, getLanguageName, normalizeLanguages, type LanguageCode } from '@/lib/languages';
 import {
     Select,
     SelectContent,
@@ -24,6 +24,11 @@ const SEARCH_DEBOUNCE_MS = 300;
 // Recent searches config
 const RECENT_SEARCHES_KEY = 'roomshare-recent-searches';
 const MAX_RECENT_SEARCHES = 5;
+
+const AMENITY_OPTIONS = ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'] as const;
+const HOUSE_RULE_OPTIONS = ['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'] as const;
+const GENDER_PREFERENCE_OPTIONS = ['any', 'MALE_ONLY', 'FEMALE_ONLY', 'NO_PREFERENCE'] as const;
+const HOUSEHOLD_GENDER_OPTIONS = ['any', 'ALL_MALE', 'ALL_FEMALE', 'MIXED'] as const;
 
 interface RecentSearch {
     location: string;
@@ -43,32 +48,58 @@ export interface MapFlyToEventDetail {
 
 export default function SearchForm({ variant = 'default' }: { variant?: 'default' | 'compact' }) {
     const searchParams = useSearchParams();
+    const parseParamList = (key: string): string[] => {
+        const values = searchParams.getAll(key);
+        if (values.length === 0) return [];
+        return values
+            .flatMap(value => value.split(','))
+            .map(value => value.trim())
+            .filter(Boolean);
+    };
+    const normalizeByAllowlist = (values: string[], allowlist: readonly string[]) => {
+        const allowMap = new Map(allowlist.map(item => [item.toLowerCase(), item]));
+        const normalized = values
+            .map(value => allowMap.get(value.toLowerCase()))
+            .filter((value): value is string => Boolean(value));
+        return Array.from(new Set(normalized));
+    };
+    const parseEnumParam = (key: string, allowlist: readonly string[]) => {
+        const value = searchParams.get(key);
+        if (!value) return '';
+        const trimmed = value.trim();
+        return allowlist.includes(trimmed) ? trimmed : '';
+    };
+    const parseLanguages = () => {
+        const normalized = normalizeLanguages(parseParamList('languages'));
+        return Array.from(new Set(normalized));
+    };
+    const parseCoords = () => {
+        const lat = searchParams.get('lat');
+        const lng = searchParams.get('lng');
+        if (!lat || !lng) return null;
+        const parsedLat = parseFloat(lat);
+        const parsedLng = parseFloat(lng);
+        if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) {
+            return null;
+        }
+        return { lat: parsedLat, lng: parsedLng };
+    };
     const [location, setLocation] = useState(searchParams.get('q') || '');
     const [minPrice, setMinPrice] = useState(searchParams.get('minPrice') || '');
     const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') || '');
     const [showFilters, setShowFilters] = useState(false);
 
-    // Initialize selectedCoords from URL params if they exist
-    const getInitialCoords = () => {
-        const lat = searchParams.get('lat');
-        const lng = searchParams.get('lng');
-        if (lat && lng) {
-            return { lat: parseFloat(lat), lng: parseFloat(lng) };
-        }
-        return null;
-    };
-
-    const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(getInitialCoords);
+    const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(parseCoords);
 
     // New filters state
     const [moveInDate, setMoveInDate] = useState(searchParams.get('moveInDate') || '');
     const [leaseDuration, setLeaseDuration] = useState(searchParams.get('leaseDuration') || '');
     const [roomType, setRoomType] = useState(searchParams.get('roomType') || '');
-    const [amenities, setAmenities] = useState<string[]>(searchParams.getAll('amenities') || []);
-    const [houseRules, setHouseRules] = useState<string[]>(searchParams.getAll('houseRules') || []);
-    const [languages, setLanguages] = useState<string[]>(searchParams.getAll('languages') || []);
-    const [genderPreference, setGenderPreference] = useState(searchParams.get('genderPreference') || '');
-    const [householdGender, setHouseholdGender] = useState(searchParams.get('householdGender') || '');
+    const [amenities, setAmenities] = useState<string[]>(normalizeByAllowlist(parseParamList('amenities'), AMENITY_OPTIONS));
+    const [houseRules, setHouseRules] = useState<string[]>(normalizeByAllowlist(parseParamList('houseRules'), HOUSE_RULE_OPTIONS));
+    const [languages, setLanguages] = useState<string[]>(parseLanguages());
+    const [genderPreference, setGenderPreference] = useState(parseEnumParam('genderPreference', GENDER_PREFERENCE_OPTIONS));
+    const [householdGender, setHouseholdGender] = useState(parseEnumParam('householdGender', HOUSEHOLD_GENDER_OPTIONS));
 
     // Language search filter state
     const [languageSearch, setLanguageSearch] = useState('');
@@ -154,14 +185,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     // Sync state with URL params when they change (e.g., after navigation)
     useEffect(() => {
-        const lat = searchParams.get('lat');
-        const lng = searchParams.get('lng');
-        // Always sync coords from URL - set to parsed values if present, otherwise null
-        if (lat && lng) {
-            setSelectedCoords({ lat: parseFloat(lat), lng: parseFloat(lng) });
-        } else {
-            // Don't clear coords here - user might be typing a new location
-            // Coords will be cleared when user types in location field
+        const coords = parseCoords();
+        if (coords) {
+            setSelectedCoords(coords);
         }
         // Sync other form fields from URL
         setLocation(searchParams.get('q') || '');
@@ -170,11 +196,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setMoveInDate(searchParams.get('moveInDate') || '');
         setLeaseDuration(searchParams.get('leaseDuration') || '');
         setRoomType(searchParams.get('roomType') || '');
-        setAmenities(searchParams.getAll('amenities') || []);
-        setHouseRules(searchParams.getAll('houseRules') || []);
-        setLanguages(searchParams.getAll('languages') || []);
-        setGenderPreference(searchParams.get('genderPreference') || '');
-        setHouseholdGender(searchParams.get('householdGender') || '');
+        setAmenities(normalizeByAllowlist(parseParamList('amenities'), AMENITY_OPTIONS));
+        setHouseRules(normalizeByAllowlist(parseParamList('houseRules'), HOUSE_RULE_OPTIONS));
+        setLanguages(parseLanguages());
+        setGenderPreference(parseEnumParam('genderPreference', GENDER_PREFERENCE_OPTIONS));
+        setHouseholdGender(parseEnumParam('householdGender', HOUSEHOLD_GENDER_OPTIONS));
     }, [searchParams]);
 
     const router = useRouter();
@@ -208,6 +234,13 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
 
         const params = new URLSearchParams();
+
+        // Preserve existing sort parameter from URL
+        const existingSort = searchParams.get('sort');
+        if (existingSort && ['recommended', 'price_asc', 'price_desc', 'newest', 'rating'].includes(existingSort)) {
+            params.set('sort', existingSort);
+        }
+
         // Only include query if it has actual content (not just whitespace)
         const trimmedLocation = location.trim();
         if (trimmedLocation && trimmedLocation.length >= 2) {
@@ -319,8 +352,12 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     // Check if any filters are active
     const hasActiveFilters = location || minPrice || maxPrice || moveInDate ||
-        leaseDuration || roomType || amenities.length > 0 || houseRules.length > 0 ||
-        languages.length > 0 || genderPreference || householdGender;
+        (leaseDuration && leaseDuration !== 'any') ||
+        (roomType && roomType !== 'any') ||
+        amenities.length > 0 || houseRules.length > 0 ||
+        languages.length > 0 ||
+        (genderPreference && genderPreference !== 'any') ||
+        (householdGender && householdGender !== 'any');
 
     // Count active filters for badge
     const activeFilterCount = [
@@ -361,6 +398,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     }, [showFilters]);
 
     const isCompact = variant === 'compact';
+    const minMoveInDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+        .toISOString()
+        .split('T')[0];
 
     return (
         <div className={`w-full mx-auto ${isCompact ? 'max-w-2xl' : 'max-w-4xl'}`}>
@@ -597,7 +637,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                         value={moveInDate}
                                         onChange={setMoveInDate}
                                         placeholder="Select move-in date"
-                                        minDate={new Date().toISOString().split('T')[0]}
+                                        minDate={minMoveInDate}
                                     />
                                 </div>
 
@@ -611,9 +651,10 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                         <SelectContent>
                                             <SelectItem value="any">Any</SelectItem>
                                             <SelectItem value="Month-to-month">Month-to-month</SelectItem>
+                                            <SelectItem value="3 months">3 months</SelectItem>
                                             <SelectItem value="6 months">6 months</SelectItem>
-                                            <SelectItem value="1 year">1 year</SelectItem>
-                                            <SelectItem value="1 year+">1 year+</SelectItem>
+                                            <SelectItem value="12 months">12 months</SelectItem>
+                                            <SelectItem value="Flexible">Flexible</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -638,7 +679,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                 <fieldset className="space-y-3">
                                     <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
                                     <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
-                                        {['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'].map(amenity => (
+                                        {AMENITY_OPTIONS.map(amenity => (
                                             <Button
                                                 key={amenity}
                                                 type="button"
@@ -661,7 +702,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                 <fieldset className="space-y-3">
                                     <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
                                     <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
-                                        {['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'].map(rule => (
+                                        {HOUSE_RULE_OPTIONS.map(rule => (
                                             <Button
                                                 key={rule}
                                                 type="button"

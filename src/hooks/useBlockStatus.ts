@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, safeRemoveChannel } from '@/lib/supabase';
 import { getBlockStatus, type BlockStatus } from '@/app/actions/block';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -90,9 +90,7 @@ export function useBlockStatus(
             });
 
         return () => {
-            if (channelRef.current && supabase) {
-                supabase.removeChannel(channelRef.current);
-            }
+            safeRemoveChannel(channelRef.current);
         };
     }, [otherUserId, currentUserId, fetchBlockStatus]);
 

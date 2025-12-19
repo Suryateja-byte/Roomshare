@@ -17,7 +17,8 @@ describe('buildSearchUrl', () => {
   it('should build URL with amenities', () => {
     const filters: SearchFilters = { amenities: ['WiFi', 'Parking'] }
     const url = buildSearchUrl(filters)
-    expect(url).toContain('amenities=WiFi%2CParking')
+    expect(url).toContain('amenities=WiFi')
+    expect(url).toContain('amenities=Parking')
   })
 
   it('should build URL with moveInDate', () => {
@@ -35,7 +36,8 @@ describe('buildSearchUrl', () => {
   it('should build URL with houseRules', () => {
     const filters: SearchFilters = { houseRules: ['No Smoking', 'No Pets'] }
     const url = buildSearchUrl(filters)
-    expect(url).toContain('houseRules=No+Smoking%2CNo+Pets')
+    expect(url).toContain('houseRules=No+Smoking')
+    expect(url).toContain('houseRules=No+Pets')
   })
 
   it('should build URL with roomType', () => {
@@ -107,9 +109,7 @@ describe('buildSearchUrl', () => {
   it('should handle zero minPrice', () => {
     const filters: SearchFilters = { minPrice: 0 }
     const url = buildSearchUrl(filters)
-    // Zero is falsy but should still be included if explicitly set
-    // Note: current implementation uses truthiness check, so 0 is not included
-    expect(url).toBe('/search?')
+    expect(url).toBe('/search?minPrice=0')
   })
 
   it('should handle only minPrice without maxPrice', () => {
@@ -126,16 +126,20 @@ describe('buildSearchUrl', () => {
     expect(url).not.toContain('minPrice')
   })
 
-  it('should join multiple amenities with comma', () => {
+  it('should append multiple amenities params', () => {
     const filters: SearchFilters = { amenities: ['WiFi', 'Parking', 'AC'] }
     const url = buildSearchUrl(filters)
-    expect(url).toContain('amenities=WiFi%2CParking%2CAC')
+    expect(url).toContain('amenities=WiFi')
+    expect(url).toContain('amenities=Parking')
+    expect(url).toContain('amenities=AC')
   })
 
-  it('should join multiple house rules with comma', () => {
+  it('should append multiple house rules params', () => {
     const filters: SearchFilters = { houseRules: ['No Smoking', 'No Pets', 'No Parties'] }
     const url = buildSearchUrl(filters)
-    expect(url).toContain('houseRules=No+Smoking%2CNo+Pets%2CNo+Parties')
+    expect(url).toContain('houseRules=No+Smoking')
+    expect(url).toContain('houseRules=No+Pets')
+    expect(url).toContain('houseRules=No+Parties')
   })
 
   it('should handle special characters in amenities', () => {

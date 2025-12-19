@@ -42,7 +42,7 @@ describe('Saved Search Actions', () => {
     query: 'apartment',
     minPrice: 500,
     maxPrice: 1500,
-    roomType: 'PRIVATE' as const,
+    roomType: 'Private Room',
   }
 
   beforeEach(() => {
@@ -86,7 +86,12 @@ describe('Saved Search Actions', () => {
           userId: 'user-123',
           name: 'My Search',
           query: 'apartment',
-          filters: mockFilters,
+          filters: expect.objectContaining({
+            query: 'apartment',
+            minPrice: 500,
+            maxPrice: 1500,
+            roomType: 'Private Room',
+          }),
           alertEnabled: true,
           alertFrequency: 'DAILY',
         },

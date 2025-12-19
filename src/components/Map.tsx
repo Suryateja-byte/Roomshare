@@ -137,6 +137,12 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const searchParams = useSearchParams();
     const mapRef = useRef<any>(null);
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+    const lastSearchTimeRef = useRef<number>(0);
+    const pendingBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
+    const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Minimum interval between map searches (prevents 429 rate limiting)
+    const MIN_SEARCH_INTERVAL_MS = 2000;
 
     // Detect dark mode
     useEffect(() => {
@@ -370,14 +376,37 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         setIsSearching(false);
     }, [listings]);
 
-    // Cleanup debounce timer on unmount
+    // Cleanup timers on unmount
     useEffect(() => {
         return () => {
             if (debounceTimer.current) {
                 clearTimeout(debounceTimer.current);
             }
+            if (throttleTimeoutRef.current) {
+                clearTimeout(throttleTimeoutRef.current);
+            }
         };
     }, []);
+
+    // Execute the actual search with the given bounds
+    const executeMapSearch = useCallback((bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }) => {
+        const params = new URLSearchParams(searchParams.toString());
+
+        // Remove single point coordinates since we now have bounds
+        params.delete('lat');
+        params.delete('lng');
+        params.delete('page');
+
+        params.set('minLng', bounds.minLng.toString());
+        params.set('maxLng', bounds.maxLng.toString());
+        params.set('minLat', bounds.minLat.toString());
+        params.set('maxLat', bounds.maxLat.toString());
+
+        lastSearchTimeRef.current = Date.now();
+        pendingBoundsRef.current = null;
+        setIsSearching(true);
+        router.push(`/search?${params.toString()}`);
+    }, [router, searchParams]);
 
     const handleMoveEnd = (e: ViewStateChangeEvent) => {
         // Update unclustered listings for rendering individual markers
@@ -390,27 +419,40 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         }
 
         debounceTimer.current = setTimeout(() => {
-            const bounds = e.target.getBounds();
-            if (!bounds) return;
+            const mapBounds = e.target.getBounds();
+            if (!mapBounds) return;
 
-            const minLng = bounds.getWest();
-            const maxLng = bounds.getEast();
-            const minLat = bounds.getSouth();
-            const maxLat = bounds.getNorth();
+            const bounds = {
+                minLng: mapBounds.getWest(),
+                maxLng: mapBounds.getEast(),
+                minLat: mapBounds.getSouth(),
+                maxLat: mapBounds.getNorth()
+            };
 
-            const params = new URLSearchParams(searchParams.toString());
+            const now = Date.now();
+            const timeSinceLastSearch = now - lastSearchTimeRef.current;
 
-            // Remove single point coordinates since we now have bounds
-            params.delete('lat');
-            params.delete('lng');
+            // If we're within the throttle window, queue the search for later
+            if (timeSinceLastSearch < MIN_SEARCH_INTERVAL_MS) {
+                pendingBoundsRef.current = bounds;
 
-            params.set('minLng', minLng.toString());
-            params.set('maxLng', maxLng.toString());
-            params.set('minLat', minLat.toString());
-            params.set('maxLat', maxLat.toString());
+                // Clear any existing throttle timeout
+                if (throttleTimeoutRef.current) {
+                    clearTimeout(throttleTimeoutRef.current);
+                }
 
-            setIsSearching(true);
-            router.push(`/search?${params.toString()}`);
+                // Schedule the pending search for when the throttle window expires
+                const delay = MIN_SEARCH_INTERVAL_MS - timeSinceLastSearch;
+                throttleTimeoutRef.current = setTimeout(() => {
+                    if (pendingBoundsRef.current) {
+                        executeMapSearch(pendingBoundsRef.current);
+                    }
+                }, delay);
+                return;
+            }
+
+            // Execute immediately if outside throttle window
+            executeMapSearch(bounds);
         }, 500); // 500ms debounce
     };
 

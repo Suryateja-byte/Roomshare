@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import { supabase, createChatChannel, broadcastTyping } from '@/lib/supabase';
+import { supabase, createChatChannel, broadcastTyping, trackPresence, safeRemoveChannel } from '@/lib/supabase';
 import { sendMessage, getMessages } from '@/app/actions/chat';
 import { blockUser, unblockUser } from '@/app/actions/block';
 import { useRouter } from 'next/navigation';
@@ -291,8 +291,9 @@ export default function ChatWindow({
                             }
                         }
                     })
-                    // Track presence
+                    // Track presence with defensive checks
                     .on('presence', { event: 'sync' }, () => {
+                        if (!channel || typeof channel.presenceState !== 'function') return;
                         const state = channel.presenceState();
                         const otherUsers = Object.values(state)
                             .flat()
@@ -306,6 +307,7 @@ export default function ChatWindow({
                     .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
                         const otherLeft = leftPresences.some((p: any) => p.user_id !== currentUserId);
                         if (otherLeft) {
+                            if (!channel || typeof channel.presenceState !== 'function') return;
                             const state = channel.presenceState();
                             const otherUsers = Object.values(state)
                                 .flat()
@@ -316,12 +318,8 @@ export default function ChatWindow({
                     .subscribe(async (status) => {
                         if (status === 'SUBSCRIBED') {
                             setConnectionStatus('connected');
-                            // Track our presence
-                            await channel.track({
-                                online_at: new Date().toISOString(),
-                                user_id: currentUserId,
-                                user_name: currentUserName || 'User'
-                            });
+                            // Track our presence using the wrapper with defensive checks
+                            await trackPresence(channel, currentUserId, currentUserName || 'User');
                         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
                             setConnectionStatus('disconnected');
                         }
@@ -333,9 +331,7 @@ export default function ChatWindow({
         pollInterval = setInterval(pollForMessages, 5000);
 
         return () => {
-            if (channelRef.current && supabase) {
-                supabase.removeChannel(channelRef.current);
-            }
+            safeRemoveChannel(channelRef.current);
             if (pollInterval) {
                 clearInterval(pollInterval);
             }

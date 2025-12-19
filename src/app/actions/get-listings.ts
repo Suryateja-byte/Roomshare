@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { crossesAntimeridian } from '@/lib/data';
 
 export interface Bounds {
   ne_lat: number;
@@ -29,25 +30,61 @@ export async function getListingsInBounds(bounds: Bounds): Promise<MapListing[]>
     // Use raw query to leverage PostGIS spatial functions
     // ST_MakeEnvelope(xmin, ymin, xmax, ymax, srid)
     // Note: PostGIS uses (lng, lat) order for coordinates
-    const listings = await prisma.$queryRaw<MapListing[]>`
-      SELECT
-        l.id,
-        l.title,
-        l.price,
-        l."availableSlots",
-        l."ownerId",
-        l.amenities,
-        l.images,
-        ST_Y(loc.coords::geometry) as lat,
-        ST_X(loc.coords::geometry) as lng
-      FROM "Listing" l
-      JOIN "Location" loc ON l.id = loc."listingId"
-      WHERE ST_Intersects(
-        loc.coords,
-        ST_MakeEnvelope(${sw_lng}, ${sw_lat}, ${ne_lng}, ${ne_lat}, 4326)
-      )
-      LIMIT 50; -- Limit to prevent overwhelming the map
-    `;
+    // sw_lng = west/minLng, ne_lng = east/maxLng
+
+    let listings: MapListing[];
+
+    if (crossesAntimeridian(sw_lng, ne_lng)) {
+      // Split into two envelopes for antimeridian crossing
+      // Envelope 1: sw_lng (west) to 180 (eastern side of dateline)
+      // Envelope 2: -180 to ne_lng (east) (western side of dateline)
+      listings = await prisma.$queryRaw<MapListing[]>`
+        SELECT
+          l.id,
+          l.title,
+          l.price,
+          l."availableSlots",
+          l."ownerId",
+          l.amenities,
+          l.images,
+          ST_Y(loc.coords::geometry) as lat,
+          ST_X(loc.coords::geometry) as lng
+        FROM "Listing" l
+        JOIN "Location" loc ON l.id = loc."listingId"
+        WHERE (
+          ST_Intersects(
+            loc.coords,
+            ST_MakeEnvelope(${sw_lng}, ${sw_lat}, 180, ${ne_lat}, 4326)
+          )
+          OR ST_Intersects(
+            loc.coords,
+            ST_MakeEnvelope(-180, ${sw_lat}, ${ne_lng}, ${ne_lat}, 4326)
+          )
+        )
+        LIMIT 50;
+      `;
+    } else {
+      // Normal envelope (no antimeridian crossing)
+      listings = await prisma.$queryRaw<MapListing[]>`
+        SELECT
+          l.id,
+          l.title,
+          l.price,
+          l."availableSlots",
+          l."ownerId",
+          l.amenities,
+          l.images,
+          ST_Y(loc.coords::geometry) as lat,
+          ST_X(loc.coords::geometry) as lng
+        FROM "Listing" l
+        JOIN "Location" loc ON l.id = loc."listingId"
+        WHERE ST_Intersects(
+          loc.coords,
+          ST_MakeEnvelope(${sw_lng}, ${sw_lat}, ${ne_lng}, ${ne_lat}, 4326)
+        )
+        LIMIT 50;
+      `;
+    }
 
     return listings;
   } catch (error: unknown) {

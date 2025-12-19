@@ -125,6 +125,8 @@ export const RATE_LIMITS = {
     unreadCount: { limit: 60, windowMs: 60 * 1000 },            // 60 per minute (frequent polling)
     toggleFavorite: { limit: 60, windowMs: 60 * 60 * 1000 },    // 60 per hour
     createReport: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
+    // P0 fix: Search page rate limit to prevent DoS
+    search: { limit: 30, windowMs: 60 * 1000 },                   // 30 per minute
 } as const;
 
 /**
@@ -143,6 +145,30 @@ export function getClientIP(request: Request): string {
 
     // Fallback for non-Vercel environments (local dev only)
     const forwarded = request.headers.get('x-forwarded-for');
+    if (forwarded && process.env.NODE_ENV === 'development') {
+        return forwarded.split(',')[0].trim();
+    }
+
+    // Fallback
+    return 'unknown';
+}
+
+/**
+ * Get client IP from Headers object (for Server Components)
+ * Server Components cannot access the Request object directly,
+ * so this version takes a Headers object from next/headers.
+ *
+ * SECURITY: Same trust model as getClientIP - prefer x-real-ip on Vercel.
+ */
+export function getClientIPFromHeaders(headersList: Headers): string {
+    // On Vercel, x-real-ip is set by the edge and cannot be spoofed
+    const realIP = headersList.get('x-real-ip');
+    if (realIP) {
+        return realIP;
+    }
+
+    // Fallback for non-Vercel environments (local dev only)
+    const forwarded = headersList.get('x-forwarded-for');
     if (forwarded && process.env.NODE_ENV === 'development') {
         return forwarded.split(',')[0].trim();
     }

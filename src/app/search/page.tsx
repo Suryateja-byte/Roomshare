@@ -1,5 +1,6 @@
 import { auth } from '@/auth';
-import { getListingsPaginated, getMapListings, getSavedListingIds, analyzeFilterImpact, SortOption } from '@/lib/data';
+import { getListingsPaginated, getMapListings, getSavedListingIds, analyzeFilterImpact, MapListingData } from '@/lib/data';
+import { isDataError } from '@/lib/errors';
 import { Suspense } from 'react';
 import SearchForm from '@/components/SearchForm';
 import DynamicMap from '@/components/DynamicMap';
@@ -8,9 +9,13 @@ import Pagination from '@/components/Pagination';
 import SortSelect from '@/components/SortSelect';
 import SaveSearchButton from '@/components/SaveSearchButton';
 import ZeroResultsSuggestions from '@/components/ZeroResultsSuggestions';
+import { SearchErrorBanner } from '@/components/SearchErrorBanner';
 import Link from 'next/link';
-import { Search, Map, List } from 'lucide-react';
+import { Search, Map, List, Clock } from 'lucide-react';
 import SearchViewToggle from '@/components/SearchViewToggle';
+import { headers } from 'next/headers';
+import { checkServerComponentRateLimit } from '@/lib/with-rate-limit';
+import { parseSearchParams } from '@/lib/search-params';
 
 // Skeleton component for listing cards during loading
 function ListingSkeleton() {
@@ -60,6 +65,8 @@ export default async function SearchPage({
         houseRules?: string | string[];
         languages?: string | string[];
         roomType?: string;
+        genderPreference?: string;
+        householdGender?: string;
         minLat?: string;
         maxLat?: string;
         minLng?: string;
@@ -70,141 +77,67 @@ export default async function SearchPage({
         sort?: string;
     }>;
 }) {
-    const { q, minPrice, maxPrice, amenities, moveInDate, leaseDuration, houseRules, languages, roomType, minLat, maxLat, minLng, maxLng, lat, lng, page, sort } = await searchParams;
+    const rawParams = await searchParams;
+
+    // P0 fix: Rate limit check before any database queries
+    const headersList = await headers();
+    const rateLimit = await checkServerComponentRateLimit(headersList, 'search', '/search');
+    if (!rateLimit.allowed) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+                <div className="text-center p-8 max-w-md">
+                    <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                        <Clock className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
+                        Too Many Requests
+                    </h1>
+                    <p className="text-zinc-600 dark:text-zinc-400 mb-6">
+                        You are searching too quickly. Please wait a moment before trying again.
+                    </p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-500">
+                        Try again in {rateLimit.retryAfter || 60} seconds
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     const session = await auth();
     const userId = session?.user?.id;
 
-    // === URL Parameter Validation ===
-    // Helper function to safely parse numeric values with validation
-    const safeParseFloat = (value: string | undefined, min?: number, max?: number): number | undefined => {
-        if (!value) return undefined;
-        const parsed = parseFloat(value);
-        if (isNaN(parsed)) return undefined;
-        if (min !== undefined && parsed < min) return min;
-        if (max !== undefined && parsed > max) return max;
-        return parsed;
-    };
+    const { q, filterParams, requestedPage, sortOption } = parseSearchParams(rawParams);
 
-    const safeParseInt = (value: string | undefined, min?: number, max?: number, defaultVal?: number): number => {
-        if (!value) return defaultVal ?? 1;
-        const parsed = parseInt(value, 10);
-        if (isNaN(parsed)) return defaultVal ?? 1;
-        if (min !== undefined && parsed < min) return min;
-        if (max !== undefined && parsed > max) return max;
-        return parsed;
-    };
+    // Critical data - let errors bubble up to error boundary
+    const paginatedResult = await getListingsPaginated({ ...filterParams, page: requestedPage, limit: ITEMS_PER_PAGE });
 
-    // Validate date format (YYYY-MM-DD) and ensure it's a valid date
-    const safeParseDate = (value: string | undefined): string | undefined => {
-        if (!value) return undefined;
-        // Check format matches YYYY-MM-DD
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
-        // Check if it's a valid date
-        const date = new Date(value);
-        if (isNaN(date.getTime())) return undefined;
-        // Don't allow dates more than 2 years in the future
-        const maxDate = new Date();
-        maxDate.setFullYear(maxDate.getFullYear() + 2);
-        if (date > maxDate) return undefined;
-        return value;
-    };
-
-    // Validate page number (will be clamped after we know totalPages)
-    const requestedPage = safeParseInt(page, 1, undefined, 1);
-
-    // Validate price range (non-negative, auto-swap if needed)
-    let validMinPrice = safeParseFloat(minPrice, 0);
-    let validMaxPrice = safeParseFloat(maxPrice, 0);
-
-    // Auto-swap if min > max
-    if (validMinPrice !== undefined && validMaxPrice !== undefined && validMinPrice > validMaxPrice) {
-        [validMinPrice, validMaxPrice] = [validMaxPrice, validMinPrice];
-    }
-
-    // Validate coordinates (latitude: -90 to 90, longitude: -180 to 180)
-    const validLat = safeParseFloat(lat, -90, 90);
-    const validLng = safeParseFloat(lng, -180, 180);
-    const validMinLat = safeParseFloat(minLat, -90, 90);
-    const validMaxLat = safeParseFloat(maxLat, -90, 90);
-    const validMinLng = safeParseFloat(minLng, -180, 180);
-    const validMaxLng = safeParseFloat(maxLng, -180, 180);
-
-    const amenitiesList = typeof amenities === 'string' ? [amenities] : amenities;
-    const houseRulesList = typeof houseRules === 'string' ? [houseRules] : houseRules;
-
-    // Parse languages: support both ?languages=en,te AND ?languages=en&languages=te
-    // Includes deduplication to avoid ['en','en','te']
-    const languagesList = (() => {
-        const list = typeof languages === 'string'
-            ? languages.split(',')
-            : Array.isArray(languages)
-                ? languages.flatMap(v => String(v).split(','))
-                : [];
-        const normalized = list.map(s => s.trim().toLowerCase()).filter(Boolean);
-        return Array.from(new Set(normalized)); // Dedupe
-    })();
-
-    // Calculate bounds from either explicit bounds or from center coordinates
-    let bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number } | undefined;
-
-    if (validMinLat !== undefined && validMaxLat !== undefined && validMinLng !== undefined && validMaxLng !== undefined) {
-        // Use explicit bounds from map movement
-        bounds = {
-            minLat: validMinLat,
-            maxLat: validMaxLat,
-            minLng: validMinLng,
-            maxLng: validMaxLng
-        };
-    } else if (validLat !== undefined && validLng !== undefined) {
-        // Create bounds around the selected location (approximately 10km radius)
-        const centerLat = validLat;
-        const centerLng = validLng;
-        const latOffset = 0.09; // ~10km in latitude
-
-        // Adjust longitude offset based on latitude (corrects for Earth's curvature)
-        // At equator, 1° longitude = ~111km. At higher latitudes, it gets shorter.
-        // lngOffset = latOffset / cos(latitude)
-        const lngOffset = 0.09 / Math.cos(centerLat * Math.PI / 180);
-
-        bounds = {
-            minLat: centerLat - latOffset,
-            maxLat: centerLat + latOffset,
-            minLng: centerLng - lngOffset,
-            maxLng: centerLng + lngOffset
-        };
-    }
-
-    // Validate sort option
-    const validSortOptions: SortOption[] = ['recommended', 'price_asc', 'price_desc', 'newest', 'rating'];
-    const sortOption: SortOption = validSortOptions.includes(sort as SortOption) ? (sort as SortOption) : 'recommended';
-
-    // Validate moveInDate format
-    const validMoveInDate = safeParseDate(moveInDate);
-
-    const filterParams = {
-        query: q,
-        minPrice: validMinPrice,
-        maxPrice: validMaxPrice,
-        amenities: amenitiesList,
-        moveInDate: validMoveInDate,
-        leaseDuration,
-        houseRules: houseRulesList,
-        languages: languagesList.length > 0 ? languagesList : undefined,
-        roomType,
-        bounds,
-        sort: sortOption
-    };
-
-    const [paginatedResult, mapListings, savedListingIds] = await Promise.all([
-        getListingsPaginated({ ...filterParams, page: requestedPage, limit: ITEMS_PER_PAGE }),
+    // Non-critical data - graceful degradation with Promise.allSettled
+    const [mapResult, savedResult] = await Promise.allSettled([
         getMapListings(filterParams), // Optimized for map - SQL-level bounds, minimal fields, LIMIT 200
         userId ? getSavedListingIds(userId) : Promise.resolve([])
     ]);
 
-    const { items: listings, total, totalPages } = paginatedResult;
+    // Handle map data with graceful fallback
+    let mapListings: MapListingData[] = [];
+    let mapError: { message: string; retryable: boolean } | null = null;
+    if (mapResult.status === 'fulfilled') {
+        mapListings = mapResult.value;
+    } else {
+        if (isDataError(mapResult.reason)) {
+            mapResult.reason.log({ route: '/search', phase: 'mapListings' });
+            mapError = {
+                message: 'Map data temporarily unavailable',
+                retryable: mapResult.reason.retryable
+            };
+        } else {
+            mapError = { message: 'Map data temporarily unavailable', retryable: true };
+        }
+    }
 
-    // Clamp current page to valid range (after we know totalPages)
-    const currentPage = Math.max(1, Math.min(requestedPage, totalPages || 1));
+    // Handle saved listings with graceful fallback
+    const savedListingIds = savedResult.status === 'fulfilled' ? savedResult.value : [];
+
+    const { items: listings, total, totalPages, page: currentPage } = paginatedResult;
 
     // Analyze filter impact when there are no results
     const filterSuggestions = total === 0 ? await analyzeFilterImpact(filterParams) : [];
@@ -292,7 +225,19 @@ export default async function SearchPage({
         </div>
     );
 
-    const mapContent = <DynamicMap listings={mapListings} />;
+    const mapContent = (
+        <div className="relative h-full">
+            {mapError && (
+                <div className="absolute top-4 left-4 right-4 z-10">
+                    <SearchErrorBanner
+                        message={mapError.message}
+                        retryable={mapError.retryable}
+                    />
+                </div>
+            )}
+            <DynamicMap listings={mapListings} />
+        </div>
+    );
 
     return (
         <div className="h-screen-safe flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-20">

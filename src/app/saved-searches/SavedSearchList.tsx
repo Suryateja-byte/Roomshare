@@ -65,10 +65,10 @@ export default function SavedSearchList({ initialSearches }: SavedSearchListProp
     const formatFilters = (filters: SearchFilters): string => {
         const parts: string[] = [];
 
-        if (filters.minPrice || filters.maxPrice) {
+        if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
             const range = [
-                filters.minPrice ? `$${filters.minPrice}` : 'Any',
-                filters.maxPrice ? `$${filters.maxPrice}` : 'Any'
+                filters.minPrice !== undefined ? `$${filters.minPrice}` : 'Any',
+                filters.maxPrice !== undefined ? `$${filters.maxPrice}` : 'Any'
             ].join(' - ');
             parts.push(`Price: ${range}`);
         }

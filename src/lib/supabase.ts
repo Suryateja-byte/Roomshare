@@ -84,3 +84,19 @@ export async function trackPresence(
         }
     }
 }
+
+// Helper to safely remove a channel with error handling
+// This prevents "Cannot read properties of undefined (reading 'send')" errors
+// that can occur during HMR or navigation when WebSocket is already closed
+export function safeRemoveChannel(channel: RealtimeChannel | null): void {
+    if (!channel || !supabase) return;
+    try {
+        supabase.removeChannel(channel);
+    } catch (error) {
+        // Silently handle errors during channel cleanup
+        // This can occur during Turbopack HMR or navigation when WebSocket is already closed
+        if (process.env.NODE_ENV !== 'production') {
+            console.debug('[SUPABASE] Channel removal error (safe to ignore):', error);
+        }
+    }
+}

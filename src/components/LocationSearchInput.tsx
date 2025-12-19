@@ -43,11 +43,16 @@ export default function LocationSearchInput({
     const [noResults, setNoResults] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
+    const requestIdRef = useRef(0);
+    const abortRef = useRef<AbortController | null>(null);
 
     const [debouncedValue] = useDebounce(value, 300);
 
     // Fetch suggestions from Mapbox Geocoding API
     const fetchSuggestions = useCallback(async (query: string) => {
+        const requestId = requestIdRef.current + 1;
+        requestIdRef.current = requestId;
+
         // Reset states
         setError(null);
         setNoResults(false);
@@ -64,13 +69,19 @@ export default function LocationSearchInput({
             return;
         }
 
+        if (abortRef.current) {
+            abortRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         setIsLoading(true);
         try {
             const encodedQuery = encodeURIComponent(query);
             // Focus on places, regions, localities, neighborhoods
             const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${token}&types=place,locality,neighborhood,address,region&limit=5&autocomplete=true`;
 
-            const response = await fetch(url);
+            const response = await fetch(url, { signal: controller.signal });
 
             if (!response.ok) {
                 if (response.status === 401 || response.status === 403) {
@@ -82,6 +93,7 @@ export default function LocationSearchInput({
             }
 
             const data = await response.json();
+            if (requestId !== requestIdRef.current) return;
             const features = data.features || [];
             setSuggestions(features);
             setSelectedIndex(-1);
@@ -91,11 +103,18 @@ export default function LocationSearchInput({
                 setNoResults(true);
             }
         } catch (err) {
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                return;
+            }
             console.error('Error fetching location suggestions:', err);
-            setSuggestions([]);
-            setError(err instanceof Error ? err.message : 'Unable to search locations');
+            if (requestId === requestIdRef.current) {
+                setSuggestions([]);
+                setError(err instanceof Error ? err.message : 'Unable to search locations');
+            }
         } finally {
-            setIsLoading(false);
+            if (requestId === requestIdRef.current) {
+                setIsLoading(false);
+            }
         }
     }, []);
 

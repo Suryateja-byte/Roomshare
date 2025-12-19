@@ -159,22 +159,31 @@ export const LEGACY_NAME_TO_CODE: Record<string, LanguageCode> = {
   Urdu: 'ur',
 };
 
+const LEGACY_NAME_TO_CODE_LOWER: Record<string, LanguageCode> = Object.fromEntries(
+  Object.entries(LEGACY_NAME_TO_CODE).map(([name, code]) => [name.toLowerCase(), code])
+);
+
 /**
  * Convert a language (code or legacy name) to its code
  * Returns the input if no mapping found
  */
 export function toLanguageCode(input: string): string {
+  const normalized = input.trim();
+  if (!normalized) {
+    return normalized;
+  }
+  const lower = normalized.toLowerCase();
   // Already a valid code
-  if (isValidLanguageCode(input)) {
-    return input;
+  if (isValidLanguageCode(lower)) {
+    return lower;
   }
   // Try legacy name mapping
-  const code = LEGACY_NAME_TO_CODE[input];
+  const code = LEGACY_NAME_TO_CODE[normalized] ?? LEGACY_NAME_TO_CODE_LOWER[lower];
   if (code) {
     return code;
   }
   // Return as-is (unknown language)
-  return input;
+  return normalized;
 }
 
 /**

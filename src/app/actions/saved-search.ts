@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import type { SearchFilters } from '@/lib/search-utils';
+import { validateSearchFilters } from '@/lib/search-params';
 import type { Prisma } from '@prisma/client';
 import { logger } from '@/lib/logger';
 
@@ -32,12 +33,15 @@ export async function saveSearch(input: SaveSearchInput) {
             return { error: 'You can only save up to 10 searches. Please delete some to save new ones.' };
         }
 
+        // Validate filters before storing (prevents malicious/malformed data)
+        const validatedFilters = validateSearchFilters(input.filters);
+
         const savedSearch = await prisma.savedSearch.create({
             data: {
                 userId: session.user.id,
                 name: input.name,
-                query: input.filters.query,
-                filters: input.filters as Prisma.InputJsonValue,
+                query: validatedFilters.query,
+                filters: validatedFilters as Prisma.InputJsonValue,
                 alertEnabled: input.alertEnabled ?? true,
                 alertFrequency: input.alertFrequency ?? 'DAILY'
             }

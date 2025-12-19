@@ -89,11 +89,11 @@ describe('SaveSearchButton', () => {
     await waitFor(() => {
       expect(mockSaveSearch).toHaveBeenCalledWith({
         name: 'apartment - $500-$1500',
-        filters: {
+        filters: expect.objectContaining({
           query: 'apartment',
           minPrice: 500,
           maxPrice: 1500,
-        },
+        }),
         alertEnabled: true,
         alertFrequency: 'DAILY',
       })

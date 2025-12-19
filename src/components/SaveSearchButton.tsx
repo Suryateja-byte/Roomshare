@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { saveSearch } from '@/app/actions/saved-search';
 import type { SearchFilters } from '@/lib/search-utils';
+import { parseSearchParams, type RawSearchParams } from '@/lib/search-params';
 import { Bookmark, Loader2, X, Bell, BellOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 
 interface SaveSearchButtonProps {
     className?: string;
@@ -21,29 +22,56 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const searchParams = useSearchParams();
-    const router = useRouter();
 
-    // Get current filters from URL
+    // Get current filters from URL using centralized validation
     const getCurrentFilters = (): SearchFilters => {
+        // Build RawSearchParams from URL
+        const raw: RawSearchParams = {
+            q: searchParams.get('q') ?? undefined,
+            minPrice: searchParams.get('minPrice') ?? undefined,
+            maxPrice: searchParams.get('maxPrice') ?? undefined,
+            amenities: searchParams.getAll('amenities'),
+            moveInDate: searchParams.get('moveInDate') ?? undefined,
+            leaseDuration: searchParams.get('leaseDuration') ?? undefined,
+            houseRules: searchParams.getAll('houseRules'),
+            roomType: searchParams.get('roomType') ?? undefined,
+            languages: searchParams.getAll('languages'),
+            genderPreference: searchParams.get('genderPreference') ?? undefined,
+            householdGender: searchParams.get('householdGender') ?? undefined,
+            lat: searchParams.get('lat') ?? undefined,
+            lng: searchParams.get('lng') ?? undefined,
+            minLat: searchParams.get('minLat') ?? undefined,
+            maxLat: searchParams.get('maxLat') ?? undefined,
+            minLng: searchParams.get('minLng') ?? undefined,
+            maxLng: searchParams.get('maxLng') ?? undefined,
+            sort: searchParams.get('sort') ?? undefined,
+        };
+
+        // Use centralized parser for validation (MAX_SAFE_PRICE, date validation, allowlists, etc.)
+        const parsed = parseSearchParams(raw);
+        const fp = parsed.filterParams;
+
+        // Convert FilterParams to SearchFilters format
         const filters: SearchFilters = {};
-
-        const q = searchParams.get('q');
-        const minPrice = searchParams.get('minPrice');
-        const maxPrice = searchParams.get('maxPrice');
-        const amenities = searchParams.get('amenities');
-        const moveInDate = searchParams.get('moveInDate');
-        const leaseDuration = searchParams.get('leaseDuration');
-        const houseRules = searchParams.get('houseRules');
-        const roomType = searchParams.get('roomType');
-
-        if (q) filters.query = q;
-        if (minPrice) filters.minPrice = parseFloat(minPrice);
-        if (maxPrice) filters.maxPrice = parseFloat(maxPrice);
-        if (amenities) filters.amenities = amenities.split(',');
-        if (moveInDate) filters.moveInDate = moveInDate;
-        if (leaseDuration) filters.leaseDuration = leaseDuration;
-        if (houseRules) filters.houseRules = houseRules.split(',');
-        if (roomType) filters.roomType = roomType;
+        if (fp.query) filters.query = fp.query;
+        if (fp.minPrice !== undefined) filters.minPrice = fp.minPrice;
+        if (fp.maxPrice !== undefined) filters.maxPrice = fp.maxPrice;
+        if (fp.amenities) filters.amenities = fp.amenities;
+        if (fp.moveInDate) filters.moveInDate = fp.moveInDate;
+        if (fp.leaseDuration) filters.leaseDuration = fp.leaseDuration;
+        if (fp.houseRules) filters.houseRules = fp.houseRules;
+        if (fp.roomType) filters.roomType = fp.roomType;
+        if (fp.languages) filters.languages = fp.languages;
+        if (fp.genderPreference) filters.genderPreference = fp.genderPreference;
+        if (fp.householdGender) filters.householdGender = fp.householdGender;
+        if (fp.sort) filters.sort = fp.sort;
+        // Convert bounds back to flat coordinate fields for SearchFilters
+        if (fp.bounds) {
+            filters.minLat = fp.bounds.minLat;
+            filters.maxLat = fp.bounds.maxLat;
+            filters.minLng = fp.bounds.minLng;
+            filters.maxLng = fp.bounds.maxLng;
+        }
 
         return filters;
     };
@@ -55,10 +83,10 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
 
         if (filters.query) parts.push(filters.query);
         if (filters.roomType) parts.push(filters.roomType.replace('_', ' '));
-        if (filters.minPrice || filters.maxPrice) {
+        if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
             const priceRange = [
-                filters.minPrice ? `$${filters.minPrice}` : '',
-                filters.maxPrice ? `$${filters.maxPrice}` : ''
+                filters.minPrice !== undefined ? `$${filters.minPrice}` : '',
+                filters.maxPrice !== undefined ? `$${filters.maxPrice}` : ''
             ].filter(Boolean).join('-');
             if (priceRange) parts.push(priceRange);
         }
