@@ -70,7 +70,15 @@
       "Bash(echo:*)",
       "Bash(exit 0)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(npx ts-node:*)",
+      "mcp__playwright__browser_close",
+      "Bash(node_modules/.bin/next-auth --version)",
+      "Bash(for:*)",
+      "Bash(do if curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/api/health/live)",
+      "Bash(then echo \"Server is ready on port 3000\")",
+      "WebFetch(domain:visgl.github.io)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": [],
     "ask": []

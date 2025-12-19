@@ -19,10 +19,10 @@ interface MarkerPosition {
 }
 
 // Cluster layer - circles for grouped markers
+// Note: No 'source' property - Layer inherits from parent Source component
 const clusterLayer: LayerProps = {
     id: 'clusters',
     type: 'circle',
-    source: 'listings',
     filter: ['has', 'point_count'],
     paint: {
         'circle-color': '#18181b',
@@ -40,7 +40,6 @@ const clusterLayer: LayerProps = {
 const clusterLayerDark: LayerProps = {
     id: 'clusters-dark',
     type: 'circle',
-    source: 'listings',
     filter: ['has', 'point_count'],
     paint: {
         'circle-color': '#ffffff',
@@ -58,7 +57,6 @@ const clusterLayerDark: LayerProps = {
 const clusterCountLayer: LayerProps = {
     id: 'cluster-count',
     type: 'symbol',
-    source: 'listings',
     filter: ['has', 'point_count'],
     layout: {
         'text-field': '{point_count_abbreviated}',
@@ -72,7 +70,6 @@ const clusterCountLayer: LayerProps = {
 const clusterCountLayerDark: LayerProps = {
     id: 'cluster-count-dark',
     type: 'symbol',
-    source: 'listings',
     filter: ['has', 'point_count'],
     layout: {
         'text-field': '{point_count_abbreviated}',
@@ -153,15 +150,21 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
         const clusterId = feature.properties?.cluster_id;
         if (!clusterId) return;
 
-        const mapboxSource = mapRef.current.getSource('listings') as GeoJSONSource;
-        mapboxSource.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
-            if (err || !feature.geometry || feature.geometry.type !== 'Point') return;
-            mapRef.current?.flyTo({
-                center: feature.geometry.coordinates as [number, number],
-                zoom: zoom,
-                duration: 500
+        const mapboxSource = mapRef.current.getSource('listings') as GeoJSONSource | undefined;
+        if (!mapboxSource) return;
+
+        try {
+            mapboxSource.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
+                if (err || !feature.geometry || feature.geometry.type !== 'Point') return;
+                mapRef.current?.flyTo({
+                    center: feature.geometry.coordinates as [number, number],
+                    zoom: zoom,
+                    duration: 500
+                });
             });
-        });
+        } catch (error) {
+            console.warn('Cluster expansion failed', error);
+        }
     }, []);
 
     // Update unclustered listings when map moves
@@ -169,7 +172,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
         if (!mapRef.current || !useClustering) return;
 
         const map = mapRef.current.getMap();
-        if (!map) return;
+        if (!map || !map.getSource('listings')) return;
 
         const features = map.querySourceFeatures('listings', {
             filter: ['!', ['has', 'point_count']]
@@ -335,7 +338,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                 style={{ width: '100%', height: '100%' }}
                 mapStyle={isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v11"}
             >
-                {/* Clustering Source and Layers - only when many listings */}
+                {/* Clustering Source and Layers - Layer nested inside Source inherits source automatically */}
                 {useClustering && (
                     <Source
                         id="listings"
@@ -345,17 +348,10 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                         clusterMaxZoom={14}
                         clusterRadius={50}
                     >
-                        {isDarkMode ? (
-                            <>
-                                <Layer {...clusterLayerDark} />
-                                <Layer {...clusterCountLayerDark} />
-                            </>
-                        ) : (
-                            <>
-                                <Layer {...clusterLayer} />
-                                <Layer {...clusterCountLayer} />
-                            </>
-                        )}
+                        {isDarkMode && <Layer {...clusterLayerDark} />}
+                        {isDarkMode && <Layer {...clusterCountLayerDark} />}
+                        {!isDarkMode && <Layer {...clusterLayer} />}
+                        {!isDarkMode && <Layer {...clusterCountLayer} />}
                     </Source>
                 )}
 

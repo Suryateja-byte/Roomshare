@@ -111,8 +111,8 @@ async function networkFirst(request) {
   try {
     const networkResponse = await fetch(request);
 
-    // Cache successful responses
-    if (networkResponse.ok) {
+    // Cache successful responses (skip opaque cross-origin responses that can't be cloned)
+    if (networkResponse.ok && networkResponse.type !== 'opaque') {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, networkResponse.clone());
     }
@@ -151,7 +151,8 @@ async function cacheFirst(request) {
   try {
     const networkResponse = await fetch(request);
 
-    if (networkResponse.ok) {
+    // Only cache responses that can be cloned (not opaque cross-origin responses)
+    if (networkResponse.ok && networkResponse.type !== 'opaque') {
       const cache = await caches.open(STATIC_CACHE);
       cache.put(request, networkResponse.clone());
     }
@@ -170,12 +171,21 @@ async function staleWhileRevalidate(request) {
   const cachedResponse = await caches.match(request);
 
   const networkPromise = fetch(request).then((networkResponse) => {
-    if (networkResponse.ok) {
+    // Clone BEFORE any async operation to prevent body consumption race condition
+    // The clone must happen synchronously before return, not inside nested .then()
+    if (networkResponse.ok && networkResponse.type !== 'opaque') {
+      const responseToCache = networkResponse.clone();
       caches.open(DYNAMIC_CACHE).then((cache) => {
-        cache.put(request, networkResponse.clone());
+        cache.put(request, responseToCache);
       });
     }
     return networkResponse;
+  }).catch((error) => {
+    // Network failed, return cached response or re-throw
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    throw error;
   });
 
   return cachedResponse || networkPromise;

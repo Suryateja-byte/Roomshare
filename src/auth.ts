@@ -35,6 +35,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 session.user.id = token.sub
                 session.user.emailVerified = token.emailVerified as Date | null
                 session.user.isAdmin = token.isAdmin as boolean
+                // Include image from token (refreshed from DB on each request)
+                if (token.image) {
+                    session.user.image = token.image as string
+                }
             }
             return session
         },
@@ -43,16 +47,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 token.sub = user.id
                 token.emailVerified = user.emailVerified
                 token.isAdmin = user.isAdmin
+                token.image = user.image
             }
-            // Refresh emailVerified status on update
-            if (trigger === 'update' && token.sub) {
+            // Refresh user data from database on update or periodically
+            // This ensures profile picture changes are reflected in the session
+            if (token.sub) {
                 const dbUser = await prisma.user.findUnique({
                     where: { id: token.sub },
-                    select: { emailVerified: true, isAdmin: true }
+                    select: { emailVerified: true, isAdmin: true, image: true, name: true }
                 })
                 if (dbUser) {
                     token.emailVerified = dbUser.emailVerified
                     token.isAdmin = dbUser.isAdmin
+                    token.image = dbUser.image
+                    token.name = dbUser.name
                 }
             }
             return token

@@ -46,6 +46,32 @@ describe('UserAvatar', () => {
       render(<UserAvatar />)
       expect(screen.queryByRole('img')).not.toBeInTheDocument()
     })
+
+    it('renders SVG when image is empty string', () => {
+      const { container } = render(<UserAvatar image="" />)
+      const svg = container.querySelector('svg')
+      expect(svg).toBeInTheDocument()
+    })
+
+    it('renders SVG when image is whitespace only', () => {
+      const { container } = render(<UserAvatar image="   " />)
+      const svg = container.querySelector('svg')
+      expect(svg).toBeInTheDocument()
+    })
+
+    it('renders initials when image is empty string but name is provided', () => {
+      const { container } = render(<UserAvatar image="" name="John Doe" />)
+      const svg = container.querySelector('svg')
+      expect(svg).not.toBeInTheDocument()
+      expect(container.textContent).toBe('J')
+    })
+
+    it('renders initials when image is invalid URL but name is provided', () => {
+      const { container } = render(<UserAvatar image="not-a-valid-url" name="Jane" />)
+      const svg = container.querySelector('svg')
+      expect(svg).not.toBeInTheDocument()
+      expect(container.textContent).toBe('J')
+    })
   })
 
   describe('sizes', () => {
@@ -152,11 +178,11 @@ describe('UserAvatar', () => {
       expect(svg).toHaveAttribute('viewBox', '0 0 24 24')
     })
 
-    it('SVG has width and height percentages', () => {
+    it('SVG has correct sizing classes', () => {
       const { container } = render(<UserAvatar />)
       const svg = container.querySelector('svg')
-      expect(svg).toHaveAttribute('width', '60%')
-      expect(svg).toHaveAttribute('height', '60%')
+      // lucide-react uses CSS classes for sizing
+      expect(svg).toHaveClass('w-[60%]', 'h-[60%]')
     })
 
     it('SVG contains circle and path elements', () => {

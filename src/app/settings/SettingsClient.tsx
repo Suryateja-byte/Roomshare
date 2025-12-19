@@ -13,6 +13,7 @@ import {
 } from '@/app/actions/settings';
 import { unblockUser } from '@/app/actions/block';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
+import UserAvatar from '@/components/UserAvatar';
 
 interface BlockedUserInfo {
     id: string;
@@ -290,19 +291,7 @@ export default function SettingsClient({
                             {blockedUsers.map((blocked) => (
                                 <li key={blocked.id} className="py-4 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        {blocked.user.image ? (
-                                            <img
-                                                src={blocked.user.image}
-                                                alt={blocked.user.name || 'User'}
-                                                className="w-10 h-10 rounded-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-10 h-10 bg-zinc-200 dark:bg-zinc-700 rounded-full flex items-center justify-center">
-                                                <span className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">
-                                                    {(blocked.user.name || 'U')[0].toUpperCase()}
-                                                </span>
-                                            </div>
-                                        )}
+                                        <UserAvatar image={blocked.user.image} name={blocked.user.name} size="md" />
                                         <div>
                                             <p className="font-medium text-zinc-900 dark:text-white">
                                                 {blocked.user.name || 'Unknown User'}

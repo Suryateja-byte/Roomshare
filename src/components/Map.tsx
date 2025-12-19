@@ -47,12 +47,11 @@ const MAP_COLORS = {
     zinc800: '#27272a',
 };
 
-
 // Cluster layer - circles for grouped markers
+// Note: No 'source' property - Layer inherits from parent Source component
 const clusterLayer: LayerProps = {
     id: 'clusters',
     type: 'circle',
-    source: 'listings',
     filter: ['has', 'point_count'],
     paint: {
         'circle-color': MAP_COLORS.zinc900, // zinc-900
@@ -73,7 +72,6 @@ const clusterLayer: LayerProps = {
 const clusterLayerDark: LayerProps = {
     id: 'clusters-dark',
     type: 'circle',
-    source: 'listings',
     filter: ['has', 'point_count'],
     paint: {
         'circle-color': MAP_COLORS.white,
@@ -94,7 +92,6 @@ const clusterLayerDark: LayerProps = {
 const clusterCountLayer: LayerProps = {
     id: 'cluster-count',
     type: 'symbol',
-    source: 'listings',
     filter: ['has', 'point_count'],
     layout: {
         'text-field': '{point_count_abbreviated}',
@@ -110,7 +107,6 @@ const clusterCountLayer: LayerProps = {
 const clusterCountLayerDark: LayerProps = {
     id: 'cluster-count-dark',
     type: 'symbol',
-    source: 'listings',
     filter: ['has', 'point_count'],
     layout: {
         'text-field': '{point_count_abbreviated}',
@@ -191,17 +187,22 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         const clusterId = feature.properties?.cluster_id;
         if (!clusterId) return;
 
-        const mapboxSource = mapRef.current.getSource('listings') as GeoJSONSource;
+        const mapboxSource = mapRef.current.getSource('listings') as GeoJSONSource | undefined;
+        if (!mapboxSource) return;
 
-        mapboxSource.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
-            if (err || !feature.geometry || feature.geometry.type !== 'Point') return;
+        try {
+            mapboxSource.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
+                if (err || !feature.geometry || feature.geometry.type !== 'Point') return;
 
-            mapRef.current?.flyTo({
-                center: feature.geometry.coordinates as [number, number],
-                zoom: zoom,
-                duration: 500
+                mapRef.current?.flyTo({
+                    center: feature.geometry.coordinates as [number, number],
+                    zoom: zoom,
+                    duration: 500
+                });
             });
-        });
+        } catch (error) {
+            console.warn('Cluster expansion failed', error);
+        }
     }, []);
 
     // Update unclustered listings when map moves (for rendering individual markers)
@@ -209,7 +210,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         if (!mapRef.current || !useClustering) return;
 
         const map = mapRef.current.getMap();
-        if (!map) return;
+        if (!map || !map.getSource('listings')) return;
 
         // Query for unclustered points (points without cluster)
         const features = map.querySourceFeatures('listings', {
@@ -514,9 +515,12 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 onIdle={() => setAreTilesLoading(false)}
                 onClick={useClustering ? onClusterClick : undefined}
                 interactiveLayerIds={useClustering ? [isDarkMode ? 'clusters-dark' : 'clusters'] : []}
-                onError={(e) => console.error('Map Error:', e)}
+                onError={(e) => {
+                    const error = (e as { error?: Error }).error;
+                    console.error('Map Error:', error?.message || 'Unknown map error', error?.stack);
+                }}
             >
-                {/* Clustering Source and Layers - only when many listings */}
+                {/* Clustering Source and Layers - Layer nested inside Source inherits source automatically */}
                 {useClustering && (
                     <Source
                         id="listings"
@@ -526,18 +530,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         clusterMaxZoom={14}
                         clusterRadius={50}
                     >
-                        {/* Show appropriate theme layers */}
-                        {isDarkMode ? (
-                            <>
-                                <Layer {...clusterLayerDark} />
-                                <Layer {...clusterCountLayerDark} />
-                            </>
-                        ) : (
-                            <>
-                                <Layer {...clusterLayer} />
-                                <Layer {...clusterCountLayer} />
-                            </>
-                        )}
+                        {isDarkMode && <Layer {...clusterLayerDark} />}
+                        {isDarkMode && <Layer {...clusterCountLayerDark} />}
+                        {!isDarkMode && <Layer {...clusterLayer} />}
+                        {!isDarkMode && <Layer {...clusterCountLayer} />}
                     </Source>
                 )}
 

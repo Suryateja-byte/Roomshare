@@ -85,8 +85,8 @@ const MenuItem = ({
     href?: string;
 }) => {
     const className = `w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${danger
-            ? 'text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
-            : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
+        ? 'text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
+        : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
         }`;
 
     const content = (
@@ -202,8 +202,8 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
     return (
         <nav
             className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-300 ease-in-out ${isScrolled
-                    ? 'py-3 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border-b border-zinc-200/80 dark:border-white/10 shadow-lg shadow-zinc-900/5 dark:shadow-black/20'
-                    : 'py-4 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-md'
+                ? 'py-3 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border-b border-zinc-200/80 dark:border-white/10 shadow-lg shadow-zinc-900/5 dark:shadow-black/20'
+                : 'py-4 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-md'
                 }`}
         >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -258,23 +258,13 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                                 <button
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                                     className={`flex items-center gap-2 p-1 pl-2 pr-1 rounded-full border transition-all ${isProfileOpen
-                                            ? 'border-indigo-500 ring-2 ring-indigo-100 dark:ring-indigo-900'
-                                            : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                                        ? 'border-indigo-500 ring-2 ring-indigo-100 dark:ring-indigo-900'
+                                        : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
                                         }`}
                                     aria-expanded={isProfileOpen}
                                     aria-haspopup="true"
                                 >
-                                    {user.image ? (
-                                        <img
-                                            src={user.image}
-                                            alt={user.name || 'User'}
-                                            className="w-8 h-8 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold text-sm">
-                                            {user.name?.charAt(0) || 'U'}
-                                        </div>
-                                    )}
+                                    <UserAvatar image={user.image} name={user.name} size="sm" />
                                     <ChevronDown
                                         size={14}
                                         className={`text-zinc-400 dark:text-zinc-500 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}
@@ -283,11 +273,10 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
 
                                 {/* Dropdown Menu - CSS animated for performance */}
                                 <div
-                                    className={`absolute right-0 mt-3 w-72 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden origin-top-right ring-1 ring-black/5 z-sticky transition-all duration-200 ease-out ${
-                                        isProfileOpen
+                                    className={`absolute right-0 mt-3 w-72 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden origin-top-right ring-1 ring-black/5 z-sticky transition-all duration-200 ease-out ${isProfileOpen
                                             ? 'opacity-100 translate-y-0 visible'
                                             : 'opacity-0 -translate-y-2 invisible pointer-events-none'
-                                    }`}
+                                        }`}
                                 >
                                     <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
                                         <p className="font-semibold text-zinc-900 dark:text-white">{user.name}</p>
@@ -348,120 +337,109 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
 
             {/* Mobile Menu - CSS animated with grid for height:auto animation */}
             <div
-                className={`md:hidden bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-white/5 overflow-hidden grid transition-all duration-300 ease-out ${
-                    isMobileMenuOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-                }`}
+                className={`md:hidden bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-white/5 overflow-hidden grid transition-all duration-300 ease-out ${isMobileMenuOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                    }`}
                 role="dialog"
                 aria-modal={isMobileMenuOpen}
                 aria-label="Navigation menu"
                 aria-hidden={!isMobileMenuOpen}
             >
                 <div className="overflow-hidden">
-                        <div className="px-6 py-4 space-y-4">
-                            {user ? (
-                                <div className="flex items-center gap-3 pb-4 border-b border-zinc-100 dark:border-zinc-800">
-                                    {user.image ? (
-                                        <img
-                                            src={user.image}
-                                            alt={user.name || 'User'}
-                                            className="w-10 h-10 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold">
-                                            {user.name?.charAt(0) || 'U'}
-                                        </div>
-                                    )}
-                                    <div>
-                                        <p className="font-semibold text-zinc-900 dark:text-white">{user.name}</p>
-                                        <Link href="/profile" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300" onClick={() => setIsMobileMenuOpen(false)}>
-                                            View Profile
-                                        </Link>
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            <Link
-                                href="/search"
-                                className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                <Search size={20} className="text-zinc-400 dark:text-zinc-500" /> Find a Room
-                            </Link>
-
-                            {user && (
-                                <>
-                                    <Link
-                                        href="/messages"
-                                        className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        <MessageSquare size={20} className="text-zinc-400 dark:text-zinc-500" />
-                                        Messages
-                                        {currentUnreadCount > 0 && (
-                                            <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                                                {currentUnreadCount > 9 ? '9+' : currentUnreadCount}
-                                            </span>
-                                        )}
-                                    </Link>
-                                    <Link
-                                        href="/bookings"
-                                        className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        <Calendar size={20} className="text-zinc-400 dark:text-zinc-500" /> Bookings
-                                    </Link>
-                                    <Link
-                                        href="/saved"
-                                        className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        <Heart size={20} className="text-zinc-400 dark:text-zinc-500" /> Saved Listings
-                                    </Link>
-                                </>
-                            )}
-
-                            <hr className="border-zinc-100 dark:border-zinc-800" />
-
-                            <Link href="/listings/create" onClick={() => setIsMobileMenuOpen(false)}>
-                                <Button className="w-full flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3 rounded-xl font-medium shadow-lg shadow-zinc-900/10 dark:shadow-white/10 h-auto hover:bg-zinc-800 dark:hover:bg-zinc-200">
-                                    <Plus size={18} />
-                                    List a Room
-                                </Button>
-                            </Link>
-
-                            {!user && (
-                                <div className="flex flex-col gap-2 pt-2">
-                                    <Link
-                                        href="/login"
-                                        className="w-full text-center text-zinc-600 dark:text-zinc-400 py-3 font-medium hover:text-zinc-900 dark:hover:text-white"
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        Log In
-                                    </Link>
-                                    <Link
-                                        href="/signup"
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        <Button className="w-full bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white py-3 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl h-auto">
-                                            Sign Up
-                                        </Button>
+                    <div className="px-6 py-4 space-y-4">
+                        {user ? (
+                            <div className="flex items-center gap-3 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                                <UserAvatar image={user.image} name={user.name} size="md" />
+                                <div>
+                                    <p className="font-semibold text-zinc-900 dark:text-white">{user.name}</p>
+                                    <Link href="/profile" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300" onClick={() => setIsMobileMenuOpen(false)}>
+                                        View Profile
                                     </Link>
                                 </div>
-                            )}
+                            </div>
+                        ) : null}
 
-                            {user && (
-                                <button
-                                    onClick={() => {
-                                        signOut();
-                                        setIsMobileMenuOpen(false);
-                                    }}
-                                    className="w-full flex items-center justify-center gap-2 text-red-600 dark:text-red-500 py-3 font-medium hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl mt-4"
+                        <Link
+                            href="/search"
+                            className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            <Search size={20} className="text-zinc-400 dark:text-zinc-500" /> Find a Room
+                        </Link>
+
+                        {user && (
+                            <>
+                                <Link
+                                    href="/messages"
+                                    className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
+                                    onClick={() => setIsMobileMenuOpen(false)}
                                 >
-                                    <LogOut size={18} />
-                                    Log out
-                                </button>
-                            )}
-                        </div>
+                                    <MessageSquare size={20} className="text-zinc-400 dark:text-zinc-500" />
+                                    Messages
+                                    {currentUnreadCount > 0 && (
+                                        <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                            {currentUnreadCount > 9 ? '9+' : currentUnreadCount}
+                                        </span>
+                                    )}
+                                </Link>
+                                <Link
+                                    href="/bookings"
+                                    className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <Calendar size={20} className="text-zinc-400 dark:text-zinc-500" /> Bookings
+                                </Link>
+                                <Link
+                                    href="/saved"
+                                    className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <Heart size={20} className="text-zinc-400 dark:text-zinc-500" /> Saved Listings
+                                </Link>
+                            </>
+                        )}
+
+                        <hr className="border-zinc-100 dark:border-zinc-800" />
+
+                        <Link href="/listings/create" onClick={() => setIsMobileMenuOpen(false)}>
+                            <Button className="w-full flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3 rounded-xl font-medium shadow-lg shadow-zinc-900/10 dark:shadow-white/10 h-auto hover:bg-zinc-800 dark:hover:bg-zinc-200">
+                                <Plus size={18} />
+                                List a Room
+                            </Button>
+                        </Link>
+
+                        {!user && (
+                            <div className="flex flex-col gap-2 pt-2">
+                                <Link
+                                    href="/login"
+                                    className="w-full text-center text-zinc-600 dark:text-zinc-400 py-3 font-medium hover:text-zinc-900 dark:hover:text-white"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    Log In
+                                </Link>
+                                <Link
+                                    href="/signup"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <Button className="w-full bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white py-3 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl h-auto">
+                                        Sign Up
+                                    </Button>
+                                </Link>
+                            </div>
+                        )}
+
+                        {user && (
+                            <button
+                                onClick={() => {
+                                    signOut();
+                                    setIsMobileMenuOpen(false);
+                                }}
+                                className="w-full flex items-center justify-center gap-2 text-red-600 dark:text-red-500 py-3 font-medium hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl mt-4"
+                            >
+                                <LogOut size={18} />
+                                Log out
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </nav>
