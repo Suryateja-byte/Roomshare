@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 
 import {
@@ -105,7 +105,7 @@ const MenuItem = ({
 
     if (href) {
         return (
-            <Link href={href} className={className}>
+            <Link href={href} className={className} onClick={onClick}>
                 {content}
             </Link>
         );
@@ -125,7 +125,12 @@ interface NavbarClientProps {
     unreadCount?: number;
 }
 
-export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProps) {
+export default function NavbarClient({ user: initialUser, unreadCount = 0 }: NavbarClientProps) {
+    const { data: session, status } = useSession();
+
+    // Use reactive session data, fall back to server props for SSR hydration
+    const user = status === 'loading' ? initialUser : (session?.user ?? initialUser);
+
     const [isScrolled, setIsScrolled] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -283,12 +288,12 @@ export default function NavbarClient({ user, unreadCount = 0 }: NavbarClientProp
                                         <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">{user.email}</p>
                                     </div>
                                     <div className="p-2 space-y-1">
-                                        <MenuItem icon={<User size={18} />} text="Profile" href="/profile" />
-                                        <MenuItem icon={<Calendar size={18} />} text="Bookings" href="/bookings" />
-                                        <MenuItem icon={<Heart size={18} />} text="Saved Listings" href="/saved" />
-                                        <MenuItem icon={<Clock size={18} />} text="Recently Viewed" href="/recently-viewed" />
+                                        <MenuItem icon={<User size={18} />} text="Profile" href="/profile" onClick={() => setIsProfileOpen(false)} />
+                                        <MenuItem icon={<Calendar size={18} />} text="Bookings" href="/bookings" onClick={() => setIsProfileOpen(false)} />
+                                        <MenuItem icon={<Heart size={18} />} text="Saved Listings" href="/saved" onClick={() => setIsProfileOpen(false)} />
+                                        <MenuItem icon={<Clock size={18} />} text="Recently Viewed" href="/recently-viewed" onClick={() => setIsProfileOpen(false)} />
                                         <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
-                                        <MenuItem icon={<Settings size={18} />} text="Settings" href="/settings" />
+                                        <MenuItem icon={<Settings size={18} />} text="Settings" href="/settings" onClick={() => setIsProfileOpen(false)} />
                                         <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
                                         <ThemeToggle variant="menu-item" />
                                         <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>

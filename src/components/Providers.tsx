@@ -13,7 +13,11 @@ interface ProvidersProps {
 
 export default function Providers({ children, session }: ProvidersProps) {
   return (
-    <SessionProvider session={session} refetchOnWindowFocus={false}>
+    <SessionProvider
+      session={session}
+      refetchOnWindowFocus={true}
+      refetchInterval={60} // Refresh session every 1 minute
+    >
       <ThemeProvider>
         {children}
         <Toaster position="top-center" richColors />

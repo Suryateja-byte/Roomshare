@@ -114,13 +114,88 @@ export async function changePassword(
     }
 }
 
-export async function deleteAccount(): Promise<{ success: boolean; error?: string }> {
+/**
+ * Verify user's password for sensitive operations
+ * Returns success if password is valid, error otherwise
+ */
+export async function verifyPassword(
+    password: string
+): Promise<{ success: boolean; error?: string }> {
     const session = await auth();
     if (!session?.user?.id) {
         return { success: false, error: 'Not authenticated' };
     }
 
     try {
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { password: true }
+        });
+
+        if (!user?.password) {
+            // OAuth-only account - allow action without password
+            // They can only be here if authenticated via OAuth
+            return { success: true };
+        }
+
+        const isValid = await bcrypt.compare(password, user.password);
+        if (!isValid) {
+            return { success: false, error: 'Password is incorrect' };
+        }
+
+        return { success: true };
+    } catch (error: unknown) {
+        logger.sync.error('Failed to verify password', {
+            action: 'verifyPassword',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return { success: false, error: 'Failed to verify password' };
+    }
+}
+
+/**
+ * Check if user has a password set (vs OAuth-only account)
+ */
+export async function hasPasswordSet(): Promise<boolean> {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return false;
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { password: true }
+    });
+
+    return !!user?.password;
+}
+
+export async function deleteAccount(
+    password?: string
+): Promise<{ success: boolean; error?: string }> {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return { success: false, error: 'Not authenticated' };
+    }
+
+    try {
+        // Verify password for accounts that have one
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { password: true }
+        });
+
+        if (user?.password) {
+            if (!password) {
+                return { success: false, error: 'Password is required to delete your account' };
+            }
+
+            const isValid = await bcrypt.compare(password, user.password);
+            if (!isValid) {
+                return { success: false, error: 'Password is incorrect' };
+            }
+        }
+
         // Delete user and all related data (cascading delete is set up in schema)
         await prisma.user.delete({
             where: { id: session.user.id }

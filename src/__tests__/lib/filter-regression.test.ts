@@ -20,6 +20,7 @@ import {
   CRITICAL_SCENARIOS,
   type FilterScenario,
   type FilterExecutor,
+  type GoldenScenario,
 } from '@/lib/filter-regression';
 import { normalizeFilters } from '@/lib/filter-schema';
 import { ACTIVE_LISTINGS, applyFilters } from '../fixtures/listings';
@@ -205,6 +206,8 @@ describe('Filter Regression Framework', () => {
         normalizedFilters: {
           // Manually set a different normalization result
           maxPrice: 9999,
+          page: 1,
+          limit: 12,
         },
         resultCount: 10,
         resultIds: [],
@@ -340,11 +343,11 @@ describe('Filter Regression Framework', () => {
     });
 
     it('detects mismatch in golden scenario', () => {
-      const golden = {
+      const golden: GoldenScenario = {
         name: 'test',
         description: 'Test scenario',
         input: { maxPrice: 2000 },
-        expectedNormalized: { maxPrice: 9999 }, // Wrong expected value
+        expectedNormalized: { maxPrice: 9999, page: 1, limit: 12 }, // Wrong expected value
       };
 
       const result = validateGoldenScenario(golden);

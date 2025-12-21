@@ -37,6 +37,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 session.user.id = token.sub
                 session.user.emailVerified = token.emailVerified as Date | null
                 session.user.isAdmin = token.isAdmin as boolean
+                session.user.isSuspended = token.isSuspended as boolean
                 // Include image from token (refreshed from DB on each request)
                 if (token.image) {
                     session.user.image = token.image as string
@@ -50,23 +51,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 token.sub = user.id
                 token.emailVerified = user.emailVerified
                 token.isAdmin = user.isAdmin
+                token.isSuspended = user.isSuspended
                 token.image = user.image
                 token.name = user.name
             }
 
-            // Only refresh from DB when explicitly triggered (e.g., after profile update)
-            // OR on first sign-in (when account exists)
-            // This prevents database queries on every single request which can cause
-            // session invalidation during rapid OAuth flows
-            if (trigger === "update" || account) {
+            // Refresh from DB on sign-in, explicit update, or first OAuth link
+            // This ensures fresh user data after account switching
+            if (trigger === "signIn" || trigger === "update" || account) {
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: token.sub as string },
-                        select: { emailVerified: true, isAdmin: true, image: true, name: true }
+                        select: { emailVerified: true, isAdmin: true, isSuspended: true, image: true, name: true }
                     })
                     if (dbUser) {
                         token.emailVerified = dbUser.emailVerified
                         token.isAdmin = dbUser.isAdmin
+                        token.isSuspended = dbUser.isSuspended
                         token.image = dbUser.image
                         token.name = dbUser.name
                     }
@@ -78,16 +79,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return token
         },
         async signIn({ user, account, profile }) {
+            // Check Google email verification
             if (account?.provider === "google") {
-                // Check if email is verified by Google
-                // This is important for security when allowDangerousEmailAccountLinking is enabled
                 const googleProfile = profile as { email_verified?: boolean }
                 if (!googleProfile?.email_verified) {
                     return '/login?error=EmailNotVerified'
                 }
-                return true
             }
-            return true
+
+            // Check suspension status for ALL providers (credentials and OAuth)
+            // Always check database to ensure we have the latest suspension status
+            if (user?.email) {
+                const dbUser = await prisma.user.findUnique({
+                    where: { email: user.email },
+                    select: { isSuspended: true }
+                });
+
+                if (dbUser?.isSuspended) {
+                    return '/login?error=AccountSuspended';
+                }
+            }
+
+            return true;
         },
         authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user;

@@ -10,6 +10,7 @@ export const mockUser = {
   image: '/avatar.jpg',
   emailVerified: null as Date | null,
   isAdmin: false,
+  isSuspended: false,
 }
 
 export const mockSession = {

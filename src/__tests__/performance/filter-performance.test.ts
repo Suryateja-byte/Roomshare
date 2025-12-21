@@ -325,7 +325,7 @@ describe('DoS/ReDoS Protection', () => {
 
       // Should complete quickly and truncate
       expect(elapsed).toBeLessThan(500);
-      expect(result.amenities.length).toBeLessThan(1000);
+      expect(result.amenities?.length ?? 0).toBeLessThan(1000);
     });
   });
 });
@@ -423,7 +423,7 @@ describe('Input Validation Stress Tests', () => {
       });
 
       // Should filter to only valid strings
-      expect(result.amenities.every((a) => typeof a === 'string')).toBe(true);
+      expect(result.amenities?.every((a) => typeof a === 'string') ?? true).toBe(true);
     });
 
     it('handles arrays with duplicate values', () => {
@@ -432,8 +432,9 @@ describe('Input Validation Stress Tests', () => {
       });
 
       // Should deduplicate
-      const uniqueCount = new Set(result.amenities.map((a) => a.toLowerCase())).size;
-      expect(result.amenities.length).toBeLessThanOrEqual(uniqueCount + 1);
+      const amenities = result.amenities ?? [];
+      const uniqueCount = new Set(amenities.map((a) => a.toLowerCase())).size;
+      expect(amenities.length).toBeLessThanOrEqual(uniqueCount + 1);
     });
 
     it('handles arrays with whitespace strings', () => {
@@ -442,7 +443,7 @@ describe('Input Validation Stress Tests', () => {
       });
 
       // Should filter empty strings and trim others
-      result.amenities.forEach((a) => {
+      (result.amenities ?? []).forEach((a) => {
         expect(a.trim()).toBe(a);
         expect(a.length).toBeGreaterThan(0);
       });

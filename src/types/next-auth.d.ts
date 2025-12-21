@@ -7,6 +7,7 @@ declare module 'next-auth' {
             id: string;
             emailVerified: Date | null;
             isAdmin: boolean;
+            isSuspended: boolean;
         } & DefaultSession['user'];
     }
 
@@ -14,6 +15,7 @@ declare module 'next-auth' {
         id: string;
         emailVerified: Date | null;
         isAdmin: boolean;
+        isSuspended: boolean;
     }
 }
 
@@ -21,6 +23,7 @@ declare module 'next-auth/jwt' {
     interface JWT extends DefaultJWT {
         emailVerified?: Date | null;
         isAdmin?: boolean;
+        isSuspended?: boolean;
         image?: string | null;
     }
 }

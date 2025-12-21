@@ -6,7 +6,7 @@ import { supabase, createChatChannel, broadcastTyping, trackPresence, safeRemove
 import { sendMessage, getMessages } from '@/app/actions/chat';
 import { blockUser, unblockUser } from '@/app/actions/block';
 import { useRouter } from 'next/navigation';
-import { Send, Loader2, Check, CheckCheck, MoreVertical, Ban, ShieldOff, WifiOff } from 'lucide-react';
+import { Send, Loader2, Check, CheckCheck, MoreVertical, Ban, ShieldOff, WifiOff, AlertCircle, RotateCw } from 'lucide-react';
 import UserAvatar from '@/components/UserAvatar';
 import { useDebouncedCallback } from 'use-debounce';
 import { useBlockStatus } from '@/hooks/useBlockStatus';
@@ -39,6 +39,7 @@ type Message = {
     senderId: string;
     createdAt: Date;
     read?: boolean;
+    failed?: boolean;
     sender?: {
         name: string | null;
         image: string | null;
@@ -377,11 +378,9 @@ export default function ChatWindow({
 
             // Check for session expiry or other errors
             if (result && 'error' in result) {
-                // Remove optimistic message
-                setMessages(prev => prev.filter(m => m.id !== optimisticId));
-
                 if (result.code === 'SESSION_EXPIRED') {
-                    // Save draft before redirect
+                    // Remove optimistic message and save draft before redirect
+                    setMessages(prev => prev.filter(m => m.id !== optimisticId));
                     sessionStorage.setItem(`chat_draft_${conversationId}`, content);
                     toast.error('Your session has expired. Redirecting to login...');
                     router.push(`/login?callbackUrl=/messages/${conversationId}`);
@@ -390,13 +389,17 @@ export default function ChatWindow({
 
                 // Check for rate limit error
                 if (handleRateLimitError(result)) {
-                    // Restore the message to input so user doesn't lose it
+                    // Remove optimistic message and restore the message to input
+                    setMessages(prev => prev.filter(m => m.id !== optimisticId));
                     setInput(content);
                     return;
                 }
 
-                // Show other errors
-                toast.error(result.error || 'Failed to send message');
+                // Mark message as failed instead of removing it
+                setMessages(prev => prev.map(m =>
+                    m.id === optimisticId ? { ...m, failed: true } : m
+                ));
+                toast.error(result.error || 'Failed to send message. Tap to retry.');
                 return;
             }
 
@@ -407,13 +410,76 @@ export default function ChatWindow({
             lastMessageIdRef.current = result.id;
         } catch (error) {
             console.error('Failed to send message:', error);
-            // Remove optimistic message on error
-            setMessages(prev => prev.filter(m => m.id !== optimisticId));
-            toast.error('Failed to send message. Please try again.');
+            // Mark message as failed instead of removing it
+            setMessages(prev => prev.map(m =>
+                m.id === optimisticId ? { ...m, failed: true } : m
+            ));
+            toast.error('Failed to send message. Tap to retry.');
         } finally {
             setIsSending(false);
             inputRef.current?.focus();
         }
+    };
+
+    // Retry sending a failed message
+    const handleRetry = async (failedMessage: Message) => {
+        if (isSending || isRateLimited || isOffline) return;
+
+        const content = failedMessage.content;
+        const failedId = failedMessage.id;
+
+        // Mark as sending (remove failed status)
+        setMessages(prev => prev.map(m =>
+            m.id === failedId ? { ...m, failed: false } : m
+        ));
+        setIsSending(true);
+
+        try {
+            const result = await sendMessage(conversationId, content);
+
+            if (result && 'error' in result) {
+                if (result.code === 'SESSION_EXPIRED') {
+                    setMessages(prev => prev.filter(m => m.id !== failedId));
+                    sessionStorage.setItem(`chat_draft_${conversationId}`, content);
+                    toast.error('Your session has expired. Redirecting to login...');
+                    router.push(`/login?callbackUrl=/messages/${conversationId}`);
+                    return;
+                }
+
+                if (handleRateLimitError(result)) {
+                    setMessages(prev => prev.filter(m => m.id !== failedId));
+                    setInput(content);
+                    return;
+                }
+
+                // Still failed - mark as failed again
+                setMessages(prev => prev.map(m =>
+                    m.id === failedId ? { ...m, failed: true } : m
+                ));
+                toast.error(result.error || 'Failed to send message. Tap to retry.');
+                return;
+            }
+
+            // Success - replace with real message
+            setMessages(prev => prev.map(m =>
+                m.id === failedId ? { ...result, sender: m.sender } : m
+            ));
+            lastMessageIdRef.current = result.id;
+            toast.success('Message sent');
+        } catch (error) {
+            console.error('Failed to retry message:', error);
+            setMessages(prev => prev.map(m =>
+                m.id === failedId ? { ...m, failed: true } : m
+            ));
+            toast.error('Failed to send message. Tap to retry.');
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    // Delete a failed message
+    const handleDeleteFailed = (messageId: string) => {
+        setMessages(prev => prev.filter(m => m.id !== messageId));
     };
 
     // Group messages by date
@@ -566,21 +632,25 @@ export default function ChatWindow({
 
                                         <div
                                             className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${isMe
-                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-br-md'
+                                                ? msg.failed
+                                                    ? 'bg-red-900/80 dark:bg-red-100 text-white dark:text-red-900 rounded-br-md border-2 border-red-500'
+                                                    : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-br-md'
                                                 : 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 rounded-bl-md'
-                                                } ${isOptimistic ? 'opacity-70' : ''}`}
+                                                } ${isOptimistic && !msg.failed ? 'opacity-70' : ''}`}
                                         >
                                             <p className="text-sm leading-relaxed">{msg.content}</p>
                                             <div className={`flex items-center gap-1 mt-1 ${isMe ? 'justify-end' : ''}`}>
-                                                <span className={`text-2xs ${isMe ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                                                <span className={`text-2xs ${isMe ? (msg.failed ? 'text-red-300 dark:text-red-700' : 'text-zinc-400 dark:text-zinc-500') : 'text-zinc-400 dark:text-zinc-500'}`}>
                                                     {new Date(msg.createdAt).toLocaleTimeString([], {
                                                         hour: '2-digit',
                                                         minute: '2-digit'
                                                     })}
                                                 </span>
                                                 {isMe && (
-                                                    <span className="text-zinc-400 dark:text-zinc-500">
-                                                        {isOptimistic ? (
+                                                    <span className={msg.failed ? 'text-red-400 dark:text-red-600' : 'text-zinc-400 dark:text-zinc-500'}>
+                                                        {msg.failed ? (
+                                                            <AlertCircle className="w-3 h-3" />
+                                                        ) : isOptimistic ? (
                                                             <Loader2 className="w-3 h-3 animate-spin" />
                                                         ) : msg.read ? (
                                                             <CheckCheck className="w-3 h-3 text-blue-400" />
@@ -590,6 +660,26 @@ export default function ChatWindow({
                                                     </span>
                                                 )}
                                             </div>
+                                            {/* Failed message actions */}
+                                            {msg.failed && (
+                                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-red-400/30">
+                                                    <button
+                                                        onClick={() => handleRetry(msg)}
+                                                        disabled={isSending || isOffline}
+                                                        className="flex items-center gap-1 text-xs text-white dark:text-red-900 hover:text-red-200 dark:hover:text-red-700 disabled:opacity-50 transition-colors"
+                                                    >
+                                                        <RotateCw className="w-3 h-3" />
+                                                        Retry
+                                                    </button>
+                                                    <span className="text-red-400/50">|</span>
+                                                    <button
+                                                        onClick={() => handleDeleteFailed(msg.id)}
+                                                        className="text-xs text-white dark:text-red-900 hover:text-red-200 dark:hover:text-red-700 transition-colors"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 );

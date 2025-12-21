@@ -14,6 +14,7 @@ import {
 import { unblockUser } from '@/app/actions/block';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 import UserAvatar from '@/components/UserAvatar';
+import { PasswordConfirmationModal } from '@/components/auth/PasswordConfirmationModal';
 
 interface BlockedUserInfo {
     id: string;
@@ -60,6 +61,7 @@ export default function SettingsClient({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [deleting, setDeleting] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
 
     const handleToggle = (key: keyof NotificationPreferences) => {
         setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
@@ -109,9 +111,13 @@ export default function SettingsClient({
         }
     };
 
-    const handleDeleteAccount = async () => {
+    const handleDeleteClick = () => {
         if (deleteConfirmText !== 'DELETE') return;
+        // Show password confirmation modal before deletion
+        setShowPasswordModal(true);
+    };
 
+    const handleDeleteAccount = async () => {
         setDeleting(true);
         const result = await deleteAccount();
 
@@ -119,6 +125,7 @@ export default function SettingsClient({
             await signOut({ callbackUrl: '/' });
         } else {
             setDeleting(false);
+            setShowPasswordModal(false);
             toast.error(result.error || 'Failed to delete account');
         }
     };
@@ -381,7 +388,7 @@ export default function SettingsClient({
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={handleDeleteAccount}
+                                    onClick={handleDeleteClick}
                                     disabled={deleteConfirmText !== 'DELETE' || deleting}
                                     className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
@@ -393,6 +400,19 @@ export default function SettingsClient({
                     )}
                 </div>
             </section>
+
+            {/* Password Confirmation Modal for Account Deletion */}
+            <PasswordConfirmationModal
+                isOpen={showPasswordModal}
+                onClose={() => setShowPasswordModal(false)}
+                onConfirm={handleDeleteAccount}
+                title="Delete Account"
+                description="This action will permanently delete your account and all associated data. This cannot be undone."
+                confirmText="Delete My Account"
+                confirmVariant="destructive"
+                hasPassword={hasPassword}
+                isLoading={deleting}
+            />
         </div>
     );
 }

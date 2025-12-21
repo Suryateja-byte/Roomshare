@@ -6,14 +6,13 @@ import { Loader2, Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react
 import { signIn } from 'next-auth/react';
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getAuthErrorMessage } from '@/lib/auth-errors';
+import { AuthErrorAlert } from '@/components/auth/AuthErrorAlert';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 
 function SignUpForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const urlError = searchParams.get('error');
-    const oauthErrorMessage = getAuthErrorMessage(urlError);
 
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
@@ -119,10 +118,11 @@ function SignUpForm() {
                         <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm sm:text-base">Enter your details to get started.</p>
                     </div>
 
-                    {(error || oauthErrorMessage) && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl text-sm text-center">
-                            {error || oauthErrorMessage}
-                        </div>
+                    {(error || urlError) && (
+                        <AuthErrorAlert
+                            errorCode={urlError}
+                            customError={error}
+                        />
                     )}
 
                     {/* Google Sign Up */}

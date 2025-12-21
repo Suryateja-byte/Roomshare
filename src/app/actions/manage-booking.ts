@@ -10,7 +10,11 @@ import { logger } from '@/lib/logger';
 
 export type BookingStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
 
-export async function updateBookingStatus(bookingId: string, status: BookingStatus) {
+export async function updateBookingStatus(
+    bookingId: string,
+    status: BookingStatus,
+    rejectionReason?: string
+) {
     const session = await auth();
     if (!session?.user?.id) {
         return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
@@ -143,15 +147,23 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
         if (status === 'REJECTED') {
             await prisma.booking.update({
                 where: { id: bookingId },
-                data: { status }
+                data: {
+                    status,
+                    rejectionReason: rejectionReason?.trim() || null
+                }
             });
+
+            // Build rejection message with optional reason
+            const reasonText = rejectionReason?.trim()
+                ? ` Reason: ${rejectionReason.trim()}`
+                : '';
 
             // Notify tenant of rejection
             await createNotification({
                 userId: booking.tenant.id,
                 type: 'BOOKING_REJECTED',
                 title: 'Booking Not Accepted',
-                message: `Your booking for "${booking.listing.title}" was not accepted`,
+                message: `Your booking for "${booking.listing.title}" was not accepted.${reasonText}`,
                 link: '/bookings'
             });
 
@@ -160,7 +172,8 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
                 await sendNotificationEmailWithPreference('bookingRejected', booking.tenant.id, booking.tenant.email, {
                     tenantName: booking.tenant.name || 'User',
                     listingTitle: booking.listing.title,
-                    hostName: booking.listing.owner.name || 'Host'
+                    hostName: booking.listing.owner.name || 'Host',
+                    rejectionReason: rejectionReason?.trim() || undefined
                 });
             }
         }

@@ -124,13 +124,15 @@ function BookingCard({
 }: {
     booking: Booking;
     type: 'sent' | 'received';
-    onStatusUpdate: (bookingId: string, status: BookingStatus) => Promise<void>;
+    onStatusUpdate: (bookingId: string, status: BookingStatus, rejectionReason?: string) => Promise<void>;
     isOffline: boolean;
 }) {
     const [updatingStatus, setUpdatingStatus] = useState<BookingStatus | null>(null);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [showRejectDialog, setShowRejectDialog] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
 
-    const handleStatusUpdate = async (status: BookingStatus) => {
+    const handleStatusUpdate = async (status: BookingStatus, reason?: string) => {
         if (isOffline) {
             toast.error("You're offline", {
                 description: 'Please check your internet connection to update booking status.'
@@ -138,7 +140,7 @@ function BookingCard({
             return;
         }
         setUpdatingStatus(status);
-        await onStatusUpdate(booking.id, status);
+        await onStatusUpdate(booking.id, status, reason);
         setUpdatingStatus(null);
     };
 
@@ -249,7 +251,7 @@ function BookingCard({
                                     )}
                                 </Button>
                                 <Button
-                                    onClick={() => handleStatusUpdate('REJECTED')}
+                                    onClick={() => setShowRejectDialog(true)}
                                     disabled={isUpdating}
                                     variant="outline"
                                     className="flex-1"
@@ -322,6 +324,71 @@ function BookingCard({
                     </AlertDialogContent>
                 </AlertDialog>
 
+                {/* Reject Booking Dialog */}
+                <AlertDialog open={showRejectDialog} onOpenChange={(open) => {
+                    setShowRejectDialog(open);
+                    if (!open) setRejectionReason('');
+                }}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                    <XCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <AlertDialogTitle>Reject this booking request?</AlertDialogTitle>
+                            </div>
+                            <AlertDialogDescription className="text-left">
+                                <span className="block mb-2">You&apos;re about to reject the booking request from:</span>
+                                <span className="block font-semibold text-zinc-900 dark:text-white">{booking.tenant?.name || 'Tenant'}</span>
+                                <span className="block text-sm mt-1">
+                                    For: {booking.listing.title}
+                                </span>
+                                <span className="block text-sm">
+                                    {formatDate(booking.startDate)} — {formatDate(booking.endDate)}
+                                </span>
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+
+                        <div className="py-2">
+                            <label
+                                htmlFor="rejection-reason"
+                                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2"
+                            >
+                                Reason for rejection (optional)
+                            </label>
+                            <textarea
+                                id="rejection-reason"
+                                value={rejectionReason}
+                                onChange={(e) => setRejectionReason(e.target.value)}
+                                placeholder="Let the tenant know why you're declining their request..."
+                                className="w-full px-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:focus:ring-zinc-400 resize-none"
+                                rows={3}
+                                maxLength={500}
+                                disabled={isUpdating}
+                            />
+                            <p className="text-xs text-zinc-400 mt-1 text-right">
+                                {rejectionReason.length}/500
+                            </p>
+                        </div>
+
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isUpdating}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => {
+                                    const reason = rejectionReason.trim() || undefined;
+                                    setShowRejectDialog(false);
+                                    setRejectionReason('');
+                                    handleStatusUpdate('REJECTED', reason);
+                                }}
+                                disabled={isUpdating}
+                                className="bg-amber-600 hover:bg-amber-700 text-white"
+                            >
+                                {isUpdating ? 'Rejecting...' : 'Reject Booking'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
                 <p className="text-xs text-zinc-400 mt-4">
                     Requested on {formatDate(booking.createdAt)}
                 </p>
@@ -337,7 +404,7 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
     const [bookings, setBookings] = useState({ sent: sentBookings, received: receivedBookings });
     const { isOffline } = useNetworkStatus();
 
-    const handleStatusUpdate = async (bookingId: string, status: BookingStatus) => {
+    const handleStatusUpdate = async (bookingId: string, status: BookingStatus, rejectionReason?: string) => {
         // Store previous state for rollback
         const previousBookings = { ...bookings };
 
@@ -352,7 +419,7 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
         }));
 
         // Then make the API call
-        const result = await updateBookingStatus(bookingId, status);
+        const result = await updateBookingStatus(bookingId, status, rejectionReason);
 
         if (result.error) {
             // Revert to previous state on error

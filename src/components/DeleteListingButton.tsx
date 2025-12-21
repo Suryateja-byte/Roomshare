@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Trash2, AlertTriangle, Loader2, MessageSquare, Calendar } from 'lucide-react';
+import { PasswordConfirmationModal } from '@/components/auth/PasswordConfirmationModal';
+import { hasPasswordSet } from '@/app/actions/settings';
 
 interface DeletionInfo {
     activeBookings: number;
@@ -19,6 +21,8 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
     const [showConfirm, setShowConfirm] = useState(false);
     const [deletionInfo, setDeletionInfo] = useState<DeletionInfo | null>(null);
     const [isBlocked, setIsBlocked] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [hasPassword, setHasPassword] = useState(false);
     const router = useRouter();
 
     const handleDeleteClick = async () => {
@@ -49,6 +53,20 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
         }
     };
 
+    const handleDeleteConfirmClick = async () => {
+        // Check if user has password and show password modal
+        try {
+            const userHasPassword = await hasPasswordSet();
+            setHasPassword(userHasPassword);
+            setShowPasswordModal(true);
+        } catch (error) {
+            console.error('Error checking password status:', error);
+            // Fallback to showing modal without password requirement
+            setHasPassword(false);
+            setShowPasswordModal(true);
+        }
+    };
+
     const handleDelete = async () => {
         setIsDeleting(true);
         try {
@@ -65,12 +83,14 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
                 toast.error(data.message || data.error || 'Failed to delete listing');
                 setIsDeleting(false);
                 setShowConfirm(false);
+                setShowPasswordModal(false);
             }
         } catch (error) {
             console.error('Error deleting listing:', error);
             toast.error('Failed to delete listing');
             setIsDeleting(false);
             setShowConfirm(false);
+            setShowPasswordModal(false);
         }
     };
 
@@ -78,6 +98,7 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
         setShowConfirm(false);
         setDeletionInfo(null);
         setIsBlocked(false);
+        setShowPasswordModal(false);
     };
 
     // Show blocking message for active bookings
@@ -170,7 +191,7 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
                     <Button
                         variant="destructive"
                         className="flex-1"
-                        onClick={handleDelete}
+                        onClick={handleDeleteConfirmClick}
                         disabled={isDeleting}
                     >
                         {isDeleting ? (
@@ -183,29 +204,57 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
                         )}
                     </Button>
                 </div>
+
+                {/* Password Confirmation Modal for Listing Deletion */}
+                <PasswordConfirmationModal
+                    isOpen={showPasswordModal}
+                    onClose={() => setShowPasswordModal(false)}
+                    onConfirm={handleDelete}
+                    title="Delete Listing"
+                    description="This action will permanently delete your listing and all associated data including bookings and conversations."
+                    confirmText="Delete Listing"
+                    confirmVariant="destructive"
+                    hasPassword={hasPassword}
+                    isLoading={isDeleting}
+                />
             </div>
         );
     }
 
     // Default state - show delete button
     return (
-        <Button
-            variant="destructive"
-            className="w-full"
-            onClick={handleDeleteClick}
-            disabled={isChecking}
-        >
-            {isChecking ? (
-                <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Checking...
-                </>
-            ) : (
-                <>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Listing
-                </>
-            )}
-        </Button>
+        <>
+            <Button
+                variant="destructive"
+                className="w-full"
+                onClick={handleDeleteClick}
+                disabled={isChecking}
+            >
+                {isChecking ? (
+                    <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Checking...
+                    </>
+                ) : (
+                    <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Listing
+                    </>
+                )}
+            </Button>
+
+            {/* Password Confirmation Modal for Listing Deletion */}
+            <PasswordConfirmationModal
+                isOpen={showPasswordModal}
+                onClose={() => setShowPasswordModal(false)}
+                onConfirm={handleDelete}
+                title="Delete Listing"
+                description="This action will permanently delete your listing and all associated data including bookings and conversations."
+                confirmText="Delete Listing"
+                confirmVariant="destructive"
+                hasPassword={hasPassword}
+                isLoading={isDeleting}
+            />
+        </>
     );
 }

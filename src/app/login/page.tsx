@@ -3,22 +3,34 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
-import { signIn } from 'next-auth/react';
-import { useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { getAuthErrorMessage } from '@/lib/auth-errors';
+import { signIn, signOut, useSession } from 'next-auth/react';
+import { useState, Suspense, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { AuthErrorAlert } from '@/components/auth/AuthErrorAlert';
+import { shouldHighlightEmailForm } from '@/lib/auth-errors';
 
 function LoginForm() {
-    const router = useRouter();
     const searchParams = useSearchParams();
+    const { data: existingSession } = useSession();
     const registered = searchParams.get('registered');
     const urlError = searchParams.get('error');
-    const oauthErrorMessage = getAuthErrorMessage(urlError);
+    const emailInputRef = useRef<HTMLInputElement>(null);
 
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+
+    // Focus email input when OAuth error suggests using email form
+    useEffect(() => {
+        if (urlError && shouldHighlightEmailForm(urlError)) {
+            // Small delay to ensure DOM is ready
+            const timer = setTimeout(() => {
+                emailInputRef.current?.focus();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [urlError]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -30,6 +42,11 @@ function LoginForm() {
         const password = formData.get('password') as string;
 
         try {
+            // Clear any existing session to prevent stale data
+            if (existingSession?.user) {
+                await signOut({ redirect: false });
+            }
+
             const result = await signIn('credentials', {
                 email,
                 password,
@@ -38,13 +55,13 @@ function LoginForm() {
 
             if (result?.error) {
                 setError('Invalid email or password');
+                setLoading(false);
             } else {
-                router.push('/');
-                router.refresh();
+                // Force full page reload to ensure fresh session from layout
+                window.location.href = '/';
             }
         } catch (err) {
             setError('An error occurred');
-        } finally {
             setLoading(false);
         }
     };
@@ -90,10 +107,11 @@ function LoginForm() {
                         </div>
                     )}
 
-                    {(error || oauthErrorMessage) && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl text-sm text-center">
-                            {error || oauthErrorMessage}
-                        </div>
+                    {(error || urlError) && (
+                        <AuthErrorAlert
+                            errorCode={urlError}
+                            customError={error}
+                        />
                     )}
 
                     {/* Google Sign In */}
@@ -102,6 +120,10 @@ function LoginForm() {
                             setGoogleLoading(true);
                             setError('');
                             try {
+                                // Clear any existing session to prevent stale data
+                                if (existingSession?.user) {
+                                    await signOut({ redirect: false });
+                                }
                                 await signIn('google', { callbackUrl: '/' });
                             } catch (err) {
                                 setError('Failed to initiate Google sign-in. Please try again.');
@@ -155,6 +177,7 @@ function LoginForm() {
                                     <Mail className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
                                 </div>
                                 <input
+                                    ref={emailInputRef}
                                     id="email"
                                     type="email"
                                     name="email"

@@ -23,6 +23,7 @@ describe('UserMenu', () => {
     image: null,
     emailVerified: null as Date | null,
     isAdmin: false,
+    isSuspended: false,
   }
 
   beforeEach(() => {

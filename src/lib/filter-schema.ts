@@ -102,7 +102,7 @@ export type SortOption = (typeof VALID_SORT_OPTIONS)[number];
 function caseInsensitiveEnum<T extends readonly string[]>(
   allowlist: T,
   options?: { treatAnyAsUndefined?: boolean }
-): z.ZodEffects<z.ZodString, T[number] | undefined, string> {
+) {
   const allowMap = new Map(allowlist.map((item) => [item.toLowerCase(), item]));
 
   return z.string().transform((val) => {
@@ -126,7 +126,7 @@ function caseInsensitiveEnum<T extends readonly string[]>(
  */
 function caseInsensitiveArrayEnum<T extends readonly string[]>(
   allowlist: T
-): z.ZodEffects<z.ZodArray<z.ZodString>, T[number][] | undefined, string[]> {
+) {
   const allowMap = new Map(allowlist.map((item) => [item.toLowerCase(), item]));
 
   return z.array(z.string()).transform((arr) => {

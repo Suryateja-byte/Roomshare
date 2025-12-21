@@ -112,6 +112,7 @@ export const emailTemplates = {
         tenantName: string;
         listingTitle: string;
         hostName: string;
+        rejectionReason?: string;
     }) => ({
         subject: `Update on your booking request for ${data.listingTitle}`,
         html: baseTemplate(`
@@ -122,6 +123,16 @@ export const emailTemplates = {
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Unfortunately, <strong>${data.hostName}</strong> was unable to accept your booking request for <strong>"${data.listingTitle}"</strong>.
             </p>
+            ${data.rejectionReason ? `
+            <div style="margin: 0 0 24px; padding: 16px; background-color: #f4f4f5; border-radius: 8px; border-left: 4px solid #71717a;">
+                <p style="margin: 0 0 8px; color: #52525b; font-size: 14px; font-weight: 600;">
+                    Reason from host:
+                </p>
+                <p style="margin: 0; color: #3f3f46; font-size: 15px; line-height: 1.5;">
+                    "${data.rejectionReason}"
+                </p>
+            </div>
+            ` : ''}
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Don't worry! There are plenty of other great listings available. Keep searching to find your perfect room.
             </p>

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
     Star,
     ShieldCheck,
@@ -18,7 +19,8 @@ import {
     MessageSquare,
     ChevronRight,
     Loader2,
-    ImageOff
+    ImageOff,
+    Home
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import UserAvatar from '@/components/UserAvatar';
@@ -63,9 +65,23 @@ const Badge = ({ icon: Icon, text, variant = "default" }: any) => {
     );
 };
 
-const ListingCard = ({ listing }: any) => {
-    const hasImages = listing.images && listing.images.length > 0;
-    const imageUrl = hasImages ? listing.images[0] : null;
+// Placeholder images for fallback when listing images fail to load
+const PLACEHOLDER_IMAGES = [
+    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1484154218962-a1c002085d2f?auto=format&fit=crop&w=800&q=80",
+];
+
+const ListingCard = ({ listing }: { listing: UserWithListings['listings'][0] }) => {
+    const [imageError, setImageError] = useState(false);
+
+    const hasImages = listing.images && listing.images.length > 0 && listing.images[0];
+    // Use a deterministic placeholder based on listing ID
+    const placeholderIndex = listing.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % PLACEHOLDER_IMAGES.length;
+    const imageUrl = hasImages && !imageError ? listing.images[0] : PLACEHOLDER_IMAGES[placeholderIndex];
+    const showPlaceholder = !hasImages || imageError;
+
     const locationText = listing.location
         ? `${listing.location.city}, ${listing.location.state}`
         : 'Location not specified';
@@ -74,16 +90,22 @@ const ListingCard = ({ listing }: any) => {
         <Link href={`/listings/${listing.id}`}>
             <div className="group relative flex flex-col gap-3 p-3 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 shadow-sm hover:shadow-md transition-all cursor-pointer">
                 <div className="relative aspect-[16/9] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-                    {imageUrl ? (
-                        <img
-                            src={imageUrl}
-                            alt={listing.title}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-500">
-                            <ImageOff className="w-8 h-8 mb-2" />
-                            <span className="text-xs">No image</span>
+                    <Image
+                        src={imageUrl}
+                        alt={listing.title}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        onError={() => setImageError(true)}
+                        loading="lazy"
+                    />
+                    {/* Show placeholder overlay when no images or image error */}
+                    {showPlaceholder && (
+                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-150 dark:from-zinc-800 dark:to-zinc-850 flex flex-col items-center justify-center">
+                            <div className="w-12 h-12 rounded-2xl bg-zinc-200/80 dark:bg-zinc-700/80 flex items-center justify-center mb-2">
+                                <Home className="w-6 h-6 text-zinc-400 dark:text-zinc-500" strokeWidth={1.5} fill="currentColor" fillOpacity={0.1} />
+                            </div>
+                            <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wider">No Photos</span>
                         </div>
                     )}
                     <div className="absolute top-2 right-2 px-2 py-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-md text-2xs font-bold uppercase tracking-wide text-green-600 dark:text-green-400">
@@ -177,8 +199,8 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                     <div className="relative z-10 flex flex-col md:flex-row gap-6 md:gap-8 md:items-start">
                         {/* Avatar */}
                         <div className="relative shrink-0 mx-auto md:mx-0">
-                            <div className="w-28 h-28 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full p-1 bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 shadow-xl">
-                                <UserAvatar image={user.image} name={user.name} className="w-full h-full" />
+                            <div className="w-40 h-40 rounded-full ring-4 ring-white dark:ring-zinc-800 shadow-xl">
+                                <UserAvatar image={user.image} name={user.name} size="2xl" />
                             </div>
                             {user.isVerified && (
                                 <div className="absolute bottom-2 right-2 bg-green-500 w-6 h-6 rounded-full border-4 border-white flex items-center justify-center shadow-sm">

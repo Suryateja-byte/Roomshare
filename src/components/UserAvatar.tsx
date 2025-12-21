@@ -8,7 +8,7 @@ import { User } from 'lucide-react';
 interface UserAvatarProps {
     image?: string | null;
     name?: string | null;
-    size?: 'sm' | 'md' | 'lg' | 'xl';
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
     className?: string;
 }
 
@@ -17,6 +17,7 @@ const sizeClasses = {
     md: 'w-10 h-10 text-sm',
     lg: 'w-12 h-12 text-base',
     xl: 'w-16 h-16 text-lg',
+    '2xl': 'w-40 h-40 text-xl',
 };
 
 const sizePx = {
@@ -24,6 +25,7 @@ const sizePx = {
     md: 40,
     lg: 48,
     xl: 64,
+    '2xl': 160,
 };
 
 // Helper to validate if an image URL is valid
@@ -72,6 +74,7 @@ export default function UserAvatar({ image, name, size = 'md', className }: User
                     alt={name || 'User'}
                     fill
                     sizes={`${sizePx[size]}px`}
+                    quality={90}
                     className={cn("object-cover transition-opacity duration-200", isLoading ? "opacity-0" : "opacity-100")}
                     onLoad={() => {
                         if (process.env.NODE_ENV === 'development') {
