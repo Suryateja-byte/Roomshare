@@ -268,6 +268,8 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                         }`}
                                     aria-expanded={isProfileOpen}
                                     aria-haspopup="true"
+                                    data-testid="user-menu"
+                                    aria-label="User menu"
                                 >
                                     <UserAvatar image={user.image} name={user.name} size="sm" />
                                     <ChevronDown

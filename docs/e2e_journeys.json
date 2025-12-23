@@ -1,0 +1,2215 @@
+[
+  {
+    "id": "J001",
+    "persona": {
+      "type": "anonymous",
+      "device": "desktop",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "none"
+    },
+    "goal": "Find a room in a specific city and open a listing details page.",
+    "entry_point": "Direct URL to /",
+    "preconditions": [
+      "No user session",
+      "At least one ACTIVE listing exists for Austin, TX"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open the home page",
+        "system_expected": "Hero and search form render",
+        "validation_checks": [
+          "UI: Search input shows placeholder City, neighborhood...",
+          "URL: /",
+          "Network: GET / returns 200",
+          "Data: No roomshare-recent-searches key exists yet"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Type Austin in the location field and select a suggestion",
+        "system_expected": "Location input is filled with the selected suggestion",
+        "validation_checks": [
+          "UI: Suggestions list appears and closes after selection",
+          "URL: /",
+          "Network: Mapbox geocoding request returns 200",
+          "Data: Location value reflects the selected suggestion"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Open filters drawer",
+        "system_expected": "Filters drawer slides in and traps focus",
+        "validation_checks": [
+          "UI: Drawer title Filters and close button are visible",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: aria-modal is true on the dialog"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Set min price 500, max price 1200, toggle Wifi amenity",
+        "system_expected": "Filter state updates",
+        "validation_checks": [
+          "UI: Wifi chip shows active state and price inputs show values",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: Inputs retain entered values"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Submit search",
+        "system_expected": "Search navigates to results page",
+        "validation_checks": [
+          "UI: Search button shows Searching... then results list",
+          "URL: /search?q=...",
+          "Network: GET /search with query params returns 200",
+          "Data: localStorage roomshare-recent-searches contains Austin"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Scan results list",
+        "system_expected": "Results show listing cards and heading",
+        "validation_checks": [
+          "UI: Heading shows place count and cards are visible",
+          "URL: /search?q=...",
+          "Network: No client error banner shown",
+          "Data: No unexpected localStorage changes"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Open the first listing card",
+        "system_expected": "Listing detail page loads",
+        "validation_checks": [
+          "UI: Listing title, price, and booking form are visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id in URL matches opened card"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "Use browser back to return to results",
+        "system_expected": "Search results restore with filters",
+        "validation_checks": [
+          "UI: Filters in form match URL params",
+          "URL: /search?q=...",
+          "Network: GET /search returns 200",
+          "Data: Recent searches remain in localStorage"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Submit search without selecting a dropdown location and confirm the warning banner appears",
+      "Double click the Search button and verify only one navigation occurs"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Recent search is not saved to localStorage",
+        "why_it_might_happen": "localStorage write is skipped on error or debounce logic short-circuits",
+        "how_to_detect": "roomshare-recent-searches remains empty after search",
+        "severity": "P2"
+      },
+      {
+        "issue": "Min and max price are swapped incorrectly",
+        "why_it_might_happen": "parseSearchParams normalization bug",
+        "how_to_detect": "URL params or results reflect reversed price bounds",
+        "severity": "P2"
+      },
+      {
+        "issue": "Filters drawer does not trap focus",
+        "why_it_might_happen": "FocusTrap not activated or portal not mounted",
+        "how_to_detect": "Tab key moves focus to background controls",
+        "severity": "P1"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/SearchForm.tsx",
+        "reason": "Search submit, filter drawer, and recent search persistence"
+      },
+      {
+        "path_or_module": "src/components/LocationSearchInput.tsx",
+        "reason": "Geocoding suggestions and selection handling"
+      },
+      {
+        "path_or_module": "src/app/search/page.tsx",
+        "reason": "Server-side search results and URL param parsing"
+      }
+    ],
+    "completion_criteria": [
+      "User reaches a listing detail page after searching",
+      "Search filters are reflected in the URL and results"
+    ],
+    "cleanup": [
+      "Clear localStorage roomshare-recent-searches if used in subsequent tests"
+    ]
+  },
+  {
+    "id": "J002",
+    "persona": {
+      "type": "returning seeker",
+      "device": "mobile",
+      "browser": "Safari",
+      "network": "fast",
+      "accessibility": "none"
+    },
+    "goal": "Use the mobile map toggle to open a listing from map results.",
+    "entry_point": "SEO link to /search?q=Seattle",
+    "preconditions": [
+      "User is logged in",
+      "At least five listings exist with coordinates near Seattle"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open /search?q=Seattle on mobile",
+        "system_expected": "Results list and map toggle button appear",
+        "validation_checks": [
+          "UI: Floating button shows Show Map",
+          "URL: /search?q=Seattle",
+          "Network: GET /search returns 200",
+          "Data: Map has not rendered before toggle"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Tap Show Map",
+        "system_expected": "Map view replaces the list",
+        "validation_checks": [
+          "UI: Button text changes to Show List",
+          "URL: /search?q=Seattle",
+          "Network: Map tiles request to Mapbox succeeds",
+          "Data: Map container is visible"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Tap a price marker",
+        "system_expected": "Popup card opens for that listing",
+        "validation_checks": [
+          "UI: Popup shows listing title and View Details button",
+          "URL: /search?q=Seattle",
+          "Network: No navigation request yet",
+          "Data: Selected marker remains highlighted"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Tap View Details in the popup",
+        "system_expected": "Listing detail page opens",
+        "validation_checks": [
+          "UI: Listing title and price render",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches popup listing"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Tap back to return to map",
+        "system_expected": "Map view returns with previous state",
+        "validation_checks": [
+          "UI: Show List button is visible",
+          "URL: /search?q=Seattle",
+          "Network: GET /search returns 200",
+          "Data: Map state is preserved after toggle"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Tap Show List",
+        "system_expected": "List view returns",
+        "validation_checks": [
+          "UI: Listing cards are visible",
+          "URL: /search?q=Seattle",
+          "Network: No map errors shown",
+          "Data: hasShownMapMobile remains true"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Open a listing card from list",
+        "system_expected": "Listing page loads",
+        "validation_checks": [
+          "UI: Image gallery and booking panel render",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "Return to results and end session",
+        "system_expected": "Search results still reflect query",
+        "validation_checks": [
+          "UI: Heading shows places in Seattle",
+          "URL: /search?q=Seattle",
+          "Network: No client error banner shown",
+          "Data: No unexpected localStorage changes"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Rotate the device after map load and confirm map does not collapse",
+      "Tap the map toggle rapidly and verify only one view is visible"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Map never renders on mobile after first toggle",
+        "why_it_might_happen": "hasShownMapMobile not set before render",
+        "how_to_detect": "Map container remains blank and no tile requests occur",
+        "severity": "P1"
+      },
+      {
+        "issue": "Popup shows wrong listing details",
+        "why_it_might_happen": "marker selection state mismatch",
+        "how_to_detect": "Popup title does not match marker price",
+        "severity": "P2"
+      },
+      {
+        "issue": "Map toggle button overlaps critical UI",
+        "why_it_might_happen": "mobile layout not accounting for safe areas",
+        "how_to_detect": "Toggle blocks list scroll or action buttons",
+        "severity": "P3"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/SearchViewToggle.tsx",
+        "reason": "Mobile map/list toggle state"
+      },
+      {
+        "path_or_module": "src/components/Map.tsx",
+        "reason": "Marker selection and popup details"
+      },
+      {
+        "path_or_module": "src/app/search/page.tsx",
+        "reason": "Search result rendering and map data"
+      }
+    ],
+    "completion_criteria": [
+      "User opens a listing from map popup on mobile",
+      "Map and list toggle works without state loss"
+    ],
+    "cleanup": [
+      "None"
+    ]
+  },
+  {
+    "id": "J003",
+    "persona": {
+      "type": "anonymous",
+      "device": "desktop",
+      "browser": "Firefox",
+      "network": "fast",
+      "accessibility": "keyboard-only"
+    },
+    "goal": "Apply filters using only the keyboard and run a search.",
+    "entry_point": "Direct URL to /",
+    "preconditions": [
+      "No user session",
+      "At least one listing exists for New York"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open the home page and tab to the search form",
+        "system_expected": "Keyboard focus moves to the location input",
+        "validation_checks": [
+          "UI: Focus ring is visible on the input",
+          "URL: /",
+          "Network: GET / returns 200",
+          "Data: No localStorage changes"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Type New York and use ArrowDown + Enter to select a suggestion",
+        "system_expected": "Selected suggestion fills the input",
+        "validation_checks": [
+          "UI: Suggestion list highlights the selection",
+          "URL: /",
+          "Network: Mapbox geocoding request returns 200",
+          "Data: Location value matches selected suggestion"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Tab to the Filters button and press Enter",
+        "system_expected": "Filter drawer opens and focus moves inside",
+        "validation_checks": [
+          "UI: Drawer title Filters is focused or next focusable element",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: FocusTrap keeps focus within drawer"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Use Tab and Space to toggle Pets allowed house rule",
+        "system_expected": "House rule toggles active",
+        "validation_checks": [
+          "UI: Pets allowed chip shows active state",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: aria-pressed reflects active state"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Set Lease Duration to 6 months via keyboard in Select",
+        "system_expected": "Select shows 6 months",
+        "validation_checks": [
+          "UI: Selected option is visible in the trigger",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: Input retains chosen value"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Submit search",
+        "system_expected": "Results page loads",
+        "validation_checks": [
+          "UI: Search button shows Searching...",
+          "URL: /search?q=...",
+          "Network: GET /search returns 200",
+          "Data: Recent searches saved to localStorage"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Tab through results and open first listing card with Enter",
+        "system_expected": "Listing detail page opens",
+        "validation_checks": [
+          "UI: Listing header and price visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "Use keyboard to navigate back to results",
+        "system_expected": "Results page restores with filters",
+        "validation_checks": [
+          "UI: Filter chips match URL params",
+          "URL: /search?q=...",
+          "Network: GET /search returns 200",
+          "Data: Recent searches remain"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Press Escape in the filters drawer and confirm it closes",
+      "Tab beyond the last filter control and ensure focus does not escape the drawer"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Keyboard selection in LocationSearchInput does not pick the highlighted item",
+        "why_it_might_happen": "selectedIndex is not synced with suggestions",
+        "how_to_detect": "Enter selects a different suggestion than highlighted",
+        "severity": "P1"
+      },
+      {
+        "issue": "Focus trap allows tabbing to background elements",
+        "why_it_might_happen": "FocusTrap not active when drawer opens",
+        "how_to_detect": "Tab key reaches navbar while drawer is open",
+        "severity": "P1"
+      },
+      {
+        "issue": "Filter changes are not reflected in URL",
+        "why_it_might_happen": "state not included in search params builder",
+        "how_to_detect": "URL missing houseRules or leaseDuration",
+        "severity": "P2"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/SearchForm.tsx",
+        "reason": "Keyboard interactions and filter drawer"
+      },
+      {
+        "path_or_module": "src/components/LocationSearchInput.tsx",
+        "reason": "Arrow key handling and selection"
+      }
+    ],
+    "completion_criteria": [
+      "Search runs with keyboard-only interactions",
+      "Applied filters appear in the URL and results"
+    ],
+    "cleanup": [
+      "Clear localStorage roomshare-recent-searches if needed"
+    ]
+  },
+  {
+    "id": "J004",
+    "persona": {
+      "type": "new renter",
+      "device": "desktop",
+      "browser": "Chrome",
+      "network": "slow",
+      "accessibility": "none"
+    },
+    "goal": "Search listings on a slow network and recover from map data error.",
+    "entry_point": "Direct URL to /search?q=Boston",
+    "preconditions": [
+      "No user session",
+      "Map data fetch fails once to trigger banner"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open /search?q=Boston",
+        "system_expected": "Skeletons show then results load",
+        "validation_checks": [
+          "UI: Listing skeletons appear then cards render",
+          "URL: /search?q=Boston",
+          "Network: GET /search returns 200",
+          "Data: No client-side crash"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Wait for map area to load",
+        "system_expected": "Map error banner may appear on failure",
+        "validation_checks": [
+          "UI: SearchErrorBanner shows Map data temporarily unavailable",
+          "URL: /search?q=Boston",
+          "Network: Map data request fails and is handled",
+          "Data: No hard page error"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Click Try again in the banner",
+        "system_expected": "Map retries loading",
+        "validation_checks": [
+          "UI: Banner disappears after retry",
+          "URL: /search?q=Boston",
+          "Network: Retry request succeeds or fails gracefully",
+          "Data: Map error state resets"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Open Filters and set Room Type to Private Room",
+        "system_expected": "Filter selection updates",
+        "validation_checks": [
+          "UI: Room Type trigger shows Private Room",
+          "URL: /search?q=Boston",
+          "Network: No new network request yet",
+          "Data: Filter state updated"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Submit search",
+        "system_expected": "Results refresh with filters",
+        "validation_checks": [
+          "UI: Results heading updates count",
+          "URL: /search?q=Boston&roomType=Private%20Room",
+          "Network: GET /search returns 200",
+          "Data: URL includes roomType"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Scroll and open a listing",
+        "system_expected": "Listing detail page opens",
+        "validation_checks": [
+          "UI: Listing header visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Return to results",
+        "system_expected": "Filters persist in URL",
+        "validation_checks": [
+          "UI: Room Type still selected",
+          "URL: /search?q=Boston&roomType=Private%20Room",
+          "Network: GET /search returns 200",
+          "Data: No unexpected resets"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "End session",
+        "system_expected": "No errors shown",
+        "validation_checks": [
+          "UI: No error banner visible",
+          "URL: /search?q=Boston&roomType=Private%20Room",
+          "Network: No pending requests",
+          "Data: No localStorage corruption"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Map data fails twice and banner remains with retry button",
+      "User retries while a previous retry is still in progress"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Map error banner never appears",
+        "why_it_might_happen": "Promise.allSettled error not surfaced",
+        "how_to_detect": "Map area blank without error messaging",
+        "severity": "P2"
+      },
+      {
+        "issue": "Retry button does nothing",
+        "why_it_might_happen": "onRetry not wired to map reload",
+        "how_to_detect": "No new map request after clicking Try again",
+        "severity": "P2"
+      },
+      {
+        "issue": "Slow network causes filter state to reset",
+        "why_it_might_happen": "state sync with URL overwrites inputs",
+        "how_to_detect": "Selected Room Type clears after navigation",
+        "severity": "P3"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/app/search/page.tsx",
+        "reason": "Map data fallback and banner wiring"
+      },
+      {
+        "path_or_module": "src/components/SearchErrorBanner.tsx",
+        "reason": "Retry UI and accessibility"
+      }
+    ],
+    "completion_criteria": [
+      "User can recover from map error and continue searching",
+      "Filtered results load on slow network"
+    ],
+    "cleanup": [
+      "None"
+    ]
+  },
+  {
+    "id": "J005",
+    "persona": {
+      "type": "returning seeker",
+      "device": "mobile",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "none"
+    },
+    "goal": "Save a search with email alerts on mobile.",
+    "entry_point": "In-app search from /search?q=Denver",
+    "preconditions": [
+      "User is logged in",
+      "User has fewer than 10 saved searches"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open /search?q=Denver",
+        "system_expected": "Search results page renders",
+        "validation_checks": [
+          "UI: Save Search button is visible",
+          "URL: /search?q=Denver",
+          "Network: GET /search returns 200",
+          "Data: No modal open"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Tap Save Search",
+        "system_expected": "Save search modal opens",
+        "validation_checks": [
+          "UI: Modal title Save This Search is visible",
+          "URL: /search?q=Denver",
+          "Network: No network request yet",
+          "Data: Modal state open"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Change name and enable alerts",
+        "system_expected": "Inputs update",
+        "validation_checks": [
+          "UI: Name field shows custom text and Email Alerts toggle is on",
+          "URL: /search?q=Denver",
+          "Network: No network request yet",
+          "Data: Form state updated"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Select Weekly frequency",
+        "system_expected": "Frequency selection updates",
+        "validation_checks": [
+          "UI: Weekly option is highlighted",
+          "URL: /search?q=Denver",
+          "Network: No network request yet",
+          "Data: Alert frequency set to WEEKLY"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Tap Save Search",
+        "system_expected": "Save action completes",
+        "validation_checks": [
+          "UI: Toast Search saved successfully! appears",
+          "URL: /search?q=Denver",
+          "Network: Server action saveSearch returns success",
+          "Data: Saved search count increments"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Open /saved-searches",
+        "system_expected": "Saved search appears in list",
+        "validation_checks": [
+          "UI: New search name is visible",
+          "URL: /saved-searches",
+          "Network: GET /saved-searches returns 200",
+          "Data: Saved search has alertEnabled true"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Tap View on the saved search",
+        "system_expected": "Search page opens with filters",
+        "validation_checks": [
+          "UI: Search heading matches saved filters",
+          "URL: /search?filters=...",
+          "Network: GET /search returns 200",
+          "Data: Filters match saved search"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "End session",
+        "system_expected": "No errors shown",
+        "validation_checks": [
+          "UI: No error banner visible",
+          "URL: /search?filters=...",
+          "Network: No pending requests",
+          "Data: Saved search persists after refresh"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Attempt to save with empty name and confirm inline error",
+      "Close modal by tapping backdrop and verify no save occurs"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Saved search not created",
+        "why_it_might_happen": "saveSearch action fails silently",
+        "how_to_detect": "Saved search not visible in /saved-searches",
+        "severity": "P2"
+      },
+      {
+        "issue": "Alert frequency not persisted",
+        "why_it_might_happen": "alertFrequency not passed to server action",
+        "how_to_detect": "Saved search shows default DAILY instead of WEEKLY",
+        "severity": "P2"
+      },
+      {
+        "issue": "Modal does not close on success",
+        "why_it_might_happen": "isOpen state not reset after success",
+        "how_to_detect": "Toast shows success but modal remains open",
+        "severity": "P3"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/SaveSearchButton.tsx",
+        "reason": "Modal state, validation, and save action"
+      },
+      {
+        "path_or_module": "src/app/actions/saved-search.ts",
+        "reason": "Save limits and alert persistence"
+      }
+    ],
+    "completion_criteria": [
+      "Saved search is listed in /saved-searches",
+      "Search alert settings persist"
+    ],
+    "cleanup": [
+      "Delete the saved search from /saved-searches"
+    ]
+  },
+  {
+    "id": "J006",
+    "persona": {
+      "type": "anonymous",
+      "device": "desktop",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "none"
+    },
+    "goal": "Attempt to save a search while logged out and see the authorization error.",
+    "entry_point": "Direct URL to /search?q=Chicago",
+    "preconditions": [
+      "No user session",
+      "Search results load"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open /search?q=Chicago",
+        "system_expected": "Results page renders",
+        "validation_checks": [
+          "UI: Save Search button visible",
+          "URL: /search?q=Chicago",
+          "Network: GET /search returns 200",
+          "Data: No modal open"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Click Save Search",
+        "system_expected": "Modal opens with default name",
+        "validation_checks": [
+          "UI: Modal title Save This Search is visible",
+          "URL: /search?q=Chicago",
+          "Network: No network request yet",
+          "Data: Name field prefilled"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Click Save Search in modal",
+        "system_expected": "Error appears in modal",
+        "validation_checks": [
+          "UI: Error text Unauthorized or similar displays",
+          "URL: /search?q=Chicago",
+          "Network: Server action returns error Unauthorized",
+          "Data: No saved search created"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Close modal",
+        "system_expected": "Modal closes",
+        "validation_checks": [
+          "UI: Backdrop disappears",
+          "URL: /search?q=Chicago",
+          "Network: No network request",
+          "Data: Modal state closed"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Click Save Search again",
+        "system_expected": "Modal opens again",
+        "validation_checks": [
+          "UI: Default name is regenerated",
+          "URL: /search?q=Chicago",
+          "Network: No network request yet",
+          "Data: Form state resets"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Open login page",
+        "system_expected": "Login page renders",
+        "validation_checks": [
+          "UI: Email input and password fields visible",
+          "URL: /login",
+          "Network: GET /login returns 200",
+          "Data: Session still anonymous"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Navigate back to search",
+        "system_expected": "Search results still available",
+        "validation_checks": [
+          "UI: Save Search button visible",
+          "URL: /search?q=Chicago",
+          "Network: GET /search returns 200",
+          "Data: No saved search created"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "End session",
+        "system_expected": "No errors shown",
+        "validation_checks": [
+          "UI: No error banners visible",
+          "URL: /search?q=Chicago",
+          "Network: No pending requests",
+          "Data: No saved search entries created"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Try saving with empty name and confirm validation error appears before auth error",
+      "Refresh while modal is open and verify modal closes on reload"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Unauthorized error not surfaced to user",
+        "why_it_might_happen": "result.error not rendered in modal",
+        "how_to_detect": "Save button appears to do nothing",
+        "severity": "P2"
+      },
+      {
+        "issue": "Modal retains stale error state",
+        "why_it_might_happen": "error not cleared on open",
+        "how_to_detect": "Error remains visible after reopening modal",
+        "severity": "P3"
+      },
+      {
+        "issue": "Save Search button is hidden for anonymous users",
+        "why_it_might_happen": "conditional rendering applied incorrectly",
+        "how_to_detect": "Button missing despite design",
+        "severity": "P3"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/SaveSearchButton.tsx",
+        "reason": "Unauthorized error handling and modal state"
+      },
+      {
+        "path_or_module": "src/app/actions/saved-search.ts",
+        "reason": "Authorization checks"
+      }
+    ],
+    "completion_criteria": [
+      "Unauthorized error is shown when saving search",
+      "No saved search is created"
+    ],
+    "cleanup": [
+      "None"
+    ]
+  },
+  {
+    "id": "J007",
+    "persona": {
+      "type": "anonymous",
+      "device": "desktop",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "screen-reader"
+    },
+    "goal": "Search using the location suggestion list with screen reader support.",
+    "entry_point": "Direct URL to /",
+    "preconditions": [
+      "No user session",
+      "Screen reader enabled"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open home page and focus location input",
+        "system_expected": "Screen reader announces input and placeholder",
+        "validation_checks": [
+          "UI: Location input is focusable and announced",
+          "URL: /",
+          "Network: GET / returns 200",
+          "Data: No localStorage changes"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Type San Jose and wait for suggestions",
+        "system_expected": "Suggestion list appears",
+        "validation_checks": [
+          "UI: Suggestions render under input",
+          "URL: /",
+          "Network: Mapbox geocoding request returns 200",
+          "Data: No errors in console"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Use ArrowDown and Enter to select suggestion",
+        "system_expected": "Input is populated with selected place",
+        "validation_checks": [
+          "UI: Suggestion list closes",
+          "URL: /",
+          "Network: No new request on selection",
+          "Data: Location value matches selected suggestion"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Open filters drawer",
+        "system_expected": "Dialog opens with aria-modal true",
+        "validation_checks": [
+          "UI: Filters heading announced by screen reader",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: Focus is within dialog"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Select Room Type Shared Room",
+        "system_expected": "Room Type value updates",
+        "validation_checks": [
+          "UI: Select shows Shared Room",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: Selected value persisted"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Submit search",
+        "system_expected": "Results page loads",
+        "validation_checks": [
+          "UI: Heading announces count of places",
+          "URL: /search?q=...",
+          "Network: GET /search returns 200",
+          "Data: Recent search saved to localStorage"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Navigate to first listing card",
+        "system_expected": "Listing page opens",
+        "validation_checks": [
+          "UI: Listing title announced",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "Return to results",
+        "system_expected": "Filters remain applied",
+        "validation_checks": [
+          "UI: Room Type filter still active",
+          "URL: /search?filters=...",
+          "Network: GET /search returns 200",
+          "Data: No state loss"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Suggestions list does not announce number of results",
+      "Focus lands on backdrop when closing filter drawer"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Screen reader cannot reach suggestion items",
+        "why_it_might_happen": "Suggestions lack proper roles or focus handling",
+        "how_to_detect": "Arrow keys do not move through suggestions",
+        "severity": "P1"
+      },
+      {
+        "issue": "Filter drawer lacks aria-labelledby",
+        "why_it_might_happen": "Missing id linkage",
+        "how_to_detect": "Screen reader reads dialog without title",
+        "severity": "P2"
+      },
+      {
+        "issue": "Search heading not announced",
+        "why_it_might_happen": "aria-live region not updated",
+        "how_to_detect": "No announcement when results load",
+        "severity": "P3"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/LocationSearchInput.tsx",
+        "reason": "Suggestion list behavior and keyboard support"
+      },
+      {
+        "path_or_module": "src/app/search/page.tsx",
+        "reason": "aria-live announcements for results"
+      }
+    ],
+    "completion_criteria": [
+      "Screen reader user can select a location and run search",
+      "Results are announced and accessible"
+    ],
+    "cleanup": [
+      "Clear localStorage recent searches if needed"
+    ]
+  },
+  {
+    "id": "J008",
+    "persona": {
+      "type": "returning seeker",
+      "device": "desktop",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "none"
+    },
+    "goal": "Reuse recent searches to run a new search quickly.",
+    "entry_point": "Direct URL to /",
+    "preconditions": [
+      "localStorage roomshare-recent-searches contains at least one item",
+      "User is logged in"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open home page",
+        "system_expected": "Search form renders",
+        "validation_checks": [
+          "UI: Recent searches section appears on focus",
+          "URL: /",
+          "Network: GET / returns 200",
+          "Data: Recent searches loaded from localStorage"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Focus the location input to show recent searches",
+        "system_expected": "Recent list becomes visible",
+        "validation_checks": [
+          "UI: Recent search items appear with clock icon",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: Recent list matches localStorage"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Select a recent search item",
+        "system_expected": "Location input is populated",
+        "validation_checks": [
+          "UI: Recent list closes after selection",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: Selected coords are set if stored"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Submit search",
+        "system_expected": "Search results load",
+        "validation_checks": [
+          "UI: Search button shows Searching...",
+          "URL: /search?q=...",
+          "Network: GET /search returns 200",
+          "Data: Recent searches order updates with most recent"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Open a listing card",
+        "system_expected": "Listing detail page opens",
+        "validation_checks": [
+          "UI: Listing title and price visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Return to search",
+        "system_expected": "Search results still reflect query",
+        "validation_checks": [
+          "UI: Heading shows places for location",
+          "URL: /search?q=...",
+          "Network: GET /search returns 200",
+          "Data: Recent searches still stored"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Clear recent searches",
+        "system_expected": "Recent searches list empties",
+        "validation_checks": [
+          "UI: Clear button removes list",
+          "URL: /search?q=...",
+          "Network: No network request fired",
+          "Data: localStorage roomshare-recent-searches removed"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "Focus input again",
+        "system_expected": "No recent searches shown",
+        "validation_checks": [
+          "UI: Empty recent list state",
+          "URL: /search?q=...",
+          "Network: No network request",
+          "Data: Recent searches key is empty"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Corrupted localStorage data should be ignored without crashing",
+      "Clearing recents should not clear current input value"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Recent searches list does not render",
+        "why_it_might_happen": "localStorage read fails or JSON parse error",
+        "how_to_detect": "No items appear despite stored data",
+        "severity": "P2"
+      },
+      {
+        "issue": "Selecting a recent search does not set coordinates",
+        "why_it_might_happen": "coords not restored from stored item",
+        "how_to_detect": "URL lacks lat/lng after search",
+        "severity": "P3"
+      },
+      {
+        "issue": "Clear recents does not remove localStorage key",
+        "why_it_might_happen": "removeItem not called",
+        "how_to_detect": "localStorage still contains recent searches",
+        "severity": "P3"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/SearchForm.tsx",
+        "reason": "Recent searches load/save/clear logic"
+      }
+    ],
+    "completion_criteria": [
+      "Recent search selection triggers a new search",
+      "Clearing recent searches removes stored data"
+    ],
+    "cleanup": [
+      "Restore localStorage roomshare-recent-searches if needed"
+    ]
+  },
+  {
+    "id": "J009",
+    "persona": {
+      "type": "new renter",
+      "device": "mobile",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "none"
+    },
+    "goal": "Start a search from the home filter tags on mobile.",
+    "entry_point": "Direct URL to /",
+    "preconditions": [
+      "No user session",
+      "At least one listing exists in Los Angeles"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open home page on mobile",
+        "system_expected": "Hero and filter tags render",
+        "validation_checks": [
+          "UI: Filter tags like Move-in Date are visible",
+          "URL: /",
+          "Network: GET / returns 200",
+          "Data: No localStorage changes"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Tap a filter tag",
+        "system_expected": "Page scrolls to search form",
+        "validation_checks": [
+          "UI: Search form is in view",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: Scroll position changes"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Type Los Angeles without selecting suggestion",
+        "system_expected": "Warning banner appears",
+        "validation_checks": [
+          "UI: Banner says Select a location from the dropdown",
+          "URL: /",
+          "Network: Mapbox request may still fire",
+          "Data: showLocationWarning true"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Select a suggestion from dropdown",
+        "system_expected": "Warning banner disappears",
+        "validation_checks": [
+          "UI: Location input matches selected suggestion",
+          "URL: /",
+          "Network: Mapbox geocoding request returns 200",
+          "Data: Selected coords stored"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Set Move-in Date from date picker",
+        "system_expected": "Date value updates",
+        "validation_checks": [
+          "UI: Date picker shows selected date",
+          "URL: /",
+          "Network: No network request fired",
+          "Data: Input value matches date"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Submit search",
+        "system_expected": "Results page loads",
+        "validation_checks": [
+          "UI: Results heading visible",
+          "URL: /search?q=...",
+          "Network: GET /search returns 200",
+          "Data: Recent search saved"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Open listing card",
+        "system_expected": "Listing detail page opens",
+        "validation_checks": [
+          "UI: Booking form visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "Navigate back",
+        "system_expected": "Results still filtered by move-in date",
+        "validation_checks": [
+          "UI: Date filter remains in URL",
+          "URL: /search?moveInDate=...",
+          "Network: GET /search returns 200",
+          "Data: No filter loss"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Attempt to submit without selecting a dropdown location",
+      "Pick a past move-in date and confirm it is rejected"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Location warning does not clear after selecting suggestion",
+        "why_it_might_happen": "showLocationWarning not reset",
+        "how_to_detect": "Warning banner remains visible",
+        "severity": "P3"
+      },
+      {
+        "issue": "Move-in date not included in URL",
+        "why_it_might_happen": "date value not serialized",
+        "how_to_detect": "URL missing moveInDate param",
+        "severity": "P2"
+      },
+      {
+        "issue": "Mobile filter tag scroll target incorrect",
+        "why_it_might_happen": "scrollIntoView called before ref is set",
+        "how_to_detect": "Tap tag does not scroll to form",
+        "severity": "P3"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/app/HomeClient.tsx",
+        "reason": "Filter tag scroll behavior"
+      },
+      {
+        "path_or_module": "src/components/SearchForm.tsx",
+        "reason": "Location warning and date picker"
+      }
+    ],
+    "completion_criteria": [
+      "Search is executed with move-in date and location",
+      "Warning banner behaves correctly"
+    ],
+    "cleanup": [
+      "Clear localStorage recent searches if needed"
+    ]
+  },
+  {
+    "id": "J010",
+    "persona": {
+      "type": "returning seeker",
+      "device": "desktop",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "high-contrast"
+    },
+    "goal": "Recover from zero results using suggested filters.",
+    "entry_point": "Direct URL to /search with restrictive filters",
+    "preconditions": [
+      "Search params produce zero results",
+      "User is logged in"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open /search with restrictive filters",
+        "system_expected": "Zero results state renders",
+        "validation_checks": [
+          "UI: No matches found message is visible",
+          "URL: /search?minPrice=999999",
+          "Network: GET /search returns 200",
+          "Data: total=0 in response"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Review suggested filter changes",
+        "system_expected": "Suggestion list renders",
+        "validation_checks": [
+          "UI: Suggestions list items are visible",
+          "URL: /search?minPrice=999999",
+          "Network: No new network request",
+          "Data: Suggestion list derived from analyzeFilterImpact"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Select a suggestion to remove a filter",
+        "system_expected": "URL updates and search reruns",
+        "validation_checks": [
+          "UI: Suggestion button shows removal label",
+          "URL: /search?filters=...",
+          "Network: GET /search returns 200",
+          "Data: URL params remove the suggested filter"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Verify results now show listings",
+        "system_expected": "Results list appears",
+        "validation_checks": [
+          "UI: Listing cards visible",
+          "URL: /search?filters=...",
+          "Network: No error banner shown",
+          "Data: total>0"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Open a listing card",
+        "system_expected": "Listing page opens",
+        "validation_checks": [
+          "UI: Listing title visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Return to results",
+        "system_expected": "Filters remain updated",
+        "validation_checks": [
+          "UI: Removed filter is not present",
+          "URL: /search?filters=...",
+          "Network: GET /search returns 200",
+          "Data: URL params persist"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Clear all filters",
+        "system_expected": "Search resets to default",
+        "validation_checks": [
+          "UI: Clear all filters button works",
+          "URL: /search",
+          "Network: GET /search returns 200",
+          "Data: URL params cleared"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "End session",
+        "system_expected": "Default search results render",
+        "validation_checks": [
+          "UI: Listings visible",
+          "URL: /search",
+          "Network: No pending requests",
+          "Data: No localStorage errors"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Suggestions list is empty and fallback message should appear",
+      "Rapidly click multiple suggestions and ensure only one navigation occurs"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Suggestion buttons do not update URL",
+        "why_it_might_happen": "handleRemoveFilter not updating search params",
+        "how_to_detect": "URL remains unchanged after click",
+        "severity": "P2"
+      },
+      {
+        "issue": "Clear all filters leaves stale params",
+        "why_it_might_happen": "router.push does not clear query",
+        "how_to_detect": "URL still contains old params after clear",
+        "severity": "P3"
+      },
+      {
+        "issue": "High contrast mode loses text readability",
+        "why_it_might_happen": "colors not tested for contrast",
+        "how_to_detect": "Text in suggestions not legible",
+        "severity": "P3"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/ZeroResultsSuggestions.tsx",
+        "reason": "Filter removal and clear all handling"
+      },
+      {
+        "path_or_module": "src/app/search/page.tsx",
+        "reason": "Zero results state"
+      }
+    ],
+    "completion_criteria": [
+      "User recovers from zero results and sees listings",
+      "Filter removal updates URL"
+    ],
+    "cleanup": [
+      "None"
+    ]
+  },
+  {
+    "id": "J011",
+    "persona": {
+      "type": "returning seeker",
+      "device": "desktop",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "none"
+    },
+    "goal": "Sort results by price and paginate through search results.",
+    "entry_point": "Direct URL to /search?q=Miami",
+    "preconditions": [
+      "At least 30 listings exist for Miami",
+      "User is logged in"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open /search?q=Miami",
+        "system_expected": "Results page renders",
+        "validation_checks": [
+          "UI: Sort select and pagination controls are visible",
+          "URL: /search?q=Miami",
+          "Network: GET /search returns 200",
+          "Data: Results list is populated"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Open sort select and choose Price: Low to High",
+        "system_expected": "Results reorder by price",
+        "validation_checks": [
+          "UI: Sort trigger shows price_asc label",
+          "URL: /search?q=Miami&sort=price_asc",
+          "Network: GET /search returns 200",
+          "Data: URL includes sort=price_asc"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Scroll to pagination and click page 2",
+        "system_expected": "Second page of results loads",
+        "validation_checks": [
+          "UI: Pagination shows page 2 active",
+          "URL: /search?q=Miami&sort=price_asc&page=2",
+          "Network: GET /search returns 200",
+          "Data: Page param is 2"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Open a listing card on page 2",
+        "system_expected": "Listing detail page opens",
+        "validation_checks": [
+          "UI: Listing title and price visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Navigate back to results",
+        "system_expected": "Page 2 remains active",
+        "validation_checks": [
+          "UI: Pagination still highlights page 2",
+          "URL: /search?q=Miami&sort=price_asc&page=2",
+          "Network: GET /search returns 200",
+          "Data: Sort remains price_asc"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Change sort to Newest",
+        "system_expected": "Page resets to 1",
+        "validation_checks": [
+          "UI: Sort trigger shows newest",
+          "URL: /search?q=Miami&sort=newest",
+          "Network: GET /search returns 200",
+          "Data: page param removed or reset"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Open a different listing",
+        "system_expected": "Listing page opens",
+        "validation_checks": [
+          "UI: Listing title visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id differs from earlier selection"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "Return to results",
+        "system_expected": "Newest sort remains",
+        "validation_checks": [
+          "UI: Sort trigger still shows newest",
+          "URL: /search?q=Miami&sort=newest",
+          "Network: GET /search returns 200",
+          "Data: URL persists sort"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Open /search?page=999 and confirm page clamps to max",
+      "Use an invalid sort value and confirm it defaults to recommended"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Sort change does not update URL",
+        "why_it_might_happen": "SortSelect not pushing query params",
+        "how_to_detect": "URL lacks sort parameter after selection",
+        "severity": "P2"
+      },
+      {
+        "issue": "Pagination does not reset on sort change",
+        "why_it_might_happen": "page param not cleared on sort update",
+        "how_to_detect": "URL keeps page=2 after sort change",
+        "severity": "P2"
+      },
+      {
+        "issue": "Results list not sorted by price",
+        "why_it_might_happen": "sort option not honored in query",
+        "how_to_detect": "Prices not ascending after price_asc",
+        "severity": "P1"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/SortSelect.tsx",
+        "reason": "Sort option selection and URL updates"
+      },
+      {
+        "path_or_module": "src/components/Pagination.tsx",
+        "reason": "Page navigation and query params"
+      },
+      {
+        "path_or_module": "src/lib/search-params.ts",
+        "reason": "Validation of sort and page params"
+      }
+    ],
+    "completion_criteria": [
+      "Sorting updates URL and results order",
+      "Pagination navigates to the correct page"
+    ],
+    "cleanup": [
+      "None"
+    ]
+  },
+  {
+    "id": "J012",
+    "persona": {
+      "type": "returning seeker",
+      "device": "mobile",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "none"
+    },
+    "goal": "Select a location and verify the map flies to the new area.",
+    "entry_point": "Direct URL to /search",
+    "preconditions": [
+      "User is logged in",
+      "Map view toggle is available on mobile"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open /search on mobile",
+        "system_expected": "Search page renders",
+        "validation_checks": [
+          "UI: Show Map button is visible",
+          "URL: /search",
+          "Network: GET /search returns 200",
+          "Data: Map not rendered until toggle"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Tap Show Map",
+        "system_expected": "Map view becomes visible",
+        "validation_checks": [
+          "UI: Map container is visible",
+          "URL: /search",
+          "Network: Map tiles load",
+          "Data: Map view state initialized"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Focus location input and type Portland",
+        "system_expected": "Suggestion list appears",
+        "validation_checks": [
+          "UI: Suggestions dropdown is visible",
+          "URL: /search",
+          "Network: Mapbox geocoding request returns 200",
+          "Data: No error state"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Select a suggestion",
+        "system_expected": "Map recenters to selected area",
+        "validation_checks": [
+          "UI: Map center visibly changes",
+          "URL: /search?lat=...&lng=...",
+          "Network: No navigation request",
+          "Data: MAP_FLY_TO_EVENT triggers map pan"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Toggle back to list view",
+        "system_expected": "List view shows results",
+        "validation_checks": [
+          "UI: Listing cards visible",
+          "URL: /search?lat=...&lng=...",
+          "Network: GET /search returns 200",
+          "Data: URL includes lat/lng"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Open a listing from the list",
+        "system_expected": "Listing detail page opens",
+        "validation_checks": [
+          "UI: Listing title visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Return to map view",
+        "system_expected": "Map still centered on selected area",
+        "validation_checks": [
+          "UI: Map view shows markers in area",
+          "URL: /search?lat=...&lng=...",
+          "Network: No map errors",
+          "Data: Map center persists"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "End session",
+        "system_expected": "Search state remains stable",
+        "validation_checks": [
+          "UI: No warnings visible",
+          "URL: /search?lat=...&lng=...",
+          "Network: No pending requests",
+          "Data: Recent searches saved"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Select a suggestion without lat/lng and ensure map does not crash",
+      "Tap Show Map when map data failed and verify graceful fallback"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "MAP_FLY_TO_EVENT not handled by map",
+        "why_it_might_happen": "event listener not wired",
+        "how_to_detect": "Map center does not change after selection",
+        "severity": "P2"
+      },
+      {
+        "issue": "URL missing lat/lng after selection",
+        "why_it_might_happen": "selectedCoords not serialized",
+        "how_to_detect": "No lat or lng in query params",
+        "severity": "P2"
+      },
+      {
+        "issue": "Map fails to render after toggling",
+        "why_it_might_happen": "hasShownMapMobile state lost",
+        "how_to_detect": "Blank map container",
+        "severity": "P1"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/SearchForm.tsx",
+        "reason": "MAP_FLY_TO_EVENT dispatch and location selection"
+      },
+      {
+        "path_or_module": "src/components/SearchViewToggle.tsx",
+        "reason": "Mobile map rendering and toggling"
+      },
+      {
+        "path_or_module": "src/components/Map.tsx",
+        "reason": "Map fly-to handling"
+      }
+    ],
+    "completion_criteria": [
+      "Map recenters on selected location",
+      "List and map views stay in sync"
+    ],
+    "cleanup": [
+      "Clear recent searches if reused"
+    ]
+  },
+  {
+    "id": "J013",
+    "persona": {
+      "type": "new renter",
+      "device": "desktop",
+      "browser": "Firefox",
+      "network": "flaky",
+      "accessibility": "none"
+    },
+    "goal": "Handle a location suggestion error when the geocoding API fails.",
+    "entry_point": "Direct URL to /",
+    "preconditions": [
+      "No user session",
+      "Mapbox geocoding request returns 500 or 503"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open the home page",
+        "system_expected": "Search form is visible",
+        "validation_checks": [
+          "UI: Location input is visible",
+          "URL: /",
+          "Network: GET / returns 200",
+          "Data: No localStorage changes"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Type Dallas in location input",
+        "system_expected": "Suggestions request is attempted",
+        "validation_checks": [
+          "UI: Loading spinner appears in input",
+          "URL: /",
+          "Network: Mapbox request fails with 5xx",
+          "Data: Error state is set"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Wait for error dropdown",
+        "system_expected": "Error dropdown appears",
+        "validation_checks": [
+          "UI: Search unavailable message is shown",
+          "URL: /",
+          "Network: No retry loop",
+          "Data: Error message is displayed"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Clear input using X button",
+        "system_expected": "Input clears and dropdown closes",
+        "validation_checks": [
+          "UI: Clear button removes text",
+          "URL: /",
+          "Network: No network request",
+          "Data: Error state cleared"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Retry typing Dallas",
+        "system_expected": "Suggestions retry",
+        "validation_checks": [
+          "UI: Suggestions list appears or error repeats",
+          "URL: /",
+          "Network: Mapbox request retried",
+          "Data: RequestId prevents stale results"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Select a suggestion if available",
+        "system_expected": "Input fills with selected place",
+        "validation_checks": [
+          "UI: Suggestions list closes",
+          "URL: /",
+          "Network: No extra request on selection",
+          "Data: Selected location set"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Submit search",
+        "system_expected": "Results page loads",
+        "validation_checks": [
+          "UI: Search button shows Searching...",
+          "URL: /search?q=...",
+          "Network: GET /search returns 200",
+          "Data: Recent searches saved"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "End session",
+        "system_expected": "No error dropdown remains",
+        "validation_checks": [
+          "UI: Search results visible",
+          "URL: /search?q=...",
+          "Network: No pending requests",
+          "Data: No localStorage corruption"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Mapbox token missing should show Location search is temporarily unavailable",
+      "Abort previous request when typing quickly"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Error dropdown does not show on API failure",
+        "why_it_might_happen": "error state not set when response not ok",
+        "how_to_detect": "No error UI despite failed request",
+        "severity": "P2"
+      },
+      {
+        "issue": "Suggestions from stale request appear",
+        "why_it_might_happen": "requestId comparison not honored",
+        "how_to_detect": "Old suggestions replace new input",
+        "severity": "P2"
+      },
+      {
+        "issue": "Clear button does not reset error state",
+        "why_it_might_happen": "error state not cleared on clear",
+        "how_to_detect": "Error dropdown persists with empty input",
+        "severity": "P3"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/components/LocationSearchInput.tsx",
+        "reason": "Error handling and abort logic"
+      }
+    ],
+    "completion_criteria": [
+      "User sees a clear error state when geocoding fails",
+      "User can retry and proceed to search"
+    ],
+    "cleanup": [
+      "Clear localStorage recent searches if needed"
+    ]
+  },
+  {
+    "id": "J014",
+    "persona": {
+      "type": "returning seeker",
+      "device": "mobile",
+      "browser": "Safari",
+      "network": "slow",
+      "accessibility": "none"
+    },
+    "goal": "Trigger the search rate limit and observe the Too Many Requests page.",
+    "entry_point": "Direct URL to /search with rapid queries",
+    "preconditions": [
+      "User is logged in",
+      "Server rate limit for search is enabled"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open /search?q=San%20Diego",
+        "system_expected": "Results render",
+        "validation_checks": [
+          "UI: Search results page visible",
+          "URL: /search?q=San%20Diego",
+          "Network: GET /search returns 200",
+          "Data: Rate limit counter starts"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Rapidly change filters and resubmit search multiple times",
+        "system_expected": "Rate limit eventually triggers",
+        "validation_checks": [
+          "UI: Too Many Requests UI appears",
+          "URL: /search?q=San%20Diego",
+          "Network: GET /search returns 429",
+          "Data: retryAfter value shown"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Wait for retryAfter duration",
+        "system_expected": "Retry message shows seconds",
+        "validation_checks": [
+          "UI: Retry text shows countdown or seconds",
+          "URL: /search?q=San%20Diego",
+          "Network: No new requests during wait",
+          "Data: Rate limit resets after wait"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Retry the search",
+        "system_expected": "Results page loads again",
+        "validation_checks": [
+          "UI: Results list visible",
+          "URL: /search?q=San%20Diego",
+          "Network: GET /search returns 200",
+          "Data: Rate limit no longer blocking"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Open listing from results",
+        "system_expected": "Listing detail page opens",
+        "validation_checks": [
+          "UI: Listing title visible",
+          "URL: /listings/{id}",
+          "Network: GET /listings/{id} returns 200",
+          "Data: Listing id matches card"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Go back to search",
+        "system_expected": "Results still visible",
+        "validation_checks": [
+          "UI: Heading shows place count",
+          "URL: /search?q=San%20Diego",
+          "Network: GET /search returns 200",
+          "Data: No rate limit banner"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Submit another search",
+        "system_expected": "Search executes normally",
+        "validation_checks": [
+          "UI: Search button shows Searching...",
+          "URL: /search?q=San%20Diego",
+          "Network: GET /search returns 200",
+          "Data: No 429"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "End session",
+        "system_expected": "No error state remains",
+        "validation_checks": [
+          "UI: No Too Many Requests panel shown",
+          "URL: /search?q=San%20Diego",
+          "Network: No pending requests",
+          "Data: No localStorage errors"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Refresh during rate limit screen and confirm it still shows the limit",
+      "Open search with invalid parameters and confirm rate limit still applies"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Rate limit page does not show retryAfter",
+        "why_it_might_happen": "retryAfter not passed to UI",
+        "how_to_detect": "No countdown or retry text visible",
+        "severity": "P3"
+      },
+      {
+        "issue": "429 response triggers generic error page",
+        "why_it_might_happen": "rate limit handling not wired",
+        "how_to_detect": "User sees global error instead of rate limit UI",
+        "severity": "P2"
+      },
+      {
+        "issue": "Rate limit persists after wait",
+        "why_it_might_happen": "retryAfter not respected or cached",
+        "how_to_detect": "Search still returns 429 after wait",
+        "severity": "P1"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/app/search/page.tsx",
+        "reason": "Server-side rate limit handling and UI"
+      },
+      {
+        "path_or_module": "src/lib/with-rate-limit.ts",
+        "reason": "Rate limit logic"
+      }
+    ],
+    "completion_criteria": [
+      "Too Many Requests page is displayed after rapid searches",
+      "User can retry after the wait period"
+    ],
+    "cleanup": [
+      "None"
+    ]
+  },
+  {
+    "id": "J015",
+    "persona": {
+      "type": "returning seeker",
+      "device": "desktop",
+      "browser": "Chrome",
+      "network": "fast",
+      "accessibility": "none"
+    },
+    "goal": "Open a saved search and confirm filters apply.",
+    "entry_point": "Direct URL to /saved-searches",
+    "preconditions": [
+      "User is logged in",
+      "At least one saved search exists"
+    ],
+    "journey_steps": [
+      {
+        "step": 1,
+        "user_action": "Open /saved-searches",
+        "system_expected": "Saved searches list renders",
+        "validation_checks": [
+          "UI: Saved search cards are visible",
+          "URL: /saved-searches",
+          "Network: GET /saved-searches returns 200",
+          "Data: Saved searches fetched from server"
+        ]
+      },
+      {
+        "step": 2,
+        "user_action": "Click View on a saved search",
+        "system_expected": "Search page opens with filters",
+        "validation_checks": [
+          "UI: Search heading matches saved query",
+          "URL: /search?filters=...",
+          "Network: GET /search returns 200",
+          "Data: Filters match saved search"
+        ]
+      },
+      {
+        "step": 3,
+        "user_action": "Open filters drawer",
+        "system_expected": "Filters reflect saved values",
+        "validation_checks": [
+          "UI: Selected filters match saved search",
+          "URL: /search?filters=...",
+          "Network: No network request",
+          "Data: Filter state matches URL"
+        ]
+      },
+      {
+        "step": 4,
+        "user_action": "Modify one filter and resubmit search",
+        "system_expected": "Results update",
+        "validation_checks": [
+          "UI: Heading updates with new count",
+          "URL: /search?filters=...",
+          "Network: GET /search returns 200",
+          "Data: URL reflects new filter"
+        ]
+      },
+      {
+        "step": 5,
+        "user_action": "Save the modified search",
+        "system_expected": "Save modal opens",
+        "validation_checks": [
+          "UI: Default name includes filter values",
+          "URL: /search?filters=...",
+          "Network: No network request yet",
+          "Data: Modal prefilled name"
+        ]
+      },
+      {
+        "step": 6,
+        "user_action": "Save",
+        "system_expected": "New saved search created",
+        "validation_checks": [
+          "UI: Toast Search saved successfully!",
+          "URL: /search?filters=...",
+          "Network: saveSearch action returns success",
+          "Data: Saved search count increments"
+        ]
+      },
+      {
+        "step": 7,
+        "user_action": "Return to /saved-searches",
+        "system_expected": "New saved search appears",
+        "validation_checks": [
+          "UI: List includes new name",
+          "URL: /saved-searches",
+          "Network: GET /saved-searches returns 200",
+          "Data: Saved search persisted"
+        ]
+      },
+      {
+        "step": 8,
+        "user_action": "End session",
+        "system_expected": "No errors shown",
+        "validation_checks": [
+          "UI: No error banners visible",
+          "URL: /saved-searches",
+          "Network: No pending requests",
+          "Data: No inconsistent saved search count"
+        ]
+      }
+    ],
+    "negative_or_edge_cases_in_this_journey": [
+      "Saved search list is empty and empty state should appear",
+      "Saved search filters include invalid values and should be sanitized"
+    ],
+    "likely_issues_to_watch_for": [
+      {
+        "issue": "Saved search filters not applied correctly",
+        "why_it_might_happen": "buildSearchUrl or parseSearchParams mismatch",
+        "how_to_detect": "Filters drawer shows default values instead of saved",
+        "severity": "P2"
+      },
+      {
+        "issue": "Save action fails silently",
+        "why_it_might_happen": "error not surfaced in modal",
+        "how_to_detect": "No toast or error after save",
+        "severity": "P2"
+      },
+      {
+        "issue": "Saved searches list not updated after save",
+        "why_it_might_happen": "revalidatePath not triggered",
+        "how_to_detect": "New search missing after navigation",
+        "severity": "P2"
+      }
+    ],
+    "code_hotspots_to_inspect": [
+      {
+        "path_or_module": "src/app/saved-searches/SavedSearchList.tsx",
+        "reason": "View and list handling"
+      },
+      {
+        "path_or_module": "src/app/actions/saved-search.ts",
+        "reason": "Save and revalidate"
+      }
+    ],
+    "completion_criteria": [
+      "Saved search opens with correct filters",
+      "Modified search can be saved and listed"
+    ],
+    "cleanup": [
+      "Delete test saved searches from /saved-searches"
+    ]
+  }
+]

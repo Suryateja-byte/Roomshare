@@ -1,0 +1,2926 @@
+[
+  {
+    "id": "J001",
+    "title": "Anonymous user browses home page and views featured listings",
+    "category": "discovery",
+    "tags": ["anon", "mobile", "a11y"],
+    "entry_point": "/",
+    "preconditions": ["No authentication required"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/", "expected": "Home page loads with hero section"},
+      {"step": 2, "action": "assert", "target": "featured listings section", "expected": "At least 1 featured listing visible"},
+      {"step": 3, "action": "scroll", "target": "featured listings", "expected": "Listings scroll into view"},
+      {"step": 4, "action": "click", "target": "first featured listing card", "expected": "Navigation to listing detail page"},
+      {"step": 5, "action": "assert", "target": "listing title", "expected": "Title matches clicked card"},
+      {"step": 6, "action": "navigate_back", "target": "browser back", "expected": "Return to home page"},
+      {"step": 7, "action": "click", "target": "Search CTA button", "expected": "Navigation to /search"},
+      {"step": 8, "action": "assert", "target": "search page", "expected": "Search page with filters visible"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No featured listings", "handling": "Empty state message displayed"},
+      {"case": "Slow network", "handling": "Skeleton loaders shown during fetch"}
+    ],
+    "likely_issues": [
+      {"issue": "Featured listings API timeout", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/FeaturedListings.tsx"}]},
+      {"issue": "Image lazy loading failure", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/components/listings/ListingCard.tsx"}]},
+      {"issue": "Hero section layout shift", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/HomeClient.tsx"}]}
+    ],
+    "accessibility_checks": ["Tab navigation works", "Screen reader announces listings", "Focus visible on interactive elements"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J002",
+    "title": "Anonymous user searches listings with multiple filters",
+    "category": "search",
+    "tags": ["anon", "mobile"],
+    "entry_point": "/search",
+    "preconditions": ["Database has listings with various attributes"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page loads"},
+      {"step": 2, "action": "fill", "target": "min price input", "value": "500", "expected": "Value entered"},
+      {"step": 3, "action": "fill", "target": "max price input", "value": "2000", "expected": "Value entered"},
+      {"step": 4, "action": "select", "target": "room type dropdown", "value": "Private Room", "expected": "Option selected"},
+      {"step": 5, "action": "check", "target": "wifi amenity checkbox", "expected": "Checkbox checked"},
+      {"step": 6, "action": "check", "target": "parking amenity checkbox", "expected": "Checkbox checked"},
+      {"step": 7, "action": "click", "target": "search/apply button", "expected": "Results filtered"},
+      {"step": 8, "action": "assert", "target": "URL params", "expected": "Filters reflected in URL"},
+      {"step": 9, "action": "assert", "target": "results count", "expected": "Count updated"},
+      {"step": 10, "action": "refresh", "target": "page", "expected": "Filters persist from URL"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No results for filters", "handling": "Zero results message with suggestions"},
+      {"case": "Invalid price range (min > max)", "handling": "Values auto-swapped or error shown"}
+    ],
+    "likely_issues": [
+      {"issue": "Filter state not synced with URL", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SearchForm.tsx"}]},
+      {"issue": "Pagination reset on filter change", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/page.tsx"}]},
+      {"issue": "Checkbox state lost on mobile", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SearchForm.tsx"}]}
+    ],
+    "accessibility_checks": ["Form labels associated", "Error messages announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J003",
+    "title": "Anonymous user views listing detail with image gallery",
+    "category": "discovery",
+    "tags": ["anon", "a11y"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing exists with multiple images"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page loads"},
+      {"step": 2, "action": "click", "target": "first listing card", "expected": "Navigate to detail page"},
+      {"step": 3, "action": "assert", "target": "listing title", "expected": "Title displayed"},
+      {"step": 4, "action": "assert", "target": "price", "expected": "Price displayed"},
+      {"step": 5, "action": "click", "target": "image gallery thumbnail 2", "expected": "Image changes"},
+      {"step": 6, "action": "click", "target": "next image arrow", "expected": "Gallery advances"},
+      {"step": 7, "action": "scroll", "target": "amenities section", "expected": "Amenities visible"},
+      {"step": 8, "action": "scroll", "target": "reviews section", "expected": "Reviews visible"},
+      {"step": 9, "action": "click", "target": "host profile link", "expected": "Navigate to host profile"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Listing not found", "handling": "404 page displayed"},
+      {"case": "Single image listing", "handling": "Gallery navigation hidden"}
+    ],
+    "likely_issues": [
+      {"issue": "Image gallery swipe not working on touch", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]},
+      {"issue": "Reviews not loading", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ReviewList.tsx"}]},
+      {"issue": "Layout shift when images load", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/ListingPageClient.tsx"}]}
+    ],
+    "accessibility_checks": ["Image alt texts present", "Gallery keyboard navigable"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J004",
+    "title": "Anonymous user uses map view with pan and zoom",
+    "category": "search",
+    "tags": ["anon", "slow"],
+    "entry_point": "/search",
+    "preconditions": ["Mapbox token configured", "Listings have coordinates"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page loads"},
+      {"step": 2, "action": "click", "target": "map view toggle", "expected": "Map view activated"},
+      {"step": 3, "action": "assert", "target": "map container", "expected": "Map rendered with markers"},
+      {"step": 4, "action": "drag", "target": "map", "direction": "left", "expected": "Map pans"},
+      {"step": 5, "action": "scroll_zoom", "target": "map", "direction": "in", "expected": "Map zooms in"},
+      {"step": 6, "action": "click", "target": "map marker", "expected": "Marker popup shown"},
+      {"step": 7, "action": "click", "target": "popup view listing", "expected": "Navigate to listing detail"},
+      {"step": 8, "action": "navigate_back", "target": "browser", "expected": "Return to map view"},
+      {"step": 9, "action": "assert", "target": "map position", "expected": "Map retains previous position"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No listings in visible bounds", "handling": "Empty state on map"},
+      {"case": "Mapbox API unavailable", "handling": "Fallback to list view only"}
+    ],
+    "likely_issues": [
+      {"issue": "Map not rendering on first load", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Map.tsx"}]},
+      {"issue": "Marker clustering not working", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/map/MapClient.tsx"}]},
+      {"issue": "Bounds query inefficient", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/get-listings.ts"}]},
+      {"issue": "Map state lost on navigation", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/DynamicMap.tsx"}]}
+    ],
+    "accessibility_checks": ["Map has accessible name", "Markers keyboard focusable"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J005",
+    "title": "Anonymous user sorts search results by different criteria",
+    "category": "search",
+    "tags": ["anon"],
+    "entry_point": "/search",
+    "preconditions": ["Multiple listings exist with varying prices and dates"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page with results"},
+      {"step": 2, "action": "assert", "target": "sort dropdown", "expected": "Default sort is Recommended"},
+      {"step": 3, "action": "select", "target": "sort dropdown", "value": "Price: Low to High", "expected": "Results reorder"},
+      {"step": 4, "action": "assert", "target": "first result price", "expected": "Lowest price listing first"},
+      {"step": 5, "action": "select", "target": "sort dropdown", "value": "Price: High to Low", "expected": "Results reorder"},
+      {"step": 6, "action": "assert", "target": "first result price", "expected": "Highest price listing first"},
+      {"step": 7, "action": "select", "target": "sort dropdown", "value": "Newest First", "expected": "Results by date"},
+      {"step": 8, "action": "assert", "target": "URL params", "expected": "sort=newest in URL"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Single result", "handling": "Sort dropdown still functional"},
+      {"case": "All same price", "handling": "Secondary sort applied"}
+    ],
+    "likely_issues": [
+      {"issue": "Sort not persisting on page change", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SortSelect.tsx"}]},
+      {"issue": "Page not reset to 1 on sort", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SortSelect.tsx"}]},
+      {"issue": "Sort param conflict with filters", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/search-utils.ts"}]}
+    ],
+    "accessibility_checks": ["Dropdown keyboard accessible", "Sort change announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J006",
+    "title": "Anonymous user navigates pagination through search results",
+    "category": "search",
+    "tags": ["anon", "mobile"],
+    "entry_point": "/search",
+    "preconditions": ["More than 24 listings exist"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "First page of results"},
+      {"step": 2, "action": "assert", "target": "pagination", "expected": "Showing 1-12 of X results"},
+      {"step": 3, "action": "click", "target": "next page button", "expected": "Page 2 loads"},
+      {"step": 4, "action": "assert", "target": "URL", "expected": "page=2 in URL"},
+      {"step": 5, "action": "assert", "target": "pagination", "expected": "Showing 13-24 of X"},
+      {"step": 6, "action": "click", "target": "page 1 link", "expected": "Return to first page"},
+      {"step": 7, "action": "click", "target": "last page link", "expected": "Navigate to last page"},
+      {"step": 8, "action": "refresh", "target": "page", "expected": "Stay on last page"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Invalid page number in URL", "handling": "Redirect to page 1"},
+      {"case": "Page exceeds max results", "handling": "Show last valid page"}
+    ],
+    "likely_issues": [
+      {"issue": "Pagination count incorrect after filter", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Pagination.tsx"}]},
+      {"issue": "Scroll position not reset on page change", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Pagination.tsx"}]},
+      {"issue": "Page links not updating correctly", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Pagination.tsx"}]}
+    ],
+    "accessibility_checks": ["Pagination links have labels", "Current page announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J007",
+    "title": "User signs up with email and password",
+    "category": "auth",
+    "tags": ["auth", "a11y"],
+    "entry_point": "/signup",
+    "preconditions": ["Email not already registered"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/signup", "expected": "Signup form displayed"},
+      {"step": 2, "action": "fill", "target": "name input", "value": "Test User", "expected": "Name entered"},
+      {"step": 3, "action": "fill", "target": "email input", "value": "test@example.com", "expected": "Email entered"},
+      {"step": 4, "action": "fill", "target": "password input", "value": "TestPass123!", "expected": "Password entered"},
+      {"step": 5, "action": "assert", "target": "password strength meter", "expected": "Shows strong"},
+      {"step": 6, "action": "check", "target": "terms checkbox", "expected": "Terms accepted"},
+      {"step": 7, "action": "click", "target": "signup button", "expected": "Form submits"},
+      {"step": 8, "action": "wait", "target": "redirect", "expected": "Redirect to home or verify page"},
+      {"step": 9, "action": "assert", "target": "user menu", "expected": "User is logged in"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Email already exists", "handling": "Error message displayed"},
+      {"case": "Weak password", "handling": "Validation error shown"}
+    ],
+    "likely_issues": [
+      {"issue": "Password validation mismatch client/server", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/signup/page.tsx"}, {"path_or_module": "src/app/api/register/route.ts"}]},
+      {"issue": "Terms checkbox not validated", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/signup/page.tsx"}]},
+      {"issue": "Email case sensitivity issues", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/register/route.ts"}]}
+    ],
+    "accessibility_checks": ["Form errors announced", "Password requirements visible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J008",
+    "title": "User logs in with valid credentials",
+    "category": "auth",
+    "tags": ["auth"],
+    "entry_point": "/login",
+    "preconditions": ["User account exists with verified password"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/login", "expected": "Login form displayed"},
+      {"step": 2, "action": "fill", "target": "email input", "value": "{{E2E_TEST_EMAIL}}", "expected": "Email entered"},
+      {"step": 3, "action": "fill", "target": "password input", "value": "{{E2E_TEST_PASSWORD}}", "expected": "Password entered"},
+      {"step": 4, "action": "click", "target": "login button", "expected": "Form submits"},
+      {"step": 5, "action": "wait", "target": "redirect", "expected": "Redirect to home page"},
+      {"step": 6, "action": "assert", "target": "user menu", "expected": "Shows user name/avatar"},
+      {"step": 7, "action": "refresh", "target": "page", "expected": "Session persists"},
+      {"step": 8, "action": "assert", "target": "user menu", "expected": "Still logged in"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Invalid password", "handling": "Error message without revealing which field is wrong"},
+      {"case": "Account suspended", "handling": "Specific suspension message"}
+    ],
+    "likely_issues": [
+      {"issue": "Session not persisting after refresh", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/auth.ts"}]},
+      {"issue": "Login redirect loop", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/middleware.ts"}]},
+      {"issue": "Rate limiting blocking legitimate login", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/rate-limit.ts"}]}
+    ],
+    "accessibility_checks": ["Error messages associated with inputs", "Submit button state clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J009",
+    "title": "User logs out and session is cleared",
+    "category": "auth",
+    "tags": ["auth"],
+    "entry_point": "/",
+    "preconditions": ["User is logged in"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/", "expected": "Home page as logged in user"},
+      {"step": 3, "action": "click", "target": "user menu button", "expected": "Dropdown opens"},
+      {"step": 4, "action": "click", "target": "logout button", "expected": "Logout initiated"},
+      {"step": 5, "action": "wait", "target": "redirect", "expected": "Redirect to home or login"},
+      {"step": 6, "action": "assert", "target": "login button visible", "expected": "User logged out"},
+      {"step": 7, "action": "navigate", "target": "/profile", "expected": "Redirect to login"},
+      {"step": 8, "action": "assert", "target": "login form", "expected": "Login page displayed"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Logout while on protected page", "handling": "Immediate redirect to login"},
+      {"case": "Network error during logout", "handling": "Client session cleared anyway"}
+    ],
+    "likely_issues": [
+      {"issue": "Session cookie not cleared", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/auth.ts"}]},
+      {"issue": "Cached user data shown after logout", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NavbarClient.tsx"}]},
+      {"issue": "Protected routes accessible after logout", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/middleware.ts"}]}
+    ],
+    "accessibility_checks": ["Logout confirmation if needed", "Focus management after logout"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J010",
+    "title": "User requests password reset via email",
+    "category": "auth",
+    "tags": ["auth", "flaky"],
+    "entry_point": "/forgot-password",
+    "preconditions": ["User account exists with email"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/forgot-password", "expected": "Password reset form"},
+      {"step": 2, "action": "fill", "target": "email input", "value": "{{E2E_TEST_EMAIL}}", "expected": "Email entered"},
+      {"step": 3, "action": "click", "target": "submit button", "expected": "Request sent"},
+      {"step": 4, "action": "assert", "target": "success message", "expected": "Check email message shown"},
+      {"step": 5, "action": "fill", "target": "email input", "value": "nonexistent@example.com", "expected": "Email entered"},
+      {"step": 6, "action": "click", "target": "submit button", "expected": "Request sent"},
+      {"step": 7, "action": "assert", "target": "success message", "expected": "Same message (no email enumeration)"},
+      {"step": 8, "action": "click", "target": "back to login link", "expected": "Navigate to login"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Invalid email format", "handling": "Validation error"},
+      {"case": "Rate limited", "handling": "Rate limit message with retry time"}
+    ],
+    "likely_issues": [
+      {"issue": "Email enumeration vulnerability", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/auth/forgot-password/route.ts"}]},
+      {"issue": "Token generation failure", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/auth/forgot-password/route.ts"}]},
+      {"issue": "Email delivery failure silent", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/email.ts"}]}
+    ],
+    "accessibility_checks": ["Success/error messages announced", "Form clearly labeled"],
+    "network_conditions": "flaky"
+  },
+  {
+    "id": "J011",
+    "title": "Authenticated user creates a new listing with all fields",
+    "category": "listing",
+    "tags": ["auth", "mobile"],
+    "entry_point": "/listings/create",
+    "preconditions": ["User is logged in", "User email is verified"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/create", "expected": "Create listing form"},
+      {"step": 3, "action": "fill", "target": "title input", "value": "Cozy Room in Downtown", "expected": "Title entered"},
+      {"step": 4, "action": "fill", "target": "description textarea", "value": "A beautiful room with great views and all amenities.", "expected": "Description entered"},
+      {"step": 5, "action": "fill", "target": "price input", "value": "1200", "expected": "Price entered"},
+      {"step": 6, "action": "fill", "target": "address input", "value": "123 Main St", "expected": "Address entered"},
+      {"step": 7, "action": "fill", "target": "city input", "value": "San Francisco", "expected": "City entered"},
+      {"step": 8, "action": "fill", "target": "state input", "value": "CA", "expected": "State entered"},
+      {"step": 9, "action": "fill", "target": "zip input", "value": "94102", "expected": "Zip entered"},
+      {"step": 10, "action": "check", "target": "wifi checkbox", "expected": "Amenity selected"},
+      {"step": 11, "action": "select", "target": "room type", "value": "Private Room", "expected": "Room type selected"},
+      {"step": 12, "action": "click", "target": "submit button", "expected": "Form submits"},
+      {"step": 13, "action": "wait", "target": "redirect", "expected": "Redirect to new listing page"},
+      {"step": 14, "action": "assert", "target": "listing title", "expected": "Title matches input"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Invalid address (geocoding fails)", "handling": "Error message about address"},
+      {"case": "Missing required fields", "handling": "Validation errors shown"}
+    ],
+    "likely_issues": [
+      {"issue": "Geocoding timeout", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/geocoding.ts"}]},
+      {"issue": "Form draft not saving", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/hooks/useFormPersistence.ts"}]},
+      {"issue": "Image upload before form submit", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/listings/ImageUploader.tsx"}]},
+      {"issue": "Transaction rollback on partial failure", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/create-listing.ts"}]}
+    ],
+    "accessibility_checks": ["All form fields labeled", "Error messages linked to fields"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J012",
+    "title": "Listing owner edits existing listing details",
+    "category": "listing",
+    "tags": ["auth"],
+    "entry_point": "/listings/[id]/edit",
+    "preconditions": ["User owns the listing"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/profile", "expected": "Profile with user listings"},
+      {"step": 3, "action": "click", "target": "edit button on listing", "expected": "Navigate to edit form"},
+      {"step": 4, "action": "assert", "target": "form populated", "expected": "Current values loaded"},
+      {"step": 5, "action": "clear_and_fill", "target": "title input", "value": "Updated Room Title", "expected": "Title changed"},
+      {"step": 6, "action": "clear_and_fill", "target": "price input", "value": "1500", "expected": "Price changed"},
+      {"step": 7, "action": "click", "target": "save button", "expected": "Form submits"},
+      {"step": 8, "action": "wait", "target": "redirect", "expected": "Redirect to listing detail"},
+      {"step": 9, "action": "assert", "target": "listing title", "expected": "Shows updated title"},
+      {"step": 10, "action": "assert", "target": "listing price", "expected": "Shows updated price"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Non-owner tries to edit", "handling": "403 forbidden or redirect"},
+      {"case": "Address change requires re-geocoding", "handling": "Coordinates updated"}
+    ],
+    "likely_issues": [
+      {"issue": "Stale data loaded in form", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/edit/page.tsx"}]},
+      {"issue": "Images lost on edit", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/edit/EditListingForm.tsx"}]},
+      {"issue": "Concurrent edit conflict", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/listings/[id]/route.ts"}]}
+    ],
+    "accessibility_checks": ["Form accessible for edits", "Save confirmation announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J013",
+    "title": "Listing owner deletes listing without active bookings",
+    "category": "listing",
+    "tags": ["auth"],
+    "entry_point": "/profile",
+    "preconditions": ["User owns listing", "No accepted bookings on listing"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/profile", "expected": "Profile page"},
+      {"step": 3, "action": "click", "target": "delete button on listing", "expected": "Confirmation dialog opens"},
+      {"step": 4, "action": "assert", "target": "confirmation dialog", "expected": "Warning message shown"},
+      {"step": 5, "action": "click", "target": "confirm delete button", "expected": "Deletion initiated"},
+      {"step": 6, "action": "wait", "target": "toast", "expected": "Success toast shown"},
+      {"step": 7, "action": "assert", "target": "listing list", "expected": "Listing removed from list"},
+      {"step": 8, "action": "navigate", "target": "deleted listing URL", "expected": "404 page shown"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Listing has accepted bookings", "handling": "Delete blocked with message"},
+      {"case": "User cancels confirmation", "handling": "No deletion occurs"}
+    ],
+    "likely_issues": [
+      {"issue": "Delete not blocked for active bookings", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/listings/[id]/route.ts"}]},
+      {"issue": "Related data not cleaned up", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/listings/[id]/route.ts"}]},
+      {"issue": "Optimistic UI not reverted on failure", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/DeleteListingButton.tsx"}]}
+    ],
+    "accessibility_checks": ["Confirmation dialog traps focus", "Delete action clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J014",
+    "title": "Listing owner pauses and reactivates listing",
+    "category": "listing",
+    "tags": ["auth"],
+    "entry_point": "/profile",
+    "preconditions": ["User owns active listing"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/profile", "expected": "Profile page"},
+      {"step": 3, "action": "assert", "target": "listing status", "expected": "Shows ACTIVE"},
+      {"step": 4, "action": "click", "target": "pause listing button", "expected": "Status update initiated"},
+      {"step": 5, "action": "wait", "target": "status update", "expected": "Status changes to PAUSED"},
+      {"step": 6, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 7, "action": "assert", "target": "search results", "expected": "Paused listing not visible"},
+      {"step": 8, "action": "navigate", "target": "/profile", "expected": "Back to profile"},
+      {"step": 9, "action": "click", "target": "activate listing button", "expected": "Reactivation initiated"},
+      {"step": 10, "action": "assert", "target": "listing status", "expected": "Shows ACTIVE again"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Suspended user tries to activate", "handling": "Action blocked"},
+      {"case": "Network error during update", "handling": "Error toast shown"}
+    ],
+    "likely_issues": [
+      {"issue": "Status change not reflected in search", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/listing-status.ts"}]},
+      {"issue": "Cache not invalidated", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/listing-status.ts"}]},
+      {"issue": "Optimistic update race condition", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/profile/ProfileClient.tsx"}]}
+    ],
+    "accessibility_checks": ["Status toggle accessible", "State change announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J015",
+    "title": "User uploads multiple images to listing",
+    "category": "listing",
+    "tags": ["auth", "slow"],
+    "entry_point": "/listings/create",
+    "preconditions": ["User is logged in"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/create", "expected": "Create form displayed"},
+      {"step": 3, "action": "upload", "target": "image uploader", "files": ["image1.jpg"], "expected": "First image uploaded"},
+      {"step": 4, "action": "assert", "target": "image preview", "expected": "Preview shown"},
+      {"step": 5, "action": "upload", "target": "image uploader", "files": ["image2.jpg", "image3.jpg"], "expected": "Multiple images uploaded"},
+      {"step": 6, "action": "assert", "target": "image count", "expected": "3 images shown"},
+      {"step": 7, "action": "drag", "target": "image 2", "to": "position 1", "expected": "Image reordered"},
+      {"step": 8, "action": "click", "target": "remove image 3", "expected": "Image removed"},
+      {"step": 9, "action": "assert", "target": "image count", "expected": "2 images remaining"}
+    ],
+    "negative_edge_cases": [
+      {"case": "File too large", "handling": "Error message with size limit"},
+      {"case": "Invalid file type", "handling": "Only images accepted message"},
+      {"case": "Max images exceeded", "handling": "Limit reached message"}
+    ],
+    "likely_issues": [
+      {"issue": "Upload progress not shown", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/listings/ImageUploader.tsx"}]},
+      {"issue": "Failed upload not retried", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/listings/ImageUploader.tsx"}]},
+      {"issue": "Drag and drop not working on mobile", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/listings/ImageUploader.tsx"}]},
+      {"issue": "Supabase upload timeout", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/supabase.ts"}]}
+    ],
+    "accessibility_checks": ["Upload progress announced", "Remove button labeled"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J016",
+    "title": "Authenticated user saves and unsaves a listing",
+    "category": "favorites",
+    "tags": ["auth", "mobile"],
+    "entry_point": "/search",
+    "preconditions": ["User is logged in", "Listings exist"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/search", "expected": "Search results displayed"},
+      {"step": 3, "action": "click", "target": "favorite heart on listing", "expected": "Heart fills/toggles"},
+      {"step": 4, "action": "assert", "target": "heart state", "expected": "Shows saved state"},
+      {"step": 5, "action": "navigate", "target": "/saved", "expected": "Saved listings page"},
+      {"step": 6, "action": "assert", "target": "saved listing", "expected": "Listing appears in saved"},
+      {"step": 7, "action": "click", "target": "favorite heart", "expected": "Heart unfills"},
+      {"step": 8, "action": "assert", "target": "saved list", "expected": "Listing removed"},
+      {"step": 9, "action": "navigate", "target": "/search", "expected": "Back to search"},
+      {"step": 10, "action": "assert", "target": "heart state", "expected": "Shows unsaved state"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Rate limit exceeded", "handling": "Toast with retry message"},
+      {"case": "Listing deleted while saved", "handling": "Gracefully removed from saved"}
+    ],
+    "likely_issues": [
+      {"issue": "Optimistic update not synced", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/FavoriteButton.tsx"}]},
+      {"issue": "Saved state lost on navigation", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/FavoriteButton.tsx"}]},
+      {"issue": "Double-click causes duplicate", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/favorites/route.ts"}]}
+    ],
+    "accessibility_checks": ["Heart button has label", "State change announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J017",
+    "title": "User creates and manages saved search with alerts",
+    "category": "search",
+    "tags": ["auth"],
+    "entry_point": "/search",
+    "preconditions": ["User is logged in"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/search?minPrice=500&maxPrice=2000", "expected": "Filtered search"},
+      {"step": 3, "action": "click", "target": "save search button", "expected": "Save dialog opens"},
+      {"step": 4, "action": "fill", "target": "search name input", "value": "Budget rooms", "expected": "Name entered"},
+      {"step": 5, "action": "select", "target": "alert frequency", "value": "Daily", "expected": "Frequency selected"},
+      {"step": 6, "action": "click", "target": "save button", "expected": "Search saved"},
+      {"step": 7, "action": "navigate", "target": "/saved-searches", "expected": "Saved searches page"},
+      {"step": 8, "action": "assert", "target": "saved search", "expected": "Budget rooms appears"},
+      {"step": 9, "action": "click", "target": "toggle alerts off", "expected": "Alerts disabled"},
+      {"step": 10, "action": "click", "target": "delete saved search", "expected": "Search removed"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Max saved searches reached", "handling": "Limit message shown"},
+      {"case": "Invalid filter JSON", "handling": "Error handled gracefully"}
+    ],
+    "likely_issues": [
+      {"issue": "Filters not captured correctly", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/saved-search.ts"}]},
+      {"issue": "Alert toggle not persisting", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/saved-search.ts"}]},
+      {"issue": "Saved search link incorrect", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/saved-searches/SavedSearchList.tsx"}]}
+    ],
+    "accessibility_checks": ["Dialog accessible", "Delete confirmation clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J018",
+    "title": "Tenant creates booking request for listing",
+    "category": "booking",
+    "tags": ["auth", "flaky"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["User is logged in", "User is not listing owner", "Listing has available slots"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/{listing_id}", "expected": "Listing detail page"},
+      {"step": 3, "action": "click", "target": "book now button", "expected": "Booking form opens"},
+      {"step": 4, "action": "fill", "target": "start date", "value": "2025-02-01", "expected": "Start date set"},
+      {"step": 5, "action": "fill", "target": "end date", "value": "2025-05-01", "expected": "End date set (90 days)"},
+      {"step": 6, "action": "assert", "target": "total price", "expected": "Calculated correctly"},
+      {"step": 7, "action": "click", "target": "submit booking", "expected": "Booking created"},
+      {"step": 8, "action": "wait", "target": "success message", "expected": "Booking confirmation"},
+      {"step": 9, "action": "navigate", "target": "/bookings", "expected": "Bookings page"},
+      {"step": 10, "action": "assert", "target": "booking status", "expected": "Shows PENDING"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Booking duration < 30 days", "handling": "Validation error"},
+      {"case": "Self-booking attempt", "handling": "Cannot book own listing message"},
+      {"case": "Blocked by host", "handling": "Booking blocked message"}
+    ],
+    "likely_issues": [
+      {"issue": "Double booking race condition", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/booking.ts"}]},
+      {"issue": "Price calculation mismatch", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/BookingForm.tsx"}]},
+      {"issue": "Idempotency key not preventing duplicate", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/booking.ts"}]},
+      {"issue": "Date picker timezone issues", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/date-picker.tsx"}]}
+    ],
+    "accessibility_checks": ["Date pickers accessible", "Error messages clear"],
+    "network_conditions": "flaky"
+  },
+  {
+    "id": "J019",
+    "title": "Host accepts pending booking request",
+    "category": "booking",
+    "tags": ["auth"],
+    "entry_point": "/bookings",
+    "preconditions": ["User is listing host", "Pending booking exists"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (host)", "expected": "Host authenticated"},
+      {"step": 2, "action": "navigate", "target": "/bookings", "expected": "Bookings page"},
+      {"step": 3, "action": "click", "target": "received bookings tab", "expected": "Tab switched"},
+      {"step": 4, "action": "assert", "target": "pending booking", "expected": "Booking visible with PENDING status"},
+      {"step": 5, "action": "click", "target": "accept button", "expected": "Confirmation dialog"},
+      {"step": 6, "action": "click", "target": "confirm accept", "expected": "Booking accepted"},
+      {"step": 7, "action": "assert", "target": "booking status", "expected": "Shows ACCEPTED"},
+      {"step": 8, "action": "navigate", "target": "/listings/{listing_id}", "expected": "Listing page"},
+      {"step": 9, "action": "assert", "target": "available slots", "expected": "Decremented by 1"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No available slots", "handling": "Accept blocked"},
+      {"case": "Booking already cancelled", "handling": "Stale state handled"}
+    ],
+    "likely_issues": [
+      {"issue": "Slots not decremented atomically", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/manage-booking.ts"}]},
+      {"issue": "Notification to tenant not sent", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/manage-booking.ts"}]},
+      {"issue": "Concurrent accept/reject race", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/manage-booking.ts"}]}
+    ],
+    "accessibility_checks": ["Action buttons labeled", "Status change announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J020",
+    "title": "Host rejects booking with reason",
+    "category": "booking",
+    "tags": ["auth"],
+    "entry_point": "/bookings",
+    "preconditions": ["User is listing host", "Pending booking exists"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (host)", "expected": "Host authenticated"},
+      {"step": 2, "action": "navigate", "target": "/bookings", "expected": "Bookings page"},
+      {"step": 3, "action": "click", "target": "reject button", "expected": "Rejection dialog opens"},
+      {"step": 4, "action": "fill", "target": "rejection reason", "value": "Dates not available", "expected": "Reason entered"},
+      {"step": 5, "action": "click", "target": "confirm reject", "expected": "Booking rejected"},
+      {"step": 6, "action": "assert", "target": "booking status", "expected": "Shows REJECTED"},
+      {"step": 7, "action": "assert", "target": "rejection reason", "expected": "Reason displayed"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Empty rejection reason", "handling": "Reason optional, proceeds anyway"},
+      {"case": "Booking already accepted", "handling": "Stale state handled"}
+    ],
+    "likely_issues": [
+      {"issue": "Rejection reason not saved", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/manage-booking.ts"}]},
+      {"issue": "Tenant not notified of rejection", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/manage-booking.ts"}]},
+      {"issue": "Rejection reason not shown to tenant", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/bookings/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Reason input labeled", "Rejection confirmed"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J021",
+    "title": "Tenant cancels their pending booking",
+    "category": "booking",
+    "tags": ["auth"],
+    "entry_point": "/bookings",
+    "preconditions": ["User has pending or accepted booking"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/bookings", "expected": "Bookings page"},
+      {"step": 3, "action": "assert", "target": "my booking", "expected": "Booking visible"},
+      {"step": 4, "action": "click", "target": "cancel booking button", "expected": "Confirmation dialog"},
+      {"step": 5, "action": "click", "target": "confirm cancel", "expected": "Booking cancelled"},
+      {"step": 6, "action": "assert", "target": "booking status", "expected": "Shows CANCELLED"},
+      {"step": 7, "action": "navigate", "target": "/listings/{listing_id}", "expected": "Listing page"},
+      {"step": 8, "action": "assert", "target": "available slots", "expected": "Restored if was ACCEPTED"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Cancelling already rejected booking", "handling": "Action blocked or no-op"},
+      {"case": "Host already cancelled listing", "handling": "Graceful handling"}
+    ],
+    "likely_issues": [
+      {"issue": "Slots not restored on cancel", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/manage-booking.ts"}]},
+      {"issue": "Cancel button visible for wrong statuses", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/bookings/page.tsx"}]},
+      {"issue": "Host not notified of cancellation", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/manage-booking.ts"}]}
+    ],
+    "accessibility_checks": ["Cancel confirmation clear", "Status update announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J022",
+    "title": "User starts conversation with listing host",
+    "category": "messaging",
+    "tags": ["auth", "a11y"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["User is logged in", "User is not listing owner", "Not blocked by host"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/{listing_id}", "expected": "Listing detail"},
+      {"step": 3, "action": "click", "target": "contact host button", "expected": "Message dialog or redirect"},
+      {"step": 4, "action": "fill", "target": "message input", "value": "Hi, is this still available?", "expected": "Message entered"},
+      {"step": 5, "action": "click", "target": "send button", "expected": "Message sent"},
+      {"step": 6, "action": "wait", "target": "message appears", "expected": "Message in conversation"},
+      {"step": 7, "action": "navigate", "target": "/messages", "expected": "Messages list"},
+      {"step": 8, "action": "assert", "target": "conversation", "expected": "New conversation visible"}
+    ],
+    "negative_edge_cases": [
+      {"case": "User blocked by host", "handling": "Cannot start conversation message"},
+      {"case": "Self-messaging attempt", "handling": "Button hidden for own listings"}
+    ],
+    "likely_issues": [
+      {"issue": "Duplicate conversation created", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/chat.ts"}]},
+      {"issue": "Block check race condition", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/chat.ts"}]},
+      {"issue": "Message not persisted", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/chat.ts"}]}
+    ],
+    "accessibility_checks": ["Message input labeled", "Send confirmation announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J023",
+    "title": "User sends and receives messages in real-time",
+    "category": "messaging",
+    "tags": ["auth", "slow"],
+    "entry_point": "/messages/[id]",
+    "preconditions": ["Conversation exists between two users"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/messages/{conversation_id}", "expected": "Chat window opens"},
+      {"step": 3, "action": "assert", "target": "previous messages", "expected": "History loaded"},
+      {"step": 4, "action": "fill", "target": "message input", "value": "New message", "expected": "Text entered"},
+      {"step": 5, "action": "click", "target": "send button", "expected": "Message sent"},
+      {"step": 6, "action": "assert", "target": "message list", "expected": "New message appears"},
+      {"step": 7, "action": "wait", "target": "5 seconds (polling)", "expected": "Polling interval passes"},
+      {"step": 8, "action": "simulate", "target": "other user sends message", "expected": "ASSUMPTION: Manual verification"},
+      {"step": 9, "action": "assert", "target": "incoming message", "expected": "New message from other user visible"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Network disconnection during send", "handling": "Retry or error message"},
+      {"case": "Message too long", "handling": "Character limit validation"}
+    ],
+    "likely_issues": [
+      {"issue": "Polling not fetching new messages", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/chat.ts"}]},
+      {"issue": "Messages duplicated on resend", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ChatWindow.tsx"}]},
+      {"issue": "Typing indicator stuck", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/chat.ts"}]},
+      {"issue": "Scroll position lost on new message", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/messages/[id]/ChatWindow.tsx"}]}
+    ],
+    "accessibility_checks": ["New messages announced", "Input focus managed"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J024",
+    "title": "User views typing indicator from other user",
+    "category": "messaging",
+    "tags": ["auth"],
+    "entry_point": "/messages/[id]",
+    "preconditions": ["Conversation exists", "Other user is active"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/messages/{conversation_id}", "expected": "Chat window"},
+      {"step": 3, "action": "fill", "target": "message input", "value": "typing...", "expected": "Text being entered"},
+      {"step": 4, "action": "assert", "target": "typing status API call", "expected": "Typing status sent"},
+      {"step": 5, "action": "clear", "target": "message input", "expected": "Input cleared"},
+      {"step": 6, "action": "wait", "target": "5 seconds", "expected": "Typing status expires"},
+      {"step": 7, "action": "assert", "target": "typing indicator", "expected": "Typing indicator disappears"}
+    ],
+    "negative_edge_cases": [
+      {"case": "API call fails", "handling": "Typing indicator gracefully fails"},
+      {"case": "User navigates away while typing", "handling": "Status cleared"}
+    ],
+    "likely_issues": [
+      {"issue": "Typing status not clearing", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/chat.ts"}]},
+      {"issue": "Too many API calls on keystroke", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/messages/[id]/ChatWindow.tsx"}]},
+      {"issue": "Indicator shown for wrong user", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/messages/[id]/ChatWindow.tsx"}]}
+    ],
+    "accessibility_checks": ["Typing indicator announced", "Not disruptive to input"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J025",
+    "title": "User blocks another user from messaging",
+    "category": "messaging",
+    "tags": ["auth"],
+    "entry_point": "/messages/[id]",
+    "preconditions": ["Conversation exists with other user"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/messages/{conversation_id}", "expected": "Chat window"},
+      {"step": 3, "action": "click", "target": "block user button", "expected": "Confirmation dialog"},
+      {"step": 4, "action": "click", "target": "confirm block", "expected": "User blocked"},
+      {"step": 5, "action": "assert", "target": "blocked banner", "expected": "Blocked state shown"},
+      {"step": 6, "action": "assert", "target": "message input", "expected": "Input disabled"},
+      {"step": 7, "action": "navigate", "target": "/settings", "expected": "Settings page"},
+      {"step": 8, "action": "assert", "target": "blocked users list", "expected": "Blocked user appears"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Block self attempt", "handling": "Action prevented"},
+      {"case": "Already blocked", "handling": "Show unblock option"}
+    ],
+    "likely_issues": [
+      {"issue": "Block not bidirectional", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/block.ts"}]},
+      {"issue": "Messages still sendable after block", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/chat.ts"}]},
+      {"issue": "Blocked user can still book", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/booking.ts"}]}
+    ],
+    "accessibility_checks": ["Block action confirmation", "Blocked state clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J026",
+    "title": "User submits review for completed booking",
+    "category": "reviews",
+    "tags": ["auth", "a11y"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["User has booking history with listing"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/{listing_id}", "expected": "Listing detail"},
+      {"step": 3, "action": "scroll", "target": "reviews section", "expected": "Reviews visible"},
+      {"step": 4, "action": "click", "target": "write review button", "expected": "Review form opens"},
+      {"step": 5, "action": "click", "target": "star rating 4", "expected": "4 stars selected"},
+      {"step": 6, "action": "fill", "target": "review text", "value": "Great place, very clean!", "expected": "Review entered"},
+      {"step": 7, "action": "click", "target": "submit review", "expected": "Review submitted"},
+      {"step": 8, "action": "assert", "target": "reviews list", "expected": "New review appears"},
+      {"step": 9, "action": "assert", "target": "average rating", "expected": "Rating updated"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No booking history", "handling": "Review button hidden or disabled"},
+      {"case": "Already reviewed", "handling": "Edit existing review option"}
+    ],
+    "likely_issues": [
+      {"issue": "Review submitted without booking check", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/reviews/route.ts"}]},
+      {"issue": "Duplicate review created", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/reviews/route.ts"}]},
+      {"issue": "Average rating not recalculated", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]}
+    ],
+    "accessibility_checks": ["Star rating keyboard accessible", "Review form labeled"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J027",
+    "title": "Host responds to review on their listing",
+    "category": "reviews",
+    "tags": ["auth"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["User owns listing", "Review exists on listing"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (host)", "expected": "Host authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/{listing_id}", "expected": "Listing detail"},
+      {"step": 3, "action": "scroll", "target": "reviews section", "expected": "Reviews visible"},
+      {"step": 4, "action": "click", "target": "respond to review button", "expected": "Response form opens"},
+      {"step": 5, "action": "fill", "target": "response text", "value": "Thank you for your kind words!", "expected": "Response entered"},
+      {"step": 6, "action": "click", "target": "submit response", "expected": "Response saved"},
+      {"step": 7, "action": "assert", "target": "review card", "expected": "Response visible under review"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Non-owner tries to respond", "handling": "Button not visible"},
+      {"case": "Response already exists", "handling": "Edit existing response"}
+    ],
+    "likely_issues": [
+      {"issue": "Multiple responses allowed", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/review-response.ts"}]},
+      {"issue": "Response not associated with review", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/review-response.ts"}]},
+      {"issue": "Reviewer not notified", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/review-response.ts"}]}
+    ],
+    "accessibility_checks": ["Response form accessible", "Submission confirmed"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J028",
+    "title": "User edits their profile information",
+    "category": "profile",
+    "tags": ["auth", "mobile"],
+    "entry_point": "/profile/edit",
+    "preconditions": ["User is logged in"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/profile/edit", "expected": "Edit profile form"},
+      {"step": 3, "action": "assert", "target": "current values", "expected": "Form pre-filled"},
+      {"step": 4, "action": "clear_and_fill", "target": "bio textarea", "value": "Updated bio text here", "expected": "Bio updated"},
+      {"step": 5, "action": "select", "target": "language dropdown", "value": "Spanish", "expected": "Language added"},
+      {"step": 6, "action": "click", "target": "save button", "expected": "Profile saved"},
+      {"step": 7, "action": "wait", "target": "success toast", "expected": "Success message"},
+      {"step": 8, "action": "navigate", "target": "/profile", "expected": "View profile"},
+      {"step": 9, "action": "assert", "target": "bio", "expected": "Shows updated bio"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Invalid image URL", "handling": "Validation error"},
+      {"case": "Bio too long", "handling": "Character limit shown"}
+    ],
+    "likely_issues": [
+      {"issue": "Languages not saving correctly", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/profile.ts"}]},
+      {"issue": "Avatar upload failing", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/profile/edit/page.tsx"}]},
+      {"issue": "Session not updated with new data", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/auth.ts"}]}
+    ],
+    "accessibility_checks": ["All inputs labeled", "Save confirmation clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J029",
+    "title": "User updates notification preferences",
+    "category": "settings",
+    "tags": ["auth"],
+    "entry_point": "/settings",
+    "preconditions": ["User is logged in"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/settings", "expected": "Settings page"},
+      {"step": 3, "action": "assert", "target": "notification toggles", "expected": "Current preferences shown"},
+      {"step": 4, "action": "toggle", "target": "email booking requests", "expected": "Toggle changed"},
+      {"step": 5, "action": "toggle", "target": "email messages", "expected": "Toggle changed"},
+      {"step": 6, "action": "click", "target": "save preferences", "expected": "Preferences saved"},
+      {"step": 7, "action": "refresh", "target": "page", "expected": "Settings page reloads"},
+      {"step": 8, "action": "assert", "target": "toggle states", "expected": "Changes persisted"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Save fails", "handling": "Error message, state reverted"},
+      {"case": "Invalid preference data", "handling": "Validation on server"}
+    ],
+    "likely_issues": [
+      {"issue": "Preferences not persisting", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/settings.ts"}]},
+      {"issue": "Toggle state out of sync", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/settings/page.tsx"}]},
+      {"issue": "JSON parsing error", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/settings.ts"}]}
+    ],
+    "accessibility_checks": ["Toggles accessible", "Save announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J030",
+    "title": "User changes password successfully",
+    "category": "settings",
+    "tags": ["auth"],
+    "entry_point": "/settings",
+    "preconditions": ["User has password-based account"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/settings", "expected": "Settings page"},
+      {"step": 3, "action": "fill", "target": "current password", "value": "{{E2E_TEST_PASSWORD}}", "expected": "Current password entered"},
+      {"step": 4, "action": "fill", "target": "new password", "value": "NewPassword123!", "expected": "New password entered"},
+      {"step": 5, "action": "fill", "target": "confirm password", "value": "NewPassword123!", "expected": "Confirmation entered"},
+      {"step": 6, "action": "click", "target": "change password button", "expected": "Password change initiated"},
+      {"step": 7, "action": "wait", "target": "success message", "expected": "Password changed successfully"},
+      {"step": 8, "action": "click", "target": "logout", "expected": "Logged out"},
+      {"step": 9, "action": "login_with", "target": "new password", "expected": "Login with new password works"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Wrong current password", "handling": "Error message"},
+      {"case": "Passwords don't match", "handling": "Validation error"},
+      {"case": "OAuth-only account", "handling": "Change password section hidden"}
+    ],
+    "likely_issues": [
+      {"issue": "Password not hashed correctly", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/settings.ts"}]},
+      {"issue": "Session not invalidated after change", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/settings.ts"}]},
+      {"issue": "Old password still works", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/settings.ts"}]}
+    ],
+    "accessibility_checks": ["Password fields labeled", "Error messages clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J031",
+    "title": "User deletes account with confirmation",
+    "category": "settings",
+    "tags": ["auth"],
+    "entry_point": "/settings",
+    "preconditions": ["User is logged in"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/settings", "expected": "Settings page"},
+      {"step": 3, "action": "scroll", "target": "danger zone", "expected": "Delete section visible"},
+      {"step": 4, "action": "click", "target": "delete account button", "expected": "Confirmation dialog"},
+      {"step": 5, "action": "fill", "target": "confirmation input", "value": "DELETE", "expected": "DELETE typed"},
+      {"step": 6, "action": "fill", "target": "password input", "value": "{{E2E_TEST_PASSWORD}}", "expected": "Password entered"},
+      {"step": 7, "action": "click", "target": "confirm delete", "expected": "Account deletion initiated"},
+      {"step": 8, "action": "wait", "target": "redirect", "expected": "Redirected to home"},
+      {"step": 9, "action": "navigate", "target": "/login", "expected": "Login page"},
+      {"step": 10, "action": "login_with", "target": "old credentials", "expected": "Login fails (account deleted)"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Wrong confirmation word", "handling": "Button disabled"},
+      {"case": "Wrong password", "handling": "Error message"},
+      {"case": "Has active bookings", "handling": "ASSUMPTION: May still proceed"}
+    ],
+    "likely_issues": [
+      {"issue": "Data not cascaded deleted", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/settings.ts"}]},
+      {"issue": "Session not cleared after delete", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/settings.ts"}]},
+      {"issue": "Partial deletion leaves orphans", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/settings.ts"}]}
+    ],
+    "accessibility_checks": ["Confirmation clear and accessible", "Danger zone visually distinct"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J032",
+    "title": "User submits ID verification request",
+    "category": "verification",
+    "tags": ["auth", "slow"],
+    "entry_point": "/verify",
+    "preconditions": ["User is logged in", "No pending verification"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/verify", "expected": "Verification page"},
+      {"step": 3, "action": "select", "target": "document type", "value": "Passport", "expected": "Type selected"},
+      {"step": 4, "action": "upload", "target": "document image", "files": ["passport.jpg"], "expected": "Document uploaded"},
+      {"step": 5, "action": "upload", "target": "selfie image", "files": ["selfie.jpg"], "expected": "Selfie uploaded"},
+      {"step": 6, "action": "click", "target": "submit verification", "expected": "Request submitted"},
+      {"step": 7, "action": "assert", "target": "status", "expected": "Shows PENDING"},
+      {"step": 8, "action": "refresh", "target": "page", "expected": "Status persists"},
+      {"step": 9, "action": "assert", "target": "submit button", "expected": "Disabled while pending"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Already pending", "handling": "Cannot submit new request"},
+      {"case": "Rejected within 24h", "handling": "Cooldown message shown"}
+    ],
+    "likely_issues": [
+      {"issue": "Image upload to Supabase fails", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/supabase.ts"}]},
+      {"issue": "Verification status not updating", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/verification.ts"}]},
+      {"issue": "Cooldown period not enforced", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/verification.ts"}]}
+    ],
+    "accessibility_checks": ["Upload instructions clear", "Status announced"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J033",
+    "title": "Admin views dashboard with stats",
+    "category": "admin",
+    "tags": ["auth", "role:admin"],
+    "entry_point": "/admin",
+    "preconditions": ["User is admin"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (admin)", "expected": "Admin authenticated"},
+      {"step": 2, "action": "navigate", "target": "/admin", "expected": "Admin dashboard"},
+      {"step": 3, "action": "assert", "target": "total users stat", "expected": "Number displayed"},
+      {"step": 4, "action": "assert", "target": "total listings stat", "expected": "Number displayed"},
+      {"step": 5, "action": "assert", "target": "pending verifications", "expected": "Count shown with badge if > 0"},
+      {"step": 6, "action": "assert", "target": "open reports", "expected": "Count shown"},
+      {"step": 7, "action": "click", "target": "view verifications link", "expected": "Navigate to verifications"},
+      {"step": 8, "action": "assert", "target": "verifications page", "expected": "Verification queue displayed"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Non-admin access", "handling": "Redirect to home"},
+      {"case": "Stats query timeout", "handling": "Loading state or error"}
+    ],
+    "likely_issues": [
+      {"issue": "Stats not accurate", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/admin.ts"}]},
+      {"issue": "Admin check bypassed", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/admin/page.tsx"}]},
+      {"issue": "Dashboard slow to load", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/admin/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Stats readable", "Navigation clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J034",
+    "title": "Admin approves verification request",
+    "category": "admin",
+    "tags": ["auth", "role:admin"],
+    "entry_point": "/admin/verifications",
+    "preconditions": ["User is admin", "Pending verification exists"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (admin)", "expected": "Admin authenticated"},
+      {"step": 2, "action": "navigate", "target": "/admin/verifications", "expected": "Verification queue"},
+      {"step": 3, "action": "assert", "target": "pending request", "expected": "At least one pending"},
+      {"step": 4, "action": "click", "target": "view document button", "expected": "Document image displayed"},
+      {"step": 5, "action": "click", "target": "approve button", "expected": "Confirmation dialog"},
+      {"step": 6, "action": "click", "target": "confirm approve", "expected": "Verification approved"},
+      {"step": 7, "action": "assert", "target": "request status", "expected": "Shows APPROVED or removed from queue"},
+      {"step": 8, "action": "navigate", "target": "/users/{user_id}", "expected": "User profile"},
+      {"step": 9, "action": "assert", "target": "verified badge", "expected": "Badge visible"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Request already processed", "handling": "Stale state handled"},
+      {"case": "User deleted during review", "handling": "Graceful error"}
+    ],
+    "likely_issues": [
+      {"issue": "isVerified not set on user", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/verification.ts"}]},
+      {"issue": "Audit log not created", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/verification.ts"}]},
+      {"issue": "Notification not sent to user", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/verification.ts"}]}
+    ],
+    "accessibility_checks": ["Document images have alt text", "Actions labeled"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J035",
+    "title": "Admin rejects verification with reason",
+    "category": "admin",
+    "tags": ["auth", "role:admin"],
+    "entry_point": "/admin/verifications",
+    "preconditions": ["User is admin", "Pending verification exists"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (admin)", "expected": "Admin authenticated"},
+      {"step": 2, "action": "navigate", "target": "/admin/verifications", "expected": "Verification queue"},
+      {"step": 3, "action": "click", "target": "reject button", "expected": "Rejection dialog"},
+      {"step": 4, "action": "fill", "target": "rejection reason", "value": "Document blurry and unreadable", "expected": "Reason entered"},
+      {"step": 5, "action": "click", "target": "confirm reject", "expected": "Verification rejected"},
+      {"step": 6, "action": "assert", "target": "request status", "expected": "Shows REJECTED"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Empty rejection reason", "handling": "Reason required or optional"},
+      {"case": "Already approved", "handling": "Cannot reject approved"}
+    ],
+    "likely_issues": [
+      {"issue": "Rejection reason not saved", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/verification.ts"}]},
+      {"issue": "User not notified of rejection", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/verification.ts"}]},
+      {"issue": "Cooldown not starting", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/verification.ts"}]}
+    ],
+    "accessibility_checks": ["Reason input labeled", "Rejection confirmed"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J036",
+    "title": "Admin suspends user account",
+    "category": "admin",
+    "tags": ["auth", "role:admin"],
+    "entry_point": "/admin/users",
+    "preconditions": ["User is admin", "Target user exists"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (admin)", "expected": "Admin authenticated"},
+      {"step": 2, "action": "navigate", "target": "/admin/users", "expected": "User management"},
+      {"step": 3, "action": "fill", "target": "search input", "value": "target@example.com", "expected": "Search executed"},
+      {"step": 4, "action": "click", "target": "suspend button", "expected": "Confirmation dialog"},
+      {"step": 5, "action": "click", "target": "confirm suspend", "expected": "User suspended"},
+      {"step": 6, "action": "assert", "target": "user status", "expected": "Shows suspended"},
+      {"step": 7, "action": "logout", "target": "admin", "expected": "Admin logged out"},
+      {"step": 8, "action": "login_as", "target": "suspended user", "expected": "Login blocked with message"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Suspend self", "handling": "Action prevented"},
+      {"case": "Suspend other admin", "handling": "ASSUMPTION: Allowed or blocked"}
+    ],
+    "likely_issues": [
+      {"issue": "Suspended user can still login", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/auth.ts"}]},
+      {"issue": "Audit log missing", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/admin.ts"}]},
+      {"issue": "Active sessions not invalidated", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/admin.ts"}]}
+    ],
+    "accessibility_checks": ["Suspend action clear", "Status visible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J037",
+    "title": "Admin resolves listing report",
+    "category": "admin",
+    "tags": ["auth", "role:admin"],
+    "entry_point": "/admin/reports",
+    "preconditions": ["User is admin", "Open report exists"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (admin)", "expected": "Admin authenticated"},
+      {"step": 2, "action": "navigate", "target": "/admin/reports", "expected": "Reports page"},
+      {"step": 3, "action": "assert", "target": "open reports", "expected": "At least one report visible"},
+      {"step": 4, "action": "click", "target": "view report details", "expected": "Report details shown"},
+      {"step": 5, "action": "fill", "target": "admin notes", "value": "Reviewed and addressed", "expected": "Notes entered"},
+      {"step": 6, "action": "click", "target": "resolve report", "expected": "Report resolved"},
+      {"step": 7, "action": "assert", "target": "report status", "expected": "Shows RESOLVED"},
+      {"step": 8, "action": "navigate", "target": "/admin/audit", "expected": "Audit log"},
+      {"step": 9, "action": "assert", "target": "audit entry", "expected": "Report resolution logged"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Report already resolved", "handling": "Cannot resolve again"},
+      {"case": "Listing deleted during review", "handling": "Graceful handling"}
+    ],
+    "likely_issues": [
+      {"issue": "Report status not updating", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/admin.ts"}]},
+      {"issue": "Admin notes not saved", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/admin.ts"}]},
+      {"issue": "Audit trail incomplete", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/audit.ts"}]}
+    ],
+    "accessibility_checks": ["Report details accessible", "Resolution confirmed"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J038",
+    "title": "User views notifications and marks as read",
+    "category": "notifications",
+    "tags": ["auth", "mobile"],
+    "entry_point": "/notifications",
+    "preconditions": ["User has unread notifications"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "assert", "target": "notification badge", "expected": "Unread count visible"},
+      {"step": 3, "action": "click", "target": "notification bell", "expected": "Dropdown or navigate"},
+      {"step": 4, "action": "navigate", "target": "/notifications", "expected": "Full notifications page"},
+      {"step": 5, "action": "assert", "target": "unread notifications", "expected": "Unread items highlighted"},
+      {"step": 6, "action": "click", "target": "notification item", "expected": "Marked as read"},
+      {"step": 7, "action": "click", "target": "mark all as read", "expected": "All marked read"},
+      {"step": 8, "action": "assert", "target": "notification badge", "expected": "Badge gone or shows 0"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No notifications", "handling": "Empty state message"},
+      {"case": "Notification link broken", "handling": "Graceful error"}
+    ],
+    "likely_issues": [
+      {"issue": "Badge count not synced", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NavbarClient.tsx"}]},
+      {"issue": "Mark as read not persisting", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/notifications.ts"}]},
+      {"issue": "Notification links invalid", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/notifications.ts"}]}
+    ],
+    "accessibility_checks": ["Notifications announced", "Read state clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J039",
+    "title": "User views recently viewed listings",
+    "category": "discovery",
+    "tags": ["auth"],
+    "entry_point": "/recently-viewed",
+    "preconditions": ["User has viewed listings"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/{id1}", "expected": "View first listing"},
+      {"step": 3, "action": "navigate", "target": "/listings/{id2}", "expected": "View second listing"},
+      {"step": 4, "action": "navigate", "target": "/recently-viewed", "expected": "Recently viewed page"},
+      {"step": 5, "action": "assert", "target": "listing count", "expected": "At least 2 listings"},
+      {"step": 6, "action": "assert", "target": "order", "expected": "Most recent first"},
+      {"step": 7, "action": "click", "target": "first listing", "expected": "Navigate to listing"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No view history", "handling": "Empty state"},
+      {"case": "Viewed listing deleted", "handling": "Gracefully removed"}
+    ],
+    "likely_issues": [
+      {"issue": "View not tracked", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/listing-status.ts"}]},
+      {"issue": "Max views not enforced", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/listing-status.ts"}]},
+      {"issue": "Order incorrect", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/recently-viewed/page.tsx"}]}
+    ],
+    "accessibility_checks": ["List navigable", "Timestamps readable"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J040",
+    "title": "User reports inappropriate listing",
+    "category": "reporting",
+    "tags": ["auth"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["User is logged in", "User is not listing owner"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/{listing_id}", "expected": "Listing detail"},
+      {"step": 3, "action": "click", "target": "report button", "expected": "Report dialog opens"},
+      {"step": 4, "action": "select", "target": "report reason", "value": "Misleading information", "expected": "Reason selected"},
+      {"step": 5, "action": "fill", "target": "report details", "value": "The photos don't match the actual property", "expected": "Details entered"},
+      {"step": 6, "action": "click", "target": "submit report", "expected": "Report submitted"},
+      {"step": 7, "action": "assert", "target": "success message", "expected": "Report confirmation"},
+      {"step": 8, "action": "click", "target": "report button again", "expected": "Already reported message"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Empty reason", "handling": "Validation error"},
+      {"case": "Already reported", "handling": "Duplicate prevention message"}
+    ],
+    "likely_issues": [
+      {"issue": "Duplicate report allowed", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/reports/route.ts"}]},
+      {"issue": "Report not created", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/reports/route.ts"}]},
+      {"issue": "Rate limit too restrictive", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/rate-limit.ts"}]}
+    ],
+    "accessibility_checks": ["Report form accessible", "Confirmation clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J041",
+    "title": "Anonymous user accesses protected route",
+    "category": "auth",
+    "tags": ["anon", "auth"],
+    "entry_point": "/profile",
+    "preconditions": ["User is not logged in"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/profile", "expected": "Redirect to /login"},
+      {"step": 2, "action": "assert", "target": "URL", "expected": "Contains /login"},
+      {"step": 3, "action": "assert", "target": "callbackUrl param", "expected": "Contains /profile"},
+      {"step": 4, "action": "navigate", "target": "/bookings", "expected": "Redirect to /login"},
+      {"step": 5, "action": "navigate", "target": "/messages", "expected": "Redirect to /login"},
+      {"step": 6, "action": "navigate", "target": "/settings", "expected": "Redirect to /login"},
+      {"step": 7, "action": "navigate", "target": "/admin", "expected": "Redirect to /login"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Stale session cookie", "handling": "Proper redirect"},
+      {"case": "Invalid callbackUrl", "handling": "Safe redirect"}
+    ],
+    "likely_issues": [
+      {"issue": "Protected route accessible", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/middleware.ts"}]},
+      {"issue": "Callback URL manipulation", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/auth.ts"}]},
+      {"issue": "Error page shown instead of redirect", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/middleware.ts"}]}
+    ],
+    "accessibility_checks": ["Redirect is smooth", "Login form accessible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J042",
+    "title": "User navigates app while offline",
+    "category": "pwa",
+    "tags": ["anon", "flaky", "offline"],
+    "entry_point": "/",
+    "preconditions": ["App loaded once while online", "Service worker registered"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/", "expected": "Home page loads"},
+      {"step": 2, "action": "set_offline", "target": "context", "expected": "Network disabled"},
+      {"step": 3, "action": "navigate", "target": "/search", "expected": "Offline page or cached content"},
+      {"step": 4, "action": "assert", "target": "offline indicator", "expected": "Offline status shown"},
+      {"step": 5, "action": "click", "target": "any interactive element", "expected": "Graceful failure or queued action"},
+      {"step": 6, "action": "set_online", "target": "context", "expected": "Network restored"},
+      {"step": 7, "action": "refresh", "target": "page", "expected": "Normal content loads"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Never visited while online", "handling": "Full offline fallback"},
+      {"case": "Service worker failed", "handling": "Browser default offline"}
+    ],
+    "likely_issues": [
+      {"issue": "Service worker not caching", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "public/sw.js"}]},
+      {"issue": "Offline page not styled", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/offline/page.tsx"}]},
+      {"issue": "Actions attempted while offline crash", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/hooks/useNetworkStatus.ts"}]}
+    ],
+    "accessibility_checks": ["Offline state clearly communicated", "Retry options available"],
+    "network_conditions": "offline"
+  },
+  {
+    "id": "J043",
+    "title": "Mobile user navigates using touch gestures",
+    "category": "mobile",
+    "tags": ["anon", "mobile", "a11y"],
+    "entry_point": "/",
+    "preconditions": ["Mobile viewport"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/", "expected": "Mobile layout loads"},
+      {"step": 2, "action": "tap", "target": "hamburger menu", "expected": "Mobile nav opens"},
+      {"step": 3, "action": "tap", "target": "search link", "expected": "Navigate to search"},
+      {"step": 4, "action": "swipe", "target": "search results", "direction": "up", "expected": "Scroll results"},
+      {"step": 5, "action": "tap", "target": "listing card", "expected": "Navigate to detail"},
+      {"step": 6, "action": "swipe", "target": "image gallery", "direction": "left", "expected": "Next image"},
+      {"step": 7, "action": "pinch", "target": "map", "expected": "Map zooms"},
+      {"step": 8, "action": "tap", "target": "back button", "expected": "Navigate back"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Touch target too small", "handling": "44px minimum"},
+      {"case": "Gesture conflicts", "handling": "Clear gesture areas"}
+    ],
+    "likely_issues": [
+      {"issue": "Menu not closing on navigation", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Navbar.tsx"}]},
+      {"issue": "Swipe not detected on gallery", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]},
+      {"issue": "Touch targets too small", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/button.tsx"}]}
+    ],
+    "accessibility_checks": ["Touch targets 44px+", "Gestures have alternatives"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J044",
+    "title": "User completes full booking flow end-to-end",
+    "category": "booking",
+    "tags": ["auth", "e2e", "flaky"],
+    "entry_point": "/",
+    "preconditions": ["User account exists", "Listing with available slots exists"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 3, "action": "click", "target": "listing with available slots", "expected": "Listing detail"},
+      {"step": 4, "action": "click", "target": "book now", "expected": "Booking form"},
+      {"step": 5, "action": "fill", "target": "dates", "value": "valid 60-day range", "expected": "Dates set"},
+      {"step": 6, "action": "click", "target": "submit booking", "expected": "Booking created"},
+      {"step": 7, "action": "navigate", "target": "/bookings", "expected": "My bookings"},
+      {"step": 8, "action": "assert", "target": "booking", "expected": "Shows PENDING"},
+      {"step": 9, "action": "logout", "target": "user", "expected": "Logged out"},
+      {"step": 10, "action": "login", "target": "host account", "expected": "Host authenticated"},
+      {"step": 11, "action": "navigate", "target": "/bookings", "expected": "Host bookings"},
+      {"step": 12, "action": "click", "target": "accept", "expected": "Booking accepted"},
+      {"step": 13, "action": "assert", "target": "status", "expected": "Shows ACCEPTED"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Slots fill before acceptance", "handling": "Capacity error"},
+      {"case": "Host and tenant same person", "handling": "Blocked at start"}
+    ],
+    "likely_issues": [
+      {"issue": "Full flow timing out", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]},
+      {"issue": "State not syncing between users", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/bookings/page.tsx"}]},
+      {"issue": "Notification not arriving", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/booking.ts"}]},
+      {"issue": "Multiple account handling", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]}
+    ],
+    "accessibility_checks": ["All steps accessible", "Progress clear"],
+    "network_conditions": "flaky"
+  },
+  {
+    "id": "J045",
+    "title": "User experiences slow network on search",
+    "category": "search",
+    "tags": ["anon", "slow", "a11y"],
+    "entry_point": "/search",
+    "preconditions": ["Network throttled to 3G"],
+    "steps": [
+      {"step": 1, "action": "set_network", "target": "slow-3g", "expected": "Network throttled"},
+      {"step": 2, "action": "navigate", "target": "/search", "expected": "Page starts loading"},
+      {"step": 3, "action": "assert", "target": "loading skeletons", "expected": "Skeletons visible"},
+      {"step": 4, "action": "wait", "target": "results load", "expected": "Results eventually appear"},
+      {"step": 5, "action": "fill", "target": "filter", "value": "price range", "expected": "Filter debounced"},
+      {"step": 6, "action": "assert", "target": "loading indicator", "expected": "Loading shown during fetch"},
+      {"step": 7, "action": "wait", "target": "filtered results", "expected": "Filtered results appear"},
+      {"step": 8, "action": "set_network", "target": "normal", "expected": "Network restored"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Request timeout", "handling": "Timeout error shown"},
+      {"case": "Partial data load", "handling": "Graceful degradation"}
+    ],
+    "likely_issues": [
+      {"issue": "No loading feedback", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/loading.tsx"}]},
+      {"issue": "Request not debounced", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SearchForm.tsx"}]},
+      {"issue": "Timeout not handled", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/data.ts"}]},
+      {"issue": "Skeleton layout shift", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/components/skeletons/ListingCardSkeleton.tsx"}]}
+    ],
+    "accessibility_checks": ["Loading state announced", "Timeout communicated"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J046",
+    "title": "User encounters rate limit on actions",
+    "category": "ratelimit",
+    "tags": ["auth", "flaky"],
+    "entry_point": "/search",
+    "preconditions": ["User authenticated", "Rate limit config allows testing"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "loop", "target": "save listing action", "count": 65, "expected": "Multiple saves attempted"},
+      {"step": 3, "action": "assert", "target": "rate limit response", "expected": "429 status or error message"},
+      {"step": 4, "action": "assert", "target": "retry-after header", "expected": "Contains retry time"},
+      {"step": 5, "action": "assert", "target": "UI feedback", "expected": "Rate limit message shown to user"},
+      {"step": 6, "action": "wait", "target": "rate limit window", "expected": "Wait for reset"},
+      {"step": 7, "action": "click", "target": "save action", "expected": "Action succeeds again"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Rate limit misconfigured", "handling": "Default limits apply"},
+      {"case": "Rate limit bypass attempt", "handling": "Still blocked"}
+    ],
+    "likely_issues": [
+      {"issue": "No user feedback on rate limit", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/FavoriteButton.tsx"}]},
+      {"issue": "Rate limit not enforced", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/rate-limit.ts"}]},
+      {"issue": "Rate limit too aggressive", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/rate-limit.ts"}]}
+    ],
+    "accessibility_checks": ["Rate limit message accessible", "Retry info clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J047",
+    "title": "User keyboard navigates entire listing page",
+    "category": "accessibility",
+    "tags": ["anon", "a11y"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing exists with reviews"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/listings/{id}", "expected": "Listing page loads"},
+      {"step": 2, "action": "press", "target": "Tab", "expected": "Focus moves to first element"},
+      {"step": 3, "action": "press_repeat", "target": "Tab", "count": 5, "expected": "Focus moves through nav"},
+      {"step": 4, "action": "assert", "target": "focus visible", "expected": "Visible focus ring"},
+      {"step": 5, "action": "press", "target": "Tab to gallery", "expected": "Gallery receives focus"},
+      {"step": 6, "action": "press", "target": "ArrowRight", "expected": "Gallery advances"},
+      {"step": 7, "action": "press", "target": "Tab to book button", "expected": "Book button focused"},
+      {"step": 8, "action": "press", "target": "Enter", "expected": "Booking form opens"},
+      {"step": 9, "action": "press", "target": "Escape", "expected": "Dialog closes"},
+      {"step": 10, "action": "assert", "target": "focus restored", "expected": "Focus returns to trigger"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Focus trap in modal", "handling": "Focus stays in modal"},
+      {"case": "Focus lost after action", "handling": "Focus management implemented"}
+    ],
+    "likely_issues": [
+      {"issue": "Focus ring not visible", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/globals.css"}]},
+      {"issue": "Tab order incorrect", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/ListingPageClient.tsx"}]},
+      {"issue": "Escape not closing modal", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/dialog.tsx"}]},
+      {"issue": "Focus not restored after modal", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/dialog.tsx"}]}
+    ],
+    "accessibility_checks": ["Full keyboard navigation", "No focus traps outside modals"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J048",
+    "title": "Screen reader announces search form correctly",
+    "category": "accessibility",
+    "tags": ["anon", "a11y"],
+    "entry_point": "/search",
+    "preconditions": ["Screen reader simulation"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page loads"},
+      {"step": 2, "action": "assert_aria", "target": "price inputs", "expected": "Labels read correctly"},
+      {"step": 3, "action": "assert_aria", "target": "checkboxes", "expected": "State announced"},
+      {"step": 4, "action": "assert_aria", "target": "dropdowns", "expected": "Options announced"},
+      {"step": 5, "action": "assert_aria", "target": "search button", "expected": "Button role and label"},
+      {"step": 6, "action": "assert_aria", "target": "results region", "expected": "Live region or landmark"},
+      {"step": 7, "action": "fill", "target": "filters", "expected": "Changes announced"},
+      {"step": 8, "action": "click", "target": "search", "expected": "Loading state announced"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Missing labels", "handling": "Fallback text"},
+      {"case": "Icon-only buttons", "handling": "aria-label required"}
+    ],
+    "likely_issues": [
+      {"issue": "Missing form labels", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SearchForm.tsx"}]},
+      {"issue": "Checkbox state not announced", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/checkbox.tsx"}]},
+      {"issue": "Results not in live region", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/page.tsx"}]},
+      {"issue": "Icon buttons missing labels", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/button.tsx"}]}
+    ],
+    "accessibility_checks": ["All controls labeled", "Dynamic content announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J049",
+    "title": "User interacts with neighborhood AI chat",
+    "category": "ai",
+    "tags": ["auth", "slow"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Groq API configured", "Listing has coordinates"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/{id}", "expected": "Listing detail"},
+      {"step": 3, "action": "scroll", "target": "neighborhood section", "expected": "AI chat visible"},
+      {"step": 4, "action": "fill", "target": "chat input", "value": "What restaurants are nearby?", "expected": "Question entered"},
+      {"step": 5, "action": "click", "target": "send button", "expected": "Message sent"},
+      {"step": 6, "action": "wait", "target": "AI response", "expected": "Response streams in"},
+      {"step": 7, "action": "assert", "target": "response content", "expected": "Contains relevant info"},
+      {"step": 8, "action": "fill", "target": "chat input", "value": "Tell me about schools", "expected": "Follow-up question"},
+      {"step": 9, "action": "click", "target": "send", "expected": "Second response received"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Groq API unavailable", "handling": "Error message shown"},
+      {"case": "Fair housing violation query", "handling": "Blocked with message"}
+    ],
+    "likely_issues": [
+      {"issue": "Streaming not working", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/chat/route.ts"}]},
+      {"issue": "Rate limit hit quickly", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/rate-limit-redis.ts"}]},
+      {"issue": "Fair housing filter too aggressive", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/fair-housing-policy.ts"}]},
+      {"issue": "Context not maintained", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NeighborhoodChat.tsx"}]}
+    ],
+    "accessibility_checks": ["Chat accessible", "Responses announced"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J050",
+    "title": "User encounters 404 page for deleted listing",
+    "category": "error",
+    "tags": ["anon"],
+    "entry_point": "/listings/nonexistent",
+    "preconditions": ["Listing ID does not exist"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/listings/nonexistent-id", "expected": "404 page displayed"},
+      {"step": 2, "action": "assert", "target": "page content", "expected": "Friendly 404 message"},
+      {"step": 3, "action": "assert", "target": "navigation options", "expected": "Link back to search"},
+      {"step": 4, "action": "click", "target": "back to search link", "expected": "Navigate to search"},
+      {"step": 5, "action": "assert", "target": "URL", "expected": "On /search page"}
+    ],
+    "negative_edge_cases": [
+      {"case": "500 error instead of 404", "handling": "Proper 404 response"},
+      {"case": "Blank page", "handling": "404 component renders"}
+    ],
+    "likely_issues": [
+      {"issue": "Generic error instead of 404", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/page.tsx"}]},
+      {"issue": "404 page not styled", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/not-found.tsx"}]},
+      {"issue": "Navigation links broken", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/not-found.tsx"}]}
+    ],
+    "accessibility_checks": ["404 message clear", "Navigation available"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J051",
+    "title": "User refreshes page during form submission",
+    "category": "form",
+    "tags": ["auth", "flaky"],
+    "entry_point": "/listings/create",
+    "preconditions": ["User logged in", "Form partially filled"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/create", "expected": "Create form"},
+      {"step": 3, "action": "fill", "target": "all fields", "expected": "Form filled"},
+      {"step": 4, "action": "click", "target": "submit", "expected": "Submission started"},
+      {"step": 5, "action": "refresh", "target": "immediately", "expected": "Page refreshes"},
+      {"step": 6, "action": "assert", "target": "draft restored or new form", "expected": "Graceful handling"},
+      {"step": 7, "action": "navigate", "target": "/profile", "expected": "Check for duplicate"},
+      {"step": 8, "action": "assert", "target": "listings count", "expected": "No duplicate created"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Partial submission completed", "handling": "Listing created once"},
+      {"case": "Draft restoration fails", "handling": "Clean form shown"}
+    ],
+    "likely_issues": [
+      {"issue": "Duplicate listing created", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/create/CreateListingForm.tsx"}]},
+      {"issue": "Draft not saving on refresh", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/hooks/useFormPersistence.ts"}]},
+      {"issue": "Idempotency not implemented for listings", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/create-listing.ts"}]}
+    ],
+    "accessibility_checks": ["Refresh warning if needed", "State recovery clear"],
+    "network_conditions": "flaky"
+  },
+  {
+    "id": "J052",
+    "title": "User uses browser back/forward navigation",
+    "category": "navigation",
+    "tags": ["anon", "mobile"],
+    "entry_point": "/",
+    "preconditions": ["None"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/", "expected": "Home page"},
+      {"step": 2, "action": "click", "target": "search link", "expected": "Search page"},
+      {"step": 3, "action": "fill", "target": "filters", "expected": "Filters applied"},
+      {"step": 4, "action": "click", "target": "listing", "expected": "Listing detail"},
+      {"step": 5, "action": "navigate_back", "target": "browser", "expected": "Return to filtered search"},
+      {"step": 6, "action": "assert", "target": "filters", "expected": "Filters preserved"},
+      {"step": 7, "action": "navigate_back", "target": "browser", "expected": "Return to home"},
+      {"step": 8, "action": "navigate_forward", "target": "browser", "expected": "Back to filtered search"},
+      {"step": 9, "action": "assert", "target": "filters", "expected": "Still preserved"}
+    ],
+    "negative_edge_cases": [
+      {"case": "State lost on back", "handling": "URL params restore state"},
+      {"case": "Stale data on forward", "handling": "Revalidation"}
+    ],
+    "likely_issues": [
+      {"issue": "Filters not in URL", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SearchForm.tsx"}]},
+      {"issue": "Scroll position lost", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]},
+      {"issue": "Stale data shown", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Focus managed on navigation", "Scroll restored"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J053",
+    "title": "User with multiple tabs open experiences consistency",
+    "category": "state",
+    "tags": ["auth"],
+    "entry_point": "/",
+    "preconditions": ["User can open multiple tabs"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "open_tab", "target": "tab2", "url": "/profile", "expected": "Second tab opens"},
+      {"step": 3, "action": "in_tab1", "action_type": "navigate", "target": "/settings", "expected": "Tab 1 on settings"},
+      {"step": 4, "action": "in_tab2", "action_type": "refresh", "expected": "Tab 2 refreshes"},
+      {"step": 5, "action": "in_tab1", "action_type": "logout", "expected": "Tab 1 logged out"},
+      {"step": 6, "action": "in_tab2", "action_type": "click_action", "target": "protected action", "expected": "Redirect to login or error"},
+      {"step": 7, "action": "assert", "target": "tab2 state", "expected": "Properly handles logged out state"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Stale session in tab", "handling": "Graceful redirect"},
+      {"case": "Data mutation in one tab", "handling": "Other tabs reflect changes"}
+    ],
+    "likely_issues": [
+      {"issue": "Stale auth state across tabs", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/auth.ts"}]},
+      {"issue": "Race condition on mutations", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]},
+      {"issue": "Error instead of redirect", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/middleware.ts"}]}
+    ],
+    "accessibility_checks": ["Session state clear", "Errors understandable"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J054",
+    "title": "User views public profile of another user",
+    "category": "profile",
+    "tags": ["anon"],
+    "entry_point": "/users/[id]",
+    "preconditions": ["Target user exists with listings"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/users/{user_id}", "expected": "Public profile page"},
+      {"step": 2, "action": "assert", "target": "user name", "expected": "Name displayed"},
+      {"step": 3, "action": "assert", "target": "user avatar", "expected": "Avatar shown"},
+      {"step": 4, "action": "assert", "target": "verified badge", "expected": "Badge if verified"},
+      {"step": 5, "action": "scroll", "target": "listings section", "expected": "User's listings visible"},
+      {"step": 6, "action": "click", "target": "listing card", "expected": "Navigate to listing"},
+      {"step": 7, "action": "navigate_back", "target": "browser", "expected": "Return to profile"},
+      {"step": 8, "action": "scroll", "target": "reviews section", "expected": "Reviews about user visible"}
+    ],
+    "negative_edge_cases": [
+      {"case": "User not found", "handling": "404 page"},
+      {"case": "User has no listings", "handling": "Empty state"}
+    ],
+    "likely_issues": [
+      {"issue": "Private info exposed", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/users/[id]/page.tsx"}]},
+      {"issue": "Suspended user profile visible", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/users/[id]/page.tsx"}]},
+      {"issue": "Reviews not loading", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/users/[id]/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Profile information structured", "Navigation clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J055",
+    "title": "User with slow connection uploads images",
+    "category": "upload",
+    "tags": ["auth", "slow"],
+    "entry_point": "/listings/create",
+    "preconditions": ["User logged in", "Slow network"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "set_network", "target": "slow-3g", "expected": "Network throttled"},
+      {"step": 3, "action": "navigate", "target": "/listings/create", "expected": "Create form"},
+      {"step": 4, "action": "upload", "target": "image uploader", "files": ["large-image.jpg"], "expected": "Upload starts"},
+      {"step": 5, "action": "assert", "target": "progress indicator", "expected": "Upload progress shown"},
+      {"step": 6, "action": "wait", "target": "upload complete", "expected": "Image fully uploaded"},
+      {"step": 7, "action": "assert", "target": "preview", "expected": "Preview visible"},
+      {"step": 8, "action": "set_network", "target": "normal", "expected": "Network restored"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Upload timeout", "handling": "Retry option shown"},
+      {"case": "Connection lost mid-upload", "handling": "Error with retry"}
+    ],
+    "likely_issues": [
+      {"issue": "No progress indication", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/listings/ImageUploader.tsx"}]},
+      {"issue": "Timeout too short", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/supabase.ts"}]},
+      {"issue": "No retry mechanism", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/listings/ImageUploader.tsx"}]},
+      {"issue": "Memory leak on large files", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/listings/ImageUploader.tsx"}]}
+    ],
+    "accessibility_checks": ["Progress announced", "Cancel option available"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J056",
+    "title": "User filters by language preference",
+    "category": "search",
+    "tags": ["anon", "a11y"],
+    "entry_point": "/search",
+    "preconditions": ["Listings with various languages exist"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 2, "action": "click", "target": "language filter", "expected": "Language options shown"},
+      {"step": 3, "action": "check", "target": "Spanish", "expected": "Language selected"},
+      {"step": 4, "action": "check", "target": "English", "expected": "Second language selected"},
+      {"step": 5, "action": "click", "target": "apply filters", "expected": "Results filtered"},
+      {"step": 6, "action": "assert", "target": "results", "expected": "Only matching languages shown"},
+      {"step": 7, "action": "assert", "target": "URL", "expected": "languages param in URL"},
+      {"step": 8, "action": "refresh", "target": "page", "expected": "Filter persists"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Invalid language code", "handling": "Ignored or error"},
+      {"case": "No listings match", "handling": "Zero results message"}
+    ],
+    "likely_issues": [
+      {"issue": "Language filter not working", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/data.ts"}]},
+      {"issue": "Language codes not normalized", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/languages.ts"}]},
+      {"issue": "Multi-select not working", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SearchForm.tsx"}]}
+    ],
+    "accessibility_checks": ["Language options labeled", "Selection announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J057",
+    "title": "User searches with date range filter",
+    "category": "search",
+    "tags": ["anon", "mobile"],
+    "entry_point": "/search",
+    "preconditions": ["Listings with various move-in dates exist"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 2, "action": "click", "target": "move-in date picker", "expected": "Calendar opens"},
+      {"step": 3, "action": "select", "target": "date", "value": "2025-03-01", "expected": "Date selected"},
+      {"step": 4, "action": "assert", "target": "date displayed", "expected": "Shows selected date"},
+      {"step": 5, "action": "click", "target": "apply/search", "expected": "Results filtered"},
+      {"step": 6, "action": "assert", "target": "results", "expected": "Listings with matching availability"},
+      {"step": 7, "action": "assert", "target": "URL", "expected": "moveInDate param in URL"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Past date selected", "handling": "Validation or disabled"},
+      {"case": "Far future date", "handling": "Allowed or limited"}
+    ],
+    "likely_issues": [
+      {"issue": "Date picker timezone issues", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/date-picker.tsx"}]},
+      {"issue": "Date format inconsistency", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/filter-schema.ts"}]},
+      {"issue": "Calendar not accessible", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/date-picker.tsx"}]}
+    ],
+    "accessibility_checks": ["Date picker keyboard navigable", "Date announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J058",
+    "title": "User views listing with no reviews",
+    "category": "discovery",
+    "tags": ["anon"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing exists with zero reviews"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/listings/{id_no_reviews}", "expected": "Listing detail"},
+      {"step": 2, "action": "scroll", "target": "reviews section", "expected": "Reviews section visible"},
+      {"step": 3, "action": "assert", "target": "empty state", "expected": "No reviews yet message"},
+      {"step": 4, "action": "assert", "target": "rating display", "expected": "No rating or N/A"},
+      {"step": 5, "action": "assert", "target": "write review prompt", "expected": "CTA to be first reviewer"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Reviews loading error", "handling": "Error state shown"},
+      {"case": "Deleted reviews", "handling": "Empty state, not broken"}
+    ],
+    "likely_issues": [
+      {"issue": "No empty state designed", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ReviewList.tsx"}]},
+      {"issue": "Rating shows NaN", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/ListingPageClient.tsx"}]},
+      {"issue": "Layout broken with no reviews", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ReviewList.tsx"}]}
+    ],
+    "accessibility_checks": ["Empty state readable", "CTA accessible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J059",
+    "title": "User clears all search filters",
+    "category": "search",
+    "tags": ["anon", "mobile"],
+    "entry_point": "/search",
+    "preconditions": ["Filters currently applied"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search?minPrice=500&amenities=wifi", "expected": "Filtered results"},
+      {"step": 2, "action": "assert", "target": "active filters", "expected": "Filter chips or badges shown"},
+      {"step": 3, "action": "click", "target": "clear all filters", "expected": "All filters removed"},
+      {"step": 4, "action": "assert", "target": "URL", "expected": "No filter params"},
+      {"step": 5, "action": "assert", "target": "filter controls", "expected": "All reset to default"},
+      {"step": 6, "action": "assert", "target": "results", "expected": "Full unfiltered results"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Clear button missing", "handling": "Individual filter clearing"},
+      {"case": "Sort also cleared", "handling": "Sort preserved or also cleared"}
+    ],
+    "likely_issues": [
+      {"issue": "No clear all button", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SearchForm.tsx"}]},
+      {"issue": "Filters not fully cleared", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SearchForm.tsx"}]},
+      {"issue": "URL not cleaned", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/SearchForm.tsx"}]}
+    ],
+    "accessibility_checks": ["Clear action announced", "State change clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J060",
+    "title": "Admin removes listing due to violation",
+    "category": "admin",
+    "tags": ["auth", "role:admin"],
+    "entry_point": "/admin/listings",
+    "preconditions": ["User is admin", "Listing exists"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (admin)", "expected": "Admin authenticated"},
+      {"step": 2, "action": "navigate", "target": "/admin/listings", "expected": "Listing management"},
+      {"step": 3, "action": "fill", "target": "search", "value": "violation listing", "expected": "Listing found"},
+      {"step": 4, "action": "click", "target": "delete button", "expected": "Confirmation dialog"},
+      {"step": 5, "action": "click", "target": "confirm delete", "expected": "Listing deleted"},
+      {"step": 6, "action": "assert", "target": "list", "expected": "Listing removed"},
+      {"step": 7, "action": "navigate", "target": "/listings/{deleted_id}", "expected": "404 page"},
+      {"step": 8, "action": "navigate", "target": "/admin/audit", "expected": "Audit log"},
+      {"step": 9, "action": "assert", "target": "audit entry", "expected": "Deletion logged"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Listing has active bookings", "handling": "Tenants notified"},
+      {"case": "Admin deletes own listing", "handling": "Allowed or warning"}
+    ],
+    "likely_issues": [
+      {"issue": "Orphan data after delete", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/admin.ts"}]},
+      {"issue": "Notifications not sent", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/admin.ts"}]},
+      {"issue": "Audit log incomplete", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/audit.ts"}]}
+    ],
+    "accessibility_checks": ["Delete confirmation clear", "Audit accessible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J061",
+    "title": "User double-clicks submit button",
+    "category": "form",
+    "tags": ["auth", "flaky"],
+    "entry_point": "/listings/create",
+    "preconditions": ["User logged in", "Form filled"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/create", "expected": "Create form"},
+      {"step": 3, "action": "fill", "target": "all required fields", "expected": "Form ready"},
+      {"step": 4, "action": "double_click", "target": "submit button", "expected": "Only one submission"},
+      {"step": 5, "action": "assert", "target": "button state", "expected": "Disabled during submission"},
+      {"step": 6, "action": "wait", "target": "response", "expected": "Single listing created"},
+      {"step": 7, "action": "navigate", "target": "/profile", "expected": "Profile page"},
+      {"step": 8, "action": "assert", "target": "listings count", "expected": "Only one new listing"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No button disable", "handling": "Server-side deduplication"},
+      {"case": "Quick network response", "handling": "Still protected"}
+    ],
+    "likely_issues": [
+      {"issue": "Button not disabled on click", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/create/CreateListingForm.tsx"}]},
+      {"issue": "Duplicate listings created", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/create-listing.ts"}]},
+      {"issue": "No loading state", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/create/CreateListingForm.tsx"}]}
+    ],
+    "accessibility_checks": ["Button state communicated", "Loading announced"],
+    "network_conditions": "flaky"
+  },
+  {
+    "id": "J062",
+    "title": "User session expires during activity",
+    "category": "auth",
+    "tags": ["auth", "flaky"],
+    "entry_point": "/profile",
+    "preconditions": ["User logged in", "Session can expire"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/profile", "expected": "Profile page"},
+      {"step": 3, "action": "simulate", "target": "session expiry", "expected": "ASSUMPTION: Cookie cleared"},
+      {"step": 4, "action": "click", "target": "protected action", "expected": "Error or redirect"},
+      {"step": 5, "action": "assert", "target": "behavior", "expected": "Graceful redirect to login"},
+      {"step": 6, "action": "assert", "target": "callback URL", "expected": "Return path preserved"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Token refresh succeeds", "handling": "Seamless continuation"},
+      {"case": "Mid-form session loss", "handling": "Draft preserved if possible"}
+    ],
+    "likely_issues": [
+      {"issue": "Error thrown instead of redirect", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/middleware.ts"}]},
+      {"issue": "Infinite redirect loop", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/middleware.ts"}]},
+      {"issue": "User data exposed after logout", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/profile/ProfileClient.tsx"}]}
+    ],
+    "accessibility_checks": ["Session expiry message clear", "Redirect smooth"],
+    "network_conditions": "flaky"
+  },
+  {
+    "id": "J063",
+    "title": "User resizes browser during map view",
+    "category": "responsive",
+    "tags": ["anon", "mobile"],
+    "entry_point": "/search",
+    "preconditions": ["Map view active"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 2, "action": "click", "target": "map view toggle", "expected": "Map displayed"},
+      {"step": 3, "action": "resize", "target": "viewport", "width": 1200, "height": 800, "expected": "Desktop layout"},
+      {"step": 4, "action": "assert", "target": "map size", "expected": "Map fills container"},
+      {"step": 5, "action": "resize", "target": "viewport", "width": 375, "height": 667, "expected": "Mobile layout"},
+      {"step": 6, "action": "assert", "target": "map visibility", "expected": "Map still visible or toggled"},
+      {"step": 7, "action": "resize", "target": "viewport", "width": 1200, "height": 800, "expected": "Back to desktop"},
+      {"step": 8, "action": "assert", "target": "map state", "expected": "Map position preserved"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Map breaks on resize", "handling": "Graceful rerender"},
+      {"case": "Markers disappear", "handling": "Re-rendered on resize"}
+    ],
+    "likely_issues": [
+      {"issue": "Map doesn't resize", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Map.tsx"}]},
+      {"issue": "Markers lost on resize", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/map/MapClient.tsx"}]},
+      {"issue": "Layout breaks", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Map remains accessible", "Controls visible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J064",
+    "title": "User unblocks previously blocked user",
+    "category": "blocking",
+    "tags": ["auth"],
+    "entry_point": "/settings",
+    "preconditions": ["User has blocked users"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/settings", "expected": "Settings page"},
+      {"step": 3, "action": "scroll", "target": "blocked users section", "expected": "Section visible"},
+      {"step": 4, "action": "assert", "target": "blocked user", "expected": "At least one blocked user"},
+      {"step": 5, "action": "click", "target": "unblock button", "expected": "Confirmation or immediate unblock"},
+      {"step": 6, "action": "assert", "target": "blocked list", "expected": "User removed from list"},
+      {"step": 7, "action": "navigate", "target": "/messages", "expected": "Messages page"},
+      {"step": 8, "action": "assert", "target": "conversation access", "expected": "Can message unblocked user"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Unblock fails", "handling": "Error message, state preserved"},
+      {"case": "Other user still blocking", "handling": "Still restricted messaging"}
+    ],
+    "likely_issues": [
+      {"issue": "Unblock not persisting", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/block.ts"}]},
+      {"issue": "Messaging still blocked", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/chat.ts"}]},
+      {"issue": "No confirmation feedback", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/settings/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Unblock action clear", "State change announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J065",
+    "title": "User views unread messages badge across pages",
+    "category": "messaging",
+    "tags": ["auth", "mobile"],
+    "entry_point": "/",
+    "preconditions": ["User has unread messages"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/", "expected": "Home page"},
+      {"step": 3, "action": "assert", "target": "message badge", "expected": "Shows unread count"},
+      {"step": 4, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 5, "action": "assert", "target": "message badge", "expected": "Badge persists"},
+      {"step": 6, "action": "navigate", "target": "/messages", "expected": "Messages page"},
+      {"step": 7, "action": "click", "target": "unread conversation", "expected": "Open conversation"},
+      {"step": 8, "action": "navigate_back", "target": "browser", "expected": "Return to messages"},
+      {"step": 9, "action": "assert", "target": "message badge", "expected": "Count decremented"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Badge count wrong", "handling": "Polling updates count"},
+      {"case": "Badge stuck", "handling": "Refresh fixes"}
+    ],
+    "likely_issues": [
+      {"issue": "Badge not updating in real-time", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NavbarClient.tsx"}]},
+      {"issue": "Count calculation wrong", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/chat.ts"}]},
+      {"issue": "Badge flashes on navigation", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NavbarClient.tsx"}]}
+    ],
+    "accessibility_checks": ["Badge announced to screen readers", "Count visible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J066",
+    "title": "User edits then cancels listing edit",
+    "category": "listing",
+    "tags": ["auth"],
+    "entry_point": "/listings/[id]/edit",
+    "preconditions": ["User owns listing"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/{id}/edit", "expected": "Edit form"},
+      {"step": 3, "action": "assert", "target": "original values", "expected": "Form populated"},
+      {"step": 4, "action": "clear_and_fill", "target": "title", "value": "Changed Title", "expected": "Title modified"},
+      {"step": 5, "action": "clear_and_fill", "target": "price", "value": "9999", "expected": "Price modified"},
+      {"step": 6, "action": "click", "target": "cancel button", "expected": "Confirmation or navigate away"},
+      {"step": 7, "action": "navigate", "target": "/listings/{id}", "expected": "Listing detail"},
+      {"step": 8, "action": "assert", "target": "title", "expected": "Original title unchanged"},
+      {"step": 9, "action": "assert", "target": "price", "expected": "Original price unchanged"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No cancel confirmation", "handling": "Changes lost silently"},
+      {"case": "Browser back button", "handling": "beforeunload warning"}
+    ],
+    "likely_issues": [
+      {"issue": "No unsaved changes warning", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/edit/EditListingForm.tsx"}]},
+      {"issue": "Changes accidentally saved", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/edit/EditListingForm.tsx"}]},
+      {"issue": "Cancel doesn't work", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/edit/EditListingForm.tsx"}]}
+    ],
+    "accessibility_checks": ["Cancel action clear", "Unsaved changes warning accessible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J067",
+    "title": "User scrolls infinite conversation history",
+    "category": "messaging",
+    "tags": ["auth", "slow"],
+    "entry_point": "/messages/[id]",
+    "preconditions": ["Conversation has 100+ messages"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/messages/{long_conversation}", "expected": "Chat window"},
+      {"step": 3, "action": "assert", "target": "recent messages", "expected": "Latest messages visible"},
+      {"step": 4, "action": "scroll", "target": "message list", "direction": "up", "expected": "Older messages load"},
+      {"step": 5, "action": "assert", "target": "loading indicator", "expected": "Loading shown while fetching"},
+      {"step": 6, "action": "continue_scroll", "target": "up", "expected": "More messages load"},
+      {"step": 7, "action": "assert", "target": "scroll position", "expected": "Position maintained on load"},
+      {"step": 8, "action": "scroll", "target": "down", "expected": "Return to recent messages"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Very old messages fail", "handling": "Error or end marker"},
+      {"case": "Memory exhaustion", "handling": "Virtualization or pagination"}
+    ],
+    "likely_issues": [
+      {"issue": "No pagination implemented", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/messages/[id]/ChatWindow.tsx"}]},
+      {"issue": "Scroll jump on new load", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/messages/[id]/ChatWindow.tsx"}]},
+      {"issue": "Performance degrades", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/MessageList.tsx"}]},
+      {"issue": "No virtualization", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/MessageList.tsx"}]}
+    ],
+    "accessibility_checks": ["Loading announced", "Focus managed on scroll"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J068",
+    "title": "User receives notification while on page",
+    "category": "notifications",
+    "tags": ["auth"],
+    "entry_point": "/",
+    "preconditions": ["User logged in", "Another action triggers notification"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/", "expected": "Home page"},
+      {"step": 3, "action": "assert", "target": "initial badge count", "expected": "Count noted"},
+      {"step": 4, "action": "simulate", "target": "booking request from other user", "expected": "ASSUMPTION: DB trigger"},
+      {"step": 5, "action": "wait", "target": "polling interval", "expected": "Wait for update"},
+      {"step": 6, "action": "assert", "target": "badge count", "expected": "Incremented"},
+      {"step": 7, "action": "click", "target": "notification bell", "expected": "New notification visible"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Notification delayed", "handling": "Appears on next poll"},
+      {"case": "Polling fails", "handling": "Old count shown"}
+    ],
+    "likely_issues": [
+      {"issue": "No real-time notification", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NavbarClient.tsx"}]},
+      {"issue": "Polling too slow", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NavbarClient.tsx"}]},
+      {"issue": "Badge animation jarring", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NavbarClient.tsx"}]}
+    ],
+    "accessibility_checks": ["New notification announced", "Badge accessible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J069",
+    "title": "User views listing with maximum images",
+    "category": "discovery",
+    "tags": ["anon", "slow"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing has 10 images (maximum)"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/listings/{id_max_images}", "expected": "Listing page loads"},
+      {"step": 2, "action": "assert", "target": "gallery", "expected": "All thumbnails visible or scrollable"},
+      {"step": 3, "action": "click", "target": "each thumbnail", "expected": "Each image loads"},
+      {"step": 4, "action": "click", "target": "fullscreen/lightbox", "expected": "Fullscreen view opens"},
+      {"step": 5, "action": "navigate", "target": "through all images", "expected": "All 10 accessible"},
+      {"step": 6, "action": "press", "target": "Escape", "expected": "Lightbox closes"},
+      {"step": 7, "action": "assert", "target": "page performance", "expected": "No excessive lag"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Image fails to load", "handling": "Placeholder shown"},
+      {"case": "Very large images", "handling": "Lazy loading/compression"}
+    ],
+    "likely_issues": [
+      {"issue": "Slow page load with many images", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]},
+      {"issue": "Gallery navigation breaks", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]},
+      {"issue": "No lazy loading", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]},
+      {"issue": "Lightbox trap", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]}
+    ],
+    "accessibility_checks": ["Gallery keyboard navigable", "Image descriptions available"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J070",
+    "title": "User copies listing URL and shares",
+    "category": "sharing",
+    "tags": ["anon"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing exists"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/listings/{id}", "expected": "Listing detail"},
+      {"step": 2, "action": "assert", "target": "URL", "expected": "Clean shareable URL"},
+      {"step": 3, "action": "copy", "target": "URL", "expected": "URL copied"},
+      {"step": 4, "action": "open_new_incognito", "target": "browser", "expected": "New incognito window"},
+      {"step": 5, "action": "navigate", "target": "copied URL", "expected": "Listing loads"},
+      {"step": 6, "action": "assert", "target": "page content", "expected": "Full listing visible to anonymous"},
+      {"step": 7, "action": "assert", "target": "OG meta tags", "expected": "Proper sharing metadata"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Listing deleted after share", "handling": "404 page"},
+      {"case": "Private/paused listing", "handling": "Still accessible or 404"}
+    ],
+    "likely_issues": [
+      {"issue": "URL contains unnecessary params", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/page.tsx"}]},
+      {"issue": "OG tags missing/incorrect", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/page.tsx"}]},
+      {"issue": "Paused listing publicly accessible", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Share options accessible", "Clipboard action confirmed"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J071",
+    "title": "Landlord views all their listings from profile",
+    "category": "profile",
+    "tags": ["auth"],
+    "entry_point": "/profile",
+    "preconditions": ["User has 5+ listings"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/profile", "expected": "Profile page"},
+      {"step": 3, "action": "scroll", "target": "listings section", "expected": "All listings visible"},
+      {"step": 4, "action": "assert", "target": "listing count", "expected": "All 5+ listings shown"},
+      {"step": 5, "action": "assert", "target": "each listing", "expected": "Status, price, actions visible"},
+      {"step": 6, "action": "click", "target": "listing card", "expected": "Navigate to listing detail"},
+      {"step": 7, "action": "navigate_back", "target": "browser", "expected": "Return to profile"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Many listings (20+)", "handling": "Pagination or load more"},
+      {"case": "Mixed statuses", "handling": "All statuses shown clearly"}
+    ],
+    "likely_issues": [
+      {"issue": "No pagination for many listings", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/profile/ProfileClient.tsx"}]},
+      {"issue": "Status not visible", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/profile/ProfileClient.tsx"}]},
+      {"issue": "Actions not clear", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/profile/ProfileClient.tsx"}]}
+    ],
+    "accessibility_checks": ["Listings navigable", "Status announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J072",
+    "title": "User attempts SQL injection in search",
+    "category": "security",
+    "tags": ["anon"],
+    "entry_point": "/search",
+    "preconditions": ["None"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 2, "action": "fill", "target": "query input", "value": "'; DROP TABLE listings;--", "expected": "Value entered"},
+      {"step": 3, "action": "click", "target": "search", "expected": "Search executed safely"},
+      {"step": 4, "action": "assert", "target": "results", "expected": "No results or escaped query"},
+      {"step": 5, "action": "assert", "target": "database", "expected": "Tables intact (verification)"},
+      {"step": 6, "action": "fill", "target": "min price", "value": "1; SELECT * FROM users", "expected": "Value rejected or sanitized"},
+      {"step": 7, "action": "assert", "target": "no error leak", "expected": "No SQL error exposed"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Error message reveals SQL", "handling": "Generic error only"},
+      {"case": "Query partially executed", "handling": "Transaction rolled back"}
+    ],
+    "likely_issues": [
+      {"issue": "Raw SQL exposure", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/data.ts"}]},
+      {"issue": "Error leaking SQL structure", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/page.tsx"}]},
+      {"issue": "Parameterized queries not used", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/data.ts"}]}
+    ],
+    "accessibility_checks": ["Error messages clear", "No sensitive info leaked"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J073",
+    "title": "User attempts XSS in listing description",
+    "category": "security",
+    "tags": ["auth"],
+    "entry_point": "/listings/create",
+    "preconditions": ["User logged in"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/create", "expected": "Create form"},
+      {"step": 3, "action": "fill", "target": "title", "value": "<script>alert('XSS')</script>", "expected": "Value entered"},
+      {"step": 4, "action": "fill", "target": "description", "value": "<img src=x onerror=alert('XSS')>", "expected": "Value entered"},
+      {"step": 5, "action": "fill", "target": "other required fields", "expected": "Form complete"},
+      {"step": 6, "action": "submit", "target": "form", "expected": "Listing created or validation error"},
+      {"step": 7, "action": "navigate", "target": "new listing", "expected": "View listing"},
+      {"step": 8, "action": "assert", "target": "page content", "expected": "Script not executed, escaped"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Script executes", "handling": "CRITICAL: Must be blocked"},
+      {"case": "Content stripped entirely", "handling": "Acceptable, notify user"}
+    ],
+    "likely_issues": [
+      {"issue": "XSS vulnerability", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/ListingPageClient.tsx"}]},
+      {"issue": "React dangerouslySetInnerHTML used", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]},
+      {"issue": "Sanitization inconsistent", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/create-listing.ts"}]}
+    ],
+    "accessibility_checks": ["Content renders safely", "No script execution"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J074",
+    "title": "User accesses API directly without CSRF token",
+    "category": "security",
+    "tags": ["anon"],
+    "entry_point": "/api/favorites",
+    "preconditions": ["Valid session cookie obtained"],
+    "steps": [
+      {"step": 1, "action": "api_call", "target": "POST /api/favorites", "body": {"listingId": "test"}, "expected": "Request sent"},
+      {"step": 2, "action": "assert", "target": "response", "expected": "401 or CSRF validation error"},
+      {"step": 3, "action": "api_call", "target": "POST /api/messages", "body": {"content": "test"}, "expected": "Request sent"},
+      {"step": 4, "action": "assert", "target": "response", "expected": "Protected from CSRF"},
+      {"step": 5, "action": "assert", "target": "no action taken", "expected": "No favorite/message created"}
+    ],
+    "negative_edge_cases": [
+      {"case": "CSRF protection missing", "handling": "CRITICAL vulnerability"},
+      {"case": "API allows any origin", "handling": "CORS misconfiguration"}
+    ],
+    "likely_issues": [
+      {"issue": "No CSRF protection", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/favorites/route.ts"}]},
+      {"issue": "CORS too permissive", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "next.config.ts"}]},
+      {"issue": "Origin not validated", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/middleware.ts"}]}
+    ],
+    "accessibility_checks": ["N/A - Security test"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J075",
+    "title": "User views terms of service page",
+    "category": "legal",
+    "tags": ["anon", "a11y"],
+    "entry_point": "/terms",
+    "preconditions": ["None"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/terms", "expected": "Terms page loads"},
+      {"step": 2, "action": "assert", "target": "content", "expected": "Terms content visible"},
+      {"step": 3, "action": "scroll", "target": "bottom", "expected": "Can scroll entire document"},
+      {"step": 4, "action": "click", "target": "back link", "expected": "Navigation option available"},
+      {"step": 5, "action": "assert", "target": "headings structure", "expected": "Proper heading hierarchy"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Content missing", "handling": "Error or placeholder"},
+      {"case": "Very long content", "handling": "Table of contents"}
+    ],
+    "likely_issues": [
+      {"issue": "No content", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/terms/page.tsx"}]},
+      {"issue": "Poor heading structure", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/terms/page.tsx"}]},
+      {"issue": "No back navigation", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/terms/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Document structure proper", "Readable text size"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J076",
+    "title": "User views privacy policy page",
+    "category": "legal",
+    "tags": ["anon", "a11y"],
+    "entry_point": "/privacy",
+    "preconditions": ["None"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/privacy", "expected": "Privacy page loads"},
+      {"step": 2, "action": "assert", "target": "content", "expected": "Privacy policy visible"},
+      {"step": 3, "action": "assert", "target": "data collection section", "expected": "Clear data practices"},
+      {"step": 4, "action": "scroll", "target": "bottom", "expected": "Full document accessible"},
+      {"step": 5, "action": "assert", "target": "contact information", "expected": "Contact for privacy concerns"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Outdated policy", "handling": "Date visible"},
+      {"case": "Missing sections", "handling": "Compliance issue"}
+    ],
+    "likely_issues": [
+      {"issue": "Incomplete policy", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/privacy/page.tsx"}]},
+      {"issue": "No last updated date", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/privacy/page.tsx"}]},
+      {"issue": "Poor readability", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/privacy/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Document accessible", "Links work"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J077",
+    "title": "User views about page",
+    "category": "content",
+    "tags": ["anon"],
+    "entry_point": "/about",
+    "preconditions": ["None"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/about", "expected": "About page loads"},
+      {"step": 2, "action": "assert", "target": "content", "expected": "Company/product info visible"},
+      {"step": 3, "action": "assert", "target": "navigation", "expected": "Can navigate to other pages"},
+      {"step": 4, "action": "click", "target": "footer link", "expected": "Footer navigation works"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Empty page", "handling": "At least minimal content"},
+      {"case": "Broken images", "handling": "Placeholder or alt text"}
+    ],
+    "likely_issues": [
+      {"issue": "Page empty or placeholder", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/about/page.tsx"}]},
+      {"issue": "Links broken", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/about/page.tsx"}]},
+      {"issue": "Mobile layout issues", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/about/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Content readable", "Navigation clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J078",
+    "title": "User experiences API timeout gracefully",
+    "category": "error",
+    "tags": ["anon", "slow", "flaky"],
+    "entry_point": "/search",
+    "preconditions": ["API can timeout"],
+    "steps": [
+      {"step": 1, "action": "set_network", "target": "timeout-prone", "expected": "Network configured"},
+      {"step": 2, "action": "navigate", "target": "/search", "expected": "Search page starts loading"},
+      {"step": 3, "action": "simulate", "target": "API timeout", "expected": "Request times out"},
+      {"step": 4, "action": "assert", "target": "error state", "expected": "User-friendly error shown"},
+      {"step": 5, "action": "assert", "target": "retry option", "expected": "Retry button available"},
+      {"step": 6, "action": "click", "target": "retry", "expected": "Request retried"},
+      {"step": 7, "action": "set_network", "target": "normal", "expected": "Network restored"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Infinite loading", "handling": "Timeout with error"},
+      {"case": "Partial data", "handling": "Show what loaded"}
+    ],
+    "likely_issues": [
+      {"issue": "No timeout handling", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/fetch-with-timeout.ts"}]},
+      {"issue": "No retry option", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/page.tsx"}]},
+      {"issue": "Technical error shown", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/error.tsx"}]},
+      {"issue": "Loading spinner stuck", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/loading.tsx"}]}
+    ],
+    "accessibility_checks": ["Error state announced", "Retry accessible"],
+    "network_conditions": "flaky"
+  },
+  {
+    "id": "J079",
+    "title": "User prints listing page",
+    "category": "print",
+    "tags": ["anon"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing exists"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/listings/{id}", "expected": "Listing detail page"},
+      {"step": 2, "action": "trigger", "target": "print preview", "expected": "Print preview opens"},
+      {"step": 3, "action": "assert", "target": "print layout", "expected": "Content formatted for print"},
+      {"step": 4, "action": "assert", "target": "no nav/footer", "expected": "Navigation hidden in print"},
+      {"step": 5, "action": "assert", "target": "images print", "expected": "At least main image prints"},
+      {"step": 6, "action": "cancel", "target": "print dialog", "expected": "Return to page"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No print styles", "handling": "Default browser print"},
+      {"case": "Images don't print", "handling": "At least text prints"}
+    ],
+    "likely_issues": [
+      {"issue": "No print stylesheet", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/globals.css"}]},
+      {"issue": "Navigation prints", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/globals.css"}]},
+      {"issue": "Layout broken in print", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/globals.css"}]}
+    ],
+    "accessibility_checks": ["Print content logical", "No hidden content printed"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J080",
+    "title": "User navigates footer links",
+    "category": "navigation",
+    "tags": ["anon", "a11y"],
+    "entry_point": "/",
+    "preconditions": ["Footer visible"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/", "expected": "Home page"},
+      {"step": 2, "action": "scroll", "target": "footer", "expected": "Footer visible"},
+      {"step": 3, "action": "assert", "target": "footer links", "expected": "All links present"},
+      {"step": 4, "action": "click", "target": "about link", "expected": "Navigate to /about"},
+      {"step": 5, "action": "navigate_back", "target": "browser", "expected": "Return to home"},
+      {"step": 6, "action": "click", "target": "privacy link", "expected": "Navigate to /privacy"},
+      {"step": 7, "action": "navigate_back", "target": "browser", "expected": "Return to home"},
+      {"step": 8, "action": "click", "target": "terms link", "expected": "Navigate to /terms"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Broken link", "handling": "All links work"},
+      {"case": "External link no target", "handling": "Opens appropriately"}
+    ],
+    "likely_issues": [
+      {"issue": "Footer links broken", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Footer.tsx"}]},
+      {"issue": "Footer not visible on all pages", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/components/FooterWrapper.tsx"}]},
+      {"issue": "Footer overlaps content", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Footer.tsx"}]}
+    ],
+    "accessibility_checks": ["Links keyboard accessible", "Footer landmark present"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J081",
+    "title": "User toggles theme (dark/light mode)",
+    "category": "theme",
+    "tags": ["anon", "a11y"],
+    "entry_point": "/",
+    "preconditions": ["Theme toggle exists"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/", "expected": "Home page with default theme"},
+      {"step": 2, "action": "assert", "target": "current theme", "expected": "Light or system default"},
+      {"step": 3, "action": "click", "target": "theme toggle", "expected": "Theme switches"},
+      {"step": 4, "action": "assert", "target": "background color", "expected": "Dark background"},
+      {"step": 5, "action": "assert", "target": "text contrast", "expected": "Readable text"},
+      {"step": 6, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 7, "action": "assert", "target": "theme persisted", "expected": "Still dark theme"},
+      {"step": 8, "action": "refresh", "target": "page", "expected": "Theme persists after refresh"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No theme toggle", "handling": "System preference used"},
+      {"case": "Theme flash on load", "handling": "Minimized or none"}
+    ],
+    "likely_issues": [
+      {"issue": "Theme not persisting", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ThemeProvider.tsx"}]},
+      {"issue": "Flash of wrong theme", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ThemeProvider.tsx"}]},
+      {"issue": "Components not themed", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/globals.css"}]},
+      {"issue": "Contrast issues in dark mode", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/globals.css"}]}
+    ],
+    "accessibility_checks": ["Contrast maintained", "Toggle accessible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J082",
+    "title": "User tests all form field types",
+    "category": "form",
+    "tags": ["auth", "a11y"],
+    "entry_point": "/listings/create",
+    "preconditions": ["User logged in"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/create", "expected": "Create form"},
+      {"step": 3, "action": "interact", "target": "text input", "expected": "Can type text"},
+      {"step": 4, "action": "interact", "target": "textarea", "expected": "Can type multi-line"},
+      {"step": 5, "action": "interact", "target": "number input", "expected": "Can enter numbers"},
+      {"step": 6, "action": "interact", "target": "select dropdown", "expected": "Can select option"},
+      {"step": 7, "action": "interact", "target": "checkbox", "expected": "Can check/uncheck"},
+      {"step": 8, "action": "interact", "target": "date picker", "expected": "Can select date"},
+      {"step": 9, "action": "interact", "target": "file upload", "expected": "Can upload file"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Invalid input type", "handling": "Validation error"},
+      {"case": "Field disabled unexpectedly", "handling": "Clear reason shown"}
+    ],
+    "likely_issues": [
+      {"issue": "Form field not responding", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/create/CreateListingForm.tsx"}]},
+      {"issue": "Select dropdown broken", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/select.tsx"}]},
+      {"issue": "Date picker not working", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/date-picker.tsx"}]},
+      {"issue": "Checkbox state wrong", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/checkbox.tsx"}]}
+    ],
+    "accessibility_checks": ["All fields labeled", "Focus visible on all"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J083",
+    "title": "User deletes and re-adds images during listing edit",
+    "category": "listing",
+    "tags": ["auth"],
+    "entry_point": "/listings/[id]/edit",
+    "preconditions": ["User owns listing with images"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/{id}/edit", "expected": "Edit form"},
+      {"step": 3, "action": "assert", "target": "existing images", "expected": "Current images shown"},
+      {"step": 4, "action": "click", "target": "delete image 1", "expected": "Image removed from preview"},
+      {"step": 5, "action": "upload", "target": "new image", "files": ["new-image.jpg"], "expected": "New image added"},
+      {"step": 6, "action": "click", "target": "save", "expected": "Changes saved"},
+      {"step": 7, "action": "navigate", "target": "/listings/{id}", "expected": "View listing"},
+      {"step": 8, "action": "assert", "target": "images", "expected": "Reflects changes"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Delete last image", "handling": "Allowed or warning"},
+      {"case": "Upload fails after delete", "handling": "Original preserved or error"}
+    ],
+    "likely_issues": [
+      {"issue": "Old images not deleted from storage", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/edit/EditListingForm.tsx"}]},
+      {"issue": "Image order wrong after edit", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/listings/[id]/edit/EditListingForm.tsx"}]},
+      {"issue": "Partial save leaves inconsistent state", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/listings/[id]/route.ts"}]}
+    ],
+    "accessibility_checks": ["Delete buttons labeled", "Image preview accessible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J084",
+    "title": "User navigates via header menu",
+    "category": "navigation",
+    "tags": ["anon", "mobile", "a11y"],
+    "entry_point": "/",
+    "preconditions": ["None"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/", "expected": "Home page"},
+      {"step": 2, "action": "assert", "target": "header/navbar", "expected": "Navigation visible"},
+      {"step": 3, "action": "click", "target": "search nav link", "expected": "Navigate to /search"},
+      {"step": 4, "action": "click", "target": "logo", "expected": "Navigate to home"},
+      {"step": 5, "action": "click", "target": "login link", "expected": "Navigate to /login"},
+      {"step": 6, "action": "navigate_back", "target": "browser", "expected": "Return to home"},
+      {"step": 7, "action": "click", "target": "signup link", "expected": "Navigate to /signup"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Mobile menu not opening", "handling": "Hamburger click works"},
+      {"case": "Links not visible", "handling": "Accessible navigation"}
+    ],
+    "likely_issues": [
+      {"issue": "Nav links broken", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Navbar.tsx"}]},
+      {"issue": "Mobile menu broken", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NavbarClient.tsx"}]},
+      {"issue": "Logo not linking to home", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/Navbar.tsx"}]}
+    ],
+    "accessibility_checks": ["Navigation landmark", "Links have focus states"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J085",
+    "title": "User on slow 3G views listing images",
+    "category": "performance",
+    "tags": ["anon", "slow", "mobile"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing has multiple large images", "3G network"],
+    "steps": [
+      {"step": 1, "action": "set_network", "target": "slow-3g", "expected": "Network throttled"},
+      {"step": 2, "action": "navigate", "target": "/listings/{id}", "expected": "Page starts loading"},
+      {"step": 3, "action": "assert", "target": "loading state", "expected": "Placeholder/skeleton for images"},
+      {"step": 4, "action": "wait", "target": "first image", "expected": "First image loads"},
+      {"step": 5, "action": "scroll", "target": "gallery", "expected": "More images load on scroll"},
+      {"step": 6, "action": "assert", "target": "lazy loading", "expected": "Images load progressively"},
+      {"step": 7, "action": "set_network", "target": "normal", "expected": "Network restored"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Images never load", "handling": "Timeout with placeholder"},
+      {"case": "Layout shift as images load", "handling": "Aspect ratio preserved"}
+    ],
+    "likely_issues": [
+      {"issue": "No lazy loading", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]},
+      {"issue": "Images too large", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]},
+      {"issue": "No loading placeholder", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]},
+      {"issue": "CLS from images", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ImageGallery.tsx"}]}
+    ],
+    "accessibility_checks": ["Loading states communicated", "Images have alt"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J086",
+    "title": "Admin toggles user admin status",
+    "category": "admin",
+    "tags": ["auth", "role:admin"],
+    "entry_point": "/admin/users",
+    "preconditions": ["User is admin", "Target non-admin user exists"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (admin)", "expected": "Admin authenticated"},
+      {"step": 2, "action": "navigate", "target": "/admin/users", "expected": "User management"},
+      {"step": 3, "action": "find", "target": "non-admin user", "expected": "User found"},
+      {"step": 4, "action": "click", "target": "make admin button", "expected": "Confirmation dialog"},
+      {"step": 5, "action": "click", "target": "confirm", "expected": "User now admin"},
+      {"step": 6, "action": "assert", "target": "user row", "expected": "Admin badge visible"},
+      {"step": 7, "action": "click", "target": "remove admin button", "expected": "Admin revoked"},
+      {"step": 8, "action": "assert", "target": "user row", "expected": "Admin badge removed"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Remove own admin", "handling": "Action blocked"},
+      {"case": "Toggle for suspended user", "handling": "Allowed or warning"}
+    ],
+    "likely_issues": [
+      {"issue": "Self-demotion not prevented", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/admin.ts"}]},
+      {"issue": "Admin toggle not persisting", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/admin.ts"}]},
+      {"issue": "No confirmation dialog", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/admin/users/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Toggle actions labeled", "Confirmation accessible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J087",
+    "title": "User explores neighborhood features on listing",
+    "category": "discovery",
+    "tags": ["anon", "slow"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing has valid coordinates"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/listings/{id}", "expected": "Listing detail"},
+      {"step": 2, "action": "scroll", "target": "neighborhood section", "expected": "Neighborhood module visible"},
+      {"step": 3, "action": "assert", "target": "nearby places", "expected": "Places or loading state"},
+      {"step": 4, "action": "click", "target": "place category", "expected": "Category places shown"},
+      {"step": 5, "action": "assert", "target": "place cards", "expected": "Place info visible"},
+      {"step": 6, "action": "click", "target": "place card", "expected": "Details or external link"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Places API unavailable", "handling": "Graceful error state"},
+      {"case": "No nearby places", "handling": "Empty state message"}
+    ],
+    "likely_issues": [
+      {"issue": "Places API not configured", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/neighborhood/NearbyPlacesCard.tsx"}]},
+      {"issue": "Rate limit exceeded", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/rate-limit-redis.ts"}]},
+      {"issue": "UI Kit loading fails", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/googleMapsUiKitLoader.ts"}]}
+    ],
+    "accessibility_checks": ["Places info accessible", "External links marked"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J088",
+    "title": "User completes full create-to-book journey",
+    "category": "e2e",
+    "tags": ["auth", "flaky"],
+    "entry_point": "/",
+    "preconditions": ["Two user accounts exist"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "host account", "expected": "Host authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/create", "expected": "Create form"},
+      {"step": 3, "action": "fill", "target": "all fields", "expected": "Form complete"},
+      {"step": 4, "action": "submit", "target": "form", "expected": "Listing created"},
+      {"step": 5, "action": "logout", "target": "host", "expected": "Logged out"},
+      {"step": 6, "action": "login", "target": "tenant account", "expected": "Tenant authenticated"},
+      {"step": 7, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 8, "action": "find", "target": "new listing", "expected": "Listing found"},
+      {"step": 9, "action": "click", "target": "listing", "expected": "Detail page"},
+      {"step": 10, "action": "click", "target": "book now", "expected": "Booking form"},
+      {"step": 11, "action": "fill", "target": "booking dates", "expected": "Dates set"},
+      {"step": 12, "action": "submit", "target": "booking", "expected": "Booking created"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Listing not appearing in search", "handling": "Wait for index"},
+      {"case": "Same user attempts to book own listing", "handling": "Blocked"}
+    ],
+    "likely_issues": [
+      {"issue": "Listing not searchable immediately", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]},
+      {"issue": "Session handling between users", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]},
+      {"issue": "Booking fails on new listing", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/booking.ts"}]}
+    ],
+    "accessibility_checks": ["Full flow accessible", "All steps navigable"],
+    "network_conditions": "flaky"
+  },
+  {
+    "id": "J089",
+    "title": "User receives and reads email notification",
+    "category": "notification",
+    "tags": ["auth", "slow"],
+    "entry_point": "/bookings",
+    "preconditions": ["Email service configured", "Valid email"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "trigger", "target": "booking notification", "expected": "ASSUMPTION: Trigger via booking"},
+      {"step": 3, "action": "wait", "target": "email delivery", "expected": "ASSUMPTION: Email sent"},
+      {"step": 4, "action": "check", "target": "email inbox", "expected": "ASSUMPTION: Email received"},
+      {"step": 5, "action": "click", "target": "email link", "expected": "Navigate to app"},
+      {"step": 6, "action": "assert", "target": "logged in", "expected": "Session maintained"},
+      {"step": 7, "action": "assert", "target": "destination", "expected": "Correct page loaded"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Email not sent", "handling": "Retry or in-app notification"},
+      {"case": "Link expired", "handling": "Graceful handling"}
+    ],
+    "likely_issues": [
+      {"issue": "Email not delivered", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/email.ts"}]},
+      {"issue": "Email links broken", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/email-templates.ts"}]},
+      {"issue": "Session lost on email link", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/auth.ts"}]}
+    ],
+    "accessibility_checks": ["Email content accessible", "Links clear"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J090",
+    "title": "User navigates with screen reader on mobile",
+    "category": "accessibility",
+    "tags": ["anon", "mobile", "a11y"],
+    "entry_point": "/",
+    "preconditions": ["Mobile viewport", "Screen reader simulation"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/", "expected": "Home page loads"},
+      {"step": 2, "action": "announce_check", "target": "page title", "expected": "RoomShare announced"},
+      {"step": 3, "action": "swipe", "target": "screen reader gesture", "direction": "right", "expected": "Focus moves"},
+      {"step": 4, "action": "announce_check", "target": "navigation", "expected": "Nav landmark announced"},
+      {"step": 5, "action": "activate", "target": "menu button", "expected": "Mobile menu opens"},
+      {"step": 6, "action": "swipe_navigate", "target": "to search", "expected": "Search link reached"},
+      {"step": 7, "action": "activate", "target": "search link", "expected": "Navigate to search"},
+      {"step": 8, "action": "announce_check", "target": "new page", "expected": "Search page announced"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Focus trap in menu", "handling": "Escape closes menu"},
+      {"case": "Unlabeled buttons", "handling": "ASSUMPTION: All labeled"}
+    ],
+    "likely_issues": [
+      {"issue": "Mobile menu focus trap", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/NavbarClient.tsx"}]},
+      {"issue": "Missing mobile landmarks", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/layout.tsx"}]},
+      {"issue": "Gestures not working", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]}
+    ],
+    "accessibility_checks": ["Full screen reader navigation", "All controls reachable"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J091",
+    "title": "User views high contrast mode compatibility",
+    "category": "accessibility",
+    "tags": ["anon", "a11y"],
+    "entry_point": "/search",
+    "preconditions": ["High contrast mode enabled"],
+    "steps": [
+      {"step": 1, "action": "enable", "target": "high contrast mode", "expected": "OS high contrast active"},
+      {"step": 2, "action": "navigate", "target": "/search", "expected": "Search page loads"},
+      {"step": 3, "action": "assert", "target": "buttons visible", "expected": "All buttons have borders"},
+      {"step": 4, "action": "assert", "target": "text readable", "expected": "Text has sufficient contrast"},
+      {"step": 5, "action": "assert", "target": "focus indicators", "expected": "Focus visible in high contrast"},
+      {"step": 6, "action": "navigate", "target": "/listings/{id}", "expected": "Listing page"},
+      {"step": 7, "action": "assert", "target": "essential info visible", "expected": "Price, title, actions visible"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Icons disappear", "handling": "Text alternatives available"},
+      {"case": "Color-only info lost", "handling": "Icons or text supplement color"}
+    ],
+    "likely_issues": [
+      {"issue": "Buttons invisible", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/button.tsx"}]},
+      {"issue": "Focus not visible", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/globals.css"}]},
+      {"issue": "Color-only status indicators", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/listings/ListingCard.tsx"}]}
+    ],
+    "accessibility_checks": ["High contrast support", "No info lost"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J092",
+    "title": "User cancels during multi-step form wizard",
+    "category": "form",
+    "tags": ["auth"],
+    "entry_point": "/verify",
+    "preconditions": ["User logged in", "Verification not started"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/verify", "expected": "Verification page"},
+      {"step": 3, "action": "select", "target": "document type", "expected": "Type selected"},
+      {"step": 4, "action": "upload", "target": "document", "files": ["doc.jpg"], "expected": "Document uploaded"},
+      {"step": 5, "action": "click", "target": "cancel", "expected": "Cancel confirmation"},
+      {"step": 6, "action": "confirm", "target": "cancel", "expected": "Return to previous state"},
+      {"step": 7, "action": "assert", "target": "verification status", "expected": "Not started/cancelled"},
+      {"step": 8, "action": "assert", "target": "uploaded file", "expected": "File cleaned up or discarded"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No cancel button", "handling": "Navigate away works"},
+      {"case": "Uploaded files orphaned", "handling": "Cleanup on cancel"}
+    ],
+    "likely_issues": [
+      {"issue": "No cancel option", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/verify/VerificationForm.tsx"}]},
+      {"issue": "Partial state saved", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/verification.ts"}]},
+      {"issue": "Orphan files in storage", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/supabase.ts"}]}
+    ],
+    "accessibility_checks": ["Cancel action clear", "Progress indicator accurate"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J093",
+    "title": "User tests responsive breakpoints",
+    "category": "responsive",
+    "tags": ["anon", "mobile"],
+    "entry_point": "/search",
+    "preconditions": ["None"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 2, "action": "resize", "target": "viewport", "width": 320, "expected": "Mobile XS"},
+      {"step": 3, "action": "assert", "target": "layout", "expected": "Mobile layout"},
+      {"step": 4, "action": "resize", "target": "viewport", "width": 768, "expected": "Tablet"},
+      {"step": 5, "action": "assert", "target": "layout", "expected": "Tablet layout"},
+      {"step": 6, "action": "resize", "target": "viewport", "width": 1024, "expected": "Desktop"},
+      {"step": 7, "action": "assert", "target": "layout", "expected": "Desktop layout"},
+      {"step": 8, "action": "resize", "target": "viewport", "width": 1440, "expected": "Large desktop"},
+      {"step": 9, "action": "assert", "target": "content width", "expected": "Max width respected"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Layout breaks at breakpoint", "handling": "Smooth transition"},
+      {"case": "Horizontal scroll appears", "handling": "No horizontal overflow"}
+    ],
+    "likely_issues": [
+      {"issue": "Layout breaks at 768px", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/search/page.tsx"}]},
+      {"issue": "Horizontal overflow", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/globals.css"}]},
+      {"issue": "Touch targets too small on mobile", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/ui/button.tsx"}]}
+    ],
+    "accessibility_checks": ["Touch targets appropriate per size", "Text readable"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J094",
+    "title": "User experiences concurrent booking conflict",
+    "category": "booking",
+    "tags": ["auth", "flaky"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing has 1 available slot", "Two users can book simultaneously"],
+    "steps": [
+      {"step": 1, "action": "parallel_login", "target": "two users", "expected": "ASSUMPTION: Both authenticated"},
+      {"step": 2, "action": "parallel_navigate", "target": "same listing", "expected": "Both on listing"},
+      {"step": 3, "action": "parallel_click", "target": "book now", "expected": "Both see booking form"},
+      {"step": 4, "action": "parallel_fill", "target": "same dates", "expected": "Both forms filled"},
+      {"step": 5, "action": "parallel_submit", "target": "bookings", "expected": "Race condition"},
+      {"step": 6, "action": "assert", "target": "one success one fail", "expected": "Only one booking succeeds"},
+      {"step": 7, "action": "assert", "target": "slots", "expected": "Slots correctly at 0"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Both succeed (overbooking)", "handling": "CRITICAL - must prevent"},
+      {"case": "Both fail", "handling": "At least one should succeed"}
+    ],
+    "likely_issues": [
+      {"issue": "Race condition allows overbooking", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/booking.ts"}]},
+      {"issue": "SERIALIZABLE not working", "severity": "critical", "code_hotspots_to_inspect": [{"path_or_module": "src/app/actions/booking.ts"}]},
+      {"issue": "Unclear error for loser", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/BookingForm.tsx"}]}
+    ],
+    "accessibility_checks": ["Error message clear for failed booking"],
+    "network_conditions": "flaky"
+  },
+  {
+    "id": "J095",
+    "title": "User interacts with booking calendar widget",
+    "category": "booking",
+    "tags": ["auth", "a11y"],
+    "entry_point": "/listings/[id]",
+    "preconditions": ["Listing has some booked dates"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/listings/{id}", "expected": "Listing detail"},
+      {"step": 2, "action": "scroll", "target": "calendar widget", "expected": "Calendar visible"},
+      {"step": 3, "action": "assert", "target": "booked dates", "expected": "Unavailable dates marked"},
+      {"step": 4, "action": "click", "target": "unavailable date", "expected": "Selection prevented"},
+      {"step": 5, "action": "click", "target": "available date", "expected": "Date selectable"},
+      {"step": 6, "action": "navigate", "target": "next month", "expected": "Calendar advances"},
+      {"step": 7, "action": "assert", "target": "keyboard nav", "expected": "Can navigate with arrows"}
+    ],
+    "negative_edge_cases": [
+      {"case": "All dates booked", "handling": "Fully booked message"},
+      {"case": "Calendar far in future", "handling": "Limit or allow"}
+    ],
+    "likely_issues": [
+      {"issue": "Booked dates not shown", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/BookingCalendar.tsx"}]},
+      {"issue": "Can select unavailable dates", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/BookingCalendar.tsx"}]},
+      {"issue": "Calendar keyboard navigation broken", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/components/BookingCalendar.tsx"}]}
+    ],
+    "accessibility_checks": ["Calendar keyboard navigable", "Date states announced"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J096",
+    "title": "User with JavaScript disabled sees fallback",
+    "category": "progressive",
+    "tags": ["anon"],
+    "entry_point": "/",
+    "preconditions": ["JavaScript disabled"],
+    "steps": [
+      {"step": 1, "action": "disable", "target": "JavaScript", "expected": "JS disabled"},
+      {"step": 2, "action": "navigate", "target": "/", "expected": "Page loads"},
+      {"step": 3, "action": "assert", "target": "basic content", "expected": "Some content visible"},
+      {"step": 4, "action": "assert", "target": "noscript message", "expected": "JS required message or graceful fallback"},
+      {"step": 5, "action": "navigate", "target": "/search", "expected": "Page loads"},
+      {"step": 6, "action": "assert", "target": "SSR content", "expected": "Server-rendered content visible"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Blank page without JS", "handling": "At least message shown"},
+      {"case": "Critical features unavailable", "handling": "Graceful messaging"}
+    ],
+    "likely_issues": [
+      {"issue": "Blank page without JS", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/page.tsx"}]},
+      {"issue": "No noscript fallback", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/layout.tsx"}]},
+      {"issue": "SSR not working", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]}
+    ],
+    "accessibility_checks": ["Basic content accessible", "Message clear"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J097",
+    "title": "User uses autocomplete on location input",
+    "category": "form",
+    "tags": ["anon", "slow"],
+    "entry_point": "/listings/create",
+    "preconditions": ["User logged in", "Location API configured"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper", "expected": "User authenticated"},
+      {"step": 2, "action": "navigate", "target": "/listings/create", "expected": "Create form"},
+      {"step": 3, "action": "focus", "target": "address input", "expected": "Input focused"},
+      {"step": 4, "action": "type", "target": "address input", "value": "123 Main", "expected": "Text entered"},
+      {"step": 5, "action": "wait", "target": "autocomplete", "expected": "Suggestions appear"},
+      {"step": 6, "action": "click", "target": "first suggestion", "expected": "Address filled"},
+      {"step": 7, "action": "assert", "target": "related fields", "expected": "City/state auto-filled"},
+      {"step": 8, "action": "press", "target": "ArrowDown then Enter", "expected": "Keyboard selection works"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Autocomplete API fails", "handling": "Manual entry allowed"},
+      {"case": "No suggestions", "handling": "User can type manually"}
+    ],
+    "likely_issues": [
+      {"issue": "Autocomplete not appearing", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/LocationSearchInput.tsx"}]},
+      {"issue": "Keyboard nav broken", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/LocationSearchInput.tsx"}]},
+      {"issue": "API key not configured", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/lib/env.ts"}]},
+      {"issue": "Rate limited", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/components/LocationSearchInput.tsx"}]}
+    ],
+    "accessibility_checks": ["Autocomplete announced", "Keyboard navigable"],
+    "network_conditions": "slow"
+  },
+  {
+    "id": "J098",
+    "title": "Admin views audit log entries",
+    "category": "admin",
+    "tags": ["auth", "role:admin"],
+    "entry_point": "/admin/audit",
+    "preconditions": ["User is admin", "Audit entries exist"],
+    "steps": [
+      {"step": 1, "action": "login", "target": "auth helper (admin)", "expected": "Admin authenticated"},
+      {"step": 2, "action": "navigate", "target": "/admin/audit", "expected": "Audit log page"},
+      {"step": 3, "action": "assert", "target": "audit entries", "expected": "Recent entries visible"},
+      {"step": 4, "action": "assert", "target": "entry details", "expected": "Action, user, timestamp visible"},
+      {"step": 5, "action": "filter", "target": "by action type", "expected": "Filtered results"},
+      {"step": 6, "action": "paginate", "target": "next page", "expected": "More entries load"},
+      {"step": 7, "action": "click", "target": "entry details", "expected": "Full details shown"}
+    ],
+    "negative_edge_cases": [
+      {"case": "No audit entries", "handling": "Empty state"},
+      {"case": "Very old entries", "handling": "Pagination or archiving"}
+    ],
+    "likely_issues": [
+      {"issue": "Audit entries not loading", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/admin/audit/page.tsx"}]},
+      {"issue": "Filter not working", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/admin/audit/page.tsx"}]},
+      {"issue": "Sensitive data exposed", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "src/app/admin/audit/page.tsx"}]}
+    ],
+    "accessibility_checks": ["Log entries readable", "Filters accessible"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J099",
+    "title": "User experiences health check endpoints",
+    "category": "system",
+    "tags": ["anon"],
+    "entry_point": "/api/health/live",
+    "preconditions": ["App running"],
+    "steps": [
+      {"step": 1, "action": "api_call", "target": "GET /api/health/live", "expected": "200 OK"},
+      {"step": 2, "action": "assert", "target": "response", "expected": "Healthy status"},
+      {"step": 3, "action": "api_call", "target": "GET /api/health/ready", "expected": "200 OK or 503"},
+      {"step": 4, "action": "assert", "target": "response", "expected": "Ready status with details"},
+      {"step": 5, "action": "assert", "target": "database connectivity", "expected": "DB check in ready"}
+    ],
+    "negative_edge_cases": [
+      {"case": "DB down", "handling": "Ready returns 503"},
+      {"case": "Partial service failure", "handling": "Degraded status"}
+    ],
+    "likely_issues": [
+      {"issue": "Health check always passes", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/health/live/route.ts"}]},
+      {"issue": "Ready check doesn't check DB", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/health/ready/route.ts"}]},
+      {"issue": "Health checks too slow", "severity": "low", "code_hotspots_to_inspect": [{"path_or_module": "src/app/api/health/ready/route.ts"}]}
+    ],
+    "accessibility_checks": ["N/A - API endpoints"],
+    "network_conditions": "normal"
+  },
+  {
+    "id": "J100",
+    "title": "User completes full app tour from signup to booking",
+    "category": "e2e",
+    "tags": ["auth", "e2e", "flaky"],
+    "entry_point": "/",
+    "preconditions": ["Fresh user account possible"],
+    "steps": [
+      {"step": 1, "action": "navigate", "target": "/", "expected": "Home page"},
+      {"step": 2, "action": "click", "target": "sign up", "expected": "Signup page"},
+      {"step": 3, "action": "fill", "target": "signup form", "expected": "Form complete"},
+      {"step": 4, "action": "submit", "target": "signup", "expected": "Account created"},
+      {"step": 5, "action": "navigate", "target": "/search", "expected": "Search page"},
+      {"step": 6, "action": "apply", "target": "filters", "expected": "Filtered results"},
+      {"step": 7, "action": "click", "target": "listing", "expected": "Listing detail"},
+      {"step": 8, "action": "click", "target": "save/favorite", "expected": "Listing saved"},
+      {"step": 9, "action": "click", "target": "contact host", "expected": "Message sent"},
+      {"step": 10, "action": "click", "target": "book now", "expected": "Booking form"},
+      {"step": 11, "action": "fill", "target": "booking", "expected": "Form complete"},
+      {"step": 12, "action": "submit", "target": "booking", "expected": "Booking created"},
+      {"step": 13, "action": "navigate", "target": "/profile", "expected": "Profile page"},
+      {"step": 14, "action": "assert", "target": "user data", "expected": "Profile shows info"},
+      {"step": 15, "action": "logout", "target": "user", "expected": "Logged out"}
+    ],
+    "negative_edge_cases": [
+      {"case": "Any step fails", "handling": "Graceful error handling"},
+      {"case": "Session lost mid-flow", "handling": "Redirect to login"}
+    ],
+    "likely_issues": [
+      {"issue": "Flow breaks at any point", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]},
+      {"issue": "State not persisting", "severity": "high", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]},
+      {"issue": "Race conditions in E2E", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]},
+      {"issue": "Test data cleanup needed", "severity": "medium", "code_hotspots_to_inspect": [{"path_or_module": "UNKNOWN"}]}
+    ],
+    "accessibility_checks": ["Full flow accessible", "All steps keyboard navigable"],
+    "network_conditions": "flaky"
+  }
+]

@@ -5,6 +5,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MapPin, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { loadPlacesUiKit } from '@/lib/googleMapsUiKitLoader';
+import type { NeighborhoodSearchResult } from '@/lib/places/types';
 
 /**
  * NearbyPlacesCard - Renders Google Places UI Kit components.
@@ -22,8 +23,8 @@ export interface NearbyPlacesCardProps {
   latitude: number;
   /** Listing longitude */
   longitude: number;
-  /** Original user query text */
-  queryText: string;
+  /** Original user query text (optional for NeighborhoodModule usage) */
+  queryText?: string;
   /** Normalized intent from detectNearbyIntent */
   normalizedIntent: {
     mode: 'type' | 'text';
@@ -42,6 +43,14 @@ export interface NearbyPlacesCardProps {
   remainingSearches?: number;
   /** P2-C3 FIX: Whether multiple brands were detected in query */
   multiBrandDetected?: boolean;
+  /** Optional: Search radius in meters (used by NeighborhoodModule) */
+  radiusMeters?: number;
+  /** Optional: Callback when search results are ready (used by NeighborhoodModule) */
+  onSearchResultsReady?: (result: NeighborhoodSearchResult) => void;
+  /** Optional: Callback when an error occurs (used by NeighborhoodModule) */
+  onError?: (error: string) => void;
+  /** Optional: Callback when loading state changes (used by NeighborhoodModule) */
+  onLoadingChange?: (loading: boolean) => void;
 }
 
 const INITIAL_RADIUS = 1600; // 1.6km
@@ -61,6 +70,10 @@ export function NearbyPlacesCard({
   canSearch = true,  // C2 FIX: Default to true for backwards compatibility
   remainingSearches,
   multiBrandDetected = false,  // P2-C3 FIX: Multi-brand warning
+  radiusMeters,      // Used by NeighborhoodModule (passed through)
+  onSearchResultsReady, // Used by NeighborhoodModule
+  onError,           // Used by NeighborhoodModule
+  onLoadingChange,   // Used by NeighborhoodModule
 }: NearbyPlacesCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);

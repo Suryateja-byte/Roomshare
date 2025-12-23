@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "feature-dev@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "supabase@claude-plugins-official": true,
+    "backend-development@claude-code-workflows": true,
+    "database-design@claude-code-workflows": true,
+    "code-refactoring@claude-code-workflows": true,
+    "context-management@claude-code-workflows": true
+  }
+}

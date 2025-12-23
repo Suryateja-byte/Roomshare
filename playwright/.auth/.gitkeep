@@ -1,0 +1,2 @@
+# This directory stores authentication state for Playwright tests
+# The user.json file is generated during test setup and should not be committed

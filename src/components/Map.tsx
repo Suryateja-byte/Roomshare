@@ -9,6 +9,7 @@
  * - Click cluster to zoom and expand
  */
 
+import '@/lib/mapbox-init'; // Must be first - initializes worker
 import Map, { Marker, Popup, Source, Layer, MapLayerMouseEvent, ViewStateChangeEvent } from 'react-map-gl';
 import type { LayerProps, GeoJSONSource } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';

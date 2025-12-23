@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && cp node_modules/mapbox-gl/dist/mapbox-gl-csp-worker.js public/mapbox-gl-csp-worker.js",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -24,7 +24,19 @@
     "test:filters:e2e": "jest src/__tests__/e2e/",
     "test:filters:regression": "jest src/__tests__/lib/filter-regression.test.ts",
     "test:filters:perf": "jest src/__tests__/performance/ --testTimeout=60000",
-    "test:filters:all": "jest src/__tests__/lib/filter-schema.test.ts src/__tests__/lib/filter-regression.test.ts src/__tests__/integration/ src/__tests__/property/ src/__tests__/e2e/ src/__tests__/performance/ --testTimeout=60000"
+    "test:filters:all": "jest src/__tests__/lib/filter-schema.test.ts src/__tests__/lib/filter-regression.test.ts src/__tests__/integration/ src/__tests__/property/ src/__tests__/e2e/ src/__tests__/performance/ --testTimeout=60000",
+    "clean:next-locks": "rm -rf .next/dev/lock 2>/dev/null || true",
+    "test:e2e": "npm run clean:next-locks && playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:chromium": "playwright test --project=chromium",
+    "test:e2e:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'",
+    "test:e2e:anon": "playwright test --project=chromium-anon",
+    "geocode:compare": "npx ts-node scripts/geocode-accuracy-check.ts",
+    "geocode:compare:extended": "npx ts-node scripts/geocode-accuracy-extended.ts",
+    "geocode:compare:json": "npx ts-node scripts/geocode-accuracy-extended.ts --json"
   },
   "dependencies": {
     "@ai-sdk/groq": "^2.0.32",
@@ -64,6 +76,7 @@
     "zod": "^4.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -83,6 +96,7 @@
     "prisma": "^6.0.0",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.5",
+    "ts-node": "^10.9.2",
     "typescript": "^5",
     "whatwg-fetch": "^3.6.20"
   }

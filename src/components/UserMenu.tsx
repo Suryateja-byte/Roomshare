@@ -17,6 +17,8 @@ export default function UserMenu({ user }: UserMenuProps) {
         <div className="relative">
             <button
                 onClick={() => setIsOpen(!isOpen)}
+                data-testid="user-menu"
+                aria-label="User menu"
                 className="flex items-center gap-2 p-1 pr-3 rounded-full border border-border hover:bg-accent transition-colors"
             >
                 <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold">

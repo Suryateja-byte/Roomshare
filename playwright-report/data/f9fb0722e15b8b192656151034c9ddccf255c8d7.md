@@ -1,0 +1,111 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e5]:
+    - navigation [ref=e6]:
+      - generic [ref=e8]:
+        - link "R RoomShare." [ref=e9] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e10]: R
+          - generic [ref=e11]: RoomShare.
+        - generic [ref=e12]:
+          - link "Find a Room" [ref=e13] [cursor=pointer]:
+            - /url: /search
+          - generic [ref=e14]:
+            - button [ref=e16]:
+              - img [ref=e17]
+            - link "Messages" [ref=e20] [cursor=pointer]:
+              - /url: /messages
+              - img [ref=e21]
+          - link "List a Room" [ref=e23] [cursor=pointer]:
+            - /url: /listings/create
+            - button "List a Room" [ref=e24]:
+              - img [ref=e25]
+              - generic [ref=e26]: List a Room
+          - button "User menu" [ref=e28]:
+            - img "Updated Test User" [ref=e30]
+            - img [ref=e31]
+    - main [ref=e33]:
+      - generic [ref=e35]:
+        - img [ref=e37]
+        - heading "Something went wrong" [level=1] [ref=e39]
+        - paragraph [ref=e40]: We couldn't load the search results. This might be a temporary issue with our servers.
+        - generic [ref=e41]:
+          - button "Try again" [ref=e42]:
+            - img [ref=e43]
+            - text: Try again
+          - link "Go home" [ref=e48] [cursor=pointer]:
+            - /url: /
+            - img [ref=e49]
+            - text: Go home
+        - group [ref=e52]:
+          - generic "Error details (dev only)" [ref=e53] [cursor=pointer]
+    - contentinfo [ref=e54]:
+      - generic [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - link "RoomShare." [ref=e58] [cursor=pointer]:
+              - /url: /
+              - generic [ref=e59]: RoomShare.
+            - paragraph [ref=e60]:
+              - text: Designed for modern living.
+              - text: Connect, live, and thrive with people like you.
+          - generic [ref=e61]:
+            - heading "Platform" [level=4] [ref=e62]
+            - list [ref=e63]:
+              - listitem [ref=e64]:
+                - link "Browse" [ref=e65] [cursor=pointer]:
+                  - /url: /search
+              - listitem [ref=e66]:
+                - link "List a Room" [ref=e67] [cursor=pointer]:
+                  - /url: /listings/create
+              - listitem [ref=e68]:
+                - button "Trust & Safety" [ref=e69]
+          - generic [ref=e70]:
+            - heading "Company" [level=4] [ref=e71]
+            - list [ref=e72]:
+              - listitem [ref=e73]:
+                - link "About" [ref=e74] [cursor=pointer]:
+                  - /url: /about
+              - listitem [ref=e75]:
+                - button "Careers" [ref=e76]
+              - listitem [ref=e77]:
+                - button "Blog" [ref=e78]
+          - generic [ref=e79]:
+            - heading "Support" [level=4] [ref=e80]
+            - list [ref=e81]:
+              - listitem [ref=e82]:
+                - button "Help Center" [ref=e83]
+              - listitem [ref=e84]:
+                - button "Contact" [ref=e85]
+          - generic [ref=e86]:
+            - heading "Legal" [level=4] [ref=e87]
+            - list [ref=e88]:
+              - listitem [ref=e89]:
+                - button "Privacy" [ref=e90]
+              - listitem [ref=e91]:
+                - button "Terms" [ref=e92]
+        - generic [ref=e93]:
+          - paragraph [ref=e94]: © 2025 RoomShare Inc.
+          - navigation "Legal links" [ref=e95]:
+            - button "Privacy" [ref=e96]
+            - button "Terms" [ref=e97]
+  - region "Notifications alt+T"
+  - generic [ref=e103] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e104]:
+      - img [ref=e105]
+    - generic [ref=e108]:
+      - button "Open issues overlay" [ref=e109]:
+        - generic [ref=e110]:
+          - generic [ref=e111]: "4"
+          - generic [ref=e112]: "5"
+        - generic [ref=e113]:
+          - text: Issue
+          - generic [ref=e114]: s
+      - button "Collapse issues badge" [ref=e115]:
+        - img [ref=e116]
+  - alert [ref=e118]
+```

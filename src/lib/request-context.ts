@@ -4,7 +4,23 @@
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
-import { randomUUID } from 'crypto';
+
+/**
+ * Generate a UUID using Web Crypto API (Edge Runtime compatible)
+ * Falls back to a pseudo-random implementation for older environments
+ */
+function generateUUID(): string {
+  // Use Web Crypto API (available in Edge Runtime and modern browsers)
+  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  // Fallback for older environments
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export interface RequestContext {
   requestId: string;
@@ -22,7 +38,7 @@ const requestContextStorage = new AsyncLocalStorage<RequestContext>();
  * Uses x-request-id header if present, otherwise generates a UUID
  */
 export function generateRequestId(existingId?: string): string {
-  return existingId || randomUUID();
+  return existingId || generateUUID();
 }
 
 /**

@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
+import { logger } from "@/lib/logger"
 
 async function getUser(email: string) {
     try {
@@ -13,7 +14,7 @@ async function getUser(email: string) {
         })
         return user
     } catch (error) {
-        console.error("Failed to fetch user:", error)
+        logger.sync.error("Failed to fetch user", { error: error instanceof Error ? error.message : String(error) })
         throw new Error("Failed to fetch user.")
     }
 }
@@ -26,7 +27,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     session: {
         strategy: "jwt",
-        maxAge: 30 * 24 * 60 * 60, // 30 days
+        maxAge: 14 * 24 * 60 * 60, // 14 days (security hardening from 30 days)
         updateAge: 24 * 60 * 60,   // Refresh token once per day
     },
     // Note: In NextAuth v5 (Auth.js), account linking is handled by the adapter
@@ -72,7 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         token.name = dbUser.name
                     }
                 } catch (error) {
-                    console.error("JWT callback DB error:", error)
+                    logger.sync.error("JWT callback DB error", { error: error instanceof Error ? error.message : String(error) })
                     // Don't invalidate session on DB errors - keep existing token values
                 }
             }
@@ -125,7 +126,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         Credentials({
             async authorize(credentials) {
                 const parsedCredentials = z
-                    .object({ email: z.string().email(), password: z.string().min(6) })
+                    .object({ email: z.string().email(), password: z.string().min(12) })
                     .safeParse(credentials)
 
                 if (parsedCredentials.success) {
@@ -138,7 +139,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     if (passwordsMatch) return user
                 }
 
-                console.log("Invalid credentials")
+                logger.sync.warn("Invalid credentials attempt")
                 return null
             },
         }),

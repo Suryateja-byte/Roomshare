@@ -1,5 +1,6 @@
 'use client';
 
+import '@/lib/mapbox-init'; // Must be first - initializes worker
 import ReactMapGL, { Marker, Popup, Source, Layer, ViewStateChangeEvent, MapLayerMouseEvent } from 'react-map-gl';
 import type { LayerProps, GeoJSONSource } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';

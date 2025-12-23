@@ -9,7 +9,7 @@ import crypto from 'crypto';
 const registerSchema = z.object({
     name: z.string().min(2),
     email: z.string().email(),
-    password: z.string().min(6),
+    password: z.string().min(12, 'Password must be at least 12 characters'),
 });
 
 export async function POST(request: Request) {

@@ -46,6 +46,10 @@ const serverEnvSchema = z.object({
     .refine(
       (val) => !val || !val.includes('change-in-production'),
       'CRON_SECRET must not contain placeholder values'
+    )
+    .refine(
+      (val) => process.env.NODE_ENV !== 'production' || !!val,
+      'CRON_SECRET is required in production'
     ),
 
   // Security: Origin enforcement (comma-separated URLs)

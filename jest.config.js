@@ -35,7 +35,8 @@ const customJestConfig = {
   moduleDirectories: ['node_modules', '<rootDir>/'],
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   transformIgnorePatterns: [
-    '/node_modules/',
+    // Allow next-auth, @auth, and jose packages to be transformed (ESM modules)
+    'node_modules/(?!(next-auth|@auth|jose|oauth4webapi|preact|preact-render-to-string)/)',
     '^.+\\.module\\.(css|sass|scss)$',
   ],
 }

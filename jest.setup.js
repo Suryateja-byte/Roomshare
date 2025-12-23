@@ -74,6 +74,44 @@ jest.mock('next/link', () => ({
   ),
 }))
 
+// Mock next-auth (ESM module)
+jest.mock('next-auth', () => ({
+  __esModule: true,
+  default: jest.fn(() => ({
+    handlers: { GET: jest.fn(), POST: jest.fn() },
+    auth: jest.fn(),
+    signIn: jest.fn(),
+    signOut: jest.fn(),
+  })),
+  getServerSession: jest.fn(),
+}))
+
+// Mock next-auth/react
+jest.mock('next-auth/react', () => ({
+  __esModule: true,
+  useSession: jest.fn(() => ({ data: null, status: 'unauthenticated' })),
+  signIn: jest.fn(),
+  signOut: jest.fn(),
+  SessionProvider: ({ children }) => children,
+}))
+
+// Mock next-auth providers
+jest.mock('next-auth/providers/credentials', () => ({
+  __esModule: true,
+  default: jest.fn(() => ({ id: 'credentials', name: 'Credentials', type: 'credentials' })),
+}))
+
+jest.mock('next-auth/providers/google', () => ({
+  __esModule: true,
+  default: jest.fn(() => ({ id: 'google', name: 'Google', type: 'oauth' })),
+}))
+
+// Mock @auth/prisma-adapter
+jest.mock('@auth/prisma-adapter', () => ({
+  __esModule: true,
+  PrismaAdapter: jest.fn(() => ({})),
+}))
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

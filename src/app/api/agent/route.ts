@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { logger } from '@/lib/logger';
 
 interface AgentRequest {
   question: string;
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Check for n8n webhook URL
     const webhookUrl = process.env.N8N_WEBHOOK_URL;
     if (!webhookUrl) {
-      console.error('N8N_WEBHOOK_URL is not configured');
+      logger.sync.error('N8N_WEBHOOK_URL is not configured');
       return NextResponse.json(
         { error: 'Service temporarily unavailable' },
         { status: 503 }
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeoutId);
 
       if (!n8nResponse.ok) {
-        console.error(`n8n webhook error: ${n8nResponse.status}`);
+        logger.sync.error('n8n webhook error', { status: n8nResponse.status });
         // P1-24 FIX: Return graceful fallback with helpful message
         return NextResponse.json({
           answer: "I'm having trouble connecting to my knowledge service right now. Please try again in a moment, or feel free to explore the listing details and neighborhood information available on the page.",
@@ -118,14 +119,14 @@ export async function POST(request: NextRequest) {
 
       // P1-11 FIX: Handle fetch errors properly instead of re-throwing
       // P1-24 FIX: Return graceful fallback on connection failure
-      console.error('Agent webhook fetch error:', fetchError instanceof Error ? fetchError.message : 'Unknown error');
+      logger.sync.error('Agent webhook fetch error', { error: fetchError instanceof Error ? fetchError.message : 'Unknown error' });
       return NextResponse.json({
         answer: "I'm temporarily unable to process your question. Please try again shortly, or browse the available listing information on this page.",
         fallback: true
       });
     }
   } catch (error) {
-    console.error('Agent API error:', error);
+    logger.sync.error('Agent API error', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
