@@ -476,3 +476,68 @@ input:autofill {
     transition-duration: 300ms;
   }
 }
+
+/* MapLibre GL Controls - Adjust for mobile toggle button */
+.maplibregl-ctrl-bottom-right {
+  margin-bottom: 80px;
+}
+
+@media (min-width: 1024px) {
+  .maplibregl-ctrl-bottom-right {
+    margin-bottom: 0;
+  }
+}
+
+/* MapLibre Attribution - Premium glassmorphism styling */
+.maplibregl-ctrl-attrib {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  padding: 4px 10px !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  color: #71717a !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  margin: 0 12px 12px 0 !important;
+}
+
+.dark .maplibregl-ctrl-attrib {
+  background: rgba(24, 24, 27, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #a1a1aa !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Clean up attribution links */
+.maplibregl-ctrl-attrib a {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+.maplibregl-ctrl-attrib a:hover {
+  text-decoration: underline !important;
+}
+
+/* Hide the toggle button for compact attribution */
+.maplibregl-ctrl-attrib-button {
+  display: none !important;
+}
+
+/* Ensure attribution inner content has proper spacing */
+.maplibregl-ctrl-attrib-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Hide scrollbar utility (explicit class for specific elements) */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

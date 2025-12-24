@@ -390,6 +390,21 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         };
     }, []);
 
+    // Suppress mapbox-gl worker communication errors during HMR/Turbopack
+    // These are non-fatal and occur when the worker connection is lost during hot reload
+    useEffect(() => {
+        const handleError = (event: ErrorEvent) => {
+            const message = event.message || '';
+            if (message.includes("reading 'send'") || message.includes("reading 'target'")) {
+                event.preventDefault();
+                console.warn('[Map] Suppressed worker communication error during HMR');
+            }
+        };
+
+        window.addEventListener('error', handleError);
+        return () => window.removeEventListener('error', handleError);
+    }, []);
+
     // Execute the actual search with the given bounds
     const executeMapSearch = useCallback((bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -518,7 +533,16 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 interactiveLayerIds={useClustering ? [isDarkMode ? 'clusters-dark' : 'clusters'] : []}
                 onError={(e) => {
                     const error = (e as { error?: Error }).error;
-                    console.error('Map Error:', error?.message || 'Unknown map error', error?.stack);
+                    const message = error?.message || 'Unknown map error';
+
+                    // Worker communication errors are non-fatal during HMR/navigation
+                    // These occur when the mapbox-gl worker loses connection during hot reload
+                    if (message.includes('send') || message.includes('worker') || message.includes('Actor')) {
+                        console.warn('[Map] Worker communication issue (safe to ignore during HMR):', message);
+                        return;
+                    }
+
+                    console.error('Map Error:', message, error?.stack);
                 }}
             >
                 {/* Clustering Source and Layers - Layer nested inside Source inherits source automatically */}

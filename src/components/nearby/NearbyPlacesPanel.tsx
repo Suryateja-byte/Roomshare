@@ -6,6 +6,7 @@
  * Search interface for nearby places with category chips, search input, and results list.
  *
  * Design: Premium minimalist with elegant micro-interactions and perfect theme consistency.
+ * Features: Horizontal scrollable categories, category-colored icons, mobile toggle.
  *
  * COMPLIANCE CRITICAL:
  * - NO API call on mount (only on explicit user interaction)
@@ -16,7 +17,6 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import {
   MapPin,
-  Navigation,
   Search,
   AlertCircle,
   ArrowRight,
@@ -26,9 +26,19 @@ import {
   Fuel,
   Dumbbell,
   Pill,
+  Footprints,
+  Car,
+  Map as MapIcon,
+  List as ListIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CATEGORY_CHIPS, RADIUS_OPTIONS, type NearbyPlace, type CategoryChip } from '@/types/nearby';
+import {
+  CATEGORY_CHIPS,
+  RADIUS_OPTIONS,
+  getCategoryColors,
+  type NearbyPlace,
+  type CategoryChip,
+} from '@/types/nearby';
 
 // Icon mapping for category chips
 const ICON_MAP = {
@@ -44,12 +54,16 @@ interface NearbyPlacesPanelProps {
   listingLat: number;
   listingLng: number;
   onPlacesChange?: (places: NearbyPlace[]) => void;
+  viewMode?: 'list' | 'map';
+  onViewModeChange?: (mode: 'list' | 'map') => void;
 }
 
 export default function NearbyPlacesPanel({
   listingLat,
   listingLng,
   onPlacesChange,
+  viewMode = 'list',
+  onViewModeChange,
 }: NearbyPlacesPanelProps) {
   const { data: session, status } = useSession();
   const [searchQuery, setSearchQuery] = useState('');
@@ -157,11 +171,11 @@ export default function NearbyPlacesPanel({
   // Auth gate - show loading skeleton
   if (status === 'loading') {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-12 bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
-        <div className="flex gap-2">
+      <div className="p-4 sm:p-6 animate-pulse space-y-4">
+        <div className="h-12 bg-zinc-100 dark:bg-zinc-800 rounded-2xl" />
+        <div className="flex gap-2 overflow-x-auto hide-scrollbar">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-10 w-28 bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
+            <div key={i} className="h-10 w-28 flex-shrink-0 bg-zinc-100 dark:bg-zinc-800 rounded-full" />
           ))}
         </div>
       </div>
@@ -174,10 +188,9 @@ export default function NearbyPlacesPanel({
       <div
         className="
           flex flex-col items-center justify-center
-          py-16 px-6 text-center
+          h-full py-16 px-6 text-center
           bg-gradient-to-br from-zinc-50 to-zinc-100
           dark:from-zinc-800/50 dark:to-zinc-900/50
-          rounded-xl
         "
       >
         <div
@@ -207,276 +220,330 @@ export default function NearbyPlacesPanel({
   }
 
   return (
-    <div className="space-y-5">
-      {/* Search Input - Refined with Focus Glow */}
-      <div className="relative group">
-        <div
-          className="
-            absolute inset-0 -m-1
-            bg-gradient-to-r from-blue-500/20 to-indigo-500/20
-            rounded-2xl opacity-0 group-focus-within:opacity-100
-            blur-xl transition-opacity duration-500
-          "
-        />
-        <div className="relative">
-          <Search
+    <div className="flex flex-col h-full">
+      {/* Search & Filters (Sticky Header) */}
+      <div className="p-4 sm:p-6 space-y-4 shadow-sm z-20 bg-white dark:bg-zinc-900 relative flex-shrink-0">
+        {/* Search Input */}
+        <div className="relative group">
+          <div
             className="
-              absolute left-4 top-1/2 -translate-y-1/2
-              w-4 h-4 text-zinc-400
-              transition-colors duration-200
-              group-focus-within:text-blue-500
+              absolute inset-0 -m-1
+              bg-gradient-to-r from-blue-500/20 to-indigo-500/20
+              rounded-2xl opacity-0 group-focus-within:opacity-100
+              blur-xl transition-opacity duration-500
             "
           />
-          <input
-            type="text"
-            placeholder="Search for any place..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            disabled={isLoading}
-            aria-label="Search nearby places"
-            className="
-              w-full pl-11 pr-4 py-3
-              bg-zinc-100/80 dark:bg-zinc-800/80
-              border border-transparent
-              rounded-xl
-              text-zinc-900 dark:text-white
-              placeholder:text-zinc-400 dark:placeholder:text-zinc-500
-              focus:outline-none focus:bg-white dark:focus:bg-zinc-800
-              focus:border-zinc-200 dark:focus:border-zinc-700
-              focus:ring-4 focus:ring-blue-500/10 dark:focus:ring-blue-400/10
-              transition-all duration-300
-              disabled:opacity-50 disabled:cursor-not-allowed
-            "
-          />
-        </div>
-      </div>
-
-      {/* Category Chips - Elegant Pills with Icons */}
-      <div className="flex flex-wrap gap-2">
-        {CATEGORY_CHIPS.map((chip) => {
-          const isSelected = selectedChip?.label === chip.label;
-          const Icon = ICON_MAP[chip.icon];
-          return (
-            <button
-              key={chip.label}
-              onClick={() => handleChipClick(chip)}
+          <div className="relative">
+            <Search
+              className="
+                absolute left-4 top-1/2 -translate-y-1/2
+                w-4 h-4 text-zinc-400
+                transition-colors duration-200
+                group-focus-within:text-blue-500
+              "
+            />
+            <input
+              type="text"
+              placeholder="Search e.g. 'Coffee', 'Gym'"
+              value={searchQuery}
+              onChange={handleSearchChange}
               disabled={isLoading}
-              aria-pressed={isSelected}
-              className={`
-                group relative inline-flex items-center gap-2
-                px-4 py-2.5 rounded-xl
-                text-sm font-medium
-                transition-all duration-300 ease-out
-                ${isSelected
-                  ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-lg shadow-zinc-900/20 dark:shadow-white/20 scale-[1.02]'
-                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:scale-[1.02]'
-                }
-                disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
-              `}
-            >
-              <Icon className={`w-4 h-4 transition-transform duration-300 ${isSelected ? '' : 'group-hover:scale-110'}`} />
-              <span>{chip.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Radius Selector - Segmented Control */}
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-          Distance
-        </span>
-        <div
-          className="
-            inline-flex p-1
-            bg-zinc-100 dark:bg-zinc-800
-            rounded-lg
-          "
-        >
-          {RADIUS_OPTIONS.map((option) => (
-            <button
-              key={option.label}
-              onClick={() => handleRadiusChange(option.meters)}
-              disabled={isLoading}
-              aria-pressed={selectedRadius === option.meters}
-              className={`
-                px-3 py-1.5 rounded-md
-                text-xs font-medium
+              aria-label="Search nearby places"
+              className="
+                w-full pl-11 pr-4 py-3
+                bg-zinc-50 dark:bg-zinc-800/50
+                border border-zinc-200 dark:border-zinc-700
+                rounded-2xl
+                text-zinc-900 dark:text-white text-base sm:text-sm
+                placeholder:text-zinc-400 dark:placeholder:text-zinc-500
+                focus:outline-none focus:bg-white dark:focus:bg-zinc-800
+                focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-500
                 transition-all duration-200
-                ${selectedRadius === option.meters
-                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
-                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                }
                 disabled:opacity-50 disabled:cursor-not-allowed
-              `}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Loading State - Elegant Skeleton */}
-      {isLoading && (
-        <div className="space-y-3" data-testid="loading-skeleton">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="flex items-start gap-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50"
-            >
-              <div className="w-11 h-11 rounded-xl bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 w-3/4 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
-                <div className="h-3 w-1/2 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
-                <div className="h-3 w-1/4 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && (
-        <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium">{error}</p>
-            {errorDetails && (
-              <p className="text-xs text-red-500 dark:text-red-400/80 mt-1">{errorDetails}</p>
-            )}
+              "
+            />
           </div>
         </div>
-      )}
 
-      {/* Results List - Premium Cards */}
-      {!isLoading && !error && hasSearched && (
-        <>
-          {places.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="relative w-16 h-16 mb-4 flex items-center justify-center">
-                <div className="absolute inset-0 bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-800 rounded-2xl" />
-                <div className="absolute inset-1 bg-white dark:bg-zinc-900 rounded-xl" />
-                <MapPin className="relative w-6 h-6 text-zinc-400 dark:text-zinc-500" />
-              </div>
-              <p className="text-zinc-500 dark:text-zinc-400 font-medium">
-                No places found nearby
-              </p>
-              <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-1">
-                Try a different category or expand the search radius
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700">
-              {places.map((place, index) => (
-                <div
-                  key={place.id}
-                  className="
-                    group relative
-                    flex items-start gap-4 p-4
-                    bg-white dark:bg-zinc-800/50
-                    border border-zinc-100 dark:border-zinc-700/50
-                    rounded-xl
-                    hover:border-zinc-200 dark:hover:border-zinc-600
-                    hover:shadow-lg hover:shadow-zinc-900/5 dark:hover:shadow-black/20
-                    hover:-translate-y-0.5
+        {/* Category Chips - Horizontal Scroll with fade masks */}
+        <div className="relative -mx-4 sm:-mx-6">
+          {/* Left fade mask */}
+          <div className="absolute left-0 top-0 bottom-1 w-4 sm:w-6 bg-gradient-to-r from-white dark:from-zinc-900 to-transparent z-10 pointer-events-none" />
+
+          {/* Scrollable chips container */}
+          <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1 px-4 sm:px-6 scroll-smooth">
+            {CATEGORY_CHIPS.map((chip) => {
+              const isSelected = selectedChip?.label === chip.label;
+              const Icon = ICON_MAP[chip.icon];
+              return (
+                <button
+                  key={chip.label}
+                  onClick={() => handleChipClick(chip)}
+                  disabled={isLoading}
+                  aria-pressed={isSelected}
+                  className={`
+                    group relative inline-flex items-center gap-2
+                    px-4 py-2 rounded-full flex-shrink-0
+                    text-sm font-medium whitespace-nowrap
                     transition-all duration-300 ease-out
-                  "
-                  style={{ animationDelay: `${index * 50}ms` }}
+                    transform active:scale-95
+                    ${isSelected
+                      ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-md scale-100'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                    }
+                    disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+                  `}
                 >
-                  {/* Category icon with gradient background */}
+                  <Icon className={`w-3.5 h-3.5 transition-transform duration-300 ${isSelected ? '' : 'group-hover:scale-110'}`} />
+                  <span>{chip.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right fade mask */}
+          <div className="absolute right-0 top-0 bottom-1 w-4 sm:w-6 bg-gradient-to-l from-white dark:from-zinc-900 to-transparent z-10 pointer-events-none" />
+        </div>
+
+        {/* Results Header & Radius Selector */}
+        <div className="flex items-center justify-between pt-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            Results ({places.length})
+          </span>
+          <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
+            {RADIUS_OPTIONS.map((option) => (
+              <button
+                key={option.label}
+                onClick={() => handleRadiusChange(option.meters)}
+                disabled={isLoading}
+                aria-pressed={selectedRadius === option.meters}
+                className={`
+                  px-2 py-0.5 rounded-md
+                  text-xs font-medium
+                  transition-all duration-200
+                  ${selectedRadius === option.meters
+                    ? 'bg-white dark:bg-zinc-600 shadow-sm text-zinc-900 dark:text-white'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
+                  }
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                `}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Results Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto hide-scrollbar p-4 sm:px-6 space-y-3 bg-zinc-50/50 dark:bg-zinc-900/50 pb-24 lg:pb-4">
+        {/* Loading State */}
+        {isLoading && (
+          <div className="space-y-3" data-testid="loading-skeleton">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex items-start gap-4 p-4 rounded-2xl bg-white dark:bg-zinc-800/40"
+              >
+                <div className="w-12 h-12 rounded-xl bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                  <div className="h-3 w-1/2 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                  <div className="h-3 w-1/4 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">{error}</p>
+              {errorDetails && (
+                <p className="text-xs text-red-500 dark:text-red-400/80 mt-1">{errorDetails}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Results List - Premium Cards */}
+        {!isLoading && !error && hasSearched && (
+          <>
+            {places.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="relative w-16 h-16 mb-4 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-800 rounded-2xl" />
+                  <div className="absolute inset-1 bg-white dark:bg-zinc-900 rounded-xl" />
+                  <MapPin className="relative w-6 h-6 text-zinc-400 dark:text-zinc-500" />
+                </div>
+                <p className="text-zinc-500 dark:text-zinc-400 font-medium">
+                  No places found nearby
+                </p>
+                <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-1">
+                  Try a different category or expand the search radius
+                </p>
+              </div>
+            ) : (
+              places.map((place) => {
+                const colors = getCategoryColors(place.category);
+                const Icon = getIconForCategory(place.category);
+                const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.location.lat},${place.location.lng}`;
+
+                return (
                   <div
+                    key={place.id}
                     className="
-                      flex-shrink-0 w-11 h-11
-                      flex items-center justify-center
-                      bg-gradient-to-br from-zinc-100 to-zinc-200
-                      dark:from-zinc-700 dark:to-zinc-800
-                      rounded-xl
-                      group-hover:from-blue-50 group-hover:to-indigo-100
-                      dark:group-hover:from-blue-900/30 dark:group-hover:to-indigo-900/30
-                      transition-colors duration-300
+                      group relative overflow-hidden
+                      p-4 bg-white dark:bg-zinc-800/40
+                      rounded-2xl
+                      border border-zinc-200 dark:border-zinc-700/50
+                      hover:border-zinc-400 dark:hover:border-zinc-500
+                      hover:shadow-md
+                      transition-all duration-300
+                      cursor-pointer
+                      active:scale-[0.99]
                     "
                   >
-                    <MapPin className="w-5 h-5 text-zinc-500 dark:text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
-                  </div>
+                    {/* Left accent bar - appears on hover */}
+                    <div className={`absolute left-0 top-0 w-1 h-full ${colors.accent} opacity-0 group-hover:opacity-100 transition-opacity`} />
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-zinc-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {place.name}
-                    </h4>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
-                      {place.address}
-                    </p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span
-                        className="
-                          inline-flex items-center gap-1
-                          text-xs font-medium text-zinc-500 dark:text-zinc-400
-                        "
+                    <div className="flex gap-4">
+                      {/* Category-colored icon */}
+                      <div
+                        className={`
+                          w-12 h-12 rounded-xl flex-shrink-0
+                          ${colors.bg} ${colors.bgDark}
+                          flex items-center justify-center
+                          group-hover:scale-110 transition-transform duration-300
+                        `}
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                        {place.distanceMiles.toFixed(1)} mi
-                      </span>
-                      {place.chain && (
-                        <span
+                        <Icon className={`w-6 h-6 ${colors.icon} ${colors.iconDark}`} />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-semibold text-zinc-900 dark:text-white truncate pr-2">
+                            {place.name}
+                          </h4>
+                        </div>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
+                          {place.address}
+                        </p>
+
+                        {/* Distance & Chain */}
+                        <div className="flex items-center gap-3 mt-3">
+                          <div className="flex items-center gap-1 text-xs font-medium text-zinc-500">
+                            {place.distanceMiles <= 0.5 ? (
+                              <Footprints className="w-3 h-3" />
+                            ) : (
+                              <Car className="w-3 h-3" />
+                            )}
+                            <span>{place.distanceMiles.toFixed(1)} mi</span>
+                          </div>
+                          {place.chain && (
+                            <span
+                              className="
+                                px-2 py-0.5
+                                text-xs font-medium
+                                bg-zinc-100 dark:bg-zinc-700
+                                text-zinc-600 dark:text-zinc-300
+                                rounded-md
+                              "
+                            >
+                              {place.chain}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Arrow button on hover */}
+                      <div className="self-center hidden sm:block opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-300">
+                        <a
+                          href={directionsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="
-                            px-2 py-0.5
-                            text-xs font-medium
+                            p-2 rounded-full
                             bg-zinc-100 dark:bg-zinc-700
-                            text-zinc-600 dark:text-zinc-300
-                            rounded-md
+                            hover:bg-zinc-900 hover:text-white
+                            dark:hover:bg-white dark:hover:text-zinc-900
+                            transition-colors
                           "
+                          aria-label={`Get directions to ${place.name}`}
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {place.chain}
-                        </span>
-                      )}
+                          <ArrowRight className="w-4 h-4" />
+                        </a>
+                      </div>
                     </div>
                   </div>
+                );
+              })
+            )}
+          </>
+        )}
 
-                  {/* Directions button */}
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${place.location.lat},${place.location.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="
-                      flex-shrink-0
-                      flex items-center gap-1.5
-                      px-3 py-2
-                      text-xs font-medium
-                      text-blue-600 dark:text-blue-400
-                      bg-blue-50 dark:bg-blue-900/20
-                      hover:bg-blue-100 dark:hover:bg-blue-900/40
-                      rounded-lg
-                      transition-colors duration-200
-                    "
-                    aria-label={`Get directions to ${place.name}`}
-                  >
-                    <Navigation className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Directions</span>
-                  </a>
-                </div>
-              ))}
+        {/* Initial state - prompt to search */}
+        {!isLoading && !error && !hasSearched && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="relative w-16 h-16 mb-4 flex items-center justify-center">
+              <div className="absolute inset-0 bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-800 rounded-2xl" />
+              <div className="absolute inset-1 bg-white dark:bg-zinc-900 rounded-xl" />
+              <Search className="relative w-6 h-6 text-zinc-400 dark:text-zinc-500" />
             </div>
-          )}
-        </>
-      )}
-
-      {/* Initial state - prompt to search */}
-      {!isLoading && !error && !hasSearched && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="relative w-16 h-16 mb-4 flex items-center justify-center">
-            <div className="absolute inset-0 bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-800 rounded-2xl" />
-            <div className="absolute inset-1 bg-white dark:bg-zinc-900 rounded-xl" />
-            <Search className="relative w-6 h-6 text-zinc-400 dark:text-zinc-500" />
+            <p className="text-zinc-500 dark:text-zinc-400 font-medium">
+              Discover what&apos;s nearby
+            </p>
+            <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-1">
+              Select a category or search to explore
+            </p>
           </div>
-          <p className="text-zinc-500 dark:text-zinc-400 font-medium">
-            Discover what&apos;s nearby
-          </p>
-          <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-1">
-            Select a category or search to explore
-          </p>
+        )}
+      </div>
+
+      {/* Mobile Floating Toggle Button */}
+      {onViewModeChange && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 lg:hidden">
+          <button
+            onClick={() => onViewModeChange(viewMode === 'list' ? 'map' : 'list')}
+            className="
+              flex items-center gap-2
+              px-5 py-2.5
+              bg-zinc-900 dark:bg-white
+              text-white dark:text-zinc-900
+              rounded-full
+              shadow-xl shadow-zinc-900/20
+              font-semibold text-sm
+              transform transition-transform
+              active:scale-95 hover:scale-105
+            "
+          >
+            <span>{viewMode === 'list' ? 'Map' : 'List'}</span>
+            {viewMode === 'list' ? (
+              <MapIcon className="w-4 h-4" />
+            ) : (
+              <ListIcon className="w-4 h-4" />
+            )}
+          </button>
         </div>
       )}
     </div>
   );
+}
+
+/**
+ * Get appropriate icon for a category
+ */
+function getIconForCategory(category: string) {
+  if (category.includes('grocery') || category.includes('food-grocery')) return ShoppingCart;
+  if (category.includes('restaurant')) return Utensils;
+  if (category.includes('shopping') || category.includes('mall')) return ShoppingBag;
+  if (category.includes('gas') || category.includes('fuel')) return Fuel;
+  if (category.includes('gym') || category.includes('fitness')) return Dumbbell;
+  if (category.includes('pharmacy') || category.includes('drug')) return Pill;
+  return MapPin;
 }

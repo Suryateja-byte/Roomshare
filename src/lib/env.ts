@@ -84,6 +84,11 @@ const clientEnvSchema = z.object({
   // Radar (optional - for nearby places map style)
   NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY: z.string().optional(),
 
+  // Stadia Maps (optional - for premium basemap tiles)
+  // Free tier: non-commercial/evaluation only. Production requires paid plan.
+  // localhost works without API key. Production: use domain auth or API key.
+  NEXT_PUBLIC_STADIA_API_KEY: z.string().optional(),
+
   // Feature flags
   NEXT_PUBLIC_NEARBY_ENABLED: z.enum(['true', 'false']).optional(),
 });
@@ -124,6 +129,7 @@ function validateClientEnv(): ClientEnv {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
     NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY,
+    NEXT_PUBLIC_STADIA_API_KEY: process.env.NEXT_PUBLIC_STADIA_API_KEY,
     NEXT_PUBLIC_NEARBY_ENABLED: process.env.NEXT_PUBLIC_NEARBY_ENABLED,
   };
 
@@ -149,6 +155,8 @@ export const features = {
   realtime: !!(clientEnv.NEXT_PUBLIC_SUPABASE_URL && clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY),
   errorTracking: !!serverEnv.SENTRY_DSN,
   maps: !!clientEnv.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+  // Stadia Maps basemap tiles (optional - falls back to domain auth or works on localhost)
+  stadiaMaps: !!clientEnv.NEXT_PUBLIC_STADIA_API_KEY,
   // Security features
   cronAuth: !!serverEnv.CRON_SECRET,
   originEnforcement: !!(serverEnv.ALLOWED_ORIGINS || serverEnv.ALLOWED_HOSTS),

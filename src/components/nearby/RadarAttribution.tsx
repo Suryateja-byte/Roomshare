@@ -3,21 +3,18 @@
 /**
  * RadarAttribution Component
  *
- * Shows appropriate attribution based on the tile source:
- * - Radar: Required per Radar Terms of Use
- * - OpenStreetMap: Required per OSM license
+ * Shows Radar branding for the Places API. Stadia Maps and OpenStreetMap
+ * attribution is handled by MapLibre's built-in attributionControl which
+ * reads from the style JSON.
  *
  * Design: Refined glass badge with subtle hover effect.
  *
- * COMPLIANCE CRITICAL:
- * - Must be visible in bottom-left corner
- * - Must be clickable link to the appropriate source
- * - Must have high z-index (above map controls)
- * - Must account for mobile safe-area insets
- * - Must never be hidden by overlays, modals, or cookie banners
+ * COMPLIANCE:
+ * - Radar: Shows "Powered by Radar" for Places API
+ * - Stadia/OSM: Handled automatically by MapLibre attributionControl
  *
  * @see https://radar.com/terms
- * @see https://www.openstreetmap.org/copyright
+ * @see https://stadiamaps.com/attribution/
  */
 
 import React from 'react';
@@ -32,11 +29,13 @@ export default function RadarAttribution({
   className = '',
   tileSource = 'radar',
 }: RadarAttributionProps) {
-  const isOSM = tileSource === 'osm';
+  // For 'stadia' tileSource, Stadia/OSM attribution is handled by MapLibre's
+  // built-in attributionControl. This component just shows Radar branding.
+  const isStadia = tileSource === 'stadia';
 
   return (
     <a
-      href={isOSM ? 'https://www.openstreetmap.org/copyright' : 'https://radar.com'}
+      href="https://radar.com"
       target="_blank"
       rel="noopener noreferrer"
       className={`
@@ -61,31 +60,23 @@ export default function RadarAttribution({
         paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
         marginLeft: 'max(12px, env(safe-area-inset-left))',
       }}
-      aria-label={isOSM ? 'Map data by OpenStreetMap' : 'Powered by Radar'}
+      aria-label={isStadia ? 'Places data by Radar' : 'Powered by Radar'}
     >
-      {isOSM ? (
-        // OpenStreetMap attribution
-        <span>© OpenStreetMap</span>
-      ) : (
-        // Radar attribution with logo
-        <>
-          {/* Radar logo SVG */}
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-            className="opacity-70"
-          >
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-            <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2" />
-            <circle cx="12" cy="12" r="2" fill="currentColor" />
-          </svg>
-          <span>Radar</span>
-        </>
-      )}
+      {/* Radar logo SVG */}
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        className="opacity-70"
+      >
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+        <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2" />
+        <circle cx="12" cy="12" r="2" fill="currentColor" />
+      </svg>
+      <span>Radar</span>
     </a>
   );
 }
