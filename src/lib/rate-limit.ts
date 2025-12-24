@@ -127,6 +127,8 @@ export const RATE_LIMITS = {
     createReport: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
     // P0 fix: Search page rate limit to prevent DoS
     search: { limit: 30, windowMs: 60 * 1000 },                   // 30 per minute
+    // Nearby places search (Radar API)
+    nearbySearch: { limit: 30, windowMs: 60 * 1000 },             // 30 per minute
 } as const;
 
 /**

@@ -48,6 +48,19 @@ const NeighborhoodChat = dynamic(() => import('@/components/NeighborhoodChat'), 
     loading: () => null, // Chat widget appears after load, no placeholder needed
 });
 
+// Lazy-load NearbyPlacesSection (MapLibre GL + Radar) to avoid loading ~150KB+ on initial page load
+const NearbyPlacesSection = dynamic(() => import('@/components/nearby/NearbyPlacesSection'), {
+    ssr: false,
+    loading: () => (
+        <div className="mt-8 pt-8 border-t border-zinc-200">
+            <div className="animate-pulse space-y-4">
+                <div className="h-6 bg-zinc-200 rounded w-40" />
+                <div className="h-[400px] bg-zinc-100 rounded-lg" />
+            </div>
+        </div>
+    ),
+});
+
 // Types
 interface Review {
     id: string;
@@ -322,6 +335,14 @@ export default function ListingPageClient({
                                         })}
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Nearby Places Section (Radar + MapLibre) */}
+                            {process.env.NEXT_PUBLIC_NEARBY_ENABLED === 'true' && coordinates && (
+                                <NearbyPlacesSection
+                                    listingLat={coordinates.lat}
+                                    listingLng={coordinates.lng}
+                                />
                             )}
 
                             {/* Household Details */}

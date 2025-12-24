@@ -65,6 +65,9 @@ const serverEnvSchema = z.object({
   // Supabase service key (server-side)
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
 
+  // Radar API (server-side, for nearby places search)
+  RADAR_SECRET_KEY: z.string().optional(),
+
   // Node environment
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
@@ -77,6 +80,12 @@ const clientEnvSchema = z.object({
 
   // Google Maps (optional - affects map features)
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
+
+  // Radar (optional - for nearby places map style)
+  NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY: z.string().optional(),
+
+  // Feature flags
+  NEXT_PUBLIC_NEARBY_ENABLED: z.enum(['true', 'false']).optional(),
 });
 
 // Type exports for use throughout the application
@@ -114,6 +123,8 @@ function validateClientEnv(): ClientEnv {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY,
+    NEXT_PUBLIC_NEARBY_ENABLED: process.env.NEXT_PUBLIC_NEARBY_ENABLED,
   };
 
   const result = clientEnvSchema.safeParse(clientVars);
@@ -144,6 +155,12 @@ export const features = {
   metricsHmac: !!serverEnv.LOG_HMAC_SECRET,
   googlePlaces: !!serverEnv.GOOGLE_PLACES_API_KEY,
   supabaseStorage: !!serverEnv.SUPABASE_SERVICE_ROLE_KEY,
+  // Nearby Places (Radar API)
+  nearbyPlaces: !!(
+    serverEnv.RADAR_SECRET_KEY &&
+    clientEnv.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY &&
+    clientEnv.NEXT_PUBLIC_NEARBY_ENABLED === 'true'
+  ),
 } as const;
 
 // P1-25 FIX: Log startup warnings for missing optional services
@@ -168,6 +185,9 @@ if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
   }
   if (!features.cronAuth) {
     warnings.push('CRON_SECRET not configured - cron endpoints unprotected');
+  }
+  if (!features.nearbyPlaces) {
+    warnings.push('Radar API not fully configured - nearby places feature disabled');
   }
 
   if (warnings.length > 0) {
