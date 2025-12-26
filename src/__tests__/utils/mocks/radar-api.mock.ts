@@ -577,3 +577,150 @@ export function resetFetchMock() {
     (global.fetch as jest.Mock).mockReset();
   }
 }
+
+// ============================================================================
+// Malformed Response Fixtures (for defensive parsing tests)
+// ============================================================================
+
+/**
+ * Coordinates as strings instead of numbers (schema drift simulation)
+ */
+export const mockRadarPlaceNumericStrings = {
+  _id: 'place_numeric_strings',
+  name: 'String Coords Store',
+  location: {
+    type: 'Point',
+    coordinates: ['-122.4194', '37.7749'] as unknown as [number, number], // Strings!
+  },
+  categories: ['food-grocery'],
+  formattedAddress: '123 String St',
+};
+
+/**
+ * Place with null location (missing coordinates entirely)
+ */
+export const mockRadarPlaceNullLocation = {
+  _id: 'place_null_location',
+  name: 'No Location Store',
+  location: null,
+  categories: ['shopping'],
+  formattedAddress: '456 Nowhere Ave',
+};
+
+/**
+ * Place with undefined location
+ */
+export const mockRadarPlaceUndefinedLocation = {
+  _id: 'place_undefined_location',
+  name: 'Undefined Location Store',
+  categories: ['food-grocery'],
+  formattedAddress: '789 Missing Coords St',
+  // location is undefined
+};
+
+/**
+ * Place with empty coordinates array
+ */
+export const mockRadarPlaceEmptyCoordinates = {
+  _id: 'place_empty_coords',
+  name: 'Empty Coords Store',
+  location: {
+    type: 'Point',
+    coordinates: [] as number[],
+  },
+  categories: ['food-grocery'],
+  formattedAddress: '101 Empty Array St',
+};
+
+/**
+ * 200 response with error field (Radar API quirk)
+ */
+export const mockRadarResponseWithError = {
+  meta: { code: 200 },
+  error: 'Unexpected error occurred',
+  places: [],
+};
+
+/**
+ * HTML error response (e.g., from CDN/proxy)
+ */
+export const mockHtmlErrorResponse = '<html><body>502 Bad Gateway</body></html>';
+
+/**
+ * Malformed JSON response
+ */
+export const mockMalformedJsonResponse = '{"meta": {"code": 200}, "places": [';
+
+/**
+ * Response with extra-large payload simulation
+ */
+export function generateLargePayload(sizeInBytes: number): string {
+  const basePlace = JSON.stringify(mockRadarPlace);
+  const placesNeeded = Math.ceil(sizeInBytes / basePlace.length);
+  const places = generateMockPlaces(placesNeeded);
+  return JSON.stringify({ meta: { code: 200 }, places });
+}
+
+/**
+ * Response with count mismatch (meta.count doesn't match places.length)
+ */
+export const mockRadarResponseCountMismatch = {
+  meta: { code: 200, count: 10 }, // Claims 10 results
+  places: generateMockPlaces(3), // Only 3 actual results
+};
+
+/**
+ * Response with places as non-array
+ */
+export const mockRadarResponsePlacesNotArray = {
+  meta: { code: 200 },
+  places: 'not an array',
+};
+
+/**
+ * Response with nested null objects
+ */
+export const mockRadarPlaceNestedNulls = {
+  _id: 'place_nested_nulls',
+  name: 'Nested Nulls Store',
+  location: {
+    type: 'Point',
+    coordinates: [-122.4194, 37.7749],
+  },
+  categories: null,
+  chain: null,
+  formattedAddress: null,
+};
+
+/**
+ * Response with coordinates as object instead of array
+ */
+export const mockRadarPlaceCoordinatesObject = {
+  _id: 'place_coords_object',
+  name: 'Object Coords Store',
+  location: {
+    type: 'Point',
+    coordinates: { lng: -122.4194, lat: 37.7749 } as unknown as [number, number],
+  },
+  categories: ['food-grocery'],
+  formattedAddress: '200 Object St',
+};
+
+/**
+ * Response with address parts only (no formattedAddress)
+ */
+export const mockRadarPlaceAddressParts = {
+  _id: 'place_addr_parts',
+  name: 'Parts Address Store',
+  location: {
+    type: 'Point',
+    coordinates: [-122.4194, 37.7749],
+  },
+  categories: ['food-grocery'],
+  // No formattedAddress, but has parts
+  addressNumber: '123',
+  street: 'Main St',
+  city: 'San Francisco',
+  state: 'CA',
+  postalCode: '94102',
+};

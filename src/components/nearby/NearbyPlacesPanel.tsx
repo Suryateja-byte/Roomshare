@@ -79,6 +79,7 @@ export default function NearbyPlacesPanel({
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
 
   // Fetch places from API with "latest request wins" pattern
   const fetchPlaces = useCallback(async (
@@ -110,6 +111,9 @@ export default function NearbyPlacesPanel({
 
       const data = await response.json();
 
+      // Check if still mounted before updating state
+      if (!isMountedRef.current) return;
+
       if (!response.ok) {
         setError(data.error || 'Failed to fetch nearby places');
         setErrorDetails(data.details || null);
@@ -125,12 +129,17 @@ export default function NearbyPlacesPanel({
       if (err instanceof Error && err.name === 'AbortError') {
         return;
       }
+      // Check if still mounted before updating state
+      if (!isMountedRef.current) return;
       console.error('Nearby search error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       setErrorDetails(null);
       setPlaces([]);
     } finally {
-      setIsLoading(false);
+      // Check if still mounted before updating state
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [listingLat, listingLng, selectedRadius, onPlacesChange]);
 
@@ -175,7 +184,9 @@ export default function NearbyPlacesPanel({
 
   // Cleanup debounce and abort controller on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
@@ -255,6 +266,12 @@ export default function NearbyPlacesPanel({
               placeholder="Search e.g. 'Coffee', 'Gym'"
               value={searchQuery}
               onChange={handleSearchChange}
+              onKeyDown={(e) => {
+                // Prevent form submission when Enter is pressed
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                }
+              }}
               disabled={isLoading}
               aria-label="Search nearby places"
               className="

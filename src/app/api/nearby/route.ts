@@ -149,32 +149,49 @@ export async function POST(request: Request) {
     const radarData: RadarSearchResponse = await radarResponse.json();
 
     // Normalize response and compute distances
-    const places: NearbyPlace[] = radarData.places.map((place) => {
-      // Radar returns [lng, lat] in coordinates
-      const placeLat = place.location.coordinates[1];
-      const placeLng = place.location.coordinates[0];
+    const places: NearbyPlace[] = radarData.places
+      .map((place) => {
+        // Null safety: skip places with missing coordinates
+        if (!place.location?.coordinates?.length) {
+          console.warn('Place missing coordinates:', place._id);
+          return null;
+        }
 
-      return {
-        id: place._id,
-        name: place.name,
-        address: place.formattedAddress || '',
-        category: place.categories[0] || 'unknown',
-        chain: place.chain?.name,
-        location: {
-          lat: placeLat,
-          lng: placeLng,
+        // Radar returns [lng, lat] in coordinates
+        const placeLat = place.location.coordinates[1];
+        const placeLng = place.location.coordinates[0];
+
+        return {
+          id: place._id,
+          name: place.name,
+          address: place.formattedAddress || '',
+          category: place.categories?.[0] || 'unknown',
+          chain: place.chain?.name,
+          location: {
+            lat: placeLat,
+            lng: placeLng,
+          },
+          distanceMiles: haversineMiles(listingLat, listingLng, placeLat, placeLng),
+        };
+      })
+      .filter((place): place is NearbyPlace => place !== null)
+      .sort((a, b) => a.distanceMiles - b.distanceMiles);
+
+    return NextResponse.json(
+      {
+        places,
+        meta: {
+          cached: false, // Never cache per compliance
+          count: places.length,
         },
-        distanceMiles: haversineMiles(listingLat, listingLng, placeLat, placeLng),
-      };
-    });
-
-    return NextResponse.json({
-      places,
-      meta: {
-        cached: false, // Never cache per compliance
-        count: places.length,
       },
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      }
+    );
   } catch (error) {
     console.error('Nearby search error:', error);
     return NextResponse.json(
