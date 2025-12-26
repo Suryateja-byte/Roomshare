@@ -16,6 +16,7 @@ const customJestConfig = {
     '<rootDir>/node_modules/',
     '<rootDir>/.next/',
     '<rootDir>/src/__tests__/utils/',
+    '<rootDir>/tests/e2e/',
   ],
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
@@ -35,8 +36,8 @@ const customJestConfig = {
   moduleDirectories: ['node_modules', '<rootDir>/'],
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   transformIgnorePatterns: [
-    // Allow next-auth, @auth, and jose packages to be transformed (ESM modules)
-    'node_modules/(?!(next-auth|@auth|jose|oauth4webapi|preact|preact-render-to-string)/)',
+    // Allow next-auth, @auth, jose, and styled-jsx packages to be transformed (ESM modules)
+    'node_modules/(?!(next-auth|@auth|jose|oauth4webapi|preact|preact-render-to-string|styled-jsx)/)',
     '^.+\\.module\\.(css|sass|scss)$',
   ],
 }

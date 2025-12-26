@@ -83,8 +83,6 @@ export default function UserAvatar({ image, name, size = 'md', className }: User
                         setIsLoading(false);
                     }}
                     onError={() => {
-                        console.error('[UserAvatar] Image failed to load:', image);
-                        console.error('[UserAvatar] This often means the Supabase bucket is not public. Check Storage → images bucket → Settings → Make public');
                         setImageError(true);
                         setIsLoading(false);
                     }}

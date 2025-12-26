@@ -27,45 +27,41 @@ export default function NearbyPlacesSection({
 }: NearbyPlacesSectionProps) {
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
 
   return (
     <section id="nearby-places" className="mt-12 pt-8 border-t border-zinc-100 dark:border-zinc-800">
-      {/* Premium section header */}
-      <div className="flex items-center justify-between mb-6 lg:mb-8 px-1 sm:px-0">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/20 dark:shadow-blue-500/10">
-            <MapPin className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">
-              Nearby Places
-            </h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Discover convenience at your doorstep
-            </p>
-          </div>
+      {/* Minimal Section Header */}
+      <div className="flex items-center justify-between mb-6 px-1 sm:px-0">
+        <div>
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+            <MapPin className="w-5 h-5" />
+            Nearby Places
+          </h2>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+            Discover convenience at your doorstep
+          </p>
         </div>
 
-        {/* Desktop View Toggle (Map/Satellite - visual only for now) */}
-        <div className="hidden lg:flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-full border border-zinc-200 dark:border-zinc-800">
-          <button className="px-4 py-1.5 rounded-full bg-white dark:bg-zinc-700 shadow-sm text-sm font-medium text-zinc-900 dark:text-white transition-all">
+        {/* Desktop View Toggle */}
+        <div className="hidden lg:flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <button className="px-3 py-1 rounded-md bg-white dark:bg-zinc-700 shadow-sm text-sm font-medium text-zinc-900 dark:text-white transition-all">
             Map
           </button>
-          <button className="px-4 py-1.5 rounded-full text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+          <button className="px-3 py-1 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
             Satellite
           </button>
         </div>
       </div>
 
-      {/* Main Container - Taller for premium feel */}
+      {/* Main Container - Clean Border */}
       <div
         className="
           relative w-full
-          h-[65vh] sm:h-[600px] lg:h-[700px]
+          h-[60vh] sm:h-[550px] lg:h-[600px]
           bg-white dark:bg-zinc-900
-          rounded-3xl
+          rounded-2xl
           border border-zinc-200 dark:border-zinc-800
-          shadow-xl shadow-zinc-200/50 dark:shadow-none
           overflow-hidden
           lg:flex lg:flex-row
         "
@@ -75,14 +71,14 @@ export default function NearbyPlacesSection({
           className={`
             w-full h-full
             absolute inset-0 z-30
-            lg:static lg:z-auto lg:w-[420px]
+            lg:static lg:z-auto lg:w-[400px]
             flex flex-col
             border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-zinc-800
             bg-white dark:bg-zinc-900
             transition-all duration-300 ease-out
             ${viewMode === 'list'
               ? 'translate-y-0 opacity-100 pointer-events-auto'
-              : 'translate-y-5 opacity-0 pointer-events-none lg:translate-y-0 lg:opacity-100 lg:pointer-events-auto'
+              : 'translate-y-4 opacity-0 pointer-events-none lg:translate-y-0 lg:opacity-100 lg:pointer-events-auto'
             }
           `}
         >
@@ -90,17 +86,19 @@ export default function NearbyPlacesSection({
             listingLat={listingLat}
             listingLng={listingLng}
             onPlacesChange={setPlaces}
+            onPlaceHover={setHoveredPlaceId}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
           />
         </div>
 
-        {/* Right Panel: Map - always visible, takes full space on mobile when map mode */}
-        <div className="w-full h-full absolute inset-0 z-10 lg:static lg:flex-1">
+        {/* Right Panel: Map */}
+        <div className="w-full h-full absolute inset-0 z-10 lg:static lg:flex-1 bg-zinc-50 dark:bg-zinc-900">
           <NearbyPlacesMap
             listingLat={listingLat}
             listingLng={listingLng}
             places={places}
+            highlightedPlaceId={hoveredPlaceId}
             className="h-full"
           />
         </div>

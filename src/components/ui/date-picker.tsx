@@ -28,6 +28,7 @@ export function DatePicker({
     className,
     id
 }: DatePickerProps) {
+    const [mounted, setMounted] = React.useState(false);
     const [open, setOpen] = React.useState(false);
     const [viewDate, setViewDate] = React.useState(() => {
         if (value) {
@@ -35,6 +36,11 @@ export function DatePicker({
         }
         return new Date();
     });
+
+    // Prevent hydration mismatch by only rendering Popover on client
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const selectedDate = value ? parseLocalDate(value) : null;
     const today = new Date();
@@ -148,6 +154,37 @@ export function DatePicker({
     };
 
     const calendarDays = generateCalendarDays();
+
+    // Render placeholder during SSR to prevent hydration mismatch
+    if (!mounted) {
+        return (
+            <button
+                type="button"
+                id={id}
+                className={cn(
+                    'w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl',
+                    'border border-zinc-200 dark:border-zinc-700',
+                    'bg-white dark:bg-zinc-800',
+                    'text-sm touch-target text-left',
+                    className
+                )}
+            >
+                <span className={cn(
+                    value ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-500'
+                )}>
+                    {value ? formatDisplayDate(value) : placeholder}
+                </span>
+                <div className="flex items-center gap-1">
+                    {value && (
+                        <span className="p-0.5">
+                            <X className="w-3.5 h-3.5 text-zinc-400" />
+                        </span>
+                    )}
+                    <Calendar className="w-4 h-4 text-zinc-400" />
+                </div>
+            </button>
+        );
+    }
 
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>

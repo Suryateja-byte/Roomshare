@@ -90,6 +90,8 @@ export interface CategoryColorConfig {
   accent: string;
   markerBg: string;
   markerBorder: string;
+  markerBgDark: string;
+  markerBorderDark: string;
 }
 
 export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
@@ -101,6 +103,8 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     accent: 'bg-orange-500',
     markerBg: '#fff7ed',
     markerBorder: '#ea580c',
+    markerBgDark: '#431407',
+    markerBorderDark: '#fb923c',
   },
   'indian-restaurant': {
     bg: 'bg-rose-50',
@@ -110,6 +114,8 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     accent: 'bg-rose-500',
     markerBg: '#fff1f2',
     markerBorder: '#e11d48',
+    markerBgDark: '#4c0519',
+    markerBorderDark: '#fb7185',
   },
   'shopping-mall': {
     bg: 'bg-purple-50',
@@ -119,6 +125,8 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     accent: 'bg-purple-500',
     markerBg: '#faf5ff',
     markerBorder: '#9333ea',
+    markerBgDark: '#3b0764',
+    markerBorderDark: '#c084fc',
   },
   'gas-station': {
     bg: 'bg-amber-50',
@@ -128,6 +136,8 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     accent: 'bg-amber-500',
     markerBg: '#fffbeb',
     markerBorder: '#d97706',
+    markerBgDark: '#451a03',
+    markerBorderDark: '#fbbf24',
   },
   gym: {
     bg: 'bg-indigo-50',
@@ -137,6 +147,8 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     accent: 'bg-indigo-500',
     markerBg: '#eef2ff',
     markerBorder: '#4f46e5',
+    markerBgDark: '#1e1b4b',
+    markerBorderDark: '#a5b4fc',
   },
   pharmacy: {
     bg: 'bg-emerald-50',
@@ -146,6 +158,8 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     accent: 'bg-emerald-500',
     markerBg: '#ecfdf5',
     markerBorder: '#059669',
+    markerBgDark: '#022c22',
+    markerBorderDark: '#34d399',
   },
   // Fallback for unknown categories
   default: {
@@ -156,6 +170,8 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     accent: 'bg-zinc-500',
     markerBg: '#fafafa',
     markerBorder: '#71717a',
+    markerBgDark: '#27272a',
+    markerBorderDark: '#a1a1aa',
   },
 };
 

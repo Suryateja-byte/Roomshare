@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SortOption } from '@/lib/data';
 import {
@@ -23,8 +24,14 @@ interface SortSelectProps {
 }
 
 export default function SortSelect({ currentSort }: SortSelectProps) {
+    const [mounted, setMounted] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
+
+    // Prevent hydration mismatch from Radix UI generating different IDs on server vs client
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const handleSortChange = (newSort: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -39,6 +46,18 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
     };
 
     const currentLabel = sortOptions.find(opt => opt.value === currentSort)?.label || 'Recommended';
+
+    // Render placeholder during SSR to prevent hydration mismatch
+    if (!mounted) {
+        return (
+            <div className="hidden md:flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                <span>Sort by:</span>
+                <div className="h-9 min-w-[140px] px-3 py-1.5 text-zinc-900 dark:text-white font-semibold text-xs flex items-center">
+                    {currentLabel}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="hidden md:flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">

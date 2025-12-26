@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,11 +27,17 @@ interface ReportButtonProps {
 }
 
 export default function ReportButton({ listingId }: ReportButtonProps) {
+    const [mounted, setMounted] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [reason, setReason] = useState('');
     const [details, setDetails] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+
+    // Prevent hydration mismatch by only rendering Dialog on client
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const handleSubmit = async () => {
         if (!reason) return;
@@ -65,6 +71,16 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
             setIsSubmitting(false);
         }
     };
+
+    // Render placeholder button during SSR to prevent hydration mismatch
+    if (!mounted) {
+        return (
+            <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-red-600 gap-2">
+                <Flag className="w-4 h-4" />
+                <span className="text-xs">Report this listing</span>
+            </Button>
+        );
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
