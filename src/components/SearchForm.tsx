@@ -29,6 +29,28 @@ const AMENITY_OPTIONS = ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 
 const HOUSE_RULE_OPTIONS = ['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'] as const;
 const GENDER_PREFERENCE_OPTIONS = ['any', 'MALE_ONLY', 'FEMALE_ONLY', 'NO_PREFERENCE'] as const;
 const HOUSEHOLD_GENDER_OPTIONS = ['any', 'ALL_MALE', 'ALL_FEMALE', 'MIXED'] as const;
+const LEASE_DURATION_OPTIONS = ['any', 'Month-to-month', '3 months', '6 months', '12 months', 'Flexible'] as const;
+const ROOM_TYPE_OPTIONS = ['any', 'Private Room', 'Shared Room', 'Entire Place'] as const;
+
+// URL-friendly aliases for enum values
+const LEASE_DURATION_ALIASES: Record<string, string> = {
+    'month-to-month': 'Month-to-month',
+    'month_to_month': 'Month-to-month',
+    'mtm': 'Month-to-month',
+    '3_months': '3 months',
+    '6_months': '6 months',
+    '12_months': '12 months',
+    '1_year': '12 months',
+};
+
+const ROOM_TYPE_ALIASES: Record<string, string> = {
+    'private': 'Private Room',
+    'private_room': 'Private Room',
+    'shared': 'Shared Room',
+    'shared_room': 'Shared Room',
+    'entire': 'Entire Place',
+    'entire_place': 'Entire Place',
+};
 
 /**
  * Validate a move-in date string. Returns the date if valid (today or future, within 2 years),
@@ -98,11 +120,23 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             .filter((value): value is string => Boolean(value));
         return Array.from(new Set(normalized));
     };
-    const parseEnumParam = (key: string, allowlist: readonly string[]) => {
+    const parseEnumParam = (key: string, allowlist: readonly string[], aliases?: Record<string, string>) => {
         const value = searchParams.get(key);
         if (!value) return '';
         const trimmed = value.trim();
-        return allowlist.includes(trimmed) ? trimmed : '';
+        // Check direct match first
+        if (allowlist.includes(trimmed)) return trimmed;
+        // Check case-insensitive match
+        const lowerValue = trimmed.toLowerCase();
+        const caseMatch = allowlist.find(item => item.toLowerCase() === lowerValue);
+        if (caseMatch) return caseMatch;
+        // Check aliases if provided
+        if (aliases) {
+            const aliasMatch = aliases[lowerValue];
+            if (aliasMatch && allowlist.includes(aliasMatch)) return aliasMatch;
+        }
+        // Invalid value - return empty string
+        return '';
     };
     const parseLanguages = () => {
         const normalized = normalizeLanguages(parseParamList('languages'));
@@ -130,8 +164,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // Validation happens in useEffect after mount
     const [moveInDate, setMoveInDate] = useState(searchParams.get('moveInDate') || '');
     const [hasMounted, setHasMounted] = useState(false);
-    const [leaseDuration, setLeaseDuration] = useState(searchParams.get('leaseDuration') || '');
-    const [roomType, setRoomType] = useState(searchParams.get('roomType') || '');
+    const [leaseDuration, setLeaseDuration] = useState(parseEnumParam('leaseDuration', LEASE_DURATION_OPTIONS, LEASE_DURATION_ALIASES));
+    const [roomType, setRoomType] = useState(parseEnumParam('roomType', ROOM_TYPE_OPTIONS, ROOM_TYPE_ALIASES));
     const [amenities, setAmenities] = useState<string[]>(normalizeByAllowlist(parseParamList('amenities'), AMENITY_OPTIONS));
     const [houseRules, setHouseRules] = useState<string[]>(normalizeByAllowlist(parseParamList('houseRules'), HOUSE_RULE_OPTIONS));
     const [languages, setLanguages] = useState<string[]>(parseLanguages());
@@ -240,8 +274,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setMaxPrice(searchParams.get('maxPrice') || '');
         // Validate moveInDate to match server-side logic (reject past dates)
         setMoveInDate(validateMoveInDate(searchParams.get('moveInDate')));
-        setLeaseDuration(searchParams.get('leaseDuration') || '');
-        setRoomType(searchParams.get('roomType') || '');
+        setLeaseDuration(parseEnumParam('leaseDuration', LEASE_DURATION_OPTIONS, LEASE_DURATION_ALIASES));
+        setRoomType(parseEnumParam('roomType', ROOM_TYPE_OPTIONS, ROOM_TYPE_ALIASES));
         setAmenities(normalizeByAllowlist(parseParamList('amenities'), AMENITY_OPTIONS));
         setHouseRules(normalizeByAllowlist(parseParamList('houseRules'), HOUSE_RULE_OPTIONS));
         setLanguages(parseLanguages());
