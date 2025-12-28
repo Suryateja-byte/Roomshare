@@ -30,6 +30,41 @@ const HOUSE_RULE_OPTIONS = ['Pets allowed', 'Smoking allowed', 'Couples allowed'
 const GENDER_PREFERENCE_OPTIONS = ['any', 'MALE_ONLY', 'FEMALE_ONLY', 'NO_PREFERENCE'] as const;
 const HOUSEHOLD_GENDER_OPTIONS = ['any', 'ALL_MALE', 'ALL_FEMALE', 'MIXED'] as const;
 
+/**
+ * Validate a move-in date string. Returns the date if valid (today or future, within 2 years),
+ * otherwise returns empty string. This matches the server-side safeParseDate logic.
+ */
+const validateMoveInDate = (value: string | null): string => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return '';
+
+    const [yearStr, monthStr, dayStr] = trimmed.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const day = parseInt(dayStr, 10);
+
+    if (month < 1 || month > 12) return '';
+    if (day < 1 || day > 31) return '';
+
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return '';
+    }
+
+    // Reject past dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date < today) return '';
+
+    // Reject dates more than 2 years in the future
+    const maxDate = new Date();
+    maxDate.setFullYear(maxDate.getFullYear() + 2);
+    if (date > maxDate) return '';
+
+    return trimmed;
+};
+
 interface RecentSearch {
     location: string;
     coords?: { lat: number; lng: number };
@@ -91,8 +126,10 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(parseCoords);
 
-    // New filters state
+    // New filters state - don't validate in initial state to avoid hydration mismatch
+    // Validation happens in useEffect after mount
     const [moveInDate, setMoveInDate] = useState(searchParams.get('moveInDate') || '');
+    const [hasMounted, setHasMounted] = useState(false);
     const [leaseDuration, setLeaseDuration] = useState(searchParams.get('leaseDuration') || '');
     const [roomType, setRoomType] = useState(searchParams.get('roomType') || '');
     const [amenities, setAmenities] = useState<string[]>(normalizeByAllowlist(parseParamList('amenities'), AMENITY_OPTIONS));
@@ -183,6 +220,14 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setShowRecentSearches(false);
     }, []);
 
+    // Set hasMounted after initial render and validate moveInDate
+    useEffect(() => {
+        setHasMounted(true);
+        // Validate moveInDate on mount to clear invalid past dates
+        const validated = validateMoveInDate(searchParams.get('moveInDate'));
+        setMoveInDate(validated);
+    }, []);
+
     // Sync state with URL params when they change (e.g., after navigation)
     useEffect(() => {
         const coords = parseCoords();
@@ -193,7 +238,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setLocation(searchParams.get('q') || '');
         setMinPrice(searchParams.get('minPrice') || '');
         setMaxPrice(searchParams.get('maxPrice') || '');
-        setMoveInDate(searchParams.get('moveInDate') || '');
+        // Validate moveInDate to match server-side logic (reject past dates)
+        setMoveInDate(validateMoveInDate(searchParams.get('moveInDate')));
         setLeaseDuration(searchParams.get('leaseDuration') || '');
         setRoomType(searchParams.get('roomType') || '');
         setAmenities(normalizeByAllowlist(parseParamList('amenities'), AMENITY_OPTIONS));
@@ -350,18 +396,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         router.push('/search');
     };
 
-    // Check if any filters are active
-    const hasActiveFilters = location || minPrice || maxPrice || moveInDate ||
-        (leaseDuration && leaseDuration !== 'any') ||
-        (roomType && roomType !== 'any') ||
-        amenities.length > 0 || houseRules.length > 0 ||
-        languages.length > 0 ||
-        (genderPreference && genderPreference !== 'any') ||
-        (householdGender && householdGender !== 'any');
-
-    // Count active filters for badge
-    const activeFilterCount = [
-        moveInDate,
+    // Count active filters for badge - split into two parts to avoid hydration mismatch
+    // Base count excludes moveInDate (no Date() calls, safe for SSR)
+    const baseFilterCount = [
         leaseDuration && leaseDuration !== 'any',
         roomType && roomType !== 'any',
         ...amenities,
@@ -370,6 +407,22 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         genderPreference && genderPreference !== 'any',
         householdGender && householdGender !== 'any',
     ].filter(Boolean).length;
+
+    // moveInDate count only calculated after mount (uses Date() which differs server/client)
+    // IMPORTANT: Only call validateMoveInDate when hasMounted is true to avoid hydration mismatch
+    // The Date() comparison inside validateMoveInDate can produce different results on server vs client
+    const moveInDateCount = hasMounted ? (validateMoveInDate(moveInDate) ? 1 : 0) : 0;
+    const activeFilterCount = baseFilterCount + moveInDateCount;
+
+    // Check if any filters are active (for "Clear all" button visibility)
+    const hasActiveFilters = location || minPrice || maxPrice ||
+        (leaseDuration && leaseDuration !== 'any') ||
+        (roomType && roomType !== 'any') ||
+        amenities.length > 0 || houseRules.length > 0 ||
+        languages.length > 0 ||
+        (genderPreference && genderPreference !== 'any') ||
+        (householdGender && householdGender !== 'any') ||
+        moveInDateCount > 0;
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;
