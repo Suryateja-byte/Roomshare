@@ -25,7 +25,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 const RECENT_SEARCHES_KEY = 'roomshare-recent-searches';
 const MAX_RECENT_SEARCHES = 5;
 
-const AMENITY_OPTIONS = ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'] as const;
+const AMENITY_OPTIONS = ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool', 'Furnished'] as const;
 const HOUSE_RULE_OPTIONS = ['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'] as const;
 const GENDER_PREFERENCE_OPTIONS = ['any', 'MALE_ONLY', 'FEMALE_ONLY', 'NO_PREFERENCE'] as const;
 const HOUSEHOLD_GENDER_OPTIONS = ['any', 'ALL_MALE', 'ALL_FEMALE', 'MIXED'] as const;

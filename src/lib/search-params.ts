@@ -56,10 +56,38 @@ export const MAX_SAFE_PRICE = 1000000000;
 export const MAX_SAFE_PAGE = 100;
 export const MAX_ARRAY_ITEMS = 20;
 
-export const VALID_AMENITIES = ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'] as const;
+export const VALID_AMENITIES = ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool', 'Furnished'] as const;
 export const VALID_HOUSE_RULES = ['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'] as const;
 export const VALID_LEASE_DURATIONS = ['any', 'Month-to-month', '3 months', '6 months', '12 months', 'Flexible'] as const;
+// Alias mappings for alternative formats (URL-friendly formats like 6_MONTHS)
+export const LEASE_DURATION_ALIASES: Record<string, string> = {
+    'month-to-month': 'Month-to-month',
+    'month_to_month': 'Month-to-month',
+    'mtm': 'Month-to-month',
+    '3_months': '3 months',
+    '3months': '3 months',
+    '6_months': '6 months',
+    '6months': '6 months',
+    '12_months': '12 months',
+    '12months': '12 months',
+    '1_year': '12 months',
+    '1year': '12 months',
+};
 export const VALID_ROOM_TYPES = ['any', 'Private Room', 'Shared Room', 'Entire Place'] as const;
+// Alias mappings for alternative formats (URL-friendly formats like PRIVATE)
+export const ROOM_TYPE_ALIASES: Record<string, string> = {
+    'private': 'Private Room',
+    'private_room': 'Private Room',
+    'privateroom': 'Private Room',
+    'shared': 'Shared Room',
+    'shared_room': 'Shared Room',
+    'sharedroom': 'Shared Room',
+    'entire': 'Entire Place',
+    'entire_place': 'Entire Place',
+    'entireplace': 'Entire Place',
+    'whole': 'Entire Place',
+    'studio': 'Entire Place',
+};
 export const VALID_GENDER_PREFERENCES = ['any', 'MALE_ONLY', 'FEMALE_ONLY', 'NO_PREFERENCE'] as const;
 export const VALID_HOUSEHOLD_GENDERS = ['any', 'ALL_MALE', 'ALL_FEMALE', 'MIXED'] as const;
 export const VALID_SORT_OPTIONS = ['recommended', 'price_asc', 'price_desc', 'newest', 'rating'] as const;
@@ -93,13 +121,24 @@ const safeParseArray = (
 const safeParseEnum = <T extends string>(
     value: string | undefined,
     allowlist: readonly T[],
-    defaultVal?: T
+    defaultVal?: T,
+    aliases?: Record<string, string>
 ): T | undefined => {
     if (!value) return defaultVal;
     const trimmed = value.trim();
+    const lowerTrimmed = trimmed.toLowerCase();
+
+    // First check aliases to resolve alternative formats
+    if (aliases) {
+        const aliasedValue = aliases[lowerTrimmed];
+        if (aliasedValue && allowlist.includes(aliasedValue as T)) {
+            return aliasedValue === 'any' ? undefined : (aliasedValue as T);
+        }
+    }
+
     // Case-insensitive matching: find the canonical form from allowlist
     const allowMap = new Map(allowlist.map(item => [item.toLowerCase(), item]));
-    const canonical = allowMap.get(trimmed.toLowerCase());
+    const canonical = allowMap.get(lowerTrimmed);
     if (canonical) {
         return canonical === 'any' ? undefined : (canonical as T);
     }
@@ -219,8 +258,8 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
         : 'recommended';
 
     const validMoveInDate = safeParseDate(getFirstValue(raw.moveInDate));
-    const validRoomType = safeParseEnum(getFirstValue(raw.roomType), VALID_ROOM_TYPES as readonly string[]);
-    const validLeaseDuration = safeParseEnum(getFirstValue(raw.leaseDuration), VALID_LEASE_DURATIONS as readonly string[]);
+    const validRoomType = safeParseEnum(getFirstValue(raw.roomType), VALID_ROOM_TYPES as readonly string[], undefined, ROOM_TYPE_ALIASES);
+    const validLeaseDuration = safeParseEnum(getFirstValue(raw.leaseDuration), VALID_LEASE_DURATIONS as readonly string[], undefined, LEASE_DURATION_ALIASES);
     const validGenderPreference = safeParseEnum(getFirstValue(raw.genderPreference), VALID_GENDER_PREFERENCES as readonly string[]);
     const validHouseholdGender = safeParseEnum(getFirstValue(raw.householdGender), VALID_HOUSEHOLD_GENDERS as readonly string[]);
 

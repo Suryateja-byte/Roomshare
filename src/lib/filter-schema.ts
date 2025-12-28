@@ -33,6 +33,7 @@ export const VALID_AMENITIES = [
   'Kitchen',
   'Gym',
   'Pool',
+  'Furnished',
 ] as const;
 
 export const VALID_HOUSE_RULES = [
@@ -51,12 +52,42 @@ export const VALID_LEASE_DURATIONS = [
   'Flexible',
 ] as const;
 
+// Alias mappings for alternative formats (URL-friendly formats like 6_MONTHS)
+export const LEASE_DURATION_ALIASES: Record<string, string> = {
+  'month-to-month': 'Month-to-month',
+  'month_to_month': 'Month-to-month',
+  'mtm': 'Month-to-month',
+  '3_months': '3 months',
+  '3months': '3 months',
+  '6_months': '6 months',
+  '6months': '6 months',
+  '12_months': '12 months',
+  '12months': '12 months',
+  '1_year': '12 months',
+  '1year': '12 months',
+};
+
 export const VALID_ROOM_TYPES = [
   'any',
   'Private Room',
   'Shared Room',
   'Entire Place',
 ] as const;
+
+// Alias mappings for alternative formats (URL-friendly formats like PRIVATE)
+export const ROOM_TYPE_ALIASES: Record<string, string> = {
+  'private': 'Private Room',
+  'private_room': 'Private Room',
+  'privateroom': 'Private Room',
+  'shared': 'Shared Room',
+  'shared_room': 'Shared Room',
+  'sharedroom': 'Shared Room',
+  'entire': 'Entire Place',
+  'entire_place': 'Entire Place',
+  'entireplace': 'Entire Place',
+  'whole': 'Entire Place',
+  'studio': 'Entire Place',
+};
 
 export const VALID_GENDER_PREFERENCES = [
   'any',
@@ -379,8 +410,8 @@ export function normalizeFilters(input: unknown): NormalizedFilters {
   const languages = normalizeLanguageArray(raw.languages);
 
   // Normalize enum filters
-  const roomType = normalizeEnum(raw.roomType, VALID_ROOM_TYPES);
-  const leaseDuration = normalizeEnum(raw.leaseDuration, VALID_LEASE_DURATIONS);
+  const roomType = normalizeEnum(raw.roomType, VALID_ROOM_TYPES, ROOM_TYPE_ALIASES);
+  const leaseDuration = normalizeEnum(raw.leaseDuration, VALID_LEASE_DURATIONS, LEASE_DURATION_ALIASES);
   const genderPreference = normalizeEnum(raw.genderPreference, VALID_GENDER_PREFERENCES);
   const householdGender = normalizeEnum(raw.householdGender, VALID_HOUSEHOLD_GENDERS);
 
@@ -515,14 +546,27 @@ function normalizeLanguageArray(value: unknown): LanguageCode[] | undefined {
 
 function normalizeEnum<T extends readonly string[]>(
   value: unknown,
-  allowlist: T
+  allowlist: T,
+  aliases?: Record<string, string>
 ): Exclude<T[number], 'any'> | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'string') return undefined;
 
   const trimmed = value.trim();
+  const lowerTrimmed = trimmed.toLowerCase();
+
+  // First check aliases to resolve alternative formats
+  if (aliases) {
+    const aliasedValue = aliases[lowerTrimmed];
+    if (aliasedValue && allowlist.includes(aliasedValue as T[number])) {
+      if (aliasedValue === 'any') return undefined;
+      return aliasedValue as Exclude<T[number], 'any'>;
+    }
+  }
+
+  // Case-insensitive matching: find the canonical form from allowlist
   const allowMap = new Map(allowlist.map((item) => [item.toLowerCase(), item]));
-  const canonical = allowMap.get(trimmed.toLowerCase());
+  const canonical = allowMap.get(lowerTrimmed);
 
   if (!canonical || canonical === 'any') return undefined;
   return canonical as Exclude<T[number], 'any'>;
