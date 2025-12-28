@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -125,6 +125,11 @@ interface NavbarClientProps {
     unreadCount?: number;
 }
 
+// Exponential backoff constants for polling
+const BASE_POLL_INTERVAL = 30000; // 30 seconds
+const MAX_BACKOFF_INTERVAL = 300000; // 5 minutes max
+const BACKOFF_MULTIPLIER = 2;
+
 export default function NavbarClient({ user: initialUser, unreadCount = 0 }: NavbarClientProps) {
     const { data: session, status } = useSession();
 
@@ -138,19 +143,58 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     const profileRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
 
-    // Fetch unread count from API
-    const fetchUnreadCount = async () => {
+    // Refs for exponential backoff polling
+    const failureCountRef = useRef(0);
+    const currentIntervalRef = useRef(BASE_POLL_INTERVAL);
+    const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Schedule next poll with dynamic interval
+    const scheduleNextPoll = useCallback((interval: number, fetchFn: () => Promise<void>) => {
+        if (intervalIdRef.current) {
+            clearInterval(intervalIdRef.current);
+        }
+        intervalIdRef.current = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                fetchFn();
+            }
+        }, interval);
+    }, []);
+
+    // Fetch unread count from API with exponential backoff
+    const fetchUnreadCount = useCallback(async () => {
         if (!user) return;
         try {
             const response = await fetch('/api/messages/unread');
             if (response.ok) {
                 const data = await response.json();
                 setCurrentUnreadCount(data.count);
+
+                // Reset backoff on successful response
+                if (failureCountRef.current > 0) {
+                    failureCountRef.current = 0;
+                    currentIntervalRef.current = BASE_POLL_INTERVAL;
+                    scheduleNextPoll(BASE_POLL_INTERVAL, fetchUnreadCount);
+                }
             }
-        } catch (error) {
-            console.error('Failed to fetch unread count:', error);
+        } catch {
+            // Network error - implement exponential backoff
+            failureCountRef.current += 1;
+            const newInterval = Math.min(
+                BASE_POLL_INTERVAL * Math.pow(BACKOFF_MULTIPLIER, failureCountRef.current),
+                MAX_BACKOFF_INTERVAL
+            );
+
+            if (newInterval !== currentIntervalRef.current) {
+                currentIntervalRef.current = newInterval;
+                scheduleNextPoll(newInterval, fetchUnreadCount);
+            }
+
+            // Only log in development to reduce console noise (first 3 failures only)
+            if (process.env.NODE_ENV === 'development' && failureCountRef.current <= 3) {
+                console.debug(`Unread count fetch failed (attempt ${failureCountRef.current}), next check in ${newInterval / 1000}s`);
+            }
         }
-    };
+    }, [user, scheduleNextPoll]);
 
     // Handle scroll effect for glassmorphism
     useEffect(() => {
@@ -186,11 +230,15 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     useEffect(() => {
         if (!user) return;
 
+        // Reset backoff state
+        failureCountRef.current = 0;
+        currentIntervalRef.current = BASE_POLL_INTERVAL;
+
         // Fetch immediately on mount
         fetchUnreadCount();
 
-        // Poll every 30 seconds
-        const interval = setInterval(fetchUnreadCount, 30000);
+        // Start polling with base interval
+        scheduleNextPoll(BASE_POLL_INTERVAL, fetchUnreadCount);
 
         // Listen for custom event from messages page
         const handleMessagesRead = () => {
@@ -199,10 +247,12 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
         window.addEventListener('messagesRead', handleMessagesRead);
 
         return () => {
-            clearInterval(interval);
+            if (intervalIdRef.current) {
+                clearInterval(intervalIdRef.current);
+            }
             window.removeEventListener('messagesRead', handleMessagesRead);
         };
-    }, [user]);
+    }, [user, fetchUnreadCount, scheduleNextPoll]);
 
     return (
         <nav

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
@@ -8,6 +8,10 @@ interface ListingFreshnessCheckProps {
     listingId: string;
     checkInterval?: number; // in milliseconds, default 30s
 }
+
+// Exponential backoff constants
+const MAX_BACKOFF_INTERVAL = 300000; // 5 minutes max
+const BACKOFF_MULTIPLIER = 2;
 
 export default function ListingFreshnessCheck({
     listingId,
@@ -17,52 +21,93 @@ export default function ListingFreshnessCheck({
     const [isUnavailable, setIsUnavailable] = useState(false);
     const router = useRouter();
 
-    useEffect(() => {
-        let isMounted = true;
+    // Track failure count and current interval for exponential backoff
+    const failureCountRef = useRef(0);
+    const currentIntervalRef = useRef(checkInterval);
+    const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
+    const isMountedRef = useRef(true);
 
-        const checkListingExists = async () => {
-            try {
-                const response = await fetch(`/api/listings/${listingId}/status`, {
-                    method: 'GET',
-                    cache: 'no-store'
-                });
-
-                if (!isMounted) return;
-
-                // Only process JSON responses - HTML responses indicate routing issues
-                const contentType = response.headers.get('content-type');
-                if (!contentType?.includes('application/json')) {
-                    // Router returned HTML 404 page, not our API response
-                    // Silently ignore - don't show misleading "deleted" banner
-                    return;
-                }
-
-                const data = await response.json();
-
-                if (response.status === 404 && data.error === 'Listing not found') {
-                    // Confirmed from our API that listing was deleted
-                    setIsDeleted(true);
-                } else if (response.ok) {
-                    // Check if listing was paused or deactivated
-                    if (data.status === 'PAUSED' || data.status === 'RENTED') {
-                        setIsUnavailable(true);
-                    } else {
-                        setIsUnavailable(false);
-                        setIsDeleted(false);
-                    }
-                }
-                // Silently ignore 401/403/500 - don't show misleading banners
-            } catch (error) {
-                // Network or JSON parse error - don't show banner, just log
-                console.error('Failed to check listing freshness:', error);
+    const scheduleNextCheck = useCallback((interval: number) => {
+        if (intervalIdRef.current) {
+            clearInterval(intervalIdRef.current);
+        }
+        intervalIdRef.current = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                checkListingExists();
             }
-        };
+        }, interval);
+    }, []);
+
+    const checkListingExists = useCallback(async () => {
+        try {
+            const response = await fetch(`/api/listings/${listingId}/status`, {
+                method: 'GET',
+                cache: 'no-store'
+            });
+
+            if (!isMountedRef.current) return;
+
+            // Only process JSON responses - HTML responses indicate routing issues
+            const contentType = response.headers.get('content-type');
+            if (!contentType?.includes('application/json')) {
+                // Router returned HTML 404 page, not our API response
+                // Silently ignore - don't show misleading "deleted" banner
+                // Don't count as failure - could be temporary routing issue
+                return;
+            }
+
+            const data = await response.json();
+
+            // Reset backoff on successful response
+            if (failureCountRef.current > 0) {
+                failureCountRef.current = 0;
+                currentIntervalRef.current = checkInterval;
+                scheduleNextCheck(checkInterval);
+            }
+
+            if (response.status === 404 && data.error === 'Listing not found') {
+                // Confirmed from our API that listing was deleted
+                setIsDeleted(true);
+            } else if (response.ok) {
+                // Check if listing was paused or deactivated
+                if (data.status === 'PAUSED' || data.status === 'RENTED') {
+                    setIsUnavailable(true);
+                } else {
+                    setIsUnavailable(false);
+                    setIsDeleted(false);
+                }
+            }
+            // Silently ignore 401/403/500 - don't show misleading banners
+        } catch {
+            // Network error - implement exponential backoff
+            failureCountRef.current += 1;
+            const newInterval = Math.min(
+                checkInterval * Math.pow(BACKOFF_MULTIPLIER, failureCountRef.current),
+                MAX_BACKOFF_INTERVAL
+            );
+
+            if (newInterval !== currentIntervalRef.current) {
+                currentIntervalRef.current = newInterval;
+                scheduleNextCheck(newInterval);
+            }
+
+            // Only log in development to reduce console noise
+            if (process.env.NODE_ENV === 'development' && failureCountRef.current <= 3) {
+                console.debug(`Listing freshness check failed (attempt ${failureCountRef.current}), next check in ${newInterval / 1000}s`);
+            }
+        }
+    }, [listingId, checkInterval, scheduleNextCheck]);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        failureCountRef.current = 0;
+        currentIntervalRef.current = checkInterval;
 
         // Check immediately on mount
         checkListingExists();
 
         // Set up interval for periodic checks
-        const intervalId = setInterval(checkListingExists, checkInterval);
+        scheduleNextCheck(checkInterval);
 
         // Also check when tab becomes visible again
         const handleVisibilityChange = () => {
@@ -73,11 +118,13 @@ export default function ListingFreshnessCheck({
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
-            isMounted = false;
-            clearInterval(intervalId);
+            isMountedRef.current = false;
+            if (intervalIdRef.current) {
+                clearInterval(intervalIdRef.current);
+            }
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [listingId, checkInterval]);
+    }, [listingId, checkInterval, checkListingExists, scheduleNextCheck]);
 
     if (isDeleted) {
         return (
