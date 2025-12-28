@@ -562,22 +562,24 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
     });
   });
 
-  describe('Debounce Cleanup', () => {
-    it('clears debounce timeout on unmount', () => {
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+  describe('AbortController Cleanup', () => {
+    it('aborts in-flight request on unmount', async () => {
+      const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
 
       const { unmount } = renderPanel();
 
-      // Type in search to trigger debounce
-      const searchInput = screen.getByPlaceholderText(/search/i);
-      fireEvent.change(searchInput, { target: { value: 'coffee' } });
+      // Click a chip to trigger fetch
+      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      await act(async () => {
+        fireEvent.click(groceryChip);
+      });
 
       // Unmount
       unmount();
 
-      // clearTimeout should have been called
-      expect(clearTimeoutSpy).toHaveBeenCalled();
-      clearTimeoutSpy.mockRestore();
+      // AbortController.abort should have been called
+      expect(abortSpy).toHaveBeenCalled();
+      abortSpy.mockRestore();
     });
   });
 });

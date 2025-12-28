@@ -117,14 +117,15 @@ describe('POST /api/nearby - Radar Response Handling', () => {
       expect(data.places[0].address).toBe('');
     });
 
-    it('handles POI with empty name - passes through', async () => {
+    it('handles POI with empty name - uses fallback', async () => {
       mockRadarSuccess([mockRadarPlaceEmptyName]);
 
       const response = await POST(createRequest(validRequestBody));
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.places[0].name).toBe('');
+      // Empty name uses 'Unknown Place' fallback for better UX
+      expect(data.places[0].name).toBe('Unknown Place');
     });
 
     it('handles POI with whitespace-only name', async () => {
@@ -395,7 +396,7 @@ describe('POST /api/nearby - Radar Response Handling', () => {
       expect(data.error).toBe('Internal Server Error');
     });
 
-    it('handles response with missing places array', async () => {
+    it('handles response with missing places array gracefully', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
@@ -403,10 +404,12 @@ describe('POST /api/nearby - Radar Response Handling', () => {
       });
 
       const response = await POST(createRequest(validRequestBody));
+      const data = await response.json();
 
-      // Should either handle gracefully or return error
-      // Based on implementation, this will throw when trying to map over undefined
-      expect(response.status).toBe(500);
+      // With || [] fallback, missing places array returns empty results gracefully
+      expect(response.status).toBe(200);
+      expect(data.places).toEqual([]);
+      expect(data.meta.count).toBe(0);
     });
   });
 

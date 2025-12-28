@@ -77,7 +77,6 @@ export default function NearbyPlacesPanel({
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isMountedRef = useRef(true);
 
@@ -150,25 +149,19 @@ export default function NearbyPlacesPanel({
     fetchPlaces(chip.categories, chip.query);
   }, [fetchPlaces]);
 
-  // Handle search input change with debounce
+  // Handle search input change - no auto-search, wait for explicit action
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchQuery(value);
+    setSearchQuery(e.target.value);
     setSelectedChip(null);
+  }, []);
 
-    // Clear existing debounce
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
+  // Handle explicit search (Enter key or button click)
+  const handleSearch = useCallback(() => {
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.length >= 2) {
+      fetchPlaces(undefined, trimmedQuery);
     }
-
-    // Only search if trimmed query is >= 2 chars
-    const trimmedValue = value.trim();
-    if (trimmedValue.length >= 2) {
-      debounceRef.current = setTimeout(() => {
-        fetchPlaces(undefined, trimmedValue);
-      }, 300);
-    }
-  }, [fetchPlaces]);
+  }, [searchQuery, fetchPlaces]);
 
   // Handle radius change
   const handleRadiusChange = useCallback((newRadius: number) => {
@@ -182,18 +175,27 @@ export default function NearbyPlacesPanel({
     }
   }, [selectedChip, searchQuery, fetchPlaces]);
 
-  // Cleanup debounce and abort controller on unmount
+  // Cleanup abort controller on unmount
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
       // Cancel any in-flight request on unmount
       abortControllerRef.current?.abort();
     };
   }, []);
+
+  // Reset state when listing coordinates change (new listing context)
+  useEffect(() => {
+    setSearchQuery('');
+    setSelectedChip(null);
+    setPlaces([]);
+    setHasSearched(false);
+    setError(null);
+    setErrorDetails(null);
+    // Cancel any in-flight request
+    abortControllerRef.current?.abort();
+  }, [listingLat, listingLng]);
 
   // Auth gate - show loading skeleton
   if (status === 'loading') {
@@ -267,15 +269,16 @@ export default function NearbyPlacesPanel({
               value={searchQuery}
               onChange={handleSearchChange}
               onKeyDown={(e) => {
-                // Prevent form submission when Enter is pressed
                 if (e.key === 'Enter') {
                   e.preventDefault();
+                  handleSearch();
                 }
               }}
               disabled={isLoading}
+              maxLength={100}
               aria-label="Search nearby places"
               className="
-                w-full pl-11 pr-4 py-2.5
+                w-full pl-11 pr-10 py-2.5
                 bg-zinc-50 dark:bg-zinc-800
                 border border-transparent
                 focus:bg-white dark:focus:bg-zinc-800
@@ -283,11 +286,32 @@ export default function NearbyPlacesPanel({
                 rounded-xl
                 text-zinc-900 dark:text-white text-sm
                 placeholder:text-zinc-400 dark:placeholder:text-zinc-500
-                focus:outline-none 
+                focus:outline-none
                 transition-all duration-200
                 disabled:opacity-50 disabled:cursor-not-allowed
               "
             />
+            {/* Search icon button - appears when 2+ chars typed */}
+            {searchQuery.trim().length >= 2 && (
+              <button
+                onClick={handleSearch}
+                disabled={isLoading}
+                aria-label="Search"
+                className="
+                  absolute right-2 top-1/2 -translate-y-1/2
+                  w-7 h-7
+                  flex items-center justify-center
+                  bg-zinc-900 dark:bg-white
+                  text-white dark:text-zinc-900
+                  rounded-lg
+                  hover:bg-zinc-800 dark:hover:bg-zinc-100
+                  disabled:opacity-50
+                  transition-colors
+                "
+              >
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -414,9 +438,12 @@ export default function NearbyPlacesPanel({
                 </div>
                 <p className="text-zinc-900 dark:text-zinc-100 font-medium text-sm">
                   No places found
+                  {searchQuery.trim() && (
+                    <span className="font-normal"> for &ldquo;{searchQuery.trim()}&rdquo;</span>
+                  )}
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Try a different listing or category
+                  Try a different search or category
                 </p>
               </div>
             ) : (
@@ -528,13 +555,20 @@ export default function NearbyPlacesPanel({
 
 /**
  * Get appropriate icon for a category
+ * Handles valid Radar API category names
  */
 function getIconForCategory(category: string) {
-  if (category.includes('grocery') || category.includes('food-grocery')) return ShoppingCart;
-  if (category.includes('restaurant')) return Utensils;
-  if (category.includes('shopping') || category.includes('mall')) return ShoppingBag;
+  // Grocery - Radar API uses 'grocery'
+  if (category.includes('grocery')) return ShoppingCart;
+  // Restaurants - Radar API uses 'restaurant' and 'food-beverage'
+  if (category.includes('restaurant') || category.includes('food-beverage')) return Utensils;
+  // Shopping - Radar API uses 'shopping'
+  if (category.includes('shopping')) return ShoppingBag;
+  // Gas stations - Radar API uses 'gas-station'
   if (category.includes('gas') || category.includes('fuel')) return Fuel;
+  // Fitness - Radar API uses 'gym' and 'fitness-recreation'
   if (category.includes('gym') || category.includes('fitness')) return Dumbbell;
-  if (category.includes('pharmacy') || category.includes('drug')) return Pill;
+  // Pharmacy - Radar API uses 'health-medicine' and 'drugstore'
+  if (category.includes('pharmacy') || category.includes('drugstore') || category.includes('health-medicine')) return Pill;
   return MapPin;
 }

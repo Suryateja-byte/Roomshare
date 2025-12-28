@@ -197,12 +197,13 @@ describe('POST /api/nearby - Server Edge Cases', () => {
   });
 
   describe('Request Parsing', () => {
-    it('returns 500 on malformed JSON body', async () => {
+    it('returns 400 on malformed JSON body', async () => {
       const response = await POST(createMalformedRequest());
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Internal Server Error');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid request body');
+      expect(data.details).toBe('Request body must be valid JSON');
     });
 
     it('returns 400 on empty request body', async () => {

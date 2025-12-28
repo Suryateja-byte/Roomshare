@@ -336,7 +336,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
 
   // D6: Spam radius toggles rate limited client-side
   describe('D6: Client Throttle', () => {
-    it('debounces search input to prevent spam', async () => {
+    it('does not call API until explicit search action', async () => {
       jest.useRealTimers();
 
       renderPanel();
@@ -346,13 +346,13 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       // Type rapidly
       await userEvent.type(searchInput, 'coffee', { delay: 50 });
 
-      // Wait for debounce
+      // Wait a bit - should not make any API call
       await act(async () => {
         await new Promise((r) => setTimeout(r, 400));
       });
 
-      // Should only make one request after debounce
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // Should not make any API call (no Enter pressed)
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it('debounces multiple chip clicks', async () => {
@@ -558,24 +558,29 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   });
 
   describe('Concurrent Requests', () => {
-    it('handles concurrent category and search requests', async () => {
+    it('handles sequential category and search requests', async () => {
       renderPanel();
 
       // Click category
       const groceryChip = screen.getByRole('button', { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
+        jest.runAllTimers();
       });
 
-      // Type in search (should cancel category request)
+      // First request made for category
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Type in search and press Enter (explicit search required)
       const searchInput = screen.getByPlaceholderText(/search/i);
       await act(async () => {
         fireEvent.change(searchInput, { target: { value: 'coffee' } });
-        jest.advanceTimersByTime(350); // After debounce
+        fireEvent.keyDown(searchInput, { key: 'Enter' });
+        jest.runAllTimers();
       });
 
-      // Both requests made, but first should be aborted
-      expect(mockFetch).toHaveBeenCalled();
+      // Second request made for search
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
   });
 });

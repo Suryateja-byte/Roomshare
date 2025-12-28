@@ -49,7 +49,7 @@ describe('NearbyPlacesPanel', () => {
         id: 'place-1',
         name: 'Indian Restaurant',
         address: '123 Main St',
-        category: 'indian-restaurant',
+        category: 'restaurant',
         location: { lat: 37.7760, lng: -122.4180 },
         distanceMiles: 0.1,
       },
@@ -156,55 +156,37 @@ describe('NearbyPlacesPanel', () => {
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith('/api/nearby', expect.objectContaining({
           method: 'POST',
-          body: expect.stringContaining('indian-restaurant'),
+          body: expect.stringContaining('restaurant'),
         }))
       })
     })
 
-    it('includes query filter for Indian grocery', async () => {
+    it('sends multiple categories for Restaurants chip', async () => {
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
       render(<NearbyPlacesPanel {...defaultProps} />)
 
-      const chip = screen.getByRole('button', { name: /indian grocery/i })
+      const chip = screen.getByRole('button', { name: /Restaurants/i })
       await user.click(chip)
 
       await waitFor(() => {
         const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
-        expect(callBody.categories).toContain('food-grocery')
-        expect(callBody.query).toBe('indian')
+        expect(callBody.categories).toEqual(['restaurant', 'food-beverage'])
       })
     })
   })
 
   describe('search input', () => {
-    it('has debounced input (300ms)', async () => {
+    it('does not call API on typing (explicit search required)', async () => {
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
       render(<NearbyPlacesPanel {...defaultProps} />)
 
       const input = screen.getByPlaceholderText(/search/i)
       await user.type(input, 'coffee')
 
-      // API should not be called immediately
+      // API should not be called - requires explicit Enter or button click
       expect(mockFetch).not.toHaveBeenCalled()
 
-      // Advance timers by 300ms
-      await act(async () => {
-        jest.advanceTimersByTime(300)
-      })
-
-      // Now API should be called
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalled()
-      })
-    })
-
-    it('does not call API for short queries (<2 chars)', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
-      render(<NearbyPlacesPanel {...defaultProps} />)
-
-      const input = screen.getByPlaceholderText(/search/i)
-      await user.type(input, 'a')
-
+      // Advance timers - still no call
       await act(async () => {
         jest.advanceTimersByTime(500)
       })
@@ -212,16 +194,24 @@ describe('NearbyPlacesPanel', () => {
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
-    it('calls API with search query', async () => {
+    it('does not call API for short queries (<2 chars) even on Enter', async () => {
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+      render(<NearbyPlacesPanel {...defaultProps} />)
+
+      const input = screen.getByPlaceholderText(/search/i)
+      await user.type(input, 'a')
+      await user.keyboard('{Enter}')
+
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('calls API with search query on Enter key', async () => {
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
       render(<NearbyPlacesPanel {...defaultProps} />)
 
       const input = screen.getByPlaceholderText(/search/i)
       await user.type(input, 'coffee shop')
-
-      await act(async () => {
-        jest.advanceTimersByTime(300)
-      })
+      await user.keyboard('{Enter}')
 
       await waitFor(() => {
         const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
@@ -560,88 +550,74 @@ describe('NearbyPlacesPanel', () => {
   })
 
   describe('Search UX - request cancellation', () => {
-    it('makes new request when query changes', async () => {
+    it('makes new request when query changes and Enter pressed again', async () => {
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
       render(<NearbyPlacesPanel {...defaultProps} />)
 
       const input = screen.getByPlaceholderText(/search/i)
 
-      // Type first query
-      await user.type(input, 'coffee')
-      await act(async () => {
-        jest.advanceTimersByTime(300)
-      })
+      // Type first query and press Enter
+      await user.type(input, 'coffee{Enter}')
 
       // First request made
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(1)
+      })
       const firstCall = JSON.parse(mockFetch.mock.calls[0][1].body)
       expect(firstCall.query).toBe('coffee')
 
-      // Wait for response
-      await act(async () => {
-        jest.advanceTimersByTime(100)
+      // Wait for first request to complete
+      await waitFor(() => {
+        expect(screen.getByText('Indian Restaurant')).toBeInTheDocument()
       })
 
-      // Type additional characters for new query
-      await user.type(input, ' shop')
-      await act(async () => {
-        jest.advanceTimersByTime(300)
-      })
+      // Clear and type new query - this will trigger a new search
+      await user.clear(input)
+      await user.type(input, 'coffee shop{Enter}')
 
-      // Second request made with updated query
-      expect(mockFetch).toHaveBeenCalledTimes(2)
+      // Second request made with new query
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+      })
       const secondCall = JSON.parse(mockFetch.mock.calls[1][1].body)
       expect(secondCall.query).toBe('coffee shop')
     })
 
-    it('only makes single API call for rapid typing', async () => {
+    it('does not make API call until Enter is pressed', async () => {
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
       render(<NearbyPlacesPanel {...defaultProps} />)
 
       const input = screen.getByPlaceholderText(/search/i)
 
-      // Type rapidly
-      await user.type(input, 'c')
-      await act(async () => {
-        jest.advanceTimersByTime(100)
-      })
-      await user.type(input, 'o')
-      await act(async () => {
-        jest.advanceTimersByTime(100)
-      })
-      await user.type(input, 'f')
-      await act(async () => {
-        jest.advanceTimersByTime(100)
-      })
-      await user.type(input, 'f')
-      await act(async () => {
-        jest.advanceTimersByTime(100)
-      })
-      await user.type(input, 'ee')
+      // Type rapidly without Enter
+      await user.type(input, 'coffee')
 
-      // Wait for debounce
+      // Wait - no API call without Enter
       await act(async () => {
-        jest.advanceTimersByTime(300)
+        jest.advanceTimersByTime(500)
       })
 
-      // Should only make one API call
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      // Should not make any API call
+      expect(mockFetch).not.toHaveBeenCalled()
 
-      // And it should be with the full query
+      // Press Enter to trigger search
+      await user.keyboard('{Enter}')
+
+      // Now API should be called with the full query
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(1)
+      })
       const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
       expect(callBody.query).toBe('coffee')
     })
 
-    it('does not call API for query with only spaces', async () => {
+    it('does not call API for query with only spaces even on Enter', async () => {
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
       render(<NearbyPlacesPanel {...defaultProps} />)
 
       const input = screen.getByPlaceholderText(/search/i)
       await user.type(input, '   ')
-
-      await act(async () => {
-        jest.advanceTimersByTime(500)
-      })
+      await user.keyboard('{Enter}')
 
       expect(mockFetch).not.toHaveBeenCalled()
     })
@@ -652,10 +628,7 @@ describe('NearbyPlacesPanel', () => {
 
       const input = screen.getByPlaceholderText(/search/i)
       await user.type(input, "ATM's & Banks")
-
-      await act(async () => {
-        jest.advanceTimersByTime(300)
-      })
+      await user.keyboard('{Enter}')
 
       await waitFor(() => {
         const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
@@ -673,7 +646,7 @@ describe('NearbyPlacesPanel', () => {
       await user.click(screen.getByRole('button', { name: /Restaurants/i }))
       expect(mockFetch).toHaveBeenCalledTimes(1)
       const firstCallBody = JSON.parse(mockFetch.mock.calls[0][1].body)
-      expect(firstCallBody.categories).toEqual(['indian-restaurant'])
+      expect(firstCallBody.categories).toEqual(['restaurant', 'food-beverage'])
 
       // Wait for first request to complete (chips re-enabled)
       await waitFor(() => {
@@ -684,7 +657,7 @@ describe('NearbyPlacesPanel', () => {
       await user.click(screen.getByRole('button', { name: /Shopping/i }))
       expect(mockFetch).toHaveBeenCalledTimes(2)
       const secondCallBody = JSON.parse(mockFetch.mock.calls[1][1].body)
-      expect(secondCallBody.categories).toEqual(['shopping-mall'])
+      expect(secondCallBody.categories).toEqual(['shopping-retail'])
     })
 
     it('triggers new request with updated radius when radius button clicked after search', async () => {
@@ -729,8 +702,8 @@ describe('NearbyPlacesPanel', () => {
       expect(mockFetch).toHaveBeenCalledTimes(3)
 
       // Verify all 3 requests had correct categories
-      expect(JSON.parse(mockFetch.mock.calls[0][1].body).categories).toEqual(['indian-restaurant'])
-      expect(JSON.parse(mockFetch.mock.calls[1][1].body).categories).toEqual(['shopping-mall'])
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body).categories).toEqual(['restaurant', 'food-beverage'])
+      expect(JSON.parse(mockFetch.mock.calls[1][1].body).categories).toEqual(['shopping-retail'])
       expect(JSON.parse(mockFetch.mock.calls[2][1].body).categories).toEqual(['pharmacy'])
     })
   })
