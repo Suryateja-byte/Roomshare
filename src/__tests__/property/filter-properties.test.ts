@@ -30,7 +30,7 @@ import {
   applyFilters,
   sortListings,
   paginateListings,
-} from '../fixtures/listings';
+} from '../fixtures/listings.fixture';
 
 // ============================================
 // Arbitraries (Random Value Generators)

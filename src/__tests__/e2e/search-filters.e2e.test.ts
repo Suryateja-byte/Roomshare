@@ -5,8 +5,8 @@
  * Validates critical user journeys and filter combinations that must always work.
  */
 
-import { TEST_LISTINGS, ACTIVE_LISTINGS, applyFilters, sortListings, paginateListings } from '../fixtures/listings';
-import type { TestListing } from '../fixtures/listings';
+import { TEST_LISTINGS, ACTIVE_LISTINGS, applyFilters, sortListings, paginateListings } from '../fixtures/listings.fixture';
+import type { TestListing } from '../fixtures/listings.fixture';
 import { normalizeFilters, type FilterParams } from '@/lib/filter-schema';
 import {
   filterByPrice,

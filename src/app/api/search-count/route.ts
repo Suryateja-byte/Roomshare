@@ -1,0 +1,102 @@
+/**
+ * Search Count API Endpoint
+ *
+ * Returns a count of listings matching the given filter parameters.
+ * Used by the filter drawer to show "Show X listings" button preview.
+ *
+ * Returns:
+ * - { count: number } when count is ≤100
+ * - { count: null } when count is >100 (indicates "100+")
+ *
+ * Uses the same parseSearchParams() logic as the main search
+ * to ensure consistent filter interpretation.
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
+import {
+  createContextFromHeaders,
+  runWithRequestContext,
+  getRequestId,
+} from "@/lib/request-context";
+import { parseSearchParams } from "@/lib/search-params";
+import { getLimitedCount } from "@/lib/data";
+import { logger } from "@/lib/logger";
+
+// Disable static caching - counts must be fresh
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  const context = createContextFromHeaders(request.headers);
+
+  return runWithRequestContext(context, async () => {
+    const requestId = getRequestId();
+
+    // Rate limiting - use a dedicated type for count requests
+    const rateLimitResponse = await withRateLimitRedis(request, {
+      type: "search-count",
+    });
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    try {
+      // Parse URL search params using same logic as main search
+      const { searchParams } = request.nextUrl;
+      const rawParams: Record<string, string | string[] | undefined> = {};
+
+      // Convert URLSearchParams to raw params object
+      searchParams.forEach((value, key) => {
+        const existing = rawParams[key];
+        if (existing) {
+          // Handle multiple values for same key
+          if (Array.isArray(existing)) {
+            existing.push(value);
+          } else {
+            rawParams[key] = [existing, value];
+          }
+        } else {
+          rawParams[key] = value;
+        }
+      });
+
+      // Parse and validate using same logic as main search
+      const { filterParams } = parseSearchParams(rawParams);
+
+      // Get count using existing getLimitedCount function
+      // Returns exact count if ≤100, null if >100
+      const count = await getLimitedCount(filterParams);
+
+      logger.debug("Search count request", {
+        requestId,
+        count,
+        hasFilters: Object.keys(filterParams).length > 0,
+      });
+
+      return NextResponse.json(
+        { count },
+        {
+          headers: {
+            // No caching - client handles debouncing and in-memory caching
+            "Cache-Control": "private, no-store",
+          },
+        },
+      );
+    } catch (error) {
+      logger.error("Search count error", {
+        requestId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+
+      return NextResponse.json(
+        { error: "Failed to get count" },
+        {
+          status: 500,
+          headers: {
+            "Cache-Control": "private, no-store",
+          },
+        },
+      );
+    }
+  });
+}

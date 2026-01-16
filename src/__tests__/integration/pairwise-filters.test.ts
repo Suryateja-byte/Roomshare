@@ -19,7 +19,7 @@ import {
   sortListings,
   paginateListings,
   verifyCoverage,
-} from '../fixtures/listings';
+} from '../fixtures/listings.fixture';
 import { normalizeFilters, NormalizedFilters } from '@/lib/filter-schema';
 
 // ============================================

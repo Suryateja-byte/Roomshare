@@ -1,0 +1,339 @@
+/**
+ * Unit tests for /api/search/facets endpoint
+ *
+ * Tests facet counts for filter options (amenities, houseRules, roomTypes, priceRanges).
+ */
+
+// Mock prisma before importing route
+jest.mock("@/lib/prisma", () => ({
+  prisma: {
+    $queryRawUnsafe: jest.fn(),
+  },
+}));
+
+// Mock rate limiting to return null (allow request)
+jest.mock("@/lib/with-rate-limit-redis", () => ({
+  withRateLimitRedis: jest.fn().mockResolvedValue(null),
+}));
+
+// Mock request context
+jest.mock("@/lib/request-context", () => ({
+  createContextFromHeaders: jest.fn().mockReturnValue({}),
+  runWithRequestContext: jest.fn((_, fn) => fn()),
+  getRequestId: jest.fn().mockReturnValue("test-request-id"),
+}));
+
+// Mock unstable_cache to execute function immediately
+jest.mock("next/cache", () => ({
+  unstable_cache: jest.fn((fn) => fn),
+}));
+
+// Mock next/server NextResponse
+jest.mock("next/server", () => ({
+  NextResponse: {
+    json: (
+      data: unknown,
+      init?: { status?: number; headers?: Record<string, string> },
+    ) => {
+      const headersMap = new Map(Object.entries(init?.headers || {}));
+      return {
+        status: init?.status || 200,
+        json: async () => data,
+        headers: {
+          get: (key: string) => headersMap.get(key) || null,
+          entries: () => headersMap.entries(),
+        },
+      };
+    },
+  },
+}));
+
+import { GET } from "@/app/api/search/facets/route";
+import { prisma } from "@/lib/prisma";
+import type { NextRequest } from "next/server";
+
+// Get the mocked function
+const mockQueryRawUnsafe = prisma.$queryRawUnsafe as jest.Mock;
+
+// Helper to create a mock NextRequest with searchParams
+function createRequest(params: Record<string, string> = {}): NextRequest {
+  const searchParams = new URLSearchParams(params);
+  const request = {
+    nextUrl: {
+      searchParams,
+    },
+    headers: new Headers(),
+  } as unknown as NextRequest;
+  return request;
+}
+
+describe("/api/search/facets", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default mock returns for each facet query
+    mockQueryRawUnsafe
+      // Amenities query
+      .mockResolvedValueOnce([
+        { amenity: "Wifi", count: BigInt(45) },
+        { amenity: "Parking", count: BigInt(23) },
+        { amenity: "Air Conditioning", count: BigInt(15) },
+      ])
+      // House rules query
+      .mockResolvedValueOnce([
+        { rule: "Pets allowed", count: BigInt(30) },
+        { rule: "No smoking", count: BigInt(20) },
+      ])
+      // Room types query
+      .mockResolvedValueOnce([
+        { roomType: "Private Room", count: BigInt(50) },
+        { roomType: "Shared Room", count: BigInt(20) },
+      ])
+      // Price ranges query
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+  });
+
+  describe("response structure", () => {
+    it("should return facets with correct structure", async () => {
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data).toHaveProperty("amenities");
+      expect(data).toHaveProperty("houseRules");
+      expect(data).toHaveProperty("roomTypes");
+      expect(data).toHaveProperty("priceRanges");
+    });
+
+    it("should return amenities as Record<string, number>", async () => {
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.amenities).toEqual({
+        Wifi: 45,
+        Parking: 23,
+        "Air Conditioning": 15,
+      });
+    });
+
+    it("should return house rules as Record<string, number>", async () => {
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.houseRules).toEqual({
+        "Pets allowed": 30,
+        "No smoking": 20,
+      });
+    });
+
+    it("should return room types as Record<string, number>", async () => {
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.roomTypes).toEqual({
+        "Private Room": 50,
+        "Shared Room": 20,
+      });
+    });
+
+    it("should return price ranges with min, max, median", async () => {
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.priceRanges).toEqual({
+        min: 500,
+        max: 3000,
+        median: 1200,
+      });
+    });
+  });
+
+  describe("filter params handling", () => {
+    it("should apply bounds filter to queries", async () => {
+      const request = createRequest({
+        minLng: "-97.8",
+        maxLng: "-97.6",
+        minLat: "30.2",
+        maxLat: "30.4",
+      });
+
+      await GET(request);
+
+      // Check that all queries included bounds
+      expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(4);
+      // First call (amenities) should include bounds params
+      const firstCallQuery = mockQueryRawUnsafe.mock.calls[0][0];
+      expect(firstCallQuery).toContain("ST_MakeEnvelope");
+    });
+
+    it("should apply price filter to non-price facets", async () => {
+      const request = createRequest({
+        minPrice: "500",
+        maxPrice: "2000",
+      });
+
+      await GET(request);
+
+      // Amenities query (first call) should include price filter
+      const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
+      expect(amenitiesQuery).toContain("d.price >=");
+      expect(amenitiesQuery).toContain("d.price <=");
+
+      // Price ranges query (fourth call) should NOT include price filter
+      const priceQuery = mockQueryRawUnsafe.mock.calls[3][0];
+      expect(priceQuery).not.toContain("d.price >=");
+      expect(priceQuery).not.toContain("d.price <=");
+    });
+
+    it("should apply roomType filter to non-roomType facets", async () => {
+      const request = createRequest({
+        roomType: "Private Room",
+      });
+
+      await GET(request);
+
+      // Amenities query should include room type filter
+      const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
+      expect(amenitiesQuery.toLowerCase()).toContain("room_type");
+
+      // Room types query should NOT include room type filter
+      const roomTypesQuery = mockQueryRawUnsafe.mock.calls[2][0];
+      // The query groups by room_type but shouldn't filter by it
+      expect(roomTypesQuery).toContain("GROUP BY d.room_type");
+    });
+
+    it("should apply text search filter", async () => {
+      const request = createRequest({
+        q: "austin",
+      });
+
+      await GET(request);
+
+      // All queries should include text search
+      const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
+      expect(amenitiesQuery.toLowerCase()).toContain("like");
+    });
+  });
+
+  describe("empty results handling", () => {
+    it("should return empty objects when no data", async () => {
+      mockQueryRawUnsafe.mockReset();
+      mockQueryRawUnsafe
+        .mockResolvedValueOnce([]) // Empty amenities
+        .mockResolvedValueOnce([]) // Empty house rules
+        .mockResolvedValueOnce([]) // Empty room types
+        .mockResolvedValueOnce([{ min: null, max: null, median: null }]); // Null price ranges
+
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.amenities).toEqual({});
+      expect(data.houseRules).toEqual({});
+      expect(data.roomTypes).toEqual({});
+      expect(data.priceRanges).toEqual({
+        min: null,
+        max: null,
+        median: null,
+      });
+    });
+  });
+
+  describe("error handling", () => {
+    it("should return 500 on database error", async () => {
+      mockQueryRawUnsafe.mockReset();
+      mockQueryRawUnsafe.mockRejectedValue(new Error("Database error"));
+
+      const request = createRequest();
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data).toHaveProperty("error");
+    });
+  });
+
+  describe("headers", () => {
+    it("should include cache control headers", async () => {
+      const request = createRequest();
+      const response = await GET(request);
+
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+      expect(response.headers.get("X-Cache-TTL")).toBe("30");
+    });
+  });
+
+  describe("rate limiting integration", () => {
+    it("should return rate limit response when limited", async () => {
+      // Override rate limit mock to return a response
+      const mockRateLimitResponse = {
+        status: 429,
+        json: async () => ({ error: "Too many requests" }),
+      };
+      jest
+        .mocked(
+          (await import("@/lib/with-rate-limit-redis")).withRateLimitRedis,
+        )
+        .mockResolvedValueOnce(mockRateLimitResponse as never);
+
+      const request = createRequest();
+      const response = await GET(request);
+
+      expect(response.status).toBe(429);
+    });
+  });
+});
+
+describe("facet exclusion logic", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should exclude amenities filter when querying amenities facet", async () => {
+    // Setup mocks for this specific test
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(100) }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ min: null, max: null, median: null }]);
+
+    const request = createRequest({
+      amenities: "Wifi,Parking",
+    });
+
+    await GET(request);
+
+    // Amenities query should NOT filter by amenities
+    const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
+    expect(amenitiesQuery).not.toContain("amenities_lower");
+
+    // House rules query SHOULD include amenities filter
+    const houseRulesQuery = mockQueryRawUnsafe.mock.calls[1][0];
+    expect(houseRulesQuery).toContain("amenities_lower");
+  });
+
+  it("should exclude houseRules filter when querying houseRules facet", async () => {
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ rule: "Pets allowed", count: BigInt(50) }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ min: null, max: null, median: null }]);
+
+    const request = createRequest({
+      houseRules: "Pets allowed",
+    });
+
+    await GET(request);
+
+    // House rules query should NOT filter by house rules
+    const houseRulesQuery = mockQueryRawUnsafe.mock.calls[1][0];
+    expect(houseRulesQuery).not.toContain("house_rules_lower @>");
+
+    // Amenities query SHOULD include house rules filter
+    const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
+    expect(amenitiesQuery).toContain("house_rules_lower @>");
+  });
+});

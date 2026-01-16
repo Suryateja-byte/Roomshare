@@ -4,18 +4,20 @@
  * Fails fast if critical variables are missing
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 // Schema for server-side environment variables
 const serverEnvSchema = z.object({
   // Database (REQUIRED)
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 
   // Authentication (REQUIRED)
-  NEXTAUTH_SECRET: z.string().min(32, 'NEXTAUTH_SECRET must be at least 32 characters'),
-  NEXTAUTH_URL: z.string().url('NEXTAUTH_URL must be a valid URL'),
-  GOOGLE_CLIENT_ID: z.string().min(1, 'GOOGLE_CLIENT_ID is required'),
-  GOOGLE_CLIENT_SECRET: z.string().min(1, 'GOOGLE_CLIENT_SECRET is required'),
+  NEXTAUTH_SECRET: z
+    .string()
+    .min(32, "NEXTAUTH_SECRET must be at least 32 characters"),
+  NEXTAUTH_URL: z.string().url("NEXTAUTH_URL must be a valid URL"),
+  GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is required"),
+  GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET is required"),
 
   // Email (optional - gracefully degrades)
   RESEND_API_KEY: z.string().optional(),
@@ -36,20 +38,21 @@ const serverEnvSchema = z.object({
   SENTRY_AUTH_TOKEN: z.string().optional(),
 
   // Vercel-specific (auto-populated)
-  VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
+  VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
 
   // Security: Cron authentication (required in production)
-  CRON_SECRET: z.string()
-    .min(32, 'CRON_SECRET must be at least 32 characters')
+  CRON_SECRET: z
+    .string()
+    .min(32, "CRON_SECRET must be at least 32 characters")
     .optional()
     .refine(
-      (val) => !val || !val.includes('change-in-production'),
-      'CRON_SECRET must not contain placeholder values'
+      (val) => !val || !val.includes("change-in-production"),
+      "CRON_SECRET must not contain placeholder values",
     )
     .refine(
-      (val) => process.env.NODE_ENV !== 'production' || !!val,
-      'CRON_SECRET is required in production'
+      (val) => process.env.NODE_ENV !== "production" || !!val,
+      "CRON_SECRET is required in production",
     ),
 
   // Security: Origin enforcement (comma-separated URLs)
@@ -57,7 +60,10 @@ const serverEnvSchema = z.object({
   ALLOWED_HOSTS: z.string().optional(),
 
   // Privacy: Metrics HMAC
-  LOG_HMAC_SECRET: z.string().min(32, 'LOG_HMAC_SECRET must be at least 32 characters').optional(),
+  LOG_HMAC_SECRET: z
+    .string()
+    .min(32, "LOG_HMAC_SECRET must be at least 32 characters")
+    .optional(),
 
   // Google Places (server-side, IP-restricted key)
   GOOGLE_PLACES_API_KEY: z.string().optional(),
@@ -69,7 +75,9 @@ const serverEnvSchema = z.object({
   RADAR_SECRET_KEY: z.string().optional(),
 
   // Node environment
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
 });
 
 // Schema for client-side (public) environment variables
@@ -90,7 +98,7 @@ const clientEnvSchema = z.object({
   NEXT_PUBLIC_STADIA_API_KEY: z.string().optional(),
 
   // Feature flags
-  NEXT_PUBLIC_NEARBY_ENABLED: z.enum(['true', 'false']).optional(),
+  NEXT_PUBLIC_NEARBY_ENABLED: z.enum(["true", "false"]).optional(),
 });
 
 // Type exports for use throughout the application
@@ -106,14 +114,16 @@ function validateServerEnv(): ServerEnv {
 
   if (!result.success) {
     const errors = result.error.issues
-      .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
-      .join('\n');
+      .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
+      .join("\n");
 
-    console.error('Environment validation failed:\n' + errors);
+    console.error("Environment validation failed:\n" + errors);
 
     // In production, fail fast. In development, warn but continue
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('Invalid environment configuration. Check logs for details.');
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Invalid environment configuration. Check logs for details.",
+      );
     }
   }
 
@@ -127,8 +137,10 @@ function validateClientEnv(): ClientEnv {
   const clientVars = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-    NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY,
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:
+      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY:
+      process.env.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY,
     NEXT_PUBLIC_STADIA_API_KEY: process.env.NEXT_PUBLIC_STADIA_API_KEY,
     NEXT_PUBLIC_NEARBY_ENABLED: process.env.NEXT_PUBLIC_NEARBY_ENABLED,
   };
@@ -136,7 +148,10 @@ function validateClientEnv(): ClientEnv {
   const result = clientEnvSchema.safeParse(clientVars);
 
   if (!result.success) {
-    console.warn('Client environment validation warnings:', result.error.issues);
+    console.warn(
+      "Client environment validation warnings:",
+      result.error.issues,
+    );
   }
 
   return result.success ? result.data : (clientVars as ClientEnv);
@@ -150,9 +165,14 @@ export const clientEnv = validateClientEnv();
 export const features = {
   email: !!serverEnv.RESEND_API_KEY,
   geocoding: !!serverEnv.MAPBOX_ACCESS_TOKEN,
-  redis: !!(serverEnv.UPSTASH_REDIS_REST_URL && serverEnv.UPSTASH_REDIS_REST_TOKEN),
+  redis: !!(
+    serverEnv.UPSTASH_REDIS_REST_URL && serverEnv.UPSTASH_REDIS_REST_TOKEN
+  ),
   aiChat: !!serverEnv.GROQ_API_KEY,
-  realtime: !!(clientEnv.NEXT_PUBLIC_SUPABASE_URL && clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+  realtime: !!(
+    clientEnv.NEXT_PUBLIC_SUPABASE_URL &&
+    clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ),
   errorTracking: !!serverEnv.SENTRY_DSN,
   maps: !!clientEnv.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
   // Stadia Maps basemap tiles (optional - falls back to domain auth or works on localhost)
@@ -167,38 +187,50 @@ export const features = {
   nearbyPlaces: !!(
     serverEnv.RADAR_SECRET_KEY &&
     clientEnv.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY &&
-    clientEnv.NEXT_PUBLIC_NEARBY_ENABLED === 'true'
+    clientEnv.NEXT_PUBLIC_NEARBY_ENABLED === "true"
   ),
+  // Search v2 features (always enabled - no env vars needed for backward compat)
+  searchV2: true,
+  searchKeyset: true,
+  searchRanking: true,
 } as const;
 
 // P1-25 FIX: Log startup warnings for missing optional services
 // This helps operators understand which features are disabled
-if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+if (typeof window === "undefined" && process.env.NODE_ENV === "production") {
   const warnings: string[] = [];
 
   if (!features.aiChat) {
-    warnings.push('GROQ_API_KEY not configured - AI chat feature disabled');
+    warnings.push("GROQ_API_KEY not configured - AI chat feature disabled");
   }
   if (!features.email) {
-    warnings.push('RESEND_API_KEY not configured - email notifications disabled');
+    warnings.push(
+      "RESEND_API_KEY not configured - email notifications disabled",
+    );
   }
   if (!features.errorTracking) {
-    warnings.push('SENTRY_DSN not configured - error tracking disabled');
+    warnings.push("SENTRY_DSN not configured - error tracking disabled");
   }
   if (!features.redis) {
-    warnings.push('Redis not configured - using database-backed rate limiting (slower)');
+    warnings.push(
+      "Redis not configured - using database-backed rate limiting (slower)",
+    );
   }
   if (!features.geocoding) {
-    warnings.push('MAPBOX_ACCESS_TOKEN not configured - geocoding disabled');
+    warnings.push("MAPBOX_ACCESS_TOKEN not configured - geocoding disabled");
   }
   if (!features.cronAuth) {
-    warnings.push('CRON_SECRET not configured - cron endpoints unprotected');
+    warnings.push("CRON_SECRET not configured - cron endpoints unprotected");
   }
   if (!features.nearbyPlaces) {
-    warnings.push('Radar API not fully configured - nearby places feature disabled');
+    warnings.push(
+      "Radar API not fully configured - nearby places feature disabled",
+    );
   }
 
   if (warnings.length > 0) {
-    console.warn('[ENV] Optional services not configured:\n  - ' + warnings.join('\n  - '));
+    console.warn(
+      "[ENV] Optional services not configured:\n  - " + warnings.join("\n  - "),
+    );
   }
 }

@@ -10,7 +10,7 @@
  */
 
 import { normalizeFilters, type FilterParams } from '@/lib/filter-schema';
-import { TEST_LISTINGS, ACTIVE_LISTINGS, applyFilters, sortListings } from '../fixtures/listings';
+import { TEST_LISTINGS, ACTIVE_LISTINGS, applyFilters, sortListings } from '../fixtures/listings.fixture';
 import { sanitizeSearchQuery, isValidQuery } from '@/lib/data';
 
 // ============================================

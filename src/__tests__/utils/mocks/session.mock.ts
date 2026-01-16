@@ -5,16 +5,19 @@
  * Supports: slow sessions, expiring sessions, blocked cookies, etc.
  */
 
-import type { Session } from 'next-auth';
+import type { Session } from "next-auth";
 
 /**
  * Standard mock session for authenticated tests
  */
 export const mockSession: Session = {
   user: {
-    id: 'user-123',
-    name: 'Test User',
-    email: 'test@example.com',
+    id: "user-123",
+    name: "Test User",
+    email: "test@example.com",
+    emailVerified: null,
+    isAdmin: false,
+    isSuspended: false,
   },
   expires: new Date(Date.now() + 86400000).toISOString(), // 24h from now
 };
@@ -24,8 +27,12 @@ export const mockSession: Session = {
  */
 export const mockSessionNoId: Session = {
   user: {
-    name: 'Test User',
-    email: 'test@example.com',
+    id: "", // Empty ID edge case
+    name: "Test User",
+    email: "test@example.com",
+    emailVerified: null,
+    isAdmin: false,
+    isSuspended: false,
   },
   expires: new Date(Date.now() + 86400000).toISOString(),
 };
@@ -37,7 +44,10 @@ export const mockSessionNoId: Session = {
 export function createSlowSessionMock(delay: number) {
   return {
     auth: jest.fn(
-      () => new Promise<Session>((resolve) => setTimeout(() => resolve(mockSession), delay))
+      () =>
+        new Promise<Session>((resolve) =>
+          setTimeout(() => resolve(mockSession), delay),
+        ),
     ),
   };
 }
@@ -62,7 +72,9 @@ export function createExpiringSessionMock() {
 /**
  * Create a mock that throws an error (simulates auth system failure)
  */
-export function createFailingSessionMock(errorMessage: string = 'Auth system unavailable') {
+export function createFailingSessionMock(
+  errorMessage: string = "Auth system unavailable",
+) {
   return {
     auth: jest.fn(() => Promise.reject(new Error(errorMessage))),
   };
@@ -72,13 +84,13 @@ export function createFailingSessionMock(errorMessage: string = 'Auth system una
  * Create a mock that simulates switching accounts
  */
 export function createAccountSwitchMock() {
-  let currentUser = 'user-123';
+  let currentUser = "user-123";
   return {
     auth: jest.fn(() =>
       Promise.resolve({
         ...mockSession,
         user: { ...mockSession.user, id: currentUser },
-      })
+      }),
     ),
     switchTo: (userId: string) => {
       currentUser = userId;
@@ -92,18 +104,18 @@ export function createAccountSwitchMock() {
  */
 export const mockUseSessionAuthenticated = {
   data: mockSession,
-  status: 'authenticated' as const,
+  status: "authenticated" as const,
   update: jest.fn(),
 };
 
 export const mockUseSessionLoading = {
   data: null,
-  status: 'loading' as const,
+  status: "loading" as const,
   update: jest.fn(),
 };
 
 export const mockUseSessionUnauthenticated = {
   data: null,
-  status: 'unauthenticated' as const,
+  status: "unauthenticated" as const,
   update: jest.fn(),
 };

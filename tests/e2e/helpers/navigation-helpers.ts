@@ -1,27 +1,30 @@
-import { Page, expect } from '@playwright/test';
-import { selectors, timeouts } from './test-utils';
+import { Page, expect } from "@playwright/test";
+import { selectors, timeouts } from "./test-utils";
 
 /**
  * Wait for page to be ready - more reliable than networkidle
  * Uses domcontentloaded + element visibility instead of waiting for all network traffic
  */
-async function waitForPageReady(page: Page, options?: {
-  selector?: string;
-  timeout?: number;
-}) {
+async function waitForPageReady(
+  page: Page,
+  options?: {
+    selector?: string;
+    timeout?: number;
+  },
+) {
   const timeout = options?.timeout ?? timeouts.action;
   const selector = options?.selector ?? 'main, [role="main"], #__next';
 
-  await page.waitForLoadState('domcontentloaded');
+  await page.waitForLoadState("domcontentloaded");
 
   try {
     await page.locator(selector).first().waitFor({
-      state: 'visible',
-      timeout
+      state: "visible",
+      timeout,
     });
   } catch {
     // Fallback: just ensure body is visible
-    await page.locator('body').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator("body").waitFor({ state: "visible", timeout: 5000 });
   }
 }
 
@@ -34,8 +37,8 @@ export function navigationHelpers(page: Page) {
      * Navigate to home page
      */
     async goHome() {
-      await page.goto('/');
-      await waitForPageReady(page, { selector: 'nav, main' });
+      await page.goto("/");
+      await waitForPageReady(page, { selector: "nav, main" });
     },
 
     /**
@@ -43,23 +46,39 @@ export function navigationHelpers(page: Page) {
      */
     async goToSearch(query?: {
       location?: string;
+      q?: string;
       minPrice?: number;
       maxPrice?: number;
       moveIn?: string;
       roomType?: string;
+      bounds?: {
+        minLat: number;
+        maxLat: number;
+        minLng: number;
+        maxLng: number;
+      };
     }) {
-      let url = '/search';
+      let url = "/search";
       if (query) {
         const params = new URLSearchParams();
-        if (query.location) params.set('location', query.location);
-        if (query.minPrice) params.set('minPrice', query.minPrice.toString());
-        if (query.maxPrice) params.set('maxPrice', query.maxPrice.toString());
-        if (query.moveIn) params.set('moveIn', query.moveIn);
-        if (query.roomType) params.set('roomType', query.roomType);
+        if (query.location) params.set("location", query.location);
+        if (query.q) params.set("q", query.q);
+        if (query.minPrice) params.set("minPrice", query.minPrice.toString());
+        if (query.maxPrice) params.set("maxPrice", query.maxPrice.toString());
+        if (query.moveIn) params.set("moveIn", query.moveIn);
+        if (query.roomType) params.set("roomType", query.roomType);
+        if (query.bounds) {
+          params.set("minLat", query.bounds.minLat.toString());
+          params.set("maxLat", query.bounds.maxLat.toString());
+          params.set("minLng", query.bounds.minLng.toString());
+          params.set("maxLng", query.bounds.maxLng.toString());
+        }
         if (params.toString()) url += `?${params.toString()}`;
       }
       await page.goto(url);
-      await waitForPageReady(page, { selector: 'form, [data-testid="search-form"], main' });
+      await waitForPageReady(page, {
+        selector: 'form, [data-testid="search-form"], main',
+      });
     },
 
     /**
@@ -67,39 +86,45 @@ export function navigationHelpers(page: Page) {
      */
     async goToListing(listingId: string) {
       await page.goto(`/listings/${listingId}`);
-      await waitForPageReady(page, { selector: 'h1, [data-testid="listing-detail"]' });
+      await waitForPageReady(page, {
+        selector: 'h1, [data-testid="listing-detail"]',
+      });
     },
 
     /**
      * Navigate to create listing page
      */
     async goToCreateListing() {
-      await page.goto('/listings/create');
-      await waitForPageReady(page, { selector: 'form, h1' });
+      await page.goto("/listings/create");
+      await waitForPageReady(page, { selector: "form, h1" });
     },
 
     /**
      * Navigate to messages
      */
     async goToMessages(conversationId?: string) {
-      const url = conversationId ? `/messages/${conversationId}` : '/messages';
+      const url = conversationId ? `/messages/${conversationId}` : "/messages";
       await page.goto(url);
-      await waitForPageReady(page, { selector: '[data-testid="messages"], h1, main' });
+      await waitForPageReady(page, {
+        selector: '[data-testid="messages"], h1, main',
+      });
     },
 
     /**
      * Navigate to bookings
      */
     async goToBookings() {
-      await page.goto('/bookings');
-      await waitForPageReady(page, { selector: 'h1, [data-testid="bookings"]' });
+      await page.goto("/bookings");
+      await waitForPageReady(page, {
+        selector: 'h1, [data-testid="bookings"]',
+      });
     },
 
     /**
      * Navigate to profile
      */
     async goToProfile() {
-      await page.goto('/profile');
+      await page.goto("/profile");
       await waitForPageReady(page, { selector: 'h1, [data-testid="profile"]' });
     },
 
@@ -107,15 +132,15 @@ export function navigationHelpers(page: Page) {
      * Navigate to settings
      */
     async goToSettings() {
-      await page.goto('/settings');
-      await waitForPageReady(page, { selector: 'h1, form' });
+      await page.goto("/settings");
+      await waitForPageReady(page, { selector: "h1, form" });
     },
 
     /**
      * Navigate to saved listings
      */
     async goToSaved() {
-      await page.goto('/saved');
+      await page.goto("/saved");
       await waitForPageReady(page, { selector: 'h1, [data-testid="saved"]' });
     },
 
@@ -123,23 +148,27 @@ export function navigationHelpers(page: Page) {
      * Navigate to saved searches
      */
     async goToSavedSearches() {
-      await page.goto('/saved-searches');
-      await waitForPageReady(page, { selector: 'h1, [data-testid="saved-searches"]' });
+      await page.goto("/saved-searches");
+      await waitForPageReady(page, {
+        selector: 'h1, [data-testid="saved-searches"]',
+      });
     },
 
     /**
      * Navigate to notifications
      */
     async goToNotifications() {
-      await page.goto('/notifications');
-      await waitForPageReady(page, { selector: 'h1, [data-testid="notifications"]' });
+      await page.goto("/notifications");
+      await waitForPageReady(page, {
+        selector: 'h1, [data-testid="notifications"]',
+      });
     },
 
     /**
      * Navigate to admin panel
      */
     async goToAdmin() {
-      await page.goto('/admin');
+      await page.goto("/admin");
       await waitForPageReady(page, { selector: 'h1, [data-testid="admin"]' });
     },
 
@@ -147,8 +176,8 @@ export function navigationHelpers(page: Page) {
      * Navigate to verification page
      */
     async goToVerification() {
-      await page.goto('/verify');
-      await waitForPageReady(page, { selector: 'h1, form' });
+      await page.goto("/verify");
+      await waitForPageReady(page, { selector: "h1, form" });
     },
 
     /**
@@ -169,7 +198,7 @@ export function navigationHelpers(page: Page) {
           }
           return null;
         },
-        { selector: cardSelector, idx: index }
+        { selector: cardSelector, idx: index },
       );
       if (!url) throw new Error(`No listing card found at index ${index}`);
       await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
@@ -185,7 +214,7 @@ export function navigationHelpers(page: Page) {
         .or(page.locator('[data-testid="search-input"]'));
 
       await searchInput.fill(location);
-      await searchInput.press('Enter');
+      await searchInput.press("Enter");
       await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
     },
 
@@ -195,7 +224,7 @@ export function navigationHelpers(page: Page) {
     async navigateViaMenu(menuItem: string) {
       // Open user menu if it exists
       const userMenuButton = page
-        .getByRole('button', { name: /menu|profile|account/i })
+        .getByRole("button", { name: /menu|profile|account/i })
         .or(page.locator('[data-testid="user-menu"]'));
 
       if (await userMenuButton.isVisible()) {
@@ -205,8 +234,8 @@ export function navigationHelpers(page: Page) {
 
       // Click the menu item
       await page
-        .getByRole('menuitem', { name: new RegExp(menuItem, 'i') })
-        .or(page.getByRole('link', { name: new RegExp(menuItem, 'i') }))
+        .getByRole("menuitem", { name: new RegExp(menuItem, "i") })
+        .or(page.getByRole("link", { name: new RegExp(menuItem, "i") }))
         .click();
 
       await waitForPageReady(page);
@@ -225,7 +254,7 @@ export function navigationHelpers(page: Page) {
      */
     async goBack() {
       await page.goBack();
-      await waitForPageReady(page, { selector: 'main' });
+      await waitForPageReady(page, { selector: "main" });
     },
 
     /**
@@ -233,7 +262,7 @@ export function navigationHelpers(page: Page) {
      */
     async refresh() {
       await page.reload();
-      await waitForPageReady(page, { selector: 'main' });
+      await waitForPageReady(page, { selector: "main" });
     },
 
     /**

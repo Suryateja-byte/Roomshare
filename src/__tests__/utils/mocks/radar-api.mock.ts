@@ -9,25 +9,29 @@
  * - Edge cases
  */
 
-import type { RadarSearchResponse, RadarPlace, NearbyPlace } from '@/types/nearby';
+import type {
+  RadarSearchResponse,
+  RadarPlace,
+  NearbyPlace,
+} from "@/types/nearby";
 
 // ============================================================================
 // Standard Success Fixtures
 // ============================================================================
 
 export const mockRadarPlace: RadarPlace = {
-  _id: 'place_123',
-  name: 'Patel Brothers',
+  _id: "place_123",
+  name: "Patel Brothers",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.4194, 37.7749], // [lng, lat]
   },
-  categories: ['food-grocery'],
+  categories: ["food-grocery"],
   chain: {
-    name: 'Patel Brothers',
-    slug: 'patel-brothers',
+    name: "Patel Brothers",
+    slug: "patel-brothers",
   },
-  formattedAddress: '123 Main St, San Francisco, CA 94102',
+  formattedAddress: "123 Main St, San Francisco, CA 94102",
 };
 
 export const mockRadarResponse: RadarSearchResponse = {
@@ -37,28 +41,28 @@ export const mockRadarResponse: RadarSearchResponse = {
   places: [
     mockRadarPlace,
     {
-      _id: 'place_456',
-      name: 'India Bazaar',
+      _id: "place_456",
+      name: "India Bazaar",
       location: {
-        type: 'Point',
+        type: "Point",
         coordinates: [-122.4089, 37.7851],
       },
-      categories: ['food-grocery'],
-      formattedAddress: '456 Market St, San Francisco, CA 94103',
+      categories: ["food-grocery"],
+      formattedAddress: "456 Market St, San Francisco, CA 94103",
     },
     {
-      _id: 'place_789',
-      name: 'Shalimar Restaurant',
+      _id: "place_789",
+      name: "Shalimar Restaurant",
       location: {
-        type: 'Point',
+        type: "Point",
         coordinates: [-122.4156, 37.7879],
       },
-      categories: ['indian-restaurant'],
+      categories: ["indian-restaurant"],
       chain: {
-        name: 'Shalimar',
-        slug: 'shalimar',
+        name: "Shalimar",
+        slug: "shalimar",
       },
-      formattedAddress: '789 Geary St, San Francisco, CA 94109',
+      formattedAddress: "789 Geary St, San Francisco, CA 94109",
     },
   ],
 };
@@ -66,28 +70,28 @@ export const mockRadarResponse: RadarSearchResponse = {
 // Normalized NearbyPlace fixtures (after API transformation)
 export const mockNearbyPlaces: NearbyPlace[] = [
   {
-    id: 'place_123',
-    name: 'Patel Brothers',
-    address: '123 Main St, San Francisco, CA 94102',
-    category: 'food-grocery',
-    chain: 'Patel Brothers',
+    id: "place_123",
+    name: "Patel Brothers",
+    address: "123 Main St, San Francisco, CA 94102",
+    category: "food-grocery",
+    chain: "Patel Brothers",
     location: { lat: 37.7749, lng: -122.4194 },
     distanceMiles: 0.5,
   },
   {
-    id: 'place_456',
-    name: 'India Bazaar',
-    address: '456 Market St, San Francisco, CA 94103',
-    category: 'food-grocery',
+    id: "place_456",
+    name: "India Bazaar",
+    address: "456 Market St, San Francisco, CA 94103",
+    category: "food-grocery",
     location: { lat: 37.7851, lng: -122.4089 },
     distanceMiles: 0.8,
   },
   {
-    id: 'place_789',
-    name: 'Shalimar Restaurant',
-    address: '789 Geary St, San Francisco, CA 94109',
-    category: 'indian-restaurant',
-    chain: 'Shalimar',
+    id: "place_789",
+    name: "Shalimar Restaurant",
+    address: "789 Geary St, San Francisco, CA 94109",
+    category: "indian-restaurant",
+    chain: "Shalimar",
     location: { lat: 37.7879, lng: -122.4156 },
     distanceMiles: 1.2,
   },
@@ -98,59 +102,75 @@ export const mockNearbyPlaces: NearbyPlace[] = [
 // ============================================================================
 
 export const mockRadarPlaceMissingAddress: RadarPlace = {
-  _id: 'place_no_addr',
-  name: 'Mystery Store',
+  _id: "place_no_addr",
+  name: "H Mart Mystery",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.42, 37.78],
   },
-  categories: ['shopping'],
+  categories: ["food-grocery"],
+  chain: {
+    name: "H Mart",
+    slug: "h-mart",
+  },
   // formattedAddress is undefined
 };
 
 export const mockRadarPlaceEmptyName: RadarPlace = {
-  _id: 'place_empty_name',
-  name: '',
+  _id: "place_empty_name",
+  name: "",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.43, 37.79],
   },
-  categories: ['food-beverage'],
-  formattedAddress: '100 Empty St',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Trader Joes",
+    slug: "trader-joes",
+  },
+  formattedAddress: "100 Empty St",
 };
 
 export const mockRadarPlaceWhitespaceName: RadarPlace = {
-  _id: 'place_whitespace',
-  name: '   ',
+  _id: "place_whitespace",
+  name: "   ",
   location: {
-    type: 'Point',
-    coordinates: [-122.44, 37.80],
+    type: "Point",
+    coordinates: [-122.44, 37.8],
   },
-  categories: ['gas-station'],
-  formattedAddress: '200 Whitespace Ave',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Whole Foods",
+    slug: "whole-foods",
+  },
+  formattedAddress: "200 Whitespace Ave",
 };
 
 export const mockRadarPlaceEmptyCategories: RadarPlace = {
-  _id: 'place_no_cats',
-  name: 'Uncategorized Place',
+  _id: "place_no_cats",
+  name: "Uncategorized Place",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.45, 37.81],
   },
   categories: [],
-  formattedAddress: '300 No Category Blvd',
+  chain: {
+    name: "Safeway",
+    slug: "safeway",
+  },
+  formattedAddress: "300 No Category Blvd",
 };
 
 export const mockRadarPlaceNoChain: RadarPlace = {
-  _id: 'place_no_chain',
-  name: 'Independent Store',
+  _id: "place_no_chain",
+  name: "Independent Grocery Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.46, 37.82],
   },
-  categories: ['shopping-mall'],
-  formattedAddress: '400 Independent Way',
-  // chain is undefined
+  categories: ["food-grocery"],
+  formattedAddress: "400 Independent Way",
+  // chain is undefined - passes filter via "Grocery" in name
 };
 
 // ============================================================================
@@ -158,25 +178,29 @@ export const mockRadarPlaceNoChain: RadarPlace = {
 // ============================================================================
 
 export const mockRadarPlaceLongName: RadarPlace = {
-  _id: 'place_long_name',
-  name: 'A'.repeat(500), // 500-char name
+  _id: "place_long_name",
+  name: "A".repeat(500), // 500-char name
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.47, 37.83],
   },
-  categories: ['food-grocery'],
-  formattedAddress: '500 Long Name St',
+  categories: ["food-grocery"],
+  chain: {
+    name: "99 Ranch Market",
+    slug: "99-ranch-market",
+  },
+  formattedAddress: "500 Long Name St",
 };
 
 export const mockRadarPlaceLongAddress: RadarPlace = {
-  _id: 'place_long_addr',
-  name: 'Normal Store',
+  _id: "place_long_addr",
+  name: "Normal Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.48, 37.84],
   },
-  categories: ['pharmacy'],
-  formattedAddress: 'B'.repeat(300), // 300-char address
+  categories: ["pharmacy"],
+  formattedAddress: "B".repeat(300), // 300-char address
 };
 
 // ============================================================================
@@ -184,58 +208,78 @@ export const mockRadarPlaceLongAddress: RadarPlace = {
 // ============================================================================
 
 export const mockRadarPlaceTelugu: RadarPlace = {
-  _id: 'place_telugu',
-  name: 'తెలుగు స్టోర్', // Telugu script
+  _id: "place_telugu",
+  name: "తెలుగు స్టోర్", // Telugu script
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.49, 37.85],
   },
-  categories: ['food-grocery'],
-  formattedAddress: '600 తెలుగు వీధి, San Francisco',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Patel Brothers",
+    slug: "patel-brothers",
+  },
+  formattedAddress: "600 తెలుగు వీధి, San Francisco",
 };
 
 export const mockRadarPlaceHindi: RadarPlace = {
-  _id: 'place_hindi',
-  name: 'हिंदी दुकान', // Hindi script
+  _id: "place_hindi",
+  name: "हिंदी दुकान", // Hindi script
   location: {
-    type: 'Point',
-    coordinates: [-122.50, 37.86],
+    type: "Point",
+    coordinates: [-122.5, 37.86],
   },
-  categories: ['indian-restaurant'],
-  formattedAddress: '700 हिंदी मार्ग, San Francisco',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Mitsuwa",
+    slug: "mitsuwa",
+  },
+  formattedAddress: "700 हिंदी मार्ग, San Francisco",
 };
 
 export const mockRadarPlaceArabic: RadarPlace = {
-  _id: 'place_arabic',
-  name: 'متجر عربي', // Arabic script
+  _id: "place_arabic",
+  name: "متجر عربي", // Arabic script
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.51, 37.87],
   },
-  categories: ['food-grocery'],
-  formattedAddress: '800 شارع عربي, San Francisco',
+  categories: ["food-grocery"],
+  chain: {
+    name: "H Mart",
+    slug: "h-mart",
+  },
+  formattedAddress: "800 شارع عربي, San Francisco",
 };
 
 export const mockRadarPlaceEmoji: RadarPlace = {
-  _id: 'place_emoji',
-  name: 'Coffee Shop ☕🍕🎉',
+  _id: "place_emoji",
+  name: "Coffee Shop ☕🍕🎉",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.52, 37.88],
   },
-  categories: ['food-beverage'],
-  formattedAddress: '900 Emoji Lane 🏠',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Trader Joes",
+    slug: "trader-joes",
+  },
+  formattedAddress: "900 Emoji Lane 🏠",
 };
 
 export const mockRadarPlaceChinese: RadarPlace = {
-  _id: 'place_chinese',
-  name: '中国商店',
+  _id: "place_chinese",
+  name: "中国商店",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.53, 37.89],
   },
-  categories: ['food-grocery'],
-  formattedAddress: '1000 中国街, San Francisco',
+  categories: ["food-grocery"],
+  chain: {
+    name: "99 Ranch Market",
+    slug: "99-ranch-market",
+  },
+  formattedAddress: "1000 中国街, San Francisco",
 };
 
 // ============================================================================
@@ -243,46 +287,50 @@ export const mockRadarPlaceChinese: RadarPlace = {
 // ============================================================================
 
 export const mockRadarPlaceXSSScript: RadarPlace = {
-  _id: 'place_xss_script',
+  _id: "place_xss_script",
   name: '<script>alert("XSS")</script>',
   location: {
-    type: 'Point',
-    coordinates: [-122.54, 37.90],
+    type: "Point",
+    coordinates: [-122.54, 37.9],
   },
-  categories: ['food-grocery'],
-  formattedAddress: '<script>document.cookie</script>',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Walmart",
+    slug: "walmart",
+  },
+  formattedAddress: "<script>document.cookie</script>",
 };
 
 export const mockRadarPlaceXSSImgOnerror: RadarPlace = {
-  _id: 'place_xss_img',
+  _id: "place_xss_img",
   name: '<img src="x" onerror="alert(1)">',
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.55, 37.91],
   },
-  categories: ['shopping'],
-  formattedAddress: '<img src=x onerror=alert(1)>',
+  categories: ["shopping"],
+  formattedAddress: "<img src=x onerror=alert(1)>",
 };
 
 export const mockRadarPlaceXSSEventHandler: RadarPlace = {
-  _id: 'place_xss_event',
+  _id: "place_xss_event",
   name: 'Store" onclick="alert(1)" data-x="',
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.56, 37.92],
   },
-  categories: ['gym'],
+  categories: ["gym"],
   formattedAddress: '123 Main" onmouseover="alert(1)" x="',
 };
 
 export const mockRadarPlaceXSSHref: RadarPlace = {
-  _id: 'place_xss_href',
-  name: 'Click Me',
+  _id: "place_xss_href",
+  name: "Click Me",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.57, 37.93],
   },
-  categories: ['pharmacy'],
+  categories: ["pharmacy"],
   formattedAddress: '<a href="javascript:alert(1)">Click</a>',
 };
 
@@ -291,25 +339,25 @@ export const mockRadarPlaceXSSHref: RadarPlace = {
 // ============================================================================
 
 export const mockRadarPlaceSpecialChars: RadarPlace = {
-  _id: 'place_special',
-  name: 'ATM? & Bank < > " \' $100',
+  _id: "place_special",
+  name: "ATM? & Bank < > \" ' $100",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.58, 37.94],
   },
-  categories: ['finance'],
+  categories: ["finance"],
   formattedAddress: '123 Main St #5 & Suite "A"',
 };
 
 export const mockRadarPlaceNewlines: RadarPlace = {
-  _id: 'place_newlines',
-  name: 'Store\nWith\nNewlines',
+  _id: "place_newlines",
+  name: "Store\nWith\nNewlines",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.59, 37.95],
   },
-  categories: ['shopping'],
-  formattedAddress: '123\nMain\nSt',
+  categories: ["shopping"],
+  formattedAddress: "123\nMain\nSt",
 };
 
 // ============================================================================
@@ -323,7 +371,7 @@ export const mockRadarResponseWithDuplicates: RadarSearchResponse = {
     mockRadarPlace, // Exact duplicate
     {
       ...mockRadarPlace,
-      _id: 'place_123_dupe', // Same data, different ID
+      _id: "place_123_dupe", // Same data, different ID
     },
   ],
 };
@@ -340,7 +388,7 @@ export const mockRadarEmptyResponse: RadarSearchResponse = {
 export const mockRadarErrorResponse = {
   meta: {
     code: 400,
-    message: 'Invalid parameters',
+    message: "Invalid parameters",
   },
   places: [],
 };
@@ -348,21 +396,21 @@ export const mockRadarErrorResponse = {
 export const mockRadarRateLimitResponse = {
   meta: {
     code: 429,
-    message: 'Rate limit exceeded',
+    message: "Rate limit exceeded",
   },
 };
 
 export const mockRadarAuthErrorResponse = {
   meta: {
     code: 401,
-    message: 'Unauthorized',
+    message: "Unauthorized",
   },
 };
 
 export const mockRadarForbiddenResponse = {
   meta: {
     code: 403,
-    message: 'Access denied',
+    message: "Access denied",
   },
 };
 
@@ -375,10 +423,14 @@ export function generateMockPlaces(count: number): RadarPlace[] {
     _id: `place_gen_${i}`,
     name: `Generated Store ${i}`,
     location: {
-      type: 'Point' as const,
-      coordinates: [-122.4 + (i * 0.001), 37.7 + (i * 0.001)] as [number, number],
+      type: "Point" as const,
+      coordinates: [-122.4 + i * 0.001, 37.7 + i * 0.001] as [number, number],
     },
-    categories: ['food-grocery'],
+    categories: ["food-grocery"],
+    chain: {
+      name: "Walmart",
+      slug: "walmart",
+    },
     formattedAddress: `${i} Generated St, San Francisco, CA`,
   }));
 }
@@ -393,58 +445,78 @@ export const mockRadarLargeResponse: RadarSearchResponse = {
 // ============================================================================
 
 export const mockRadarPlaceAtOrigin: RadarPlace = {
-  _id: 'place_origin',
-  name: 'Gulf of Guinea Store',
+  _id: "place_origin",
+  name: "Gulf of Guinea Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [0, 0], // Origin
   },
-  categories: ['food-grocery'],
-  formattedAddress: 'Origin Point',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Kroger",
+    slug: "kroger",
+  },
+  formattedAddress: "Origin Point",
 };
 
 export const mockRadarPlaceNorthPole: RadarPlace = {
-  _id: 'place_north_pole',
-  name: 'Arctic Store',
+  _id: "place_north_pole",
+  name: "Arctic Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [0, 90], // North Pole
   },
-  categories: ['food-grocery'],
-  formattedAddress: 'North Pole',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Safeway",
+    slug: "safeway",
+  },
+  formattedAddress: "North Pole",
 };
 
 export const mockRadarPlaceSouthPole: RadarPlace = {
-  _id: 'place_south_pole',
-  name: 'Antarctic Store',
+  _id: "place_south_pole",
+  name: "Antarctic Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [0, -90], // South Pole
   },
-  categories: ['food-grocery'],
-  formattedAddress: 'South Pole',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Albertsons",
+    slug: "albertsons",
+  },
+  formattedAddress: "South Pole",
 };
 
 export const mockRadarPlaceAntimeridian: RadarPlace = {
-  _id: 'place_antimeridian',
-  name: 'Date Line Store',
+  _id: "place_antimeridian",
+  name: "Date Line Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [180, 0], // International Date Line
   },
-  categories: ['food-grocery'],
-  formattedAddress: 'International Date Line',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Publix",
+    slug: "publix",
+  },
+  formattedAddress: "International Date Line",
 };
 
 export const mockRadarPlacePreciseCoords: RadarPlace = {
-  _id: 'place_precise',
-  name: 'Precise Location Store',
+  _id: "place_precise",
+  name: "Precise Location Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.41941261291504, 37.77492950439453], // Many decimal places
   },
-  categories: ['food-grocery'],
-  formattedAddress: '123 Precise Ave',
+  categories: ["food-grocery"],
+  chain: {
+    name: "Whole Foods",
+    slug: "whole-foods",
+  },
+  formattedAddress: "123 Precise Ave",
 };
 
 // ============================================================================
@@ -452,58 +524,54 @@ export const mockRadarPlacePreciseCoords: RadarPlace = {
 // ============================================================================
 
 export const mockCategoryFixtures: Record<string, RadarPlace[]> = {
-  'food-grocery': [
-    mockRadarPlace,
-    mockRadarPlaceTelugu,
-    mockRadarPlaceHindi,
-  ],
-  'indian-restaurant': [
+  "food-grocery": [mockRadarPlace, mockRadarPlaceTelugu, mockRadarPlaceHindi],
+  "indian-restaurant": [
     {
-      _id: 'rest_1',
-      name: 'Taj Mahal Restaurant',
-      location: { type: 'Point', coordinates: [-122.42, 37.78] },
-      categories: ['indian-restaurant'],
-      formattedAddress: '100 Curry Lane',
+      _id: "rest_1",
+      name: "Taj Mahal Restaurant",
+      location: { type: "Point", coordinates: [-122.42, 37.78] },
+      categories: ["indian-restaurant"],
+      formattedAddress: "100 Curry Lane",
     },
   ],
-  'shopping-mall': [
+  "shopping-mall": [
     {
-      _id: 'mall_1',
-      name: 'Westfield Mall',
-      location: { type: 'Point', coordinates: [-122.43, 37.79] },
-      categories: ['shopping-mall'],
-      chain: { name: 'Westfield', slug: 'westfield' },
-      formattedAddress: '865 Market St',
+      _id: "mall_1",
+      name: "Westfield Mall",
+      location: { type: "Point", coordinates: [-122.43, 37.79] },
+      categories: ["shopping-mall"],
+      chain: { name: "Westfield", slug: "westfield" },
+      formattedAddress: "865 Market St",
     },
   ],
-  'gas-station': [
+  "gas-station": [
     {
-      _id: 'gas_1',
-      name: 'Shell',
-      location: { type: 'Point', coordinates: [-122.44, 37.80] },
-      categories: ['gas-station'],
-      chain: { name: 'Shell', slug: 'shell' },
-      formattedAddress: '200 Gas Ave',
+      _id: "gas_1",
+      name: "Shell",
+      location: { type: "Point", coordinates: [-122.44, 37.8] },
+      categories: ["gas-station"],
+      chain: { name: "Shell", slug: "shell" },
+      formattedAddress: "200 Gas Ave",
     },
   ],
   gym: [
     {
-      _id: 'gym_1',
-      name: '24 Hour Fitness',
-      location: { type: 'Point', coordinates: [-122.45, 37.81] },
-      categories: ['gym'],
-      chain: { name: '24 Hour Fitness', slug: '24-hour-fitness' },
-      formattedAddress: '300 Fitness Blvd',
+      _id: "gym_1",
+      name: "24 Hour Fitness",
+      location: { type: "Point", coordinates: [-122.45, 37.81] },
+      categories: ["gym"],
+      chain: { name: "24 Hour Fitness", slug: "24-hour-fitness" },
+      formattedAddress: "300 Fitness Blvd",
     },
   ],
   pharmacy: [
     {
-      _id: 'pharm_1',
-      name: 'CVS Pharmacy',
-      location: { type: 'Point', coordinates: [-122.46, 37.82] },
-      categories: ['pharmacy'],
-      chain: { name: 'CVS', slug: 'cvs' },
-      formattedAddress: '400 Health St',
+      _id: "pharm_1",
+      name: "CVS Pharmacy",
+      location: { type: "Point", coordinates: [-122.46, 37.82] },
+      categories: ["pharmacy"],
+      chain: { name: "CVS", slug: "cvs" },
+      formattedAddress: "400 Health St",
     },
   ],
 };
@@ -515,14 +583,14 @@ export const mockCategoryFixtures: Record<string, RadarPlace[]> = {
 export const mockValidSearchRequest = {
   listingLat: 37.7749,
   listingLng: -122.4194,
-  categories: ['food-grocery'],
+  categories: ["food-grocery"],
   radiusMeters: 1609,
   limit: 20,
 };
 
 export const mockSearchRequestWithQuery = {
   ...mockValidSearchRequest,
-  query: 'indian',
+  query: "indian",
 };
 
 export const mockSearchRequestLargeRadius = {
@@ -538,20 +606,23 @@ export function createMockFetchResponse(data: unknown, status = 200): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
-    statusText: status === 200 ? 'OK' : 'Error',
+    statusText: status === 200 ? "OK" : "Error",
     json: async () => data,
     text: async () => JSON.stringify(data),
-    headers: new Headers({ 'Content-Type': 'application/json' }),
+    headers: new Headers({ "Content-Type": "application/json" }),
   } as Response;
 }
 
-export function createMockFetchError(status: number, message: string): Response {
+export function createMockFetchError(
+  status: number,
+  message: string,
+): Response {
   return createMockFetchResponse({ meta: { code: status, message } }, status);
 }
 
 export function setupFetchMock(response: Response | (() => Response)) {
   const mockFetch = jest.fn(() =>
-    Promise.resolve(typeof response === 'function' ? response() : response)
+    Promise.resolve(typeof response === "function" ? response() : response),
   );
   global.fetch = mockFetch;
   return mockFetch;
@@ -586,50 +657,62 @@ export function resetFetchMock() {
  * Coordinates as strings instead of numbers (schema drift simulation)
  */
 export const mockRadarPlaceNumericStrings = {
-  _id: 'place_numeric_strings',
-  name: 'String Coords Store',
+  _id: "place_numeric_strings",
+  name: "String Coords Store",
   location: {
-    type: 'Point',
-    coordinates: ['-122.4194', '37.7749'] as unknown as [number, number], // Strings!
+    type: "Point",
+    coordinates: ["-122.4194", "37.7749"] as unknown as [number, number], // Strings!
   },
-  categories: ['food-grocery'],
-  formattedAddress: '123 String St',
+  categories: ["food-grocery"],
+  formattedAddress: "123 String St",
+  chain: {
+    name: "Safeway",
+    slug: "safeway",
+  },
 };
 
 /**
  * Place with null location (missing coordinates entirely)
  */
 export const mockRadarPlaceNullLocation = {
-  _id: 'place_null_location',
-  name: 'No Location Store',
+  _id: "place_null_location",
+  name: "No Location Store",
   location: null,
-  categories: ['shopping'],
-  formattedAddress: '456 Nowhere Ave',
+  categories: ["shopping"],
+  formattedAddress: "456 Nowhere Ave",
 };
 
 /**
  * Place with undefined location
  */
 export const mockRadarPlaceUndefinedLocation = {
-  _id: 'place_undefined_location',
-  name: 'Undefined Location Store',
-  categories: ['food-grocery'],
-  formattedAddress: '789 Missing Coords St',
+  _id: "place_undefined_location",
+  name: "Undefined Location Store",
+  categories: ["food-grocery"],
+  formattedAddress: "789 Missing Coords St",
   // location is undefined
+  chain: {
+    name: "Kroger",
+    slug: "kroger",
+  },
 };
 
 /**
  * Place with empty coordinates array
  */
 export const mockRadarPlaceEmptyCoordinates = {
-  _id: 'place_empty_coords',
-  name: 'Empty Coords Store',
+  _id: "place_empty_coords",
+  name: "Empty Coords Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [] as number[],
   },
-  categories: ['food-grocery'],
-  formattedAddress: '101 Empty Array St',
+  categories: ["food-grocery"],
+  formattedAddress: "101 Empty Array St",
+  chain: {
+    name: "Albertsons",
+    slug: "albertsons",
+  },
 };
 
 /**
@@ -637,14 +720,15 @@ export const mockRadarPlaceEmptyCoordinates = {
  */
 export const mockRadarResponseWithError = {
   meta: { code: 200 },
-  error: 'Unexpected error occurred',
+  error: "Unexpected error occurred",
   places: [],
 };
 
 /**
  * HTML error response (e.g., from CDN/proxy)
  */
-export const mockHtmlErrorResponse = '<html><body>502 Bad Gateway</body></html>';
+export const mockHtmlErrorResponse =
+  "<html><body>502 Bad Gateway</body></html>";
 
 /**
  * Malformed JSON response
@@ -674,17 +758,18 @@ export const mockRadarResponseCountMismatch = {
  */
 export const mockRadarResponsePlacesNotArray = {
   meta: { code: 200 },
-  places: 'not an array',
+  places: "not an array",
 };
 
 /**
  * Response with nested null objects
+ * Note: Name includes "Grocery" to pass strict category filtering while testing null handling
  */
 export const mockRadarPlaceNestedNulls = {
-  _id: 'place_nested_nulls',
-  name: 'Nested Nulls Store',
+  _id: "place_nested_nulls",
+  name: "Nested Nulls Grocery Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.4194, 37.7749],
   },
   categories: null,
@@ -696,31 +781,42 @@ export const mockRadarPlaceNestedNulls = {
  * Response with coordinates as object instead of array
  */
 export const mockRadarPlaceCoordinatesObject = {
-  _id: 'place_coords_object',
-  name: 'Object Coords Store',
+  _id: "place_coords_object",
+  name: "Object Coords Store",
   location: {
-    type: 'Point',
-    coordinates: { lng: -122.4194, lat: 37.7749 } as unknown as [number, number],
+    type: "Point",
+    coordinates: { lng: -122.4194, lat: 37.7749 } as unknown as [
+      number,
+      number,
+    ],
   },
-  categories: ['food-grocery'],
-  formattedAddress: '200 Object St',
+  categories: ["food-grocery"],
+  formattedAddress: "200 Object St",
+  chain: {
+    name: "Publix",
+    slug: "publix",
+  },
 };
 
 /**
  * Response with address parts only (no formattedAddress)
  */
 export const mockRadarPlaceAddressParts = {
-  _id: 'place_addr_parts',
-  name: 'Parts Address Store',
+  _id: "place_addr_parts",
+  name: "Parts Address Store",
   location: {
-    type: 'Point',
+    type: "Point",
     coordinates: [-122.4194, 37.7749],
   },
-  categories: ['food-grocery'],
+  categories: ["food-grocery"],
   // No formattedAddress, but has parts
-  addressNumber: '123',
-  street: 'Main St',
-  city: 'San Francisco',
-  state: 'CA',
-  postalCode: '94102',
+  addressNumber: "123",
+  street: "Main St",
+  city: "San Francisco",
+  state: "CA",
+  postalCode: "94102",
+  chain: {
+    name: "Target",
+    slug: "target",
+  },
 };

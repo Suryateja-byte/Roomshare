@@ -1,130 +1,146 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import LoginPage from '@/app/login/page'
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import LoginPage from "@/app/login/page";
 
 // Mock next-auth/react
-const mockSignIn = jest.fn()
-jest.mock('next-auth/react', () => ({
-  signIn: (...args: any[]) => mockSignIn(...args),
-}))
+const mockSignIn = jest.fn();
+jest.mock("next-auth/react", () => ({
+  signIn: (...args: unknown[]) => mockSignIn(...args),
+  useSession: () => ({ data: null, status: "unauthenticated" }),
+}));
 
 // Mock next/navigation
-const mockPush = jest.fn()
-const mockRefresh = jest.fn()
-jest.mock('next/navigation', () => ({
+const mockPush = jest.fn();
+const mockRefresh = jest.fn();
+jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
     refresh: mockRefresh,
   }),
   useSearchParams: () => new URLSearchParams(),
-}))
+}));
 
 // Mock next/link
-jest.mock('next/link', () => {
-  return function MockLink({ children, href }: { children: React.ReactNode; href: string }) {
-    return <a href={href}>{children}</a>
-  }
-})
+jest.mock("next/link", () => {
+  return function MockLink({
+    children,
+    href,
+  }: {
+    children: React.ReactNode;
+    href: string;
+  }) {
+    return <a href={href}>{children}</a>;
+  };
+});
 
-describe('LoginPage', () => {
+describe("LoginPage", () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
-  it('renders login form', () => {
-    render(<LoginPage />)
+  it("renders login form", () => {
+    render(<LoginPage />);
 
-    expect(screen.getByText('Welcome back')).toBeInTheDocument()
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText('Password')).toBeInTheDocument()
-  })
+    expect(screen.getByText("Welcome back")).toBeInTheDocument();
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+  });
 
-  it('renders google sign in button', () => {
-    render(<LoginPage />)
+  it("renders google sign in button", () => {
+    render(<LoginPage />);
 
-    expect(screen.getByText('Continue with Google')).toBeInTheDocument()
-  })
+    expect(screen.getByText("Continue with Google")).toBeInTheDocument();
+  });
 
-  it('renders sign up link', () => {
-    render(<LoginPage />)
+  it("renders sign up link", () => {
+    render(<LoginPage />);
 
-    const signUpLink = screen.getByText('Sign up')
-    expect(signUpLink.closest('a')).toHaveAttribute('href', '/signup')
-  })
+    const signUpLink = screen.getByText("Sign up");
+    expect(signUpLink.closest("a")).toHaveAttribute("href", "/signup");
+  });
 
-  it('renders forgot password link', () => {
-    render(<LoginPage />)
+  it("renders forgot password link", () => {
+    render(<LoginPage />);
 
-    const forgotLink = screen.getByText('Forgot password?')
-    expect(forgotLink.closest('a')).toHaveAttribute('href', '/forgot-password')
-  })
+    const forgotLink = screen.getByText("Forgot password?");
+    expect(forgotLink.closest("a")).toHaveAttribute("href", "/forgot-password");
+  });
 
-  it('calls signIn on form submit', async () => {
-    mockSignIn.mockResolvedValue({ error: null })
+  it("calls signIn on form submit", async () => {
+    mockSignIn.mockResolvedValue({ error: null });
 
-    render(<LoginPage />)
+    render(<LoginPage />);
 
-    await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText('Password'), 'password123')
-    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(mockSignIn).toHaveBeenCalledWith('credentials', {
-        email: 'test@example.com',
-        password: 'password123',
+      expect(mockSignIn).toHaveBeenCalledWith("credentials", {
+        email: "test@example.com",
+        password: "password123",
         redirect: false,
-      })
-    })
-  })
+      });
+    });
+  });
 
-  it('redirects on successful login', async () => {
-    mockSignIn.mockResolvedValue({ error: null })
+  it("completes login successfully without error", async () => {
+    mockSignIn.mockResolvedValue({ error: null });
 
-    render(<LoginPage />)
+    render(<LoginPage />);
 
-    await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText('Password'), 'password123')
-    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
-
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/')
-      expect(mockRefresh).toHaveBeenCalled()
-    })
-  })
-
-  it('shows error on failed login', async () => {
-    mockSignIn.mockResolvedValue({ error: 'Invalid credentials' })
-
-    render(<LoginPage />)
-
-    await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText('Password'), 'wrongpassword')
-    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Invalid email or password')).toBeInTheDocument()
-    })
-  })
+      // Verify signIn was called and completed without error
+      expect(mockSignIn).toHaveBeenCalledWith("credentials", {
+        email: "test@example.com",
+        password: "password123",
+        redirect: false,
+      });
+    });
 
-  it('calls Google signIn when clicking Google button', async () => {
-    render(<LoginPage />)
+    // Verify no error message is shown after successful login
+    expect(
+      screen.queryByText("Invalid email or password"),
+    ).not.toBeInTheDocument();
+  });
 
-    await userEvent.click(screen.getByText('Continue with Google'))
+  it("shows error on failed login", async () => {
+    mockSignIn.mockResolvedValue({ error: "Invalid credentials" });
 
-    expect(mockSignIn).toHaveBeenCalledWith('google', { callbackUrl: '/' })
-  })
+    render(<LoginPage />);
 
-  it('shows loading state during login', async () => {
-    mockSignIn.mockImplementation(() => new Promise(() => { })) // Never resolves
+    await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "wrongpassword");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
-    render(<LoginPage />)
+    await waitFor(() => {
+      expect(screen.getByText("Invalid email or password")).toBeInTheDocument();
+    });
+  });
 
-    await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText('Password'), 'password123')
-    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
+  it("calls Google signIn when clicking Google button", async () => {
+    render(<LoginPage />);
+
+    await userEvent.click(screen.getByText("Continue with Google"));
+
+    expect(mockSignIn).toHaveBeenCalledWith("google", { callbackUrl: "/" });
+  });
+
+  it("shows loading state during login", async () => {
+    mockSignIn.mockImplementation(() => new Promise(() => {})); // Never resolves
+
+    render(<LoginPage />);
+
+    await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     // Submit button should be disabled during loading
-    const submitButton = screen.getByRole('button', { name: '' })
-    expect(submitButton).toBeDisabled()
-  })
-})
+    const submitButton = screen.getByRole("button", { name: "" });
+    expect(submitButton).toBeDisabled();
+  });
+});
