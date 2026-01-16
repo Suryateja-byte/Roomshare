@@ -624,7 +624,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             variant="filter"
                             onClick={() => setShowFilters(!showFilters)}
                             data-active={activeFilterCount > 0}
-                            className={`hidden sm:flex items-center gap-2 rounded-full h-10 px-5 transition-all duration-200 ${showFilters ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : ''}`}
+                            className={`flex items-center gap-2 rounded-full h-10 px-5 transition-all duration-200 ${showFilters ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : ''}`}
                             aria-expanded={showFilters}
                             aria-controls="search-filters"
                         >
