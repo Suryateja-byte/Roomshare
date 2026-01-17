@@ -45,7 +45,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - run: npx jest --ci --coverage --testPathPattern="src/__tests__/(lib|hooks)/" --testPathIgnorePatterns="filter-regression"
+      - run: npx jest --ci --coverage "src/__tests__/(lib|hooks)/" --testPathIgnorePatterns="filter-regression"
       - uses: codecov/codecov-action@v4
         if: always()
         with:
@@ -64,7 +64,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - run: npx jest --ci --coverage --testPathPattern="src/__tests__/(components|pages)/"
+      - run: npx jest --ci --coverage "src/__tests__/(components|pages)/"
       - uses: codecov/codecov-action@v4
         if: always()
         with:
@@ -83,7 +83,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - run: npx jest --ci --coverage --testPathPattern="src/__tests__/(api|actions)/"
+      - run: npx jest --ci --coverage "src/__tests__/(api|actions)/"
       - uses: codecov/codecov-action@v4
         if: always()
         with:
