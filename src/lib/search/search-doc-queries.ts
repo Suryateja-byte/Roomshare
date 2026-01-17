@@ -271,6 +271,8 @@ interface WhereBuilder {
   conditions: string[];
   params: unknown[];
   paramIndex: number;
+  /** Index of the FTS query param (if FTS is active), used for ts_rank_cd */
+  ftsQueryParamIndex: number | null;
 }
 
 function buildSearchDocWhereConditions(
@@ -298,6 +300,7 @@ function buildSearchDocWhereConditions(
   ];
   const params: unknown[] = [];
   let paramIndex = 1;
+  let ftsQueryParamIndex: number | null = null;
 
   // Geographic bounds filter using PostGIS geography
   if (bounds) {
@@ -336,6 +339,7 @@ function buildSearchDocWhereConditions(
     if (sanitizedQuery) {
       // Use FTS: search_tsv @@ plainto_tsquery('english', $N)
       // plainto_tsquery handles multi-word queries as AND by default
+      ftsQueryParamIndex = paramIndex; // Track for ts_rank_cd in ORDER BY
       conditions.push(`d.search_tsv @@ plainto_tsquery('english', $${paramIndex})`);
       params.push(sanitizedQuery);
       paramIndex++;
@@ -407,7 +411,48 @@ function buildSearchDocWhereConditions(
     }
   }
 
-  return { conditions, params, paramIndex };
+  return { conditions, params, paramIndex, ftsQueryParamIndex };
+}
+
+// ============================================
+// ORDER BY Clause Builder with FTS Ranking
+// ============================================
+
+/**
+ * Build ORDER BY clause with optional ts_rank_cd tie-breaker.
+ *
+ * When FTS is active (ftsQueryParamIndex is set), adds ts_rank_cd as secondary
+ * sort factor to break ties within primary sort. This leverages tsvector weights
+ * (A=title, B=city/state, C=description) for relevance ranking.
+ *
+ * Stable ORDER BY pattern: primarySort, ts_rank_cd DESC, listing_created_at DESC, id ASC
+ *
+ * @param sort - Sort option
+ * @param ftsQueryParamIndex - Index of FTS query param (or null if no FTS)
+ * @returns ORDER BY clause string
+ */
+function buildOrderByClause(
+  sort: SortOption,
+  ftsQueryParamIndex: number | null,
+): string {
+  // ts_rank_cd expression (only used when FTS is active)
+  const tsRankExpr = ftsQueryParamIndex !== null
+    ? `ts_rank_cd(d.search_tsv, plainto_tsquery('english', $${ftsQueryParamIndex})) DESC, `
+    : "";
+
+  switch (sort) {
+    case "price_asc":
+      return `d.price ASC NULLS LAST, ${tsRankExpr}d.listing_created_at DESC, d.id ASC`;
+    case "price_desc":
+      return `d.price DESC NULLS LAST, ${tsRankExpr}d.listing_created_at DESC, d.id ASC`;
+    case "newest":
+      return `d.listing_created_at DESC, ${tsRankExpr}d.id ASC`;
+    case "rating":
+      return `d.avg_rating DESC NULLS LAST, d.review_count DESC, ${tsRankExpr}d.listing_created_at DESC, d.id ASC`;
+    case "recommended":
+    default:
+      return `d.recommended_score DESC, ${tsRankExpr}d.listing_created_at DESC, d.id ASC`;
+  }
 }
 
 // ============================================
@@ -554,37 +599,12 @@ async function getSearchDocListingsPaginatedInternal(
       conditions,
       params: queryParams,
       paramIndex: startParamIndex,
+      ftsQueryParamIndex,
     } = buildSearchDocWhereConditions(params);
     const whereClause = conditions.join(" AND ");
 
-    // Build ORDER BY clause based on sort option
-    // Uses precomputed recommended_score for efficiency
-    // IMPORTANT: All ORDER BY clauses include `id ASC` as final tie-breaker
-    // for deterministic keyset pagination
-    let orderByClause: string;
-    switch (sort) {
-      case "price_asc":
-        orderByClause =
-          "d.price ASC NULLS LAST, d.listing_created_at DESC, d.id ASC";
-        break;
-      case "price_desc":
-        orderByClause =
-          "d.price DESC NULLS LAST, d.listing_created_at DESC, d.id ASC";
-        break;
-      case "newest":
-        orderByClause = "d.listing_created_at DESC, d.id ASC";
-        break;
-      case "rating":
-        orderByClause =
-          "d.avg_rating DESC NULLS LAST, d.review_count DESC, d.listing_created_at DESC, d.id ASC";
-        break;
-      case "recommended":
-      default:
-        // Use precomputed recommended_score for efficiency
-        orderByClause =
-          "d.recommended_score DESC, d.listing_created_at DESC, d.id ASC";
-        break;
-    }
+    // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
+    const orderByClause = buildOrderByClause(sort, ftsQueryParamIndex);
 
     // Hybrid pagination: Use getLimitedCount for efficient counting
     const limitedCount = await getSearchDocLimitedCount(params);
@@ -828,6 +848,7 @@ export async function getSearchDocListingsWithKeyset(
       conditions,
       params: queryParams,
       paramIndex: startParamIndex,
+      ftsQueryParamIndex,
     } = buildSearchDocWhereConditions(params);
 
     // Add keyset WHERE clause
@@ -842,30 +863,8 @@ export async function getSearchDocListingsWithKeyset(
 
     const whereClause = conditions.join(" AND ");
 
-    // Build ORDER BY clause (same as offset-based)
-    let orderByClause: string;
-    switch (sortOption) {
-      case "price_asc":
-        orderByClause =
-          "d.price ASC NULLS LAST, d.listing_created_at DESC, d.id ASC";
-        break;
-      case "price_desc":
-        orderByClause =
-          "d.price DESC NULLS LAST, d.listing_created_at DESC, d.id ASC";
-        break;
-      case "newest":
-        orderByClause = "d.listing_created_at DESC, d.id ASC";
-        break;
-      case "rating":
-        orderByClause =
-          "d.avg_rating DESC NULLS LAST, d.review_count DESC, d.listing_created_at DESC, d.id ASC";
-        break;
-      case "recommended":
-      default:
-        orderByClause =
-          "d.recommended_score DESC, d.listing_created_at DESC, d.id ASC";
-        break;
-    }
+    // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
+    const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex);
 
     // Fetch limit+1 items to determine hasNextPage
     const fetchLimit = limit + 1;
@@ -1037,33 +1036,12 @@ export async function getSearchDocListingsFirstPage(
       conditions,
       params: queryParams,
       paramIndex: startParamIndex,
+      ftsQueryParamIndex,
     } = buildSearchDocWhereConditions(params);
     const whereClause = conditions.join(" AND ");
 
-    // Build ORDER BY clause
-    let orderByClause: string;
-    switch (sortOption) {
-      case "price_asc":
-        orderByClause =
-          "d.price ASC NULLS LAST, d.listing_created_at DESC, d.id ASC";
-        break;
-      case "price_desc":
-        orderByClause =
-          "d.price DESC NULLS LAST, d.listing_created_at DESC, d.id ASC";
-        break;
-      case "newest":
-        orderByClause = "d.listing_created_at DESC, d.id ASC";
-        break;
-      case "rating":
-        orderByClause =
-          "d.avg_rating DESC NULLS LAST, d.review_count DESC, d.listing_created_at DESC, d.id ASC";
-        break;
-      case "recommended":
-      default:
-        orderByClause =
-          "d.recommended_score DESC, d.listing_created_at DESC, d.id ASC";
-        break;
-    }
+    // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
+    const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex);
 
     // Hybrid count
     const limitedCount = await getSearchDocLimitedCount(params);

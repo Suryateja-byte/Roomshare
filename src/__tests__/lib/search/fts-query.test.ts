@@ -62,6 +62,11 @@ describe("FTS Query Helpers", () => {
       expect(isValidQuery("")).toBe(false);
     });
 
+    it("rejects whitespace-only queries", () => {
+      expect(isValidQuery("   ")).toBe(false);
+      expect(isValidQuery("\t\n")).toBe(false);
+    });
+
     it("truncates and validates long queries", () => {
       // Long queries are truncated by sanitizeSearchQuery (MAX_QUERY_LENGTH=200)
       // but still pass isValidQuery since the truncated result is >= MIN_QUERY_LENGTH
@@ -69,6 +74,47 @@ describe("FTS Query Helpers", () => {
       expect(isValidQuery(longQuery)).toBe(true);
       // Verify truncation happens in sanitizeSearchQuery
       expect(sanitizeSearchQuery(longQuery).length).toBeLessThanOrEqual(200);
+    });
+  });
+
+  describe("Query normalization edge cases", () => {
+    it("preserves case (FTS handles case-insensitivity at DB level)", () => {
+      expect(sanitizeSearchQuery("DOWNTOWN")).toBe("DOWNTOWN");
+      expect(sanitizeSearchQuery("Downtown")).toBe("Downtown");
+    });
+
+    it("handles multiple spaces between words", () => {
+      // Internal whitespace should be normalized
+      const result = sanitizeSearchQuery("san    francisco");
+      expect(result).toMatch(/san\s+francisco/);
+    });
+
+    it("query that becomes empty after sanitization is invalid", () => {
+      // SQL-only characters get stripped, leaving empty
+      const sanitized = sanitizeSearchQuery("';--");
+      expect(sanitized).toBe("");
+      expect(isValidQuery(sanitized)).toBe(false);
+    });
+
+    it("handles mixed valid and invalid characters", () => {
+      // Valid search terms remain after stripping dangerous chars
+      const result = sanitizeSearchQuery("cozy'; room--");
+      expect(result).toContain("cozy");
+      expect(result).toContain("room");
+      expect(result).not.toContain(";");
+      expect(result).not.toContain("'");
+      expect(result).not.toContain("--");
+    });
+
+    it("handles numbers in search query", () => {
+      expect(sanitizeSearchQuery("2 bedroom")).toContain("2");
+      expect(sanitizeSearchQuery("apartment 101")).toContain("101");
+    });
+
+    it("handles hyphens (common in addresses)", () => {
+      // Hyphens are typically preserved for compound words
+      const result = sanitizeSearchQuery("two-bedroom");
+      expect(result.length).toBeGreaterThan(0);
     });
   });
 });
