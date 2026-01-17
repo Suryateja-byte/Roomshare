@@ -45,7 +45,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - run: npx jest --ci --coverage "src/__tests__/(lib|hooks)/" --testPathIgnorePatterns="filter-regression"
+      - run: npx jest --ci --coverage --testPathPatterns="src/__tests__/lib/" --testPathPatterns="src/__tests__/hooks/" --testPathIgnorePatterns="filter-regression"
       - uses: codecov/codecov-action@v4
         if: always()
         with:
@@ -64,7 +64,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - run: npx jest --ci --coverage "src/__tests__/(components|pages)/"
+      - run: npx jest --ci --coverage --testPathPatterns="src/__tests__/components/" --testPathPatterns="src/__tests__/pages/"
       - uses: codecov/codecov-action@v4
         if: always()
         with:
@@ -83,7 +83,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - run: npx jest --ci --coverage "src/__tests__/(api|actions)/"
+      - run: npx jest --ci --coverage --testPathPatterns="src/__tests__/api/" --testPathPatterns="src/__tests__/actions/"
       - uses: codecov/codecov-action@v4
         if: always()
         with:
@@ -103,13 +103,13 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - name: Run filter schema tests
-        run: npx jest --ci src/__tests__/lib/filter-schema.test.ts
+        run: npx jest --ci --testPathPatterns="src/__tests__/lib/filter-schema.test.ts"
       - name: Run pairwise integration tests
-        run: npx jest --ci src/__tests__/integration/
+        run: npx jest --ci --testPathPatterns="src/__tests__/integration/"
       - name: Run property-based tests
-        run: npx jest --ci src/__tests__/property/
+        run: npx jest --ci --testPathPatterns="src/__tests__/property/"
       - name: Run E2E filter tests
-        run: npx jest --ci src/__tests__/e2e/
+        run: npx jest --ci --testPathPatterns="src/__tests__/e2e/"
 
   # Filter regression validation - ensures filter behavior hasn't changed
   test-filter-regression:
@@ -123,7 +123,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - name: Run regression framework tests
-        run: npx jest --ci src/__tests__/lib/filter-regression.test.ts
+        run: npx jest --ci --testPathPatterns="src/__tests__/lib/filter-regression.test.ts"
       - name: Validate critical filter scenarios
         run: node scripts/validate-filter-scenarios.js
 
@@ -139,7 +139,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - name: Run performance tests
-        run: npx jest --ci src/__tests__/performance/ --testTimeout=60000
+        run: npx jest --ci --testPathPatterns="src/__tests__/performance/" --testTimeout=60000
 
   build:
     name: Build
