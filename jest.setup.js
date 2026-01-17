@@ -6,6 +6,10 @@ import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
 
+// Set test environment variables (required by some tests)
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test-project.supabase.co'
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
+
 // Polyfill Response.json static method for Next.js API routes
 if (!Response.json) {
   Response.json = function(data, init = {}) {
