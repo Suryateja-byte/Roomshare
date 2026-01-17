@@ -158,42 +158,113 @@ function validateClientEnv(): ClientEnv {
 }
 
 // Validated environment objects - import these instead of using process.env directly
-export const serverEnv = validateServerEnv();
-export const clientEnv = validateClientEnv();
+// Use lazy initialization to avoid validation at module import time (breaks unit tests)
+let _serverEnv: ServerEnv | null = null;
+let _clientEnv: ClientEnv | null = null;
+
+/**
+ * Returns validated server environment, lazily initialized on first call.
+ * This prevents env validation from running at module import time,
+ * which would cause console.error noise during unit tests.
+ */
+export function getServerEnv(): ServerEnv {
+  if (_serverEnv === null) {
+    _serverEnv = validateServerEnv();
+  }
+  return _serverEnv;
+}
+
+/**
+ * Returns validated client environment, lazily initialized on first call.
+ */
+export function getClientEnv(): ClientEnv {
+  if (_clientEnv === null) {
+    _clientEnv = validateClientEnv();
+  }
+  return _clientEnv;
+}
+
+// Legacy exports for backward compatibility (deprecated - use getServerEnv/getClientEnv)
+// These are getters that lazily validate on first access
+export const serverEnv: ServerEnv = new Proxy({} as ServerEnv, {
+  get: (_, prop) => getServerEnv()[prop as keyof ServerEnv],
+});
+export const clientEnv: ClientEnv = new Proxy({} as ClientEnv, {
+  get: (_, prop) => getClientEnv()[prop as keyof ClientEnv],
+});
 
 // Helper to check if a feature is available
+// Uses getters to defer env access to runtime (prevents import-time validation noise)
 export const features = {
-  email: !!serverEnv.RESEND_API_KEY,
-  geocoding: !!serverEnv.MAPBOX_ACCESS_TOKEN,
-  redis: !!(
-    serverEnv.UPSTASH_REDIS_REST_URL && serverEnv.UPSTASH_REDIS_REST_TOKEN
-  ),
-  aiChat: !!serverEnv.GROQ_API_KEY,
-  realtime: !!(
-    clientEnv.NEXT_PUBLIC_SUPABASE_URL &&
-    clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ),
-  errorTracking: !!serverEnv.SENTRY_DSN,
-  maps: !!clientEnv.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+  get email() {
+    const e = getServerEnv();
+    return !!e.RESEND_API_KEY;
+  },
+  get geocoding() {
+    const e = getServerEnv();
+    return !!e.MAPBOX_ACCESS_TOKEN;
+  },
+  get redis() {
+    const e = getServerEnv();
+    return !!(e.UPSTASH_REDIS_REST_URL && e.UPSTASH_REDIS_REST_TOKEN);
+  },
+  get aiChat() {
+    const e = getServerEnv();
+    return !!e.GROQ_API_KEY;
+  },
+  get realtime() {
+    const c = getClientEnv();
+    return !!(c.NEXT_PUBLIC_SUPABASE_URL && c.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  },
+  get errorTracking() {
+    const e = getServerEnv();
+    return !!e.SENTRY_DSN;
+  },
+  get maps() {
+    const c = getClientEnv();
+    return !!c.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  },
   // Stadia Maps basemap tiles (optional - falls back to domain auth or works on localhost)
-  stadiaMaps: !!clientEnv.NEXT_PUBLIC_STADIA_API_KEY,
+  get stadiaMaps() {
+    const c = getClientEnv();
+    return !!c.NEXT_PUBLIC_STADIA_API_KEY;
+  },
   // Security features
-  cronAuth: !!serverEnv.CRON_SECRET,
-  originEnforcement: !!(serverEnv.ALLOWED_ORIGINS || serverEnv.ALLOWED_HOSTS),
-  metricsHmac: !!serverEnv.LOG_HMAC_SECRET,
-  googlePlaces: !!serverEnv.GOOGLE_PLACES_API_KEY,
-  supabaseStorage: !!serverEnv.SUPABASE_SERVICE_ROLE_KEY,
+  get cronAuth() {
+    const e = getServerEnv();
+    return !!e.CRON_SECRET;
+  },
+  get originEnforcement() {
+    const e = getServerEnv();
+    return !!(e.ALLOWED_ORIGINS || e.ALLOWED_HOSTS);
+  },
+  get metricsHmac() {
+    const e = getServerEnv();
+    return !!e.LOG_HMAC_SECRET;
+  },
+  get googlePlaces() {
+    const e = getServerEnv();
+    return !!e.GOOGLE_PLACES_API_KEY;
+  },
+  get supabaseStorage() {
+    const e = getServerEnv();
+    return !!e.SUPABASE_SERVICE_ROLE_KEY;
+  },
   // Nearby Places (Radar API)
-  nearbyPlaces: !!(
-    serverEnv.RADAR_SECRET_KEY &&
-    clientEnv.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY &&
-    clientEnv.NEXT_PUBLIC_NEARBY_ENABLED === "true"
-  ),
+  get nearbyPlaces() {
+    const e = getServerEnv();
+    const c = getClientEnv();
+    return !!(
+      e.RADAR_SECRET_KEY &&
+      c.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY &&
+      c.NEXT_PUBLIC_NEARBY_ENABLED === "true"
+    );
+  },
   // Search v2 features (always enabled - no env vars needed for backward compat)
-  searchV2: true,
-  searchKeyset: true,
-  searchRanking: true,
-} as const;
+  searchV2: true as const,
+  searchKeyset: true as const,
+  searchRanking: true as const,
+};
 
 // P1-25 FIX: Log startup warnings for missing optional services
 // This helps operators understand which features are disabled
