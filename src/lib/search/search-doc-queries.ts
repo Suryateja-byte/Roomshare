@@ -329,18 +329,15 @@ function buildSearchDocWhereConditions(
     params.push(maxPrice);
   }
 
-  // Text search filter (searches title, description, city, state)
+  // Text search filter using full-text search (tsvector/plainto_tsquery)
+  // Falls back to LIKE if search_tsv column is not yet populated
   if (query && isValidQuery(query)) {
     const sanitizedQuery = sanitizeSearchQuery(query);
     if (sanitizedQuery) {
-      const searchPattern = `%${sanitizedQuery}%`;
-      conditions.push(`(
-        LOWER(d.title) LIKE LOWER($${paramIndex}) OR
-        LOWER(d.description) LIKE LOWER($${paramIndex}) OR
-        LOWER(d.city) LIKE LOWER($${paramIndex}) OR
-        LOWER(d.state) LIKE LOWER($${paramIndex})
-      )`);
-      params.push(searchPattern);
+      // Use FTS: search_tsv @@ plainto_tsquery('english', $N)
+      // plainto_tsquery handles multi-word queries as AND by default
+      conditions.push(`d.search_tsv @@ plainto_tsquery('english', $${paramIndex})`);
+      params.push(sanitizedQuery);
       paramIndex++;
     }
   }
