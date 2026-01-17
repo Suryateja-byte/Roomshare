@@ -6,11 +6,8 @@ import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
 
-// Set test environment variables (required by some tests)
-// These must be set BEFORE any module imports to prevent initialization errors
-process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test'
-process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test-project.supabase.co'
-process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
+// Environment variables are now set in jest.env.js (via setupFiles)
+// which runs BEFORE module imports to prevent initialization errors
 
 // Polyfill Response.json static method for Next.js API routes
 if (!Response.json) {
