@@ -268,7 +268,16 @@ export const features = {
 
 // P1-25 FIX: Log startup warnings for missing optional services
 // This helps operators understand which features are disabled
-if (typeof window === "undefined" && process.env.NODE_ENV === "production") {
+// Wrapped in a function to prevent execution during Next.js build phase
+let _startupWarningsLogged = false;
+export function logStartupWarnings(): void {
+  if (_startupWarningsLogged) return;
+  if (typeof window !== "undefined") return;
+  if (process.env.NODE_ENV !== "production") return;
+  // Skip during Next.js build phase (NEXT_PHASE is set during builds)
+  if (process.env.NEXT_PHASE) return;
+
+  _startupWarningsLogged = true;
   const warnings: string[] = [];
 
   if (!features.aiChat) {
