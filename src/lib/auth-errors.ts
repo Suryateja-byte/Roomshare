@@ -41,8 +41,8 @@ export const AUTH_ERROR_INFO: Record<string, AuthErrorInfo> = {
         severity: 'error',
     },
     OAuthAccountNotLinked: {
-        message: 'This email is already registered with a password.',
-        hint: 'Please sign in using the email form below. If you forgot your password, use the reset link.',
+        message: 'Unable to link this Google account.',
+        hint: 'This may happen if your Google email is not verified. Please verify your Google email or sign in with your password.',
         showPasswordReset: true,
         showEmailForm: true,
         severity: 'warning',

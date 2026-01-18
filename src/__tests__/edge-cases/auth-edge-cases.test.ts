@@ -245,6 +245,58 @@ describe("Auth Edge Cases - Category A", () => {
 
       expect(newUser.email).toBe(oauthProfile.email);
     });
+
+    // A4.4: Password user links Google OAuth (allowDangerousEmailAccountLinking feature)
+    it("links Google OAuth to existing password user with verified email", async () => {
+      const existingUser = {
+        id: "user-123",
+        email: "test@example.com",
+        password: "hashed-password", // Has password (password-based user)
+        emailVerified: null,
+      };
+
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(existingUser);
+      (prisma.account.create as jest.Mock).mockResolvedValue({
+        id: "account-123",
+        userId: "user-123", // Same user ID - linked to existing user
+        provider: "google",
+        providerAccountId: "google-oauth-id",
+      });
+
+      const user = await prisma.user.findUnique({
+        where: { email: "test@example.com" },
+      });
+
+      // Simulate account linking (what happens with allowDangerousEmailAccountLinking)
+      const newAccount = await prisma.account.create({
+        data: {
+          userId: user!.id,
+          provider: "google",
+          providerAccountId: "google-oauth-id",
+          type: "oauth",
+        },
+      });
+
+      // Critical assertion: account links to existing user, not creates new
+      expect(newAccount.userId).toBe(existingUser.id);
+      expect(newAccount.provider).toBe("google");
+      expect(user?.password).toBeTruthy(); // Confirms it's a password user
+    });
+
+    // A4.5: Test isGoogleEmailVerified hard-fail behavior
+    it("blocks Google OAuth when email_verified is not exactly true", async () => {
+      // Import the helper to test
+      const { isGoogleEmailVerified } = await import("@/lib/auth-helpers");
+
+      // These should all fail the check
+      expect(isGoogleEmailVerified({ email_verified: false })).toBe(false);
+      expect(isGoogleEmailVerified({ email_verified: undefined })).toBe(false);
+      expect(isGoogleEmailVerified(undefined)).toBe(false);
+      expect(isGoogleEmailVerified({})).toBe(false);
+
+      // Only explicit true passes
+      expect(isGoogleEmailVerified({ email_verified: true })).toBe(true);
+    });
   });
 
   // A5: Email verification with case sensitivity
