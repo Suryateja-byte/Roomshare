@@ -52,8 +52,10 @@ export function WebVitals() {
             };
 
             // Use sendBeacon for reliability (doesn't block page unload)
+            // Must use Blob to set Content-Type (sendBeacon doesn't support headers)
             if (navigator.sendBeacon) {
-                navigator.sendBeacon('/api/metrics', JSON.stringify(body));
+                const blob = new Blob([JSON.stringify(body)], { type: 'application/json' });
+                navigator.sendBeacon('/api/metrics', blob);
             } else {
                 // Fallback for browsers without sendBeacon
                 fetch('/api/metrics', {
