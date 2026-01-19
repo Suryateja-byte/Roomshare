@@ -50,6 +50,14 @@ export async function GET(request: NextRequest) {
 
       const bounds = boundsResult.bounds;
 
+      /** Get multi-value param supporting both repeated keys and CSV format */
+      const getMultiValue = (key: string): string[] | undefined => {
+        const values = searchParams.getAll(key);
+        if (values.length === 0) return undefined;
+        const result = values.flatMap((v: string) => v.split(",")).filter(Boolean);
+        return result.length > 0 ? result : undefined;
+      };
+
       // Extract filters
       const filterParams = {
         query: searchParams.get("q") || undefined,
@@ -60,15 +68,9 @@ export async function GET(request: NextRequest) {
           ? parseInt(searchParams.get("maxPrice")!)
           : undefined,
         bounds,
-        amenities:
-          searchParams.get("amenities")?.split(",").filter(Boolean) ||
-          undefined,
-        languages:
-          searchParams.get("languages")?.split(",").filter(Boolean) ||
-          undefined,
-        houseRules:
-          searchParams.get("houseRules")?.split(",").filter(Boolean) ||
-          undefined,
+        amenities: getMultiValue("amenities"),
+        languages: getMultiValue("languages"),
+        houseRules: getMultiValue("houseRules"),
         moveInDate: searchParams.get("moveInDate") || undefined,
         leaseDuration: searchParams.get("leaseDuration") || undefined,
         roomType: searchParams.get("roomType") || undefined,
