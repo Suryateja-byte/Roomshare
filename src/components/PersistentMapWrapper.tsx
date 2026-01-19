@@ -24,11 +24,12 @@ import {
   useState,
   useRef,
   useCallback,
+  useMemo,
   lazy,
   Suspense,
 } from "react";
 import type { MapListingData } from "@/lib/data";
-import { useSearchV2Data } from "@/contexts/SearchV2DataContext";
+import { useSearchV2Data, type V2MapData } from "@/contexts/SearchV2DataContext";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 
 // CRITICAL: Lazy import - only loads when component renders
@@ -145,6 +146,31 @@ function MapTransitionOverlay() {
   );
 }
 
+/**
+ * Convert v2 GeoJSON features to MapListingData format.
+ * Maps GeoJSON properties to fields used by Map.tsx:
+ * - id: for key and click handling
+ * - location: for pin placement
+ * - price: for pin label
+ * - title: for popup/tooltip
+ * - availableSlots: for "N Available" / "Filled" badge in popup
+ * - ownerId: for showing "Message" button in popup
+ */
+function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
+  return v2MapData.geojson.features.map((feature) => ({
+    id: feature.properties.id,
+    title: feature.properties.title ?? "",
+    price: feature.properties.price ?? 0,
+    availableSlots: feature.properties.availableSlots,
+    ownerId: feature.properties.ownerId,
+    images: feature.properties.image ? [feature.properties.image] : [],
+    location: {
+      lng: feature.geometry.coordinates[0],
+      lat: feature.geometry.coordinates[1],
+    },
+  }));
+}
+
 interface PersistentMapWrapperProps {
   /**
    * Whether to render the map. When false, map bundle is not loaded.
@@ -168,6 +194,25 @@ export default function PersistentMapWrapper({
   const transitionContext = useSearchTransitionSafe();
   const isListTransitioning = transitionContext?.isPending ?? false;
   const hasV2Data = v2MapData !== null;
+
+  // Compute effective listings based on data source (v2 context or v1 fetch)
+  // Memoized for stable reference to prevent unnecessary Map re-renders
+  const effectiveListings = useMemo(() => {
+    // Safe: check both flags before accessing v2MapData
+    if (hasV2Data && v2MapData) {
+      return v2MapDataToListings(v2MapData);
+    }
+    // Defensive: if v2 signaled but data missing, log and fallback
+    if (hasV2Data && !v2MapData) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[PersistentMapWrapper] hasV2Data=true but v2MapData is null",
+        );
+      }
+      return [];
+    }
+    return listings;
+  }, [hasV2Data, v2MapData, listings]);
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
@@ -352,9 +397,7 @@ export default function PersistentMapWrapper({
       {/* Coordinated loading overlay - shows when list is transitioning (filter change) */}
       {isListTransitioning && <MapTransitionOverlay />}
       <Suspense fallback={<MapLoadingPlaceholder />}>
-        {/* When v2 data is available, pass empty array since Map still expects listings prop
-            v2 map data integration with Map component is TODO */}
-        <LazyDynamicMap listings={hasV2Data ? [] : listings} />
+        <LazyDynamicMap listings={effectiveListings} />
       </Suspense>
     </div>
   );

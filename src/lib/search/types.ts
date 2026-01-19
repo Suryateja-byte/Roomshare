@@ -30,6 +30,8 @@ export interface SearchV2FeatureProperties {
   title: string;
   price: number | null;
   image: string | null;
+  availableSlots: number;
+  ownerId: string;
 }
 
 /** A single point feature for the map */

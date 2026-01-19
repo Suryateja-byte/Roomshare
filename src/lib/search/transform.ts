@@ -125,6 +125,8 @@ export function transformToGeoJSON(
       title: listing.title,
       price: listing.price,
       image: listing.images[0] ?? null,
+      availableSlots: listing.availableSlots,
+      ownerId: listing.ownerId,
     } satisfies SearchV2FeatureProperties,
   }));
 
