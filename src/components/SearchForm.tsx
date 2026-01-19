@@ -6,7 +6,7 @@ import { Search, Clock, Loader2, SlidersHorizontal, Home, Users, Building2, Layo
 import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
 import { SUPPORTED_LANGUAGES, getLanguageName, normalizeLanguages, type LanguageCode } from '@/lib/languages';
-import { FilterModal } from '@/components/search/FilterModal';
+import FilterModal from '@/components/search/FilterModal';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
