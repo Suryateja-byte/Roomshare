@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTransition } from 'react';
+import { useTransition, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { encodeStack, decodeStack } from '@/lib/search/cursor';
 
 interface PaginationProps {
     currentPage: number;
@@ -28,7 +29,7 @@ export default function Pagination({
     nextCursor,
     prevCursor,
     hasNextPage,
-    hasPrevPage,
+    hasPrevPage: _hasPrevPage, // Intentionally unused - cursorStack is source of truth for keyset mode
 }: PaginationProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -38,13 +39,33 @@ export default function Pagination({
     // Note: We detect keyset mode by checking if nextCursor is explicitly provided (even if null)
     const useKeysetPagination = nextCursor !== undefined || prevCursor !== undefined;
 
-    // For keyset pagination, we need actual cursors to navigate (not just flags)
-    // hasPrevPage may be true but without prevCursor we can't navigate back in keyset mode
+    // Read cursor stack and page number from URL for keyset navigation history
+    const cursorStack = useMemo(() => {
+        const stackParam = searchParams.get('cursorStack');
+        return stackParam ? decodeStack(stackParam) : [];
+    }, [searchParams]);
+
+    // Get current page number from URL (for keyset mode, pageNumber tracks position)
+    const pageNumber = useMemo(() => {
+        const pageNumParam = searchParams.get('pageNumber');
+        if (pageNumParam) {
+            const num = parseInt(pageNumParam, 10);
+            if (Number.isFinite(num) && num >= 1) return num;
+        }
+        // Fall back to currentPage prop (from server) or 1
+        return currentPage ?? 1;
+    }, [searchParams, currentPage]);
+
+    // For keyset pagination, we can go back if we're past page 1.
+    // We use pageNumber > 1 (not cursorStack.length) because:
+    // - On page 1→2, currentCursor is null so nothing gets pushed to stack
+    // - pageNumber accurately tracks position regardless of stack state
+    // - The prev handler correctly clears cursor when returning to page 1
     const canGoNext = useKeysetPagination
         ? (hasNextPage ?? false) && (nextCursor !== null && nextCursor !== undefined)
         : currentPage < totalPages;
     const canGoPrev = useKeysetPagination
-        ? (hasPrevPage ?? false) && (prevCursor !== null && prevCursor !== undefined)
+        ? pageNumber > 1
         : currentPage > 1;
 
     if (totalPages <= 1 && !useKeysetPagination) return null;
@@ -54,7 +75,10 @@ export default function Pagination({
         startTransition(() => {
             const params = new URLSearchParams(searchParams.toString());
             params.set('page', page.toString());
-            params.delete('cursor'); // Clear cursor when using offset pagination
+            // Clear keyset pagination params when using offset pagination
+            params.delete('cursor');
+            params.delete('cursorStack');
+            params.delete('pageNumber');
             router.push(`?${params.toString()}`, { scroll: false });
         });
     };
@@ -63,20 +87,63 @@ export default function Pagination({
     const handleCursorNavigation = (direction: 'next' | 'prev') => {
         startTransition(() => {
             const params = new URLSearchParams(searchParams.toString());
-            const cursor = direction === 'next' ? nextCursor : prevCursor;
+            const currentCursor = searchParams.get('cursor');
 
-            if (cursor) {
-                params.set('cursor', cursor);
-                params.delete('page'); // Clear page when using cursor pagination
-            } else if (currentPage !== null && Number.isFinite(currentPage)) {
-                // Fallback to offset only if we have a valid page number
-                const targetPage = direction === 'next' ? currentPage + 1 : currentPage - 1;
-                params.set('page', targetPage.toString());
-                params.delete('cursor');
+            if (direction === 'next') {
+                // Going forward: push current cursor onto stack, advance to next cursor
+                if (nextCursor) {
+                    const newStack = [...cursorStack];
+                    if (currentCursor) {
+                        newStack.push(currentCursor);
+                    }
+
+                    params.set('cursor', nextCursor);
+                    if (newStack.length > 0) {
+                        params.set('cursorStack', encodeStack(newStack));
+                    } else {
+                        params.delete('cursorStack');
+                    }
+                    params.set('pageNumber', (pageNumber + 1).toString());
+                    params.delete('page'); // Clear offset pagination
+                } else {
+                    // Fallback to offset if no next cursor
+                    const targetPage = pageNumber + 1;
+                    params.set('page', targetPage.toString());
+                    params.delete('cursor');
+                    params.delete('cursorStack');
+                    params.delete('pageNumber');
+                }
             } else {
-                // No cursor and no valid page - cannot navigate (shouldn't happen with canGoNext/canGoPrev checks)
-                console.warn('[Pagination] Cannot navigate: no cursor and invalid page number');
-                return;
+                // Going back: pop cursor from stack, navigate to popped cursor
+                if (cursorStack.length > 0) {
+                    const newStack = [...cursorStack];
+                    const prevCursorFromStack = newStack.pop();
+
+                    if (prevCursorFromStack) {
+                        params.set('cursor', prevCursorFromStack);
+                    } else {
+                        // First page - clear cursor
+                        params.delete('cursor');
+                    }
+
+                    if (newStack.length > 0) {
+                        params.set('cursorStack', encodeStack(newStack));
+                    } else {
+                        params.delete('cursorStack');
+                    }
+                    params.set('pageNumber', Math.max(1, pageNumber - 1).toString());
+                    params.delete('page');
+                } else if (pageNumber > 1) {
+                    // Stack is empty but we're not on page 1 - go to page 1
+                    params.delete('cursor');
+                    params.delete('cursorStack');
+                    params.set('pageNumber', '1');
+                    params.delete('page');
+                } else {
+                    // Already on page 1, nothing to do
+                    console.warn('[Pagination] Cannot go back: already on first page');
+                    return;
+                }
             }
 
             router.push(`?${params.toString()}`, { scroll: false });
@@ -96,19 +163,19 @@ export default function Pagination({
             // Always show first page
             pages.push(1);
 
-            if (currentPage > 3) {
+            if (pageNumber > 3) {
                 pages.push('...');
             }
 
             // Show pages around current page
-            const start = Math.max(2, currentPage - 1);
-            const end = Math.min(totalPages - 1, currentPage + 1);
+            const start = Math.max(2, pageNumber - 1);
+            const end = Math.min(totalPages - 1, pageNumber + 1);
 
             for (let i = start; i <= end; i++) {
                 pages.push(i);
             }
 
-            if (currentPage < totalPages - 2) {
+            if (pageNumber < totalPages - 2) {
                 pages.push('...');
             }
 
@@ -121,12 +188,10 @@ export default function Pagination({
         return pages;
     };
 
-    // Handle null currentPage (keyset pagination doesn't track page numbers)
-    // For keyset mode, we can't show accurate "X to Y of Z" without page numbers
-    const effectivePage = currentPage ?? 1;
-    const startItem = (effectivePage - 1) * itemsPerPage + 1;
+    // Use pageNumber for range text display (works for both offset and keyset modes)
+    const startItem = (pageNumber - 1) * itemsPerPage + 1;
     // When totalItems is null (unknown count), use page-based estimation
-    const pageEndItem = effectivePage * itemsPerPage;
+    const pageEndItem = pageNumber * itemsPerPage;
     const endItem = totalItems !== null ? Math.min(pageEndItem, totalItems) : pageEndItem;
 
     return (
@@ -164,7 +229,7 @@ export default function Pagination({
 
                 {/* Page numbers - only show when we have valid page numbers (offset mode or keyset with known page) */}
                 {/* In pure keyset mode, we can only go prev/next, not jump to arbitrary pages */}
-                {(!useKeysetPagination || (currentPage !== null && Number.isFinite(currentPage))) && (
+                {(!useKeysetPagination || (pageNumber !== null && Number.isFinite(pageNumber))) && (
                     <div className="flex items-center gap-0.5 sm:gap-1">
                         {getPageNumbers().map((page, index) => (
                             typeof page === 'number' ? (
@@ -173,8 +238,8 @@ export default function Pagination({
                                     onClick={() => handlePageChange(page)}
                                     disabled={isPending}
                                     aria-label={`Page ${page}`}
-                                    aria-current={page === effectivePage ? 'page' : undefined}
-                                    className={`min-w-[40px] sm:min-w-[36px] h-10 sm:h-9 px-2 sm:px-3 rounded-lg text-sm font-medium transition-colors touch-target disabled:cursor-not-allowed ${page === effectivePage
+                                    aria-current={page === pageNumber ? 'page' : undefined}
+                                    className={`min-w-[40px] sm:min-w-[36px] h-10 sm:h-9 px-2 sm:px-3 rounded-lg text-sm font-medium transition-colors touch-target disabled:cursor-not-allowed ${page === pageNumber
                                             ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
                                             : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:hover:bg-transparent'
                                         }`}

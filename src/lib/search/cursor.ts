@@ -9,9 +9,42 @@
  * - Sort-specific key values stored in ORDER BY sequence
  * - Float/decimal values stored as strings to preserve DB precision
  * - Tie-breaker (id) ensures deterministic ordering
+ * - Browser-compatible base64url encoding (no Node Buffer dependency)
  */
 
 import { z } from "zod";
+
+// ============================================================================
+// Browser-compatible Base64url Encoding
+// ============================================================================
+
+/**
+ * Encode a string to base64url (browser-compatible, no Buffer dependency).
+ * Base64url differs from base64: '+' → '-', '/' → '_', no padding.
+ */
+function toBase64Url(str: string): string {
+  // Use TextEncoder for proper UTF-8 encoding
+  const bytes = new TextEncoder().encode(str);
+  const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
+  const base64 = btoa(binString);
+  // Convert to base64url
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/**
+ * Decode a base64url string (browser-compatible, no Buffer dependency).
+ */
+function fromBase64Url(base64url: string): string {
+  // Convert from base64url to base64
+  let base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+  // Add padding if needed
+  const padLength = (4 - (base64.length % 4)) % 4;
+  base64 += "=".repeat(padLength);
+  // Decode
+  const binString = atob(base64);
+  const bytes = Uint8Array.from(binString, (char) => char.codePointAt(0)!);
+  return new TextDecoder().decode(bytes);
+}
 
 // ============================================================================
 // Types
@@ -92,7 +125,7 @@ const EXPECTED_KEY_COUNTS: Record<SortOption, number> = {
  */
 export function encodeKeysetCursor(cursor: KeysetCursor): string {
   const payload = JSON.stringify(cursor);
-  return Buffer.from(payload).toString("base64url");
+  return toBase64Url(payload);
 }
 
 /**
@@ -114,7 +147,7 @@ export function decodeKeysetCursor(
   expectedSort?: SortOption,
 ): KeysetCursor | null {
   try {
-    const payload = Buffer.from(cursorStr, "base64url").toString("utf-8");
+    const payload = fromBase64Url(cursorStr);
     const parsed = JSON.parse(payload);
 
     // Validate against Zod schema
@@ -215,6 +248,43 @@ export function buildCursorFromRow(
 }
 
 // ============================================================================
+// Cursor Stack (for bidirectional keyset pagination)
+// ============================================================================
+
+/**
+ * Encode an array of cursor strings as a single base64url string.
+ * Used to store navigation history in URL for "back" navigation.
+ *
+ * @param cursors - Array of cursor strings
+ * @returns Base64url encoded JSON array, or empty string if no cursors
+ */
+export function encodeStack(cursors: string[]): string {
+  if (cursors.length === 0) return "";
+  return toBase64Url(JSON.stringify(cursors));
+}
+
+/**
+ * Decode a base64url string to an array of cursor strings.
+ * Used to restore navigation history from URL.
+ *
+ * @param encoded - Base64url encoded JSON array
+ * @returns Array of cursor strings, or empty array if invalid
+ */
+export function decodeStack(encoded: string): string[] {
+  if (!encoded) return [];
+  try {
+    const json = fromBase64Url(encoded);
+    const parsed = JSON.parse(json);
+    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
+      return parsed;
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+// ============================================================================
 // Legacy Cursor Detection
 // ============================================================================
 
@@ -234,7 +304,7 @@ interface LegacyCursor {
  */
 export function decodeLegacyCursor(cursorStr: string): number | null {
   try {
-    const payload = Buffer.from(cursorStr, "base64url").toString("utf-8");
+    const payload = fromBase64Url(cursorStr);
     const parsed = JSON.parse(payload) as unknown;
 
     // Legacy format: { p: number }
