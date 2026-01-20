@@ -6,6 +6,9 @@ import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
 
+// Environment variables are now set in jest.env.js (via setupFiles)
+// which runs BEFORE module imports to prevent initialization errors
+
 // Polyfill Response.json static method for Next.js API routes
 if (!Response.json) {
   Response.json = function(data, init = {}) {
@@ -110,6 +113,55 @@ jest.mock('next-auth/providers/google', () => ({
 jest.mock('@auth/prisma-adapter', () => ({
   __esModule: true,
   PrismaAdapter: jest.fn(() => ({})),
+}))
+
+// Mock @/lib/prisma to prevent PrismaClient initialization errors in tests
+// Tests that need real DB access should set DATABASE_URL and use jest.unmock
+const mockPrismaModel = {
+  findUnique: jest.fn().mockResolvedValue(null),
+  findFirst: jest.fn().mockResolvedValue(null),
+  findMany: jest.fn().mockResolvedValue([]),
+  create: jest.fn().mockResolvedValue({}),
+  update: jest.fn().mockResolvedValue({}),
+  delete: jest.fn().mockResolvedValue({}),
+  deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+  upsert: jest.fn().mockResolvedValue({}),
+  count: jest.fn().mockResolvedValue(0),
+  aggregate: jest.fn().mockResolvedValue({}),
+  groupBy: jest.fn().mockResolvedValue([]),
+}
+
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    $connect: jest.fn().mockResolvedValue(undefined),
+    $disconnect: jest.fn().mockResolvedValue(undefined),
+    $executeRaw: jest.fn().mockResolvedValue(0),
+    $executeRawUnsafe: jest.fn().mockResolvedValue(0),
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    $queryRawUnsafe: jest.fn().mockResolvedValue([]),
+    $transaction: jest.fn((fn) => (typeof fn === 'function' ? fn({}) : Promise.all(fn))),
+    user: { ...mockPrismaModel },
+    listing: { ...mockPrismaModel },
+    location: { ...mockPrismaModel },
+    review: { ...mockPrismaModel },
+    booking: { ...mockPrismaModel },
+    message: { ...mockPrismaModel },
+    conversation: { ...mockPrismaModel },
+    notification: { ...mockPrismaModel },
+    account: { ...mockPrismaModel },
+    session: { ...mockPrismaModel },
+    verificationToken: { ...mockPrismaModel },
+    hold: { ...mockPrismaModel },
+    waitlist: { ...mockPrismaModel },
+    spot: { ...mockPrismaModel },
+    spotApplication: { ...mockPrismaModel },
+    spotMessage: { ...mockPrismaModel },
+    spotPhoto: { ...mockPrismaModel },
+    block: { ...mockPrismaModel },
+    idempotencyToken: { ...mockPrismaModel },
+    rateLimit: { ...mockPrismaModel },
+    // listing_search_docs is a raw SQL table, no Prisma model
+  },
 }))
 
 // Mock window.matchMedia

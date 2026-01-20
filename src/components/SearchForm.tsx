@@ -1,22 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, X, Clock, SlidersHorizontal, Loader2 } from 'lucide-react';
+import { Search, Clock, Loader2, SlidersHorizontal, Home, Users, Building2, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { FocusTrap } from '@/components/ui/FocusTrap';
 import LocationSearchInput from '@/components/LocationSearchInput';
-import { DatePicker } from '@/components/ui/date-picker';
 import { SUPPORTED_LANGUAGES, getLanguageName, normalizeLanguages, type LanguageCode } from '@/lib/languages';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import FilterModal from '@/components/search/FilterModal';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -31,6 +21,14 @@ const GENDER_PREFERENCE_OPTIONS = ['any', 'MALE_ONLY', 'FEMALE_ONLY', 'NO_PREFER
 const HOUSEHOLD_GENDER_OPTIONS = ['any', 'ALL_MALE', 'ALL_FEMALE', 'MIXED'] as const;
 const LEASE_DURATION_OPTIONS = ['any', 'Month-to-month', '3 months', '6 months', '12 months', 'Flexible'] as const;
 const ROOM_TYPE_OPTIONS = ['any', 'Private Room', 'Shared Room', 'Entire Place'] as const;
+
+// Room type options for inline filter tabs
+const ROOM_TYPE_TABS = [
+    { value: 'any', label: 'All', icon: LayoutGrid },
+    { value: 'Private Room', label: 'Private', icon: Home },
+    { value: 'Shared Room', label: 'Shared', icon: Users },
+    { value: 'Entire Place', label: 'Entire', icon: Building2 },
+] as const;
 
 // URL-friendly aliases for enum values
 const LEASE_DURATION_ALIASES: Record<string, string> = {
@@ -449,14 +447,44 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const activeFilterCount = baseFilterCount + moveInDateCount;
 
     // Check if any filters are active (for "Clear all" button visibility)
-    const hasActiveFilters = location || minPrice || maxPrice ||
+    // Cast to boolean to satisfy TypeScript (|| chain returns first truthy value)
+    const hasActiveFilters = Boolean(
+        location || minPrice || maxPrice ||
         (leaseDuration && leaseDuration !== 'any') ||
         (roomType && roomType !== 'any') ||
         amenities.length > 0 || houseRules.length > 0 ||
         languages.length > 0 ||
         (genderPreference && genderPreference !== 'any') ||
         (householdGender && householdGender !== 'any') ||
-        moveInDateCount > 0;
+        moveInDateCount > 0
+    );
+
+    // Handler for removing individual filters from FilterBar pills
+    const handleRemoveFilter = useCallback((type: string, value?: string) => {
+        switch (type) {
+            case 'leaseDuration':
+                setLeaseDuration('');
+                break;
+            case 'moveInDate':
+                setMoveInDate('');
+                break;
+            case 'amenity':
+                if (value) setAmenities(prev => prev.filter(a => a !== value));
+                break;
+            case 'houseRule':
+                if (value) setHouseRules(prev => prev.filter(r => r !== value));
+                break;
+            case 'language':
+                if (value) setLanguages(prev => prev.filter(l => l !== value));
+                break;
+            case 'genderPreference':
+                setGenderPreference('');
+                break;
+            case 'householdGender':
+                setHouseholdGender('');
+                break;
+        }
+    }, []);
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;
@@ -613,29 +641,79 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                     <span id="budget-hint" className="sr-only">Enter minimum and maximum monthly budget in dollars</span>
                 </div>
 
-                {/* Filters Toggle */}
+                {/* Inline Filters - Room Type Tabs + Filters Button */}
                 {!isCompact && (
                     <>
-                        <div className="hidden md:flex items-center self-stretch mx-2" aria-hidden="true">
+                        {/* Divider */}
+                        <div className="hidden md:flex items-center self-stretch" aria-hidden="true">
                             <div className="w-px h-10 bg-zinc-200 dark:bg-zinc-700"></div>
                         </div>
-                        <Button
-                            type="button"
-                            variant="filter"
-                            onClick={() => setShowFilters(!showFilters)}
-                            data-active={activeFilterCount > 0}
-                            className={`hidden sm:flex items-center gap-2 rounded-full h-10 px-5 transition-all duration-200 ${showFilters ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : ''}`}
-                            aria-expanded={showFilters}
-                            aria-controls="search-filters"
-                        >
-                            <SlidersHorizontal className="w-4 h-4" />
-                            Filters
-                            {activeFilterCount > 0 && (
-                                <span className={`ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full transition-colors ${showFilters ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white' : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'}`}>
-                                    {activeFilterCount}
-                                </span>
-                            )}
-                        </Button>
+                        <div className="md:hidden w-[calc(100%-2rem)] mx-auto h-px bg-zinc-100 dark:bg-zinc-800" aria-hidden="true"></div>
+
+                        {/* Room Type Tabs */}
+                        <div className={`flex items-center gap-1 px-2 py-1`}>
+                            <div className="flex items-center gap-0.5 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                                {ROOM_TYPE_TABS.map(({ value, label, icon: Icon }) => {
+                                    const isSelected = roomType === value || (!roomType && value === 'any');
+                                    return (
+                                        <button
+                                            key={value}
+                                            type="button"
+                                            onClick={() => setRoomType(value === 'any' ? '' : value)}
+                                            className={`
+                                                flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium
+                                                transition-all duration-200
+                                                ${isSelected
+                                                    ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm'
+                                                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-900/50'
+                                                }
+                                            `}
+                                            aria-pressed={isSelected}
+                                        >
+                                            <Icon className="w-3.5 h-3.5" />
+                                            <span className="hidden sm:inline">{label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="hidden md:flex items-center self-stretch" aria-hidden="true">
+                            <div className="w-px h-10 bg-zinc-200 dark:bg-zinc-700"></div>
+                        </div>
+
+                        {/* Filters Button */}
+                        <div className="flex items-center px-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowFilters(true)}
+                                className={`
+                                    flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
+                                    transition-all duration-200 border
+                                    ${showFilters
+                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
+                                        : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                                    }
+                                `}
+                                aria-expanded={showFilters}
+                                aria-controls="search-filters"
+                            >
+                                <SlidersHorizontal className="w-4 h-4" />
+                                <span className="hidden sm:inline">Filters</span>
+                                {activeFilterCount > 0 && (
+                                    <span className={`
+                                        inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-semibold rounded-full
+                                        ${showFilters
+                                            ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white'
+                                            : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                                        }
+                                    `}>
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
                     </>
                 )}
 
@@ -672,265 +750,44 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 </div>
             )}
 
-            {/* Filter Drawer Overlay - Rendered via Portal to escape stacking contexts */}
-            {showFilters && typeof document !== 'undefined' && createPortal(
-                <div
-                    className="fixed inset-0 z-modal overflow-hidden"
-                    aria-labelledby="filter-drawer-title"
-                    role="dialog"
-                    aria-modal="true"
-                >
-                    {/* Backdrop */}
-                    <div
-                        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"
-                        onClick={() => setShowFilters(false)}
-                        aria-label="Close filters"
-                    />
-
-                    {/* Drawer Panel with Focus Trap for accessibility */}
-                    <FocusTrap active={showFilters}>
-                        <div
-                            id="search-filters"
-                            className="absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col">
-                            {/* Note: FocusTrap wraps this - close button below will receive focus */}
-                            {/* Drawer Header */}
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-                                <h2 id="filter-drawer-title" className="text-lg font-semibold text-zinc-900 dark:text-white">
-                                    Filters
-                                    {activeFilterCount > 0 && (
-                                        <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">
-                                            {activeFilterCount}
-                                        </span>
-                                    )}
-                                </h2>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setShowFilters(false)}
-                                    className="rounded-full w-9 h-9 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                                    aria-label="Close filters"
-                                >
-                                    <X className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
-                                </Button>
-                            </div>
-
-                            {/* Scrollable Filter Content */}
-                            <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-                                {/* Move-in Date */}
-                                <div className="space-y-2">
-                                    <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">Move-in Date</label>
-                                    <DatePicker
-                                        id="filter-move-in"
-                                        value={moveInDate}
-                                        onChange={setMoveInDate}
-                                        placeholder="Select move-in date"
-                                        minDate={minMoveInDate}
-                                    />
-                                </div>
-
-                                {/* Lease Duration */}
-                                <div className="space-y-2">
-                                    <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 dark:text-white">Lease Duration</label>
-                                    <Select value={leaseDuration} onValueChange={setLeaseDuration}>
-                                        <SelectTrigger id="filter-lease">
-                                            <SelectValue placeholder="Any" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="any">Any</SelectItem>
-                                            <SelectItem value="Month-to-month">Month-to-month</SelectItem>
-                                            <SelectItem value="3 months">3 months</SelectItem>
-                                            <SelectItem value="6 months">6 months</SelectItem>
-                                            <SelectItem value="12 months">12 months</SelectItem>
-                                            <SelectItem value="Flexible">Flexible</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {/* Room Type */}
-                                <div className="space-y-2">
-                                    <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 dark:text-white">Room Type</label>
-                                    <Select value={roomType} onValueChange={setRoomType}>
-                                        <SelectTrigger id="filter-room-type">
-                                            <SelectValue placeholder="Any" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="any">Any</SelectItem>
-                                            <SelectItem value="Private Room">Private Room</SelectItem>
-                                            <SelectItem value="Shared Room">Shared Room</SelectItem>
-                                            <SelectItem value="Entire Place">Entire Place</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {/* Amenities */}
-                                <fieldset className="space-y-3">
-                                    <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
-                                    <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
-                                        {AMENITY_OPTIONS.map(amenity => (
-                                            <Button
-                                                key={amenity}
-                                                type="button"
-                                                variant="filter"
-                                                onClick={() => toggleAmenity(amenity)}
-                                                data-active={amenities.includes(amenity)}
-                                                aria-pressed={amenities.includes(amenity)}
-                                                className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${amenities.includes(amenity) ? 'scale-[1.02]' : 'hover:scale-[1.02]'}`}
-                                            >
-                                                {amenity}
-                                                {amenities.includes(amenity) && (
-                                                    <X className="w-3.5 h-3.5 ml-1.5" />
-                                                )}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </fieldset>
-
-                                {/* House Rules */}
-                                <fieldset className="space-y-3">
-                                    <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
-                                    <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
-                                        {HOUSE_RULE_OPTIONS.map(rule => (
-                                            <Button
-                                                key={rule}
-                                                type="button"
-                                                variant="filter"
-                                                onClick={() => toggleHouseRule(rule)}
-                                                data-active={houseRules.includes(rule)}
-                                                aria-pressed={houseRules.includes(rule)}
-                                                className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${houseRules.includes(rule) ? 'scale-[1.02]' : 'hover:scale-[1.02]'}`}
-                                            >
-                                                {rule}
-                                                {houseRules.includes(rule) && (
-                                                    <X className="w-3.5 h-3.5 ml-1.5" />
-                                                )}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </fieldset>
-
-                                {/* Languages */}
-                                <fieldset className="space-y-3">
-                                    <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Can Communicate In</legend>
-                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 -mt-1">Show listings where household speaks any of these</p>
-
-                                    {/* Selected languages shown at top */}
-                                    {languages.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-700" role="group" aria-label="Selected languages">
-                                            {languages.map(code => (
-                                                <Button
-                                                    key={code}
-                                                    type="button"
-                                                    variant="filter"
-                                                    onClick={() => toggleLanguage(code)}
-                                                    data-active={true}
-                                                    aria-pressed={true}
-                                                    className="rounded-full h-auto py-2 px-3 text-sm font-medium"
-                                                >
-                                                    {getLanguageName(code)}
-                                                    <X className="w-3.5 h-3.5 ml-1.5" />
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* Search input */}
-                                    <Input
-                                        type="text"
-                                        placeholder="Search languages..."
-                                        value={languageSearch}
-                                        onChange={(e) => setLanguageSearch(e.target.value)}
-                                        className="h-9"
-                                    />
-
-                                    {/* Language chips */}
-                                    <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto" role="group" aria-label="Available languages">
-                                        {filteredLanguages.filter(code => !languages.includes(code)).map(code => (
-                                            <Button
-                                                key={code}
-                                                type="button"
-                                                variant="filter"
-                                                onClick={() => toggleLanguage(code)}
-                                                data-active={false}
-                                                aria-pressed={false}
-                                                className="rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 hover:scale-[1.02]"
-                                            >
-                                                {getLanguageName(code)}
-                                            </Button>
-                                        ))}
-                                        {filteredLanguages.filter(code => !languages.includes(code)).length === 0 && (
-                                            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                                                {languageSearch ? 'No languages found' : 'All languages selected'}
-                                            </p>
-                                        )}
-                                    </div>
-                                </fieldset>
-
-                                {/* Gender Preferences */}
-                                <div className="space-y-2">
-                                    <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900 dark:text-white">Gender Preference</label>
-                                    <Select value={genderPreference} onValueChange={setGenderPreference}>
-                                        <SelectTrigger id="filter-gender-pref">
-                                            <SelectValue placeholder="Any" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="any">Any</SelectItem>
-                                            <SelectItem value="MALE_ONLY">Male Identifying Only</SelectItem>
-                                            <SelectItem value="FEMALE_ONLY">Female Identifying Only</SelectItem>
-                                            <SelectItem value="NO_PREFERENCE">Any Gender / All Welcome</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {/* Household Gender */}
-                                <div className="space-y-2">
-                                    <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900 dark:text-white">Household Gender</label>
-                                    <Select value={householdGender} onValueChange={setHouseholdGender}>
-                                        <SelectTrigger id="filter-household-gender">
-                                            <SelectValue placeholder="Any" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="any">Any</SelectItem>
-                                            <SelectItem value="ALL_MALE">All Male</SelectItem>
-                                            <SelectItem value="ALL_FEMALE">All Female</SelectItem>
-                                            <SelectItem value="MIXED">Mixed (Co-ed)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            {/* Drawer Footer with Actions */}
-                            <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-3">
-                                {hasActiveFilters && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={handleClearAllFilters}
-                                        className="flex-1 rounded-xl h-12"
-                                    >
-                                        Clear all
-                                    </Button>
-                                )}
-                                <Button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowFilters(false);
-                                        // Trigger search with current filters
-                                        const form = document.querySelector('form[role="search"]') as HTMLFormElement;
-                                        if (form) {
-                                            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-                                        }
-                                    }}
-                                    className="flex-1 rounded-xl h-12 bg-zinc-900 text-white hover:bg-zinc-800 shadow-md"
-                                >
-                                    Show Results
-                                </Button>
-                            </div>
-                        </div>
-                    </FocusTrap>
-                </div >,
-                document.body
-            )
-            }
-        </div >
+            {/* Filter Modal - Presentational component */}
+            <FilterModal
+                isOpen={showFilters}
+                onClose={() => setShowFilters(false)}
+                onApply={() => {
+                    setShowFilters(false);
+                    // Trigger search with current filters
+                    const form = document.querySelector('form[role="search"]') as HTMLFormElement;
+                    if (form) {
+                        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    }
+                }}
+                onClearAll={handleClearAllFilters}
+                hasActiveFilters={hasActiveFilters}
+                activeFilterCount={activeFilterCount}
+                moveInDate={moveInDate}
+                leaseDuration={leaseDuration}
+                roomType={roomType}
+                amenities={amenities}
+                houseRules={houseRules}
+                languages={languages}
+                genderPreference={genderPreference}
+                householdGender={householdGender}
+                onMoveInDateChange={setMoveInDate}
+                onLeaseDurationChange={setLeaseDuration}
+                onRoomTypeChange={setRoomType}
+                onToggleAmenity={toggleAmenity}
+                onToggleHouseRule={toggleHouseRule}
+                onToggleLanguage={toggleLanguage}
+                onGenderPreferenceChange={setGenderPreference}
+                onHouseholdGenderChange={setHouseholdGender}
+                languageSearch={languageSearch}
+                onLanguageSearchChange={setLanguageSearch}
+                filteredLanguages={filteredLanguages}
+                minMoveInDate={minMoveInDate}
+                amenityOptions={AMENITY_OPTIONS}
+                houseRuleOptions={HOUSE_RULE_OPTIONS}
+            />
+        </div>
     );
 }

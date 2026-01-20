@@ -10,7 +10,10 @@ export default function NavbarWrapper({ children }: { children: React.ReactNode 
         pathname === '/reset-password' ||
         pathname === '/verify';
 
-    if (isAuthPage) {
+    // Search page has its own header with search functionality
+    const isSearchPage = pathname === '/search';
+
+    if (isAuthPage || isSearchPage) {
         return null;
     }
 

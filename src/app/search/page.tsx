@@ -2,7 +2,6 @@ import { auth } from '@/auth';
 import { getListingsPaginated, getMapListings, getSavedListingIds, analyzeFilterImpact, MapListingData } from '@/lib/data';
 import { isDataError } from '@/lib/errors';
 import { Suspense } from 'react';
-import SearchForm from '@/components/SearchForm';
 import DynamicMap from '@/components/DynamicMap';
 import ListingCard from '@/components/listings/ListingCard';
 import Pagination from '@/components/Pagination';
@@ -241,15 +240,6 @@ export default async function SearchPage({
 
     return (
         <div className="h-screen-safe flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-20">
-            {/* Search Header */}
-            <header className="w-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800 relative z-50">
-                <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
-                    <Suspense fallback={<div className="h-14 sm:h-16 w-full bg-zinc-100 dark:bg-zinc-800 animate-pulse rounded-full" />}>
-                        <SearchForm />
-                    </Suspense>
-                </div>
-            </header>
-
             <SearchViewToggle mapComponent={mapContent}>
                 {listContent}
             </SearchViewToggle>

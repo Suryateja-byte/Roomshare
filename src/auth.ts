@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { logger } from "@/lib/logger"
+import { isGoogleEmailVerified, AUTH_ROUTES } from "@/lib/auth-helpers"
 
 async function getUser(email: string) {
     try {
@@ -22,13 +23,24 @@ async function getUser(email: string) {
 export const { handlers, auth, signIn, signOut } = NextAuth({
     adapter: PrismaAdapter(prisma) as any,
     pages: {
-        signIn: '/login',
-        error: '/login', // Redirect OAuth errors to login page with error params
+        signIn: AUTH_ROUTES.signIn,
+        error: AUTH_ROUTES.signIn, // Redirect OAuth errors to login page with error params
     },
     session: {
         strategy: "jwt",
         maxAge: 14 * 24 * 60 * 60, // 14 days (security hardening from 30 days)
         updateAge: 24 * 60 * 60,   // Refresh token once per day
+    },
+    // Audit logging for security-sensitive events
+    events: {
+        async linkAccount({ user, account }) {
+            // Log when OAuth account is linked to existing user (for audit trail)
+            // Never log providerAccountId (PII)
+            logger.sync.info("OAuth account linked", {
+                userId: user.id,
+                provider: account.provider,
+            });
+        },
     },
     // Note: In NextAuth v5 (Auth.js), account linking is handled by the adapter
     // The Prisma adapter will auto-link accounts when email matches
@@ -80,11 +92,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return token
         },
         async signIn({ user, account, profile }) {
-            // Check Google email verification
+            // HARD-FAIL: Block Google OAuth if email not verified
+            // This is critical for allowDangerousEmailAccountLinking safety
             if (account?.provider === "google") {
-                const googleProfile = profile as { email_verified?: boolean }
-                if (!googleProfile?.email_verified) {
-                    return '/login?error=EmailNotVerified'
+                if (!isGoogleEmailVerified(profile as { email_verified?: boolean })) {
+                    logger.sync.warn("Google OAuth blocked: email not verified", {
+                        email: user?.email ? user.email.substring(0, 3) + "***" : "unknown",
+                        email_verified: (profile as { email_verified?: boolean })?.email_verified,
+                    });
+                    return `${AUTH_ROUTES.signIn}?error=EmailNotVerified`;
                 }
             }
 
@@ -122,6 +138,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         Google({
             clientId: process.env.GOOGLE_CLIENT_ID!,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            // Enable account linking for users who registered with password then try Google OAuth
+            // SAFE: email_verified === true is enforced in signIn callback above
+            allowDangerousEmailAccountLinking: true,
         }),
         Credentials({
             async authorize(credentials) {

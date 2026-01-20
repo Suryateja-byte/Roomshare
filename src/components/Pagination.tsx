@@ -1,27 +1,151 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTransition } from 'react';
+import { useTransition, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { encodeStack, decodeStack } from '@/lib/search/cursor';
 
 interface PaginationProps {
     currentPage: number;
     totalPages: number;
-    totalItems: number;
+    /** Total items - null means "unknown count (>100 results)" for hybrid count optimization */
+    totalItems: number | null;
     itemsPerPage: number;
+    /** Optional keyset cursor for next page (base64url encoded) */
+    nextCursor?: string | null;
+    /** Optional keyset cursor for previous page (base64url encoded) */
+    prevCursor?: string | null;
+    /** Whether there's a next page (used with keyset pagination) */
+    hasNextPage?: boolean;
+    /** Whether there's a previous page (used with keyset pagination) */
+    hasPrevPage?: boolean;
 }
 
-export default function Pagination({ currentPage, totalPages, totalItems, itemsPerPage }: PaginationProps) {
+export default function Pagination({
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage,
+    nextCursor,
+    prevCursor,
+    hasNextPage,
+    hasPrevPage: _hasPrevPage, // Intentionally unused - cursorStack is source of truth for keyset mode
+}: PaginationProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [isPending, startTransition] = useTransition();
 
-    if (totalPages <= 1) return null;
+    // Determine if we're using keyset pagination (cursor available)
+    // Note: We detect keyset mode by checking if nextCursor is explicitly provided (even if null)
+    const useKeysetPagination = nextCursor !== undefined || prevCursor !== undefined;
 
+    // Read cursor stack and page number from URL for keyset navigation history
+    const cursorStack = useMemo(() => {
+        const stackParam = searchParams.get('cursorStack');
+        return stackParam ? decodeStack(stackParam) : [];
+    }, [searchParams]);
+
+    // Get current page number from URL (for keyset mode, pageNumber tracks position)
+    const pageNumber = useMemo(() => {
+        const pageNumParam = searchParams.get('pageNumber');
+        if (pageNumParam) {
+            const num = parseInt(pageNumParam, 10);
+            if (Number.isFinite(num) && num >= 1) return num;
+        }
+        // Fall back to currentPage prop (from server) or 1
+        return currentPage ?? 1;
+    }, [searchParams, currentPage]);
+
+    // For keyset pagination, we can go back if we're past page 1.
+    // We use pageNumber > 1 (not cursorStack.length) because:
+    // - On page 1→2, currentCursor is null so nothing gets pushed to stack
+    // - pageNumber accurately tracks position regardless of stack state
+    // - The prev handler correctly clears cursor when returning to page 1
+    const canGoNext = useKeysetPagination
+        ? (hasNextPage ?? false) && (nextCursor !== null && nextCursor !== undefined)
+        : currentPage < totalPages;
+    const canGoPrev = useKeysetPagination
+        ? pageNumber > 1
+        : currentPage > 1;
+
+    if (totalPages <= 1 && !useKeysetPagination) return null;
+
+    // Handle offset-based page navigation (clicking specific page number)
     const handlePageChange = (page: number) => {
         startTransition(() => {
             const params = new URLSearchParams(searchParams.toString());
             params.set('page', page.toString());
+            // Clear keyset pagination params when using offset pagination
+            params.delete('cursor');
+            params.delete('cursorStack');
+            params.delete('pageNumber');
+            router.push(`?${params.toString()}`, { scroll: false });
+        });
+    };
+
+    // Handle cursor-based navigation (next/prev with keyset)
+    const handleCursorNavigation = (direction: 'next' | 'prev') => {
+        startTransition(() => {
+            const params = new URLSearchParams(searchParams.toString());
+            const currentCursor = searchParams.get('cursor');
+
+            if (direction === 'next') {
+                // Going forward: push current cursor onto stack, advance to next cursor
+                if (nextCursor) {
+                    const newStack = [...cursorStack];
+                    if (currentCursor) {
+                        newStack.push(currentCursor);
+                    }
+
+                    params.set('cursor', nextCursor);
+                    if (newStack.length > 0) {
+                        params.set('cursorStack', encodeStack(newStack));
+                    } else {
+                        params.delete('cursorStack');
+                    }
+                    params.set('pageNumber', (pageNumber + 1).toString());
+                    params.delete('page'); // Clear offset pagination
+                } else {
+                    // Fallback to offset if no next cursor
+                    const targetPage = pageNumber + 1;
+                    params.set('page', targetPage.toString());
+                    params.delete('cursor');
+                    params.delete('cursorStack');
+                    params.delete('pageNumber');
+                }
+            } else {
+                // Going back: pop cursor from stack, navigate to popped cursor
+                if (cursorStack.length > 0) {
+                    const newStack = [...cursorStack];
+                    const prevCursorFromStack = newStack.pop();
+
+                    if (prevCursorFromStack) {
+                        params.set('cursor', prevCursorFromStack);
+                    } else {
+                        // First page - clear cursor
+                        params.delete('cursor');
+                    }
+
+                    if (newStack.length > 0) {
+                        params.set('cursorStack', encodeStack(newStack));
+                    } else {
+                        params.delete('cursorStack');
+                    }
+                    params.set('pageNumber', Math.max(1, pageNumber - 1).toString());
+                    params.delete('page');
+                } else if (pageNumber > 1) {
+                    // Stack is empty but we're not on page 1 - go to page 1
+                    params.delete('cursor');
+                    params.delete('cursorStack');
+                    params.set('pageNumber', '1');
+                    params.delete('page');
+                } else {
+                    // Already on page 1, nothing to do
+                    console.warn('[Pagination] Cannot go back: already on first page');
+                    return;
+                }
+            }
+
             router.push(`?${params.toString()}`, { scroll: false });
         });
     };
@@ -39,19 +163,19 @@ export default function Pagination({ currentPage, totalPages, totalItems, itemsP
             // Always show first page
             pages.push(1);
 
-            if (currentPage > 3) {
+            if (pageNumber > 3) {
                 pages.push('...');
             }
 
             // Show pages around current page
-            const start = Math.max(2, currentPage - 1);
-            const end = Math.min(totalPages - 1, currentPage + 1);
+            const start = Math.max(2, pageNumber - 1);
+            const end = Math.min(totalPages - 1, pageNumber + 1);
 
             for (let i = start; i <= end; i++) {
                 pages.push(i);
             }
 
-            if (currentPage < totalPages - 2) {
+            if (pageNumber < totalPages - 2) {
                 pages.push('...');
             }
 
@@ -64,8 +188,11 @@ export default function Pagination({ currentPage, totalPages, totalItems, itemsP
         return pages;
     };
 
-    const startItem = (currentPage - 1) * itemsPerPage + 1;
-    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+    // Use pageNumber for range text display (works for both offset and keyset modes)
+    const startItem = (pageNumber - 1) * itemsPerPage + 1;
+    // When totalItems is null (unknown count), use page-based estimation
+    const pageEndItem = pageNumber * itemsPerPage;
+    const endItem = totalItems !== null ? Math.min(pageEndItem, totalItems) : pageEndItem;
 
     return (
         <nav
@@ -77,7 +204,7 @@ export default function Pagination({ currentPage, totalPages, totalItems, itemsP
             <p className="text-sm text-zinc-500 ">
                 Showing <span className="font-medium text-zinc-900 ">{startItem}</span> to{' '}
                 <span className="font-medium text-zinc-900 ">{endItem}</span> of{' '}
-                <span className="font-medium text-zinc-900 ">{totalItems}</span> results
+                <span className="font-medium text-zinc-900 ">{totalItems !== null ? totalItems : '100+'}</span> results
                 {isPending && <span className="ml-2 text-zinc-400">(Loading...)</span>}
             </p>
 
@@ -85,8 +212,11 @@ export default function Pagination({ currentPage, totalPages, totalItems, itemsP
             <div className="flex items-center gap-1" role="group" aria-label="Page navigation">
                 {/* Previous button */}
                 <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1 || isPending}
+                    onClick={() => useKeysetPagination
+                        ? handleCursorNavigation('prev')
+                        : handlePageChange(currentPage - 1)
+                    }
+                    disabled={!canGoPrev || isPending}
                     aria-label="Go to previous page"
                     className="p-2.5 sm:p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
                 >
@@ -97,35 +227,41 @@ export default function Pagination({ currentPage, totalPages, totalItems, itemsP
                     )}
                 </button>
 
-                {/* Page numbers */}
-                <div className="flex items-center gap-0.5 sm:gap-1">
-                    {getPageNumbers().map((page, index) => (
-                        typeof page === 'number' ? (
-                            <button
-                                key={index}
-                                onClick={() => handlePageChange(page)}
-                                disabled={isPending}
-                                aria-label={`Page ${page}`}
-                                aria-current={page === currentPage ? 'page' : undefined}
-                                className={`min-w-[40px] sm:min-w-[36px] h-10 sm:h-9 px-2 sm:px-3 rounded-lg text-sm font-medium transition-colors touch-target disabled:cursor-not-allowed ${page === currentPage
-                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
-                                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:hover:bg-transparent'
-                                    }`}
-                            >
-                                {page}
-                            </button>
-                        ) : (
-                            <span key={index} className="px-1 sm:px-2 text-zinc-400 " aria-hidden="true">
-                                {page}
-                            </span>
-                        )
-                    ))}
-                </div>
+                {/* Page numbers - only show when we have valid page numbers (offset mode or keyset with known page) */}
+                {/* In pure keyset mode, we can only go prev/next, not jump to arbitrary pages */}
+                {(!useKeysetPagination || (pageNumber !== null && Number.isFinite(pageNumber))) && (
+                    <div className="flex items-center gap-0.5 sm:gap-1">
+                        {getPageNumbers().map((page, index) => (
+                            typeof page === 'number' ? (
+                                <button
+                                    key={index}
+                                    onClick={() => handlePageChange(page)}
+                                    disabled={isPending}
+                                    aria-label={`Page ${page}`}
+                                    aria-current={page === pageNumber ? 'page' : undefined}
+                                    className={`min-w-[40px] sm:min-w-[36px] h-10 sm:h-9 px-2 sm:px-3 rounded-lg text-sm font-medium transition-colors touch-target disabled:cursor-not-allowed ${page === pageNumber
+                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                                            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:hover:bg-transparent'
+                                        }`}
+                                >
+                                    {page}
+                                </button>
+                            ) : (
+                                <span key={index} className="px-1 sm:px-2 text-zinc-400 " aria-hidden="true">
+                                    {page}
+                                </span>
+                            )
+                        ))}
+                    </div>
+                )}
 
                 {/* Next button */}
                 <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages || isPending}
+                    onClick={() => useKeysetPagination
+                        ? handleCursorNavigation('next')
+                        : handlePageChange(currentPage + 1)
+                    }
+                    disabled={!canGoNext || isPending}
                     aria-label="Go to next page"
                     className="p-2.5 sm:p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
                 >

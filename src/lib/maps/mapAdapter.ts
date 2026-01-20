@@ -9,11 +9,24 @@
  * @see Plan stability adjustment #2: Create Map Adapter Layer
  */
 
-import maplibregl from 'maplibre-gl';
-import type { Map, Marker, Popup, LngLatBounds, MapOptions, MarkerOptions, PopupOptions } from 'maplibre-gl';
+import maplibregl from "maplibre-gl";
+import type {
+  Map,
+  Marker,
+  Popup,
+  LngLatBounds,
+  MapOptions,
+  MarkerOptions,
+  PopupOptions,
+} from "maplibre-gl";
 
 // Re-export types for consumers
-export type { Map as MapInstance, Marker as MarkerInstance, Popup as PopupInstance, LngLatBounds as BoundsInstance };
+export type {
+  Map as MapInstance,
+  Marker as MarkerInstance,
+  Popup as PopupInstance,
+  LngLatBounds as BoundsInstance,
+};
 
 // ============================================================================
 // Adapter Types
@@ -24,12 +37,22 @@ export interface MapAdapterOptions {
   style: string;
   center: [number, number]; // [lng, lat]
   zoom: number;
-  attributionControl?: boolean;
+  // MapLibre only accepts false (to disable) or AttributionControlOptions, not true
+  attributionControl?: false;
 }
 
 export interface MarkerAdapterOptions {
   element?: HTMLElement;
-  anchor?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  anchor?:
+    | "center"
+    | "top"
+    | "bottom"
+    | "left"
+    | "right"
+    | "top-left"
+    | "top-right"
+    | "bottom-left"
+    | "bottom-right";
   offset?: [number, number];
 }
 
@@ -42,7 +65,9 @@ export interface PopupAdapterOptions {
 }
 
 export interface FitBoundsOptions {
-  padding?: number | { top: number; bottom: number; left: number; right: number };
+  padding?:
+    | number
+    | { top: number; bottom: number; left: number; right: number };
   maxZoom?: number;
   duration?: number;
 }
@@ -118,7 +143,10 @@ export function removeMarker(marker: Marker): void {
 /**
  * Set marker position
  */
-export function setMarkerPosition(marker: Marker, lngLat: [number, number]): Marker {
+export function setMarkerPosition(
+  marker: Marker,
+  lngLat: [number, number],
+): Marker {
   return marker.setLngLat(lngLat);
 }
 
@@ -139,14 +167,21 @@ export function setPopupContent(popup: Popup, html: string): Popup {
 /**
  * Fit map bounds to include all coordinates
  */
-export function fitMapBounds(map: Map, bounds: LngLatBounds, options?: FitBoundsOptions): void {
+export function fitMapBounds(
+  map: Map,
+  bounds: LngLatBounds,
+  options?: FitBoundsOptions,
+): void {
   map.fitBounds(bounds, options);
 }
 
 /**
  * Extend bounds with a coordinate
  */
-export function extendBounds(bounds: LngLatBounds, lngLat: [number, number]): LngLatBounds {
+export function extendBounds(
+  bounds: LngLatBounds,
+  lngLat: [number, number],
+): LngLatBounds {
   return bounds.extend(lngLat);
 }
 
@@ -188,14 +223,22 @@ export function getCenter(map: Map): { lng: number; lat: number } {
 /**
  * Add event listener to map
  */
-export function onMapEvent(map: Map, event: string, handler: (e: unknown) => void): void {
+export function onMapEvent(
+  map: Map,
+  event: string,
+  handler: (e: unknown) => void,
+): void {
   map.on(event as keyof maplibregl.MapEventType, handler as () => void);
 }
 
 /**
  * Remove event listener from map
  */
-export function offMapEvent(map: Map, event: string, handler: (e: unknown) => void): void {
+export function offMapEvent(
+  map: Map,
+  event: string,
+  handler: (e: unknown) => void,
+): void {
   map.off(event as keyof maplibregl.MapEventType, handler as () => void);
 }
 
@@ -223,15 +266,15 @@ export function getMarkerElement(marker: Marker): HTMLElement {
  */
 export function escapeHtml(text: string): string {
   // SSR check
-  if (typeof document === 'undefined') {
+  if (typeof document === "undefined") {
     return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
 }

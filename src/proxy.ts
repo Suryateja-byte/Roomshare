@@ -3,12 +3,12 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 /**
- * Middleware with request correlation
+ * Proxy with request correlation (Next.js 16+ convention)
  * Adds x-request-id header to all requests for observability
  * Uses header propagation for downstream handlers (AsyncLocalStorage
  * doesn't work in Edge Runtime and doesn't persist across runtime boundaries)
  */
-export default auth(async function middleware(request: NextRequest) {
+export default auth(async function proxy(request: NextRequest) {
     // Generate or propagate request ID (using Web Crypto API for Edge compatibility)
     const requestId = request.headers.get('x-request-id')
         || request.headers.get('x-vercel-id')

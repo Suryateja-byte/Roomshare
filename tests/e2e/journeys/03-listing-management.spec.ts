@@ -6,13 +6,13 @@
  * editing, pausing, deleting listings and image management.
  */
 
-import { test, expect, tags, timeouts, selectors } from '../helpers';
+import { test, expect, tags, timeouts, selectors } from "../helpers";
 
-test.describe('Listing Management Journeys', () => {
+test.describe("Listing Management Journeys", () => {
   // Use authenticated state for all tests in this file
-  test.use({ storageState: 'playwright/.auth/user.json' });
+  test.use({ storageState: "playwright/.auth/user.json" });
 
-  test.describe('J017: Create new listing', () => {
+  test.describe("J017: Create new listing", () => {
     test(`${tags.auth} ${tags.mobile} - Complete listing creation flow`, async ({
       page,
       nav,
@@ -23,7 +23,9 @@ test.describe('Listing Management Journeys', () => {
 
       // Step 1-2: Navigate to create listing
       await nav.goToCreateListing();
-      await expect(page.getByRole('heading', { name: /create|new|add.*listing/i })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: /create|new|add.*listing/i }),
+      ).toBeVisible();
 
       // Step 3: Fill title
       await page.getByLabel(/title/i).fill(listingData.title);
@@ -64,19 +66,23 @@ test.describe('Listing Management Journeys', () => {
       // Step 11: Select room type
       const roomTypeSelect = page.getByLabel(/room type/i);
       if (await roomTypeSelect.isVisible()) {
+        // @ts-expect-error - Playwright accepts RegExp for label matching at runtime
         await roomTypeSelect.selectOption({ label: /private/i });
       }
 
       // Step 12: Submit form
-      await page.getByRole('button', { name: /create|submit|post/i }).click();
+      await page.getByRole("button", { name: /create|submit|post/i }).click();
 
       // Step 13-14: Wait for redirect and verify
       await page.waitForURL(/\/listings\//, { timeout: 30000 });
 
       // Verify listing was created with correct title
-      await expect(page.getByRole('heading', { level: 1 })).toContainText(listingData.title, {
-        timeout: 10000,
-      });
+      await expect(page.getByRole("heading", { level: 1 })).toContainText(
+        listingData.title,
+        {
+          timeout: 10000,
+        },
+      );
     });
 
     test(`${tags.auth} - Validation errors for missing required fields`, async ({
@@ -86,11 +92,13 @@ test.describe('Listing Management Journeys', () => {
       await nav.goToCreateListing();
 
       // Submit without filling required fields
-      await page.getByRole('button', { name: /create|submit|post/i }).click();
+      await page.getByRole("button", { name: /create|submit|post/i }).click();
 
       // Should show validation errors
       await expect(
-        page.locator('[role="alert"], [class*="error"], [aria-invalid="true"]').first()
+        page
+          .locator('[role="alert"], [class*="error"], [aria-invalid="true"]')
+          .first(),
       ).toBeVisible({ timeout: 5000 });
 
       // Should stay on create page
@@ -98,15 +106,15 @@ test.describe('Listing Management Journeys', () => {
     });
   });
 
-  test.describe('J018: Edit existing listing', () => {
+  test.describe("J018: Edit existing listing", () => {
     test(`${tags.auth} - Edit listing details`, async ({ page, nav }) => {
       // Navigate to profile to find user's listings
       await nav.goToProfile();
 
       // Find edit button on a listing
       const editButton = page
-        .getByRole('button', { name: /edit/i })
-        .or(page.getByRole('link', { name: /edit/i }))
+        .getByRole("button", { name: /edit/i })
+        .or(page.getByRole("link", { name: /edit/i }))
         .first();
 
       if (await editButton.isVisible()) {
@@ -121,29 +129,34 @@ test.describe('Listing Management Journeys', () => {
 
         // Update title
         await titleInput.clear();
-        await titleInput.fill('Updated Listing Title');
+        await titleInput.fill("Updated Listing Title");
 
         // Update price
         const priceInput = page.getByLabel(/price/i);
         await priceInput.clear();
-        await priceInput.fill('1500');
+        await priceInput.fill("1500");
 
         // Save changes
-        await page.getByRole('button', { name: /save|update/i }).click();
+        await page.getByRole("button", { name: /save|update/i }).click();
 
         // Verify redirect and updated data
         await page.waitForURL(/\/listings\/(?!.*edit)/, { timeout: 15000 });
-        await expect(page.getByRole('heading', { level: 1 })).toContainText('Updated Listing Title');
+        await expect(page.getByRole("heading", { level: 1 })).toContainText(
+          "Updated Listing Title",
+        );
       }
     });
   });
 
-  test.describe('J019: Delete listing', () => {
-    test(`${tags.auth} - Delete listing with confirmation`, async ({ page, nav }) => {
+  test.describe("J019: Delete listing", () => {
+    test(`${tags.auth} - Delete listing with confirmation`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToProfile();
 
       const deleteButton = page
-        .getByRole('button', { name: /delete/i })
+        .getByRole("button", { name: /delete/i })
         .first();
 
       if (await deleteButton.isVisible()) {
@@ -155,13 +168,14 @@ test.describe('Listing Management Journeys', () => {
         await expect(confirmDialog).toBeVisible({ timeout: 5000 });
 
         // Confirm deletion
-        const confirmButton = confirmDialog.getByRole('button', { name: /confirm|delete|yes/i });
+        const confirmButton = confirmDialog.getByRole("button", {
+          name: /confirm|delete|yes/i,
+        });
         await confirmButton.click();
 
         // Should show success toast or listing removed
         await expect(
-          page.locator(selectors.toast)
-            .or(page.getByText(/deleted|removed/i))
+          page.locator(selectors.toast).or(page.getByText(/deleted|removed/i)),
         ).toBeVisible({ timeout: 10000 });
       }
     });
@@ -169,7 +183,9 @@ test.describe('Listing Management Journeys', () => {
     test(`${tags.auth} - Cancel delete confirmation`, async ({ page, nav }) => {
       await nav.goToProfile();
 
-      const deleteButton = page.getByRole('button', { name: /delete/i }).first();
+      const deleteButton = page
+        .getByRole("button", { name: /delete/i })
+        .first();
 
       if (await deleteButton.isVisible()) {
         await deleteButton.click();
@@ -177,7 +193,7 @@ test.describe('Listing Management Journeys', () => {
         // Cancel the confirmation
         const cancelButton = page
           .locator(selectors.modal)
-          .getByRole('button', { name: /cancel|no|close/i });
+          .getByRole("button", { name: /cancel|no|close/i });
 
         if (await cancelButton.isVisible()) {
           await cancelButton.click();
@@ -189,17 +205,17 @@ test.describe('Listing Management Journeys', () => {
     });
   });
 
-  test.describe('J020: Pause and reactivate listing', () => {
+  test.describe("J020: Pause and reactivate listing", () => {
     test(`${tags.auth} - Toggle listing status`, async ({ page, nav }) => {
       await nav.goToProfile();
 
       // Find status toggle button
       const pauseButton = page
-        .getByRole('button', { name: /pause|deactivate/i })
+        .getByRole("button", { name: /pause|deactivate/i })
         .first();
 
       const activateButton = page
-        .getByRole('button', { name: /activate|reactivate/i })
+        .getByRole("button", { name: /activate|reactivate/i })
         .first();
 
       const statusButton = pauseButton.or(activateButton);
@@ -218,8 +234,11 @@ test.describe('Listing Management Journeys', () => {
     });
   });
 
-  test.describe('J021-J022: Image upload', () => {
-    test(`${tags.auth} ${tags.slow} - Upload images to listing`, async ({ page, nav }) => {
+  test.describe("J021-J022: Image upload", () => {
+    test(`${tags.auth} ${tags.slow} - Upload images to listing`, async ({
+      page,
+      nav,
+    }) => {
       test.slow(); // Upload tests are slow
 
       await nav.goToCreateListing();
@@ -227,13 +246,15 @@ test.describe('Listing Management Journeys', () => {
       // Find image uploader
       const fileInput = page.locator('input[type="file"]');
 
-      if (await fileInput.count() > 0) {
+      if ((await fileInput.count()) > 0) {
         // Note: In a real test, you'd use actual test image files
         // For now, we'll just verify the uploader is present and functional
         await expect(fileInput.first()).toBeAttached();
 
         // Check for drag-and-drop zone
-        const dropZone = page.locator('[data-testid="drop-zone"], [class*="dropzone"], [class*="upload"]');
+        const dropZone = page.locator(
+          '[data-testid="drop-zone"], [class*="dropzone"], [class*="upload"]',
+        );
         if (await dropZone.isVisible()) {
           await expect(dropZone).toBeVisible();
         }
@@ -241,13 +262,20 @@ test.describe('Listing Management Journeys', () => {
     });
   });
 
-  test.describe('J023-J024: Listing from profile access', () => {
-    test(`${tags.auth} - Access listing management from profile`, async ({ page, nav }) => {
+  test.describe("J023-J024: Listing from profile access", () => {
+    test(`${tags.auth} - Access listing management from profile`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToProfile();
 
       // Should see user's listings section
-      const listingsSection = page.getByRole('heading', { name: /listings|my rooms/i });
-      await expect(listingsSection.or(page.locator(selectors.listingCard).first())).toBeVisible({
+      const listingsSection = page.getByRole("heading", {
+        name: /listings|my rooms/i,
+      });
+      await expect(
+        listingsSection.or(page.locator(selectors.listingCard).first()),
+      ).toBeVisible({
         timeout: 10000,
       });
 
@@ -260,22 +288,27 @@ test.describe('Listing Management Journeys', () => {
     });
   });
 
-  test.describe('J025-J026: Listing creation edge cases', () => {
-    test(`${tags.auth} - Address geocoding validation`, async ({ page, nav }) => {
+  test.describe("J025-J026: Listing creation edge cases", () => {
+    test(`${tags.auth} - Address geocoding validation`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToCreateListing();
 
       // Fill with invalid address
-      await page.getByLabel(/title/i).fill('Test Listing');
-      await page.getByLabel(/description/i).fill('Test description for listing.');
-      await page.getByLabel(/price/i).fill('1000');
+      await page.getByLabel(/title/i).fill("Test Listing");
+      await page
+        .getByLabel(/description/i)
+        .fill("Test description for listing.");
+      await page.getByLabel(/price/i).fill("1000");
 
       const addressInput = page.getByLabel(/address|street/i);
       if (await addressInput.isVisible()) {
-        await addressInput.fill('Invalid Address 99999999');
+        await addressInput.fill("Invalid Address 99999999");
       }
 
       // Try to submit
-      await page.getByRole('button', { name: /create|submit/i }).click();
+      await page.getByRole("button", { name: /create|submit/i }).click();
 
       // Should show geocoding error or address validation
       await page.waitForTimeout(5000); // Geocoding can be slow
@@ -289,8 +322,8 @@ test.describe('Listing Management Journeys', () => {
       await nav.goToCreateListing();
 
       // Fill some fields
-      await page.getByLabel(/title/i).fill('Draft Listing Title');
-      await page.getByLabel(/description/i).fill('Draft description content');
+      await page.getByLabel(/title/i).fill("Draft Listing Title");
+      await page.getByLabel(/description/i).fill("Draft description content");
 
       // Navigate away without saving
       await nav.goHome();

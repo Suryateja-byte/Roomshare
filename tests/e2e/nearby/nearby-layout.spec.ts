@@ -7,43 +7,43 @@
  * @see Plan Category G - Map Container, Layout, CSS (E2E portion)
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
 // Mock places fixture for deterministic testing
 const mockPlacesFixture = [
   {
-    id: 'place-1',
-    name: 'Test Grocery Store',
-    address: '123 Main St, San Francisco, CA',
-    category: 'food-grocery',
+    id: "place-1",
+    name: "Test Grocery Store",
+    address: "123 Main St, San Francisco, CA",
+    category: "food-grocery",
     location: { lat: 37.7749, lng: -122.4194 },
     distanceMiles: 0.3,
   },
   {
-    id: 'place-2',
-    name: 'Local Pharmacy',
-    address: '456 Oak Ave, San Francisco, CA',
-    category: 'pharmacy',
+    id: "place-2",
+    name: "Local Pharmacy",
+    address: "456 Oak Ave, San Francisco, CA",
+    category: "pharmacy",
     location: { lat: 37.7759, lng: -122.4184 },
     distanceMiles: 0.5,
   },
   {
-    id: 'place-3',
-    name: 'Corner Restaurant',
-    address: '789 Elm Blvd, San Francisco, CA',
-    category: 'restaurant',
+    id: "place-3",
+    name: "Corner Restaurant",
+    address: "789 Elm Blvd, San Francisco, CA",
+    category: "restaurant",
     location: { lat: 37.7769, lng: -122.4174 },
     distanceMiles: 0.7,
   },
 ];
 
-test.describe('Nearby Places Layout', () => {
+test.describe("Nearby Places Layout", () => {
   test.beforeEach(async ({ page }) => {
     // Mock /api/nearby for deterministic results
-    await page.route('**/api/nearby', async (route) => {
+    await page.route("**/api/nearby", async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           places: mockPlacesFixture,
           meta: { count: mockPlacesFixture.length, cached: false },
@@ -53,14 +53,18 @@ test.describe('Nearby Places Layout', () => {
   });
 
   // G1: CSS transform parent handled
-  test('G1: Map renders correctly inside transformed container', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+  test("G1: Map renders correctly inside transformed container", async ({
+    page,
+  }) => {
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
     // Check if map container exists and has proper dimensions
-    const mapContainer = page.locator('.maplibregl-map, .mapboxgl-map, [class*="map"]').first();
+    const mapContainer = page
+      .locator('.maplibregl-map, .mapboxgl-map, [class*="map"]')
+      .first();
 
-    if (await mapContainer.count() > 0) {
+    if ((await mapContainer.count()) > 0) {
       const box = await mapContainer.boundingBox();
 
       if (box) {
@@ -73,7 +77,7 @@ test.describe('Nearby Places Layout', () => {
           let parent = el.parentElement;
           while (parent) {
             const transform = window.getComputedStyle(parent).transform;
-            if (transform && transform !== 'none') {
+            if (transform && transform !== "none") {
               return true;
             }
             parent = parent.parentElement;
@@ -90,14 +94,16 @@ test.describe('Nearby Places Layout', () => {
   });
 
   // G2: Container height 0 shows fallback
-  test('G2: Handles zero-height container gracefully', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+  test("G2: Handles zero-height container gracefully", async ({ page }) => {
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
     // Find the map section
-    const nearbySection = page.locator('[data-testid="nearby-places"], [class*="nearby"]').first();
+    const nearbySection = page
+      .locator('[data-testid="nearby-places"], [class*="nearby"]')
+      .first();
 
-    if (await nearbySection.count() > 0) {
+    if ((await nearbySection.count()) > 0) {
       const box = await nearbySection.boundingBox();
 
       // Section should have positive height (fallback behavior)
@@ -107,8 +113,10 @@ test.describe('Nearby Places Layout', () => {
     }
 
     // Check that map has minimum dimensions
-    const mapContainer = page.locator('.maplibregl-map, .mapboxgl-map, [class*="map"]').first();
-    if (await mapContainer.count() > 0) {
+    const mapContainer = page
+      .locator('.maplibregl-map, .mapboxgl-map, [class*="map"]')
+      .first();
+    if ((await mapContainer.count()) > 0) {
       const mapStyles = await mapContainer.evaluate((el) => {
         const computed = window.getComputedStyle(el);
         return {
@@ -117,17 +125,18 @@ test.describe('Nearby Places Layout', () => {
         };
       });
 
-      // Should have height or minHeight defined
-      expect(
-        mapStyles.height !== '0px' || mapStyles.minHeight !== '0px' || mapStyles.minHeight !== ''
-      ).toBe(true);
+      // Should have height or minHeight defined (one of them should be non-zero/non-empty)
+      const hasValidHeight = mapStyles.height !== "0px";
+      const hasValidMinHeight =
+        mapStyles.minHeight !== "0px" && mapStyles.minHeight !== "";
+      expect(hasValidHeight || hasValidMinHeight).toBe(true);
     }
   });
 
   // G3: Sticky header doesn't overlap controls
-  test('G3: Sticky header does not overlap map controls', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+  test("G3: Sticky header does not overlap map controls", async ({ page }) => {
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
     // Scroll down to reveal any sticky header behavior
     await page.evaluate(() => {
@@ -136,10 +145,16 @@ test.describe('Nearby Places Layout', () => {
     await page.waitForTimeout(500);
 
     // Find sticky header
-    const stickyHeader = page.locator('header, [class*="sticky"], [class*="fixed"]').first();
-    const mapControls = page.locator('.maplibregl-ctrl-top-right, .mapboxgl-ctrl-top-right, [class*="control"]').first();
+    const stickyHeader = page
+      .locator('header, [class*="sticky"], [class*="fixed"]')
+      .first();
+    const mapControls = page
+      .locator(
+        '.maplibregl-ctrl-top-right, .mapboxgl-ctrl-top-right, [class*="control"]',
+      )
+      .first();
 
-    if (await stickyHeader.count() > 0 && await mapControls.count() > 0) {
+    if ((await stickyHeader.count()) > 0 && (await mapControls.count()) > 0) {
       const headerBox = await stickyHeader.boundingBox();
       const controlsBox = await mapControls.boundingBox();
 
@@ -152,37 +167,44 @@ test.describe('Nearby Places Layout', () => {
 
         if (overlap) {
           // If they overlap vertically, z-index should handle it
-          const headerZ = await stickyHeader.evaluate((el) =>
-            parseInt(window.getComputedStyle(el).zIndex) || 0
+          const headerZ = await stickyHeader.evaluate(
+            (el) => parseInt(window.getComputedStyle(el).zIndex) || 0,
           );
-          const controlsZ = await mapControls.evaluate((el) =>
-            parseInt(window.getComputedStyle(el).zIndex) || 0
+          const controlsZ = await mapControls.evaluate(
+            (el) => parseInt(window.getComputedStyle(el).zIndex) || 0,
           );
 
           // Controls should have higher z-index or be positioned to avoid overlap
           // This is a warning, not a failure
-          console.log(`Header z-index: ${headerZ}, Controls z-index: ${controlsZ}`);
+          console.log(
+            `Header z-index: ${headerZ}, Controls z-index: ${controlsZ}`,
+          );
         }
       }
     }
   });
 
   // G4: Popup z-index above overlays
-  test('G4: Map popup appears above other overlays', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+  test("G4: Map popup appears above other overlays", async ({ page }) => {
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
     // Trigger a search to show markers
-    const categoryChip = page.locator('button').filter({ hasText: /grocery/i }).first();
-    if (await categoryChip.count() > 0) {
+    const categoryChip = page
+      .locator("button")
+      .filter({ hasText: /grocery/i })
+      .first();
+    if ((await categoryChip.count()) > 0) {
       await categoryChip.click();
       await page.waitForTimeout(1000);
     }
 
     // Try to click on a marker to open popup
-    const mapCanvas = page.locator('.maplibregl-canvas, .mapboxgl-canvas').first();
+    const mapCanvas = page
+      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .first();
 
-    if (await mapCanvas.count() > 0) {
+    if ((await mapCanvas.count()) > 0) {
       const box = await mapCanvas.boundingBox();
       if (box) {
         // Click center of map
@@ -190,7 +212,9 @@ test.describe('Nearby Places Layout', () => {
         await page.waitForTimeout(500);
 
         // Check popup z-index
-        const popup = page.locator('.maplibregl-popup, .mapboxgl-popup, [class*="popup"]');
+        const popup = page.locator(
+          '.maplibregl-popup, .mapboxgl-popup, [class*="popup"]',
+        );
         if (await popup.isVisible().catch(() => false)) {
           const popupZ = await popup.evaluate((el) => {
             const computed = window.getComputedStyle(el);
@@ -205,20 +229,22 @@ test.describe('Nearby Places Layout', () => {
   });
 
   // G5: Pointer-events allows map interaction
-  test('G5: Pointer events allow map interaction', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+  test("G5: Pointer events allow map interaction", async ({ page }) => {
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
-    const mapCanvas = page.locator('.maplibregl-canvas, .mapboxgl-canvas').first();
+    const mapCanvas = page
+      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .first();
 
-    if (await mapCanvas.count() > 0) {
+    if ((await mapCanvas.count()) > 0) {
       // Check that canvas accepts pointer events
       const pointerEvents = await mapCanvas.evaluate((el) => {
         return window.getComputedStyle(el).pointerEvents;
       });
 
       // Should not be 'none'
-      expect(pointerEvents).not.toBe('none');
+      expect(pointerEvents).not.toBe("none");
 
       // Test actual interaction - drag the map
       const box = await mapCanvas.boundingBox();
@@ -238,21 +264,28 @@ test.describe('Nearby Places Layout', () => {
   });
 
   // G6: Panel scroll contained
-  test('G6: Panel scrolling is contained', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+  test("G6: Panel scrolling is contained", async ({ page }) => {
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
     // Trigger search to show results
-    const categoryChip = page.locator('button').filter({ hasText: /grocery/i }).first();
-    if (await categoryChip.count() > 0) {
+    const categoryChip = page
+      .locator("button")
+      .filter({ hasText: /grocery/i })
+      .first();
+    if ((await categoryChip.count()) > 0) {
       await categoryChip.click();
       await page.waitForTimeout(1000);
     }
 
     // Find the results panel
-    const resultsPanel = page.locator('[data-testid="results-area"], [class*="results"], [class*="panel"]').first();
+    const resultsPanel = page
+      .locator(
+        '[data-testid="results-area"], [class*="results"], [class*="panel"]',
+      )
+      .first();
 
-    if (await resultsPanel.count() > 0) {
+    if ((await resultsPanel.count()) > 0) {
       // Check overflow behavior
       const overflowStyles = await resultsPanel.evaluate((el) => {
         const computed = window.getComputedStyle(el);
@@ -263,24 +296,26 @@ test.describe('Nearby Places Layout', () => {
       });
 
       // Should have controlled overflow (scroll, auto, or hidden)
-      const validOverflow = ['scroll', 'auto', 'hidden'];
+      const validOverflow = ["scroll", "auto", "hidden"];
       expect(
         validOverflow.includes(overflowStyles.overflowY) ||
-        validOverflow.includes(overflowStyles.overflowX) ||
-        true // Relaxed check
+          validOverflow.includes(overflowStyles.overflowX) ||
+          true, // Relaxed check
       ).toBe(true);
     }
   });
 
   // G7: Safari rubber-band zoom handled
-  test('G7: Touch zoom handling on Safari', async ({ page, browserName }) => {
+  test("G7: Touch zoom handling on Safari", async ({ page, browserName }) => {
     // This test is most relevant for Safari/WebKit
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
-    const mapCanvas = page.locator('.maplibregl-canvas, .mapboxgl-canvas').first();
+    const mapCanvas = page
+      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .first();
 
-    if (await mapCanvas.count() > 0) {
+    if ((await mapCanvas.count()) > 0) {
       // Check that touch-action is properly set
       const touchAction = await mapCanvas.evaluate((el) => {
         return window.getComputedStyle(el).touchAction;
@@ -291,8 +326,8 @@ test.describe('Nearby Places Layout', () => {
       expect(touchAction).toBeDefined();
 
       // Check that overscroll behavior is controlled
-      const container = page.locator('.maplibregl-map, .mapboxgl-map').first();
-      if (await container.count() > 0) {
+      const container = page.locator(".maplibregl-map, .mapboxgl-map").first();
+      if ((await container.count()) > 0) {
         const overscroll = await container.evaluate((el) => {
           return window.getComputedStyle(el).overscrollBehavior;
         });
@@ -305,13 +340,15 @@ test.describe('Nearby Places Layout', () => {
   });
 
   // G8: Resize after rotation updates map
-  test('G8: Map updates after viewport rotation/resize', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+  test("G8: Map updates after viewport rotation/resize", async ({ page }) => {
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
-    const mapCanvas = page.locator('.maplibregl-canvas, .mapboxgl-canvas').first();
+    const mapCanvas = page
+      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .first();
 
-    if (await mapCanvas.count() > 0) {
+    if ((await mapCanvas.count()) > 0) {
       // Get initial dimensions
       const initialBox = await mapCanvas.boundingBox();
 
@@ -342,31 +379,36 @@ test.describe('Nearby Places Layout', () => {
   });
 
   // G9: Retina markers sharp (2x DPI)
-  test('G9: Markers render sharply on high-DPI displays', async ({ page }) => {
+  test("G9: Markers render sharply on high-DPI displays", async ({ page }) => {
     // Emulate high-DPI display
     await page.setViewportSize({ width: 1280, height: 720 });
 
     // Set device scale factor for Retina simulation
     await page.evaluate(() => {
-      Object.defineProperty(window, 'devicePixelRatio', {
+      Object.defineProperty(window, "devicePixelRatio", {
         get: () => 2,
       });
     });
 
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
     // Trigger search to show markers
-    const categoryChip = page.locator('button').filter({ hasText: /grocery/i }).first();
-    if (await categoryChip.count() > 0) {
+    const categoryChip = page
+      .locator("button")
+      .filter({ hasText: /grocery/i })
+      .first();
+    if ((await categoryChip.count()) > 0) {
       await categoryChip.click();
       await page.waitForTimeout(1000);
     }
 
     // Check canvas resolution
-    const mapCanvas = page.locator('.maplibregl-canvas, .mapboxgl-canvas').first();
+    const mapCanvas = page
+      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .first();
 
-    if (await mapCanvas.count() > 0) {
+    if ((await mapCanvas.count()) > 0) {
       const canvasInfo = await mapCanvas.evaluate((el: HTMLCanvasElement) => {
         const style = window.getComputedStyle(el);
         return {
@@ -385,18 +427,18 @@ test.describe('Nearby Places Layout', () => {
 
     // Take screenshot for visual verification
     await page.screenshot({
-      path: '.playwright-mcp/retina-markers.png',
-      scale: 'device',
+      path: ".playwright-mcp/retina-markers.png",
+      scale: "device",
     });
   });
 });
 
-test.describe('Nearby Places Mobile Layout', () => {
+test.describe("Nearby Places Mobile Layout", () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/nearby', async (route) => {
+    await page.route("**/api/nearby", async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           places: mockPlacesFixture,
           meta: { count: mockPlacesFixture.length, cached: false },
@@ -405,17 +447,19 @@ test.describe('Nearby Places Mobile Layout', () => {
     });
   });
 
-  test('Layout adapts to mobile viewport', async ({ page }) => {
+  test("Layout adapts to mobile viewport", async ({ page }) => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
     // Find nearby section
-    const nearbySection = page.locator('[data-testid="nearby-places"], [class*="nearby"]').first();
+    const nearbySection = page
+      .locator('[data-testid="nearby-places"], [class*="nearby"]')
+      .first();
 
-    if (await nearbySection.count() > 0) {
+    if ((await nearbySection.count()) > 0) {
       const sectionBox = await nearbySection.boundingBox();
 
       if (sectionBox) {
@@ -425,8 +469,10 @@ test.describe('Nearby Places Mobile Layout', () => {
     }
 
     // Check that category chips wrap properly
-    const chipsContainer = page.locator('[class*="chips"], [class*="categories"]').first();
-    if (await chipsContainer.count() > 0) {
+    const chipsContainer = page
+      .locator('[class*="chips"], [class*="categories"]')
+      .first();
+    if ((await chipsContainer.count()) > 0) {
       const containerBox = await chipsContainer.boundingBox();
 
       if (containerBox) {
@@ -440,34 +486,44 @@ test.describe('Nearby Places Mobile Layout', () => {
       });
 
       // Should either wrap or scroll horizontally
-      expect(['auto', 'scroll', 'visible', 'hidden']).toContain(overflow);
+      expect(["auto", "scroll", "visible", "hidden"]).toContain(overflow);
     }
   });
 
-  test('Map/list toggle works on mobile', async ({ page }) => {
+  test("Map/list toggle works on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
     // Look for map/list toggle buttons
-    const mapToggle = page.locator('button').filter({ hasText: /map/i }).first();
-    const listToggle = page.locator('button').filter({ hasText: /list/i }).first();
+    const mapToggle = page
+      .locator("button")
+      .filter({ hasText: /map/i })
+      .first();
+    const listToggle = page
+      .locator("button")
+      .filter({ hasText: /list/i })
+      .first();
 
-    if (await mapToggle.count() > 0) {
+    if ((await mapToggle.count()) > 0) {
       await mapToggle.click();
       await page.waitForTimeout(300);
 
       // Map should be visible
-      const mapContainer = page.locator('.maplibregl-map, .mapboxgl-map, [class*="map"]').first();
+      const mapContainer = page
+        .locator('.maplibregl-map, .mapboxgl-map, [class*="map"]')
+        .first();
       const mapVisible = await mapContainer.isVisible().catch(() => false);
 
-      if (await listToggle.count() > 0) {
+      if ((await listToggle.count()) > 0) {
         await listToggle.click();
         await page.waitForTimeout(300);
 
         // List should now be visible
-        const resultsArea = page.locator('[data-testid="results-area"], [class*="results"]').first();
+        const resultsArea = page
+          .locator('[data-testid="results-area"], [class*="results"]')
+          .first();
         const resultsVisible = await resultsArea.isVisible().catch(() => true);
 
         expect(resultsVisible).toBe(true);
@@ -475,15 +531,17 @@ test.describe('Nearby Places Mobile Layout', () => {
     }
   });
 
-  test('Search input is accessible on mobile keyboard', async ({ page }) => {
+  test("Search input is accessible on mobile keyboard", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    await page.goto("/listings/test-listing");
+    await page.waitForLoadState("networkidle");
 
-    const searchInput = page.locator('input[type="text"], input[placeholder*="search" i]').first();
+    const searchInput = page
+      .locator('input[type="text"], input[placeholder*="search" i]')
+      .first();
 
-    if (await searchInput.count() > 0) {
+    if ((await searchInput.count()) > 0) {
       // Focus the input
       await searchInput.focus();
       await page.waitForTimeout(300);
@@ -501,12 +559,12 @@ test.describe('Nearby Places Mobile Layout', () => {
       }
 
       // Type in the input
-      await searchInput.type('coffee');
+      await searchInput.type("coffee");
       await page.waitForTimeout(500);
 
       // Verify input value
       const inputValue = await searchInput.inputValue();
-      expect(inputValue).toBe('coffee');
+      expect(inputValue).toBe("coffee");
     }
   });
 });

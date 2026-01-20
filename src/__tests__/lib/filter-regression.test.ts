@@ -23,7 +23,7 @@ import {
   type GoldenScenario,
 } from '@/lib/filter-regression';
 import { normalizeFilters } from '@/lib/filter-schema';
-import { ACTIVE_LISTINGS, applyFilters } from '../fixtures/listings';
+import { ACTIVE_LISTINGS, applyFilters } from '../fixtures/listings.fixture';
 
 describe('Filter Regression Framework', () => {
   beforeEach(() => {
