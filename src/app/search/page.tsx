@@ -107,62 +107,14 @@ export default async function SearchPage({
     const session = await auth();
     const userId = session?.user?.id;
 
-    const { q, filterParams, requestedPage, sortOption } = parseSearchParams(rawParams);
+    const { q, filterParams, requestedPage, sortOption, boundsRequired } = parseSearchParams(rawParams);
 
     // Fetch saved listings in parallel (non-blocking)
     const savedPromise = userId ? getSavedListingIds(userId) : Promise.resolve([]);
 
-    // Track whether v2 was used successfully
-    let usedV2 = false;
-    let v2MapData: V2MapData | null = null;
-    let paginatedResult: PaginatedResult<ListingData> | PaginatedResultHybrid<ListingData> | undefined;
-    let unboundedSearch = false;
-
-    // Check if v2 is enabled via feature flag OR query param override (?v2=1)
-    const v2Override = rawParams.v2 === '1' || rawParams.v2 === 'true';
-    const useV2Search = features.searchV2 || v2Override;
-
-    // Try v2 orchestration if enabled
-    if (useV2Search) {
-        try {
-            // Build raw params for v2 service (handles repeated params properly)
-            const rawParamsForV2 = buildRawParamsFromSearchParams(new URLSearchParams(
-                Object.entries(rawParams).flatMap(([key, value]) =>
-                    Array.isArray(value) ? value.map(v => [key, v]) : value ? [[key, value]] : []
-                )
-            ));
-
-            const v2Result = await executeSearchV2({
-                rawParams: rawParamsForV2,
-                limit: ITEMS_PER_PAGE,
-            });
-
-            // Track unbounded search for handling outside try/catch
-            if (v2Result.unboundedSearch) {
-                unboundedSearch = true;
-            } else if (v2Result.response && v2Result.paginatedResult) {
-                // V2 succeeded - use its data
-                usedV2 = true;
-                paginatedResult = v2Result.paginatedResult;
-
-                // Construct v2MapData for context injection
-                // PersistentMapWrapper (in layout) will read this via SearchV2DataContext
-                v2MapData = {
-                    geojson: v2Result.response.map.geojson,
-                    pins: v2Result.response.map.pins,
-                    mode: v2Result.response.meta.mode,
-                };
-            }
-        } catch (err) {
-            // V2 failed - will fall back to v1 below
-            console.warn('[search/page] V2 orchestration failed, falling back to v1:', {
-                error: err instanceof Error ? err.message : 'Unknown error',
-            });
-        }
-    }
-
-    // Handle unbounded search: user entered text but no location (outside try/catch for lint)
-    if (unboundedSearch) {
+    // Early return for unbounded searches - check BEFORE any search attempt
+    // This ensures friendly UX regardless of V2/V1 path or failures
+    if (boundsRequired) {
         return (
             <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
                 <div className="text-center py-12">
@@ -186,6 +138,52 @@ export default async function SearchPage({
                 </div>
             </div>
         );
+    }
+
+    // Track whether v2 was used successfully
+    let usedV2 = false;
+    let v2MapData: V2MapData | null = null;
+    let paginatedResult: PaginatedResult<ListingData> | PaginatedResultHybrid<ListingData> | undefined;
+
+    // Check if v2 is enabled via feature flag OR query param override (?v2=1)
+    const v2Override = rawParams.v2 === '1' || rawParams.v2 === 'true';
+    const useV2Search = features.searchV2 || v2Override;
+
+    // Try v2 orchestration if enabled
+    if (useV2Search) {
+        try {
+            // Build raw params for v2 service (handles repeated params properly)
+            const rawParamsForV2 = buildRawParamsFromSearchParams(new URLSearchParams(
+                Object.entries(rawParams).flatMap(([key, value]) =>
+                    Array.isArray(value) ? value.map(v => [key, v]) : value ? [[key, value]] : []
+                )
+            ));
+
+            const v2Result = await executeSearchV2({
+                rawParams: rawParamsForV2,
+                limit: ITEMS_PER_PAGE,
+            });
+
+            // V2 returned valid data - use it
+            if (v2Result.response && v2Result.paginatedResult) {
+                // V2 succeeded - use its data
+                usedV2 = true;
+                paginatedResult = v2Result.paginatedResult;
+
+                // Construct v2MapData for context injection
+                // PersistentMapWrapper (in layout) will read this via SearchV2DataContext
+                v2MapData = {
+                    geojson: v2Result.response.map.geojson,
+                    pins: v2Result.response.map.pins,
+                    mode: v2Result.response.meta.mode,
+                };
+            }
+        } catch (err) {
+            // V2 failed - will fall back to v1 below
+            console.warn('[search/page] V2 orchestration failed, falling back to v1:', {
+                error: err instanceof Error ? err.message : 'Unknown error',
+            });
+        }
     }
 
     // V1 fallback path (when v2 disabled or failed)
