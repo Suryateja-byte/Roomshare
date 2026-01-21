@@ -324,6 +324,16 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         params.delete('cursorStack');
         params.delete('pageNumber');
 
+        // Clear ALL filter params BEFORE setting new values
+        // This prevents stale values from persisting when filters are cleared
+        const filterParamsToDelete = [
+            'q', 'minPrice', 'maxPrice', 'lat', 'lng',
+            'moveInDate', 'leaseDuration', 'roomType',
+            'amenities', 'houseRules', 'languages',
+            'genderPreference', 'householdGender'
+        ];
+        filterParamsToDelete.forEach(param => params.delete(param));
+
         // Only include query if it has actual content (not just whitespace)
         if (trimmedLocation && trimmedLocation.length >= 2) {
             params.set('q', trimmedLocation);

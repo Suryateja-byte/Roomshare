@@ -675,4 +675,132 @@ describe('SearchForm', () => {
       expect(mockPush).toHaveBeenCalled()
     })
   })
+
+  // ============================================
+  // Stale URL Parameter Cleanup Tests
+  // ============================================
+
+  describe('stale URL parameter cleanup', () => {
+    describe('clearing single-value filters removes them from URL', () => {
+      it('removes moveInDate from URL when value is invalid (past date)', async () => {
+        // Past dates are rejected by validation, so stale past date should not persist
+        mockSearchParams.set('moveInDate', '2024-06-01')
+        mockSearchParams.set('lat', '37.7749')
+        mockSearchParams.set('lng', '-122.4194')
+        render(<SearchForm />)
+
+        const form = screen.getByRole('search')
+        fireEvent.submit(form)
+        jest.advanceTimersByTime(500)
+
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
+        expect(pushCall).not.toContain('moveInDate')
+      })
+
+      it('removes roomType from URL when value is invalid', async () => {
+        // Invalid roomType values should be rejected and not persist
+        mockSearchParams.set('roomType', 'InvalidRoomType')
+        mockSearchParams.set('lat', '37.7749')
+        mockSearchParams.set('lng', '-122.4194')
+        render(<SearchForm />)
+
+        const form = screen.getByRole('search')
+        fireEvent.submit(form)
+        jest.advanceTimersByTime(500)
+
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
+        expect(pushCall).not.toContain('roomType')
+      })
+
+      it('removes genderPreference from URL when value is invalid', async () => {
+        // Invalid genderPreference values should be rejected and not persist
+        mockSearchParams.set('genderPreference', 'INVALID_VALUE')
+        mockSearchParams.set('lat', '37.7749')
+        mockSearchParams.set('lng', '-122.4194')
+        render(<SearchForm />)
+
+        const form = screen.getByRole('search')
+        fireEvent.submit(form)
+        jest.advanceTimersByTime(500)
+
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
+        expect(pushCall).not.toContain('genderPreference')
+      })
+    })
+
+    describe('location change clears old location params', () => {
+      it('removes old q/lat/lng when location is cleared', async () => {
+        mockSearchParams.set('q', 'San Francisco')
+        mockSearchParams.set('lat', '37.7749')
+        mockSearchParams.set('lng', '-122.4194')
+        render(<SearchForm />)
+
+        const locationInput = screen.getByTestId('location-input')
+        await user.clear(locationInput)
+
+        const form = screen.getByRole('search')
+        fireEvent.submit(form)
+        jest.advanceTimersByTime(500)
+
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
+        expect(pushCall).not.toContain('q=San')
+        expect(pushCall).not.toContain('lat=')
+        expect(pushCall).not.toContain('lng=')
+      })
+    })
+
+    describe('array filters do not accumulate', () => {
+      it('does not duplicate amenities on repeated searches', async () => {
+        mockSearchParams.set('amenities', 'Wifi')
+        mockSearchParams.append('amenities', 'AC')
+        mockSearchParams.set('lat', '37.7749')
+        mockSearchParams.set('lng', '-122.4194')
+        render(<SearchForm />)
+
+        const form = screen.getByRole('search')
+        fireEvent.submit(form)
+        jest.advanceTimersByTime(500)
+
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
+        const wifiMatches = (pushCall.match(/amenities=Wifi/g) || []).length
+        expect(wifiMatches).toBeLessThanOrEqual(1)
+      })
+
+      it('clears invalid amenities from URL', async () => {
+        // Invalid amenity values should not persist
+        mockSearchParams.set('amenities', 'InvalidAmenity')
+        mockSearchParams.set('lat', '37.7749')
+        mockSearchParams.set('lng', '-122.4194')
+        render(<SearchForm />)
+
+        const form = screen.getByRole('search')
+        fireEvent.submit(form)
+        jest.advanceTimersByTime(500)
+
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
+        expect(pushCall).not.toContain('InvalidAmenity')
+      })
+    })
+
+    describe('preserves map-related params', () => {
+      it('preserves bounds and sort across filter changes', async () => {
+        mockSearchParams.set('minLat', '37.5')
+        mockSearchParams.set('maxLat', '38.0')
+        mockSearchParams.set('minLng', '-123.0')
+        mockSearchParams.set('maxLng', '-122.0')
+        mockSearchParams.set('sort', 'price_asc')
+        mockSearchParams.set('nearMatches', '1')
+        render(<SearchForm />)
+
+        const form = screen.getByRole('search')
+        fireEvent.submit(form)
+        jest.advanceTimersByTime(500)
+
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
+        expect(pushCall).toContain('minLat=')
+        expect(pushCall).toContain('sort=price_asc')
+        expect(pushCall).toContain('nearMatches=1')
+      })
+    })
+  })
 })
