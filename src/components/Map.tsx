@@ -148,6 +148,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         setSearchHandler,
         setResetHandler,
         setSearchLocation,
+        setProgrammaticMove,
     } = useMapBounds();
 
     // Banner visibility from context
@@ -241,6 +242,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             mapboxSource.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
                 if (err || !feature.geometry || feature.geometry.type !== 'Point') return;
 
+                // Mark as programmatic move to prevent banner showing
+                setProgrammaticMove(true);
                 mapRef.current?.flyTo({
                     center: feature.geometry.coordinates as [number, number],
                     zoom: zoom,
@@ -250,7 +253,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         } catch (error) {
             console.warn('Cluster expansion failed', error);
         }
-    }, []);
+    }, [setProgrammaticMove]);
 
     // Update unclustered listings when map moves (for rendering individual markers)
     const updateUnclusteredListings = useCallback(() => {
@@ -354,6 +357,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
         const points = listings.map(l => ({ lng: l.location.lng, lat: l.location.lat }));
 
+        // Mark as programmatic move to prevent banner showing
+        setProgrammaticMove(true);
+
         if (points.length === 1) {
             mapRef.current.flyTo({
                 center: [points[0].lng, points[0].lat],
@@ -378,7 +384,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 }
             );
         }
-    }, [listings, searchParams]);
+    }, [listings, searchParams, setProgrammaticMove]);
 
     // Listen for fly-to events from location search
     useEffect(() => {
@@ -386,6 +392,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             if (!mapRef.current) return;
 
             const { lat, lng, bbox, zoom } = event.detail;
+
+            // Mark as programmatic move to prevent banner showing
+            setProgrammaticMove(true);
 
             // If bbox (bounding box) is available, use fitBounds for a better view
             if (bbox) {
@@ -417,7 +426,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         return () => {
             window.removeEventListener(MAP_FLY_TO_EVENT, handleFlyTo as EventListener);
         };
-    }, []);
+    }, [setProgrammaticMove]);
 
     // Clear searching state when listings update from SSR
     // Also update E2E marker count tracking
@@ -552,6 +561,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         setResetHandler(() => {
             if (!mapRef.current || !urlBoundsRef.current) return;
 
+            // Mark as programmatic move to prevent banner showing
+            setProgrammaticMove(true);
+
             const { minLng, maxLng, minLat, maxLat } = urlBoundsRef.current;
             mapRef.current.fitBounds(
                 [[minLng, minLat], [maxLng, maxLat]],
@@ -560,7 +572,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             setHasUserMoved(false);
             setBoundsDirty(false);
         });
-    }, [executeMapSearch, setSearchHandler, setResetHandler, setHasUserMoved, setBoundsDirty]);
+    }, [executeMapSearch, setSearchHandler, setResetHandler, setHasUserMoved, setBoundsDirty, setProgrammaticMove]);
 
     const handleMoveEnd = (e: ViewStateChangeEvent) => {
         // Update unclustered listings for rendering individual markers
@@ -718,6 +730,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         // Set active listing for card highlight and scroll-to
                         setActive(position.listing.id);
                         requestScrollTo(position.listing.id);
+                        // Mark as programmatic move to prevent banner showing
+                        setProgrammaticMove(true);
                         // Smooth pan to center popup both horizontally and vertically
                         mapRef.current?.easeTo({
                             center: [position.lng, position.lat],

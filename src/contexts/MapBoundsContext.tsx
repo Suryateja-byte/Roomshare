@@ -23,6 +23,8 @@ import {
   useState,
   useCallback,
   useMemo,
+  useRef,
+  useEffect,
 } from "react";
 
 /** Coordinates for map bounds */
@@ -46,6 +48,8 @@ interface MapBoundsState {
   boundsDirty: boolean;
   /** Whether "search as I move" toggle is ON */
   searchAsMove: boolean;
+  /** Whether current map movement is programmatic (flyTo/fitBounds/easeTo) */
+  isProgrammaticMove: boolean;
   /** Original search location name (from q param) */
   searchLocationName: string | null;
   /** Original search location center coordinates */
@@ -65,6 +69,8 @@ interface MapBoundsContextValue extends MapBoundsState {
   setBoundsDirty: (value: boolean) => void;
   /** Update searchAsMove (called by Map) */
   setSearchAsMove: (value: boolean) => void;
+  /** Set programmatic move flag (called before flyTo/fitBounds/easeTo) */
+  setProgrammaticMove: (value: boolean) => void;
   /** Update search location info (called when URL changes) */
   setSearchLocation: (name: string | null, center: PointCoords | null) => void;
   /** Update current map bounds (called by Map on moveend) */
@@ -89,10 +95,14 @@ function isPointInBounds(point: PointCoords, bounds: MapBoundsCoords): boolean {
   );
 }
 
+/** Auto-clear timeout for programmatic move flag (ms) */
+const PROGRAMMATIC_MOVE_TIMEOUT = 1500;
+
 export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
-  const [hasUserMoved, setHasUserMoved] = useState(false);
+  const [hasUserMoved, setHasUserMovedState] = useState(false);
   const [boundsDirty, setBoundsDirty] = useState(false);
   const [searchAsMove, setSearchAsMove] = useState(false);
+  const [isProgrammaticMove, setIsProgrammaticMoveState] = useState(false);
   const [searchLocationName, setSearchLocationName] = useState<string | null>(
     null,
   );
@@ -106,6 +116,59 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   const [resetHandler, setResetHandlerState] = useState<(() => void) | null>(
     null,
   );
+
+  // Ref to track programmatic move state for the safe setter callback
+  const isProgrammaticMoveRef = useRef(false);
+  // Ref to track timeout for cleanup
+  const programmaticMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (programmaticMoveTimeoutRef.current) {
+        clearTimeout(programmaticMoveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  /**
+   * Set programmatic move flag with auto-clear timeout
+   * Call this BEFORE flyTo/fitBounds/easeTo to prevent banner showing
+   */
+  const setProgrammaticMove = useCallback((value: boolean) => {
+    setIsProgrammaticMoveState(value);
+    isProgrammaticMoveRef.current = value;
+
+    // Clear any existing timeout
+    if (programmaticMoveTimeoutRef.current) {
+      clearTimeout(programmaticMoveTimeoutRef.current);
+      programmaticMoveTimeoutRef.current = null;
+    }
+
+    // Auto-clear after animation duration
+    if (value) {
+      programmaticMoveTimeoutRef.current = setTimeout(() => {
+        setIsProgrammaticMoveState(false);
+        isProgrammaticMoveRef.current = false;
+      }, PROGRAMMATIC_MOVE_TIMEOUT);
+    }
+  }, []);
+
+  /**
+   * Safe setter for hasUserMoved that checks programmatic move flag
+   * Only sets hasUserMoved to true if NOT a programmatic move
+   */
+  const setHasUserMoved = useCallback((value: boolean) => {
+    // Always allow setting to false (reset)
+    if (!value) {
+      setHasUserMovedState(false);
+      return;
+    }
+    // Only set to true if NOT a programmatic move
+    if (!isProgrammaticMoveRef.current) {
+      setHasUserMovedState(true);
+    }
+  }, []);
 
   const setSearchHandler = useCallback((handler: () => void) => {
     setSearchHandlerState(() => handler);
@@ -154,6 +217,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       hasUserMoved,
       boundsDirty,
       searchAsMove,
+      isProgrammaticMove,
       searchLocationName,
       searchLocationCenter,
       locationConflict,
@@ -162,6 +226,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       setHasUserMoved,
       setBoundsDirty,
       setSearchAsMove,
+      setProgrammaticMove,
       setSearchLocation,
       setCurrentMapBounds,
       setSearchHandler,
@@ -171,15 +236,17 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       hasUserMoved,
       boundsDirty,
       searchAsMove,
+      isProgrammaticMove,
       searchLocationName,
       searchLocationCenter,
       locationConflict,
       searchCurrentArea,
       resetToUrlBounds,
+      setHasUserMoved,
+      setProgrammaticMove,
       setSearchLocation,
       setCurrentMapBounds,
-      // Note: setters from useState are stable, setSearchHandler/setResetHandler
-      // have empty deps, so they don't need to be in the dependency array
+      // Note: setSearchHandler/setResetHandler have empty deps, so they're stable
     ],
   );
 
@@ -198,6 +265,7 @@ export function useMapBounds() {
       hasUserMoved: false,
       boundsDirty: false,
       searchAsMove: false,
+      isProgrammaticMove: false,
       searchLocationName: null,
       searchLocationCenter: null,
       locationConflict: false,
@@ -206,6 +274,7 @@ export function useMapBounds() {
       setHasUserMoved: () => {},
       setBoundsDirty: () => {},
       setSearchAsMove: () => {},
+      setProgrammaticMove: () => {},
       setSearchLocation: () => {},
       setCurrentMapBounds: () => {},
       setSearchHandler: () => {},
