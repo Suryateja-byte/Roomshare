@@ -116,6 +116,7 @@ export default async function SearchPage({
     let usedV2 = false;
     let v2MapData: V2MapData | null = null;
     let paginatedResult: PaginatedResult<ListingData> | PaginatedResultHybrid<ListingData> | undefined;
+    let unboundedSearch = false;
 
     // Check if v2 is enabled via feature flag OR query param override (?v2=1)
     const v2Override = rawParams.v2 === '1' || rawParams.v2 === 'true';
@@ -136,34 +137,10 @@ export default async function SearchPage({
                 limit: ITEMS_PER_PAGE,
             });
 
-            // Handle unbounded search: user entered text but no location
+            // Track unbounded search for handling outside try/catch
             if (v2Result.unboundedSearch) {
-                return (
-                    <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
-                        <div className="text-center py-12">
-                            <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
-                                <Search className="w-8 h-8 text-amber-600 dark:text-amber-400" />
-                            </div>
-                            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
-                                Please select a location
-                            </h2>
-                            <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6">
-                                To search for &ldquo;{q}&rdquo;, please select a location from the dropdown suggestions.
-                                This helps us find relevant listings in your area.
-                            </p>
-                            <Link
-                                href="/"
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
-                            >
-                                <Search className="w-4 h-4" />
-                                Try a new search
-                            </Link>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (v2Result.response && v2Result.paginatedResult) {
+                unboundedSearch = true;
+            } else if (v2Result.response && v2Result.paginatedResult) {
                 // V2 succeeded - use its data
                 usedV2 = true;
                 paginatedResult = v2Result.paginatedResult;
@@ -176,12 +153,39 @@ export default async function SearchPage({
                     mode: v2Result.response.meta.mode,
                 };
             }
-        } catch (error) {
+        } catch (err) {
             // V2 failed - will fall back to v1 below
             console.warn('[search/page] V2 orchestration failed, falling back to v1:', {
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: err instanceof Error ? err.message : 'Unknown error',
             });
         }
+    }
+
+    // Handle unbounded search: user entered text but no location (outside try/catch for lint)
+    if (unboundedSearch) {
+        return (
+            <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
+                <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                        <Search className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
+                        Please select a location
+                    </h2>
+                    <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6">
+                        To search for &ldquo;{q}&rdquo;, please select a location from the dropdown suggestions.
+                        This helps us find relevant listings in your area.
+                    </p>
+                    <Link
+                        href="/"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
+                    >
+                        <Search className="w-4 h-4" />
+                        Try a new search
+                    </Link>
+                </div>
+            </div>
+        );
     }
 
     // V1 fallback path (when v2 disabled or failed)
