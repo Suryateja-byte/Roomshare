@@ -1,6 +1,11 @@
 "use client";
 
 import { ReactNode } from "react";
+import SearchViewToggle from "./SearchViewToggle";
+import PersistentMapWrapper from "./PersistentMapWrapper";
+import { useMapPreference } from "@/hooks/useMapPreference";
+import { useMapMovedBanner } from "@/contexts/MapBoundsContext";
+import { MapMovedBanner } from "./map/MapMovedBanner";
 
 interface SearchLayoutViewProps {
   children: ReactNode;
@@ -10,17 +15,48 @@ interface SearchLayoutViewProps {
  * SearchLayoutView - Manages the split view layout for search
  *
  * Handles:
- * - List/Map split view rendering
- * - Map toggle visibility
+ * - List/Map split view rendering via SearchViewToggle
+ * - Persistent map that stays mounted across navigations
  * - Mobile vs desktop layout differences
+ * - User preference for map visibility (persisted in localStorage)
  *
- * This is a stub implementation - full implementation pending
+ * CRITICAL: This component lives in the layout, so:
+ * - PersistentMapWrapper stays mounted across /search navigations
+ * - Prevents Mapbox re-initialization (saves billing)
+ * - Map reads listings from SearchV2DataContext (set by page)
+ *
+ * Cost optimization:
+ * - Desktop users can hide the map (saves Mapbox billing per init)
+ * - Mobile users see list-only by default (tap to show map)
+ * - Preferences persist via localStorage
  */
 export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
+  const {
+    shouldShowMap,
+    shouldRenderMap,
+    toggleMap,
+    isLoading,
+  } = useMapPreference();
+
+  // Banner state for "search this area" / "reset" when user pans with search-as-move OFF
+  const { showBanner, showLocationConflict, onSearch, onReset } = useMapMovedBanner();
+
   return (
-    <div className="flex-1 flex overflow-hidden">
-      {/* Results list from page */}
-      <div className="flex-1 overflow-y-auto">{children}</div>
-    </div>
+    <SearchViewToggle
+      mapComponent={<PersistentMapWrapper shouldRenderMap={shouldRenderMap} />}
+      shouldShowMap={shouldShowMap}
+      onToggle={toggleMap}
+      isLoading={isLoading}
+    >
+      {/* List variant banner - shows above results when map is hidden or on mobile */}
+      {(showBanner || showLocationConflict) && (
+        <MapMovedBanner
+          variant="list"
+          onSearch={onSearch}
+          onReset={onReset}
+        />
+      )}
+      {children}
+    </SearchViewToggle>
   );
 }

@@ -74,6 +74,10 @@ const serverEnvSchema = z.object({
   // Radar API (server-side, for nearby places search)
   RADAR_SECRET_KEY: z.string().optional(),
 
+  // Search optimization (optional - defaults to slow LIKE queries if not enabled)
+  // CRITICAL: Should be enabled in production for performance
+  ENABLE_SEARCH_DOC: z.enum(["true", "false"]).optional(),
+
   // Node environment
   NODE_ENV: z
     .enum(["development", "production", "test"])
@@ -264,6 +268,11 @@ export const features = {
   searchV2: true as const,
   searchKeyset: true as const,
   searchRanking: true as const,
+  // SearchDoc optimized queries (CRITICAL for production performance)
+  get searchDoc() {
+    const e = getServerEnv();
+    return e.ENABLE_SEARCH_DOC === "true";
+  },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals
   get searchDebugRanking() {
@@ -314,6 +323,11 @@ export function logStartupWarnings(): void {
   if (!features.nearbyPlaces) {
     warnings.push(
       "Radar API not fully configured - nearby places feature disabled",
+    );
+  }
+  if (!features.searchDoc) {
+    warnings.push(
+      "ENABLE_SEARCH_DOC not enabled - using slow LIKE queries for text search (CRITICAL: enable for production)",
     );
   }
 

@@ -22,6 +22,8 @@ import { Button } from './ui/button';
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from './SearchForm';
 import { useListingFocus } from '@/contexts/ListingFocusContext';
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
+import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
+import { MapMovedBanner } from './map/MapMovedBanner';
 import { cn } from '@/lib/utils';
 
 interface Listing {
@@ -126,7 +128,6 @@ const CLUSTER_THRESHOLD = 50;
 
 export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
-    const [searchAsMove, setSearchAsMove] = useState(true);
     const [unclusteredListings, setUnclusteredListings] = useState<Listing[]>([]);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -136,11 +137,29 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const transitionContext = useSearchTransitionSafe();
+
+    // Map bounds context for "search as move" and dirty tracking
+    const {
+        searchAsMove,
+        setSearchAsMove,
+        setHasUserMoved,
+        setBoundsDirty,
+        setCurrentMapBounds,
+        setSearchHandler,
+        setResetHandler,
+        setSearchLocation,
+    } = useMapBounds();
+
+    // Banner visibility from context
+    const { showBanner, showLocationConflict, onSearch, onReset } = useMapMovedBanner();
+
     const mapRef = useRef<any>(null);
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
     const lastSearchTimeRef = useRef<number>(0);
     const pendingBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
     const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // Track URL bounds for reset functionality
+    const urlBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
 
     // Minimum interval between map searches (prevents 429 rate limiting)
     const MIN_SEARCH_INTERVAL_MS = 2000;
@@ -425,6 +444,41 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         };
     }, []);
 
+    // Sync URL bounds to context and track for reset functionality
+    useEffect(() => {
+        const minLat = searchParams.get('minLat');
+        const maxLat = searchParams.get('maxLat');
+        const minLng = searchParams.get('minLng');
+        const maxLng = searchParams.get('maxLng');
+
+        if (minLat && maxLat && minLng && maxLng) {
+            const bounds = {
+                minLat: parseFloat(minLat),
+                maxLat: parseFloat(maxLat),
+                minLng: parseFloat(minLng),
+                maxLng: parseFloat(maxLng),
+            };
+            urlBoundsRef.current = bounds;
+        }
+
+        // Extract search location from URL for location conflict detection
+        const q = searchParams.get('q');
+        const lat = searchParams.get('lat');
+        const lng = searchParams.get('lng');
+
+        if (q && lat && lng) {
+            setSearchLocation(q, { lat: parseFloat(lat), lng: parseFloat(lng) });
+        } else if (q) {
+            setSearchLocation(q, null);
+        } else {
+            setSearchLocation(null, null);
+        }
+
+        // Reset dirty state when URL changes (new search performed)
+        setHasUserMoved(false);
+        setBoundsDirty(false);
+    }, [searchParams, setSearchLocation, setHasUserMoved, setBoundsDirty]);
+
     // Suppress mapbox-gl worker communication errors during HMR/Turbopack
     // These are non-fatal and occur when the worker connection is lost during hot reload
     useEffect(() => {
@@ -471,52 +525,100 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         }
     }, [router, searchParams, transitionContext]);
 
-    const handleMoveEnd = (e: ViewStateChangeEvent) => {
-        // Update unclustered listings for rendering individual markers
-        updateUnclusteredListings();
+    // Register search and reset handlers with context (after executeMapSearch is defined)
+    useEffect(() => {
+        // Search handler: execute search with current map bounds
+        setSearchHandler(() => {
+            if (!mapRef.current) return;
+            const map = mapRef.current.getMap();
+            if (!map) return;
 
-        if (!searchAsMove) return;
-
-        if (debounceTimer.current) {
-            clearTimeout(debounceTimer.current);
-        }
-
-        debounceTimer.current = setTimeout(() => {
-            const mapBounds = e.target.getBounds();
+            const mapBounds = map.getBounds();
             if (!mapBounds) return;
 
             const bounds = {
                 minLng: mapBounds.getWest(),
                 maxLng: mapBounds.getEast(),
                 minLat: mapBounds.getSouth(),
-                maxLat: mapBounds.getNorth()
+                maxLat: mapBounds.getNorth(),
             };
 
-            const now = Date.now();
-            const timeSinceLastSearch = now - lastSearchTimeRef.current;
+            executeMapSearch(bounds);
+            setHasUserMoved(false);
+            setBoundsDirty(false);
+        });
 
-            // If we're within the throttle window, queue the search for later
-            if (timeSinceLastSearch < MIN_SEARCH_INTERVAL_MS) {
-                pendingBoundsRef.current = bounds;
+        // Reset handler: fly back to URL bounds
+        setResetHandler(() => {
+            if (!mapRef.current || !urlBoundsRef.current) return;
 
-                // Clear any existing throttle timeout
-                if (throttleTimeoutRef.current) {
-                    clearTimeout(throttleTimeoutRef.current);
-                }
+            const { minLng, maxLng, minLat, maxLat } = urlBoundsRef.current;
+            mapRef.current.fitBounds(
+                [[minLng, minLat], [maxLng, maxLat]],
+                { padding: 50, duration: 1000 }
+            );
+            setHasUserMoved(false);
+            setBoundsDirty(false);
+        });
+    }, [executeMapSearch, setSearchHandler, setResetHandler, setHasUserMoved, setBoundsDirty]);
 
-                // Schedule the pending search for when the throttle window expires
-                const delay = MIN_SEARCH_INTERVAL_MS - timeSinceLastSearch;
-                throttleTimeoutRef.current = setTimeout(() => {
-                    if (pendingBoundsRef.current) {
-                        executeMapSearch(pendingBoundsRef.current);
-                    }
-                }, delay);
-                return;
+    const handleMoveEnd = (e: ViewStateChangeEvent) => {
+        // Update unclustered listings for rendering individual markers
+        updateUnclusteredListings();
+
+        // Get current map bounds
+        const mapBounds = e.target.getBounds();
+        if (!mapBounds) return;
+
+        const bounds = {
+            minLng: mapBounds.getWest(),
+            maxLng: mapBounds.getEast(),
+            minLat: mapBounds.getSouth(),
+            maxLat: mapBounds.getNorth()
+        };
+
+        // Always update current bounds in context for location conflict detection
+        setCurrentMapBounds(bounds);
+
+        // Mark that user has manually moved the map
+        setHasUserMoved(true);
+
+        // If search-as-move is ON, trigger search with throttle/debounce
+        if (searchAsMove) {
+            if (debounceTimer.current) {
+                clearTimeout(debounceTimer.current);
             }
 
-            // Execute immediately if outside throttle window
-            executeMapSearch(bounds);
-        }, 500); // 500ms debounce
+            debounceTimer.current = setTimeout(() => {
+                const now = Date.now();
+                const timeSinceLastSearch = now - lastSearchTimeRef.current;
+
+                // If we're within the throttle window, queue the search for later
+                if (timeSinceLastSearch < MIN_SEARCH_INTERVAL_MS) {
+                    pendingBoundsRef.current = bounds;
+
+                    // Clear any existing throttle timeout
+                    if (throttleTimeoutRef.current) {
+                        clearTimeout(throttleTimeoutRef.current);
+                    }
+
+                    // Schedule the pending search for when the throttle window expires
+                    const delay = MIN_SEARCH_INTERVAL_MS - timeSinceLastSearch;
+                    throttleTimeoutRef.current = setTimeout(() => {
+                        if (pendingBoundsRef.current) {
+                            executeMapSearch(pendingBoundsRef.current);
+                        }
+                    }, delay);
+                    return;
+                }
+
+                // Execute immediately if outside throttle window
+                executeMapSearch(bounds);
+            }, 500); // 500ms debounce
+        } else {
+            // Search-as-move is OFF - mark bounds as dirty so banner shows
+            setBoundsDirty(true);
+        }
     };
 
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -782,6 +884,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     Search as I move the map
                 </label>
             </div>
+
+            {/* MapMovedBanner - Shows when user panned with search-as-move OFF */}
+            {(showBanner || showLocationConflict) && (
+                <MapMovedBanner
+                    variant="map"
+                    onSearch={onSearch}
+                    onReset={onReset}
+                />
+            )}
         </div>
     );
 }
