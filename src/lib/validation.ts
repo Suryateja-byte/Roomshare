@@ -28,8 +28,9 @@ const LNG_MAX = 180;
 
 // Maximum viewport span (5° ~550km allows regional views with clustering)
 // Increased from 2 to match Airbnb-style behavior: show markers at wider zoom
-const MAX_LAT_SPAN = 5;
-const MAX_LNG_SPAN = 5;
+// Exported for reuse in search-v2-service bounds clamping
+export const MAX_LAT_SPAN = 5;
+export const MAX_LNG_SPAN = 5;
 
 /**
  * Validates and parses bounding box parameters from URL query string.
@@ -87,4 +88,47 @@ export function validateAndParseBounds(
   }
 
   return { valid: true, bounds: parsed };
+}
+
+/**
+ * Clamps bounds to max span (keeps center, reduces span).
+ * Used for list queries where we silently reduce oversized viewports
+ * instead of rejecting them (unlike map-listings which rejects).
+ *
+ * @param bounds - The bounds to clamp
+ * @returns Clamped bounds centered on original viewport center
+ */
+export function clampBoundsToMaxSpan(bounds: MapBounds): MapBounds {
+  const { minLat, maxLat, minLng, maxLng } = bounds;
+
+  const latSpan = maxLat - minLat;
+  const crossesAntimeridian = minLng > maxLng;
+  const lngSpan = crossesAntimeridian
+    ? (180 - minLng) + (maxLng + 180)
+    : maxLng - minLng;
+
+  // Calculate center
+  const centerLat = (minLat + maxLat) / 2;
+  let centerLng: number;
+  if (crossesAntimeridian) {
+    const adjustedMax = maxLng + 360;
+    centerLng = (minLng + adjustedMax) / 2;
+    if (centerLng > 180) centerLng -= 360;
+  } else {
+    centerLng = (minLng + maxLng) / 2;
+  }
+
+  // Clamp spans
+  const clampedLatSpan = Math.min(latSpan, MAX_LAT_SPAN);
+  const clampedLngSpan = Math.min(lngSpan, MAX_LNG_SPAN);
+
+  const halfLat = clampedLatSpan / 2;
+  const halfLng = clampedLngSpan / 2;
+
+  return {
+    minLat: Math.max(LAT_MIN, centerLat - halfLat),
+    maxLat: Math.min(LAT_MAX, centerLat + halfLat),
+    minLng: Math.max(LNG_MIN, centerLng - halfLng),
+    maxLng: Math.min(LNG_MAX, centerLng + halfLng),
+  };
 }

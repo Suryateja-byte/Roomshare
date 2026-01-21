@@ -7,6 +7,18 @@ import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
 import { SUPPORTED_LANGUAGES, getLanguageName, normalizeLanguages, type LanguageCode } from '@/lib/languages';
 import FilterModal from '@/components/search/FilterModal';
+// Import canonical allowlists and aliases from shared parsing module
+// This ensures client-side parsing matches server-side validation
+import {
+    VALID_AMENITIES,
+    VALID_HOUSE_RULES,
+    VALID_LEASE_DURATIONS,
+    VALID_ROOM_TYPES,
+    VALID_GENDER_PREFERENCES,
+    VALID_HOUSEHOLD_GENDERS,
+    LEASE_DURATION_ALIASES,
+    ROOM_TYPE_ALIASES,
+} from '@/lib/search-params';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -15,12 +27,14 @@ const SEARCH_DEBOUNCE_MS = 300;
 const RECENT_SEARCHES_KEY = 'roomshare-recent-searches';
 const MAX_RECENT_SEARCHES = 5;
 
-const AMENITY_OPTIONS = ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool', 'Furnished'] as const;
-const HOUSE_RULE_OPTIONS = ['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'] as const;
-const GENDER_PREFERENCE_OPTIONS = ['any', 'MALE_ONLY', 'FEMALE_ONLY', 'NO_PREFERENCE'] as const;
-const HOUSEHOLD_GENDER_OPTIONS = ['any', 'ALL_MALE', 'ALL_FEMALE', 'MIXED'] as const;
-const LEASE_DURATION_OPTIONS = ['any', 'Month-to-month', '3 months', '6 months', '12 months', 'Flexible'] as const;
-const ROOM_TYPE_OPTIONS = ['any', 'Private Room', 'Shared Room', 'Entire Place'] as const;
+// Re-export canonical allowlists with legacy names for backwards compatibility within this component
+// This allows gradual migration without breaking existing code
+const AMENITY_OPTIONS = VALID_AMENITIES;
+const HOUSE_RULE_OPTIONS = VALID_HOUSE_RULES;
+const GENDER_PREFERENCE_OPTIONS = VALID_GENDER_PREFERENCES;
+const HOUSEHOLD_GENDER_OPTIONS = VALID_HOUSEHOLD_GENDERS;
+const LEASE_DURATION_OPTIONS = VALID_LEASE_DURATIONS;
+const ROOM_TYPE_OPTIONS = VALID_ROOM_TYPES;
 
 // Room type options for inline filter tabs
 const ROOM_TYPE_TABS = [
@@ -29,26 +43,6 @@ const ROOM_TYPE_TABS = [
     { value: 'Shared Room', label: 'Shared', icon: Users },
     { value: 'Entire Place', label: 'Entire', icon: Building2 },
 ] as const;
-
-// URL-friendly aliases for enum values
-const LEASE_DURATION_ALIASES: Record<string, string> = {
-    'month-to-month': 'Month-to-month',
-    'month_to_month': 'Month-to-month',
-    'mtm': 'Month-to-month',
-    '3_months': '3 months',
-    '6_months': '6 months',
-    '12_months': '12 months',
-    '1_year': '12 months',
-};
-
-const ROOM_TYPE_ALIASES: Record<string, string> = {
-    'private': 'Private Room',
-    'private_room': 'Private Room',
-    'shared': 'Shared Room',
-    'shared_room': 'Shared Room',
-    'entire': 'Entire Place',
-    'entire_place': 'Entire Place',
-};
 
 /**
  * Validate a move-in date string. Returns the date if valid (today or future, within 2 years),
@@ -311,13 +305,15 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             clearTimeout(searchTimeoutRef.current);
         }
 
-        const params = new URLSearchParams();
+        // Clone existing URL params to preserve bounds, nearMatches, and sort
+        // These are set by the map and should persist across filter changes
+        const params = new URLSearchParams(searchParams.toString());
 
-        // Preserve existing sort parameter from URL
-        const existingSort = searchParams.get('sort');
-        if (existingSort && ['recommended', 'price_asc', 'price_desc', 'newest', 'rating'].includes(existingSort)) {
-            params.set('sort', existingSort);
-        }
+        // Clear pagination params (filters changing = back to page 1)
+        params.delete('page');
+        params.delete('cursor');
+        params.delete('cursorStack');
+        params.delete('pageNumber');
 
         // Only include query if it has actual content (not just whitespace)
         const trimmedLocation = location.trim();
@@ -381,7 +377,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             // Reset searching state after navigation starts
             setTimeout(() => setIsSearching(false), 500);
         }, SEARCH_DEBOUNCE_MS);
-    }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching, saveRecentSearch]);
+    }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching, saveRecentSearch, searchParams]);
 
     // Cleanup timeout on unmount
     useEffect(() => {

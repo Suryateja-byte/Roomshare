@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { MapPin, Loader2, X, AlertCircle, SearchX } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 
@@ -45,6 +45,7 @@ export default function LocationSearchInput({
     const suggestionsRef = useRef<HTMLDivElement>(null);
     const requestIdRef = useRef(0);
     const abortRef = useRef<AbortController | null>(null);
+    const listboxId = useId();
 
     const [debouncedValue] = useDebounce(value, 300);
 
@@ -224,6 +225,13 @@ export default function LocationSearchInput({
                     placeholder={placeholder}
                     className="w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none text-sm truncate pr-8"
                     autoComplete="off"
+                    // ARIA combobox attributes for screen reader accessibility
+                    role="combobox"
+                    aria-expanded={showSuggestions && suggestions.length > 0}
+                    aria-controls={`${listboxId}-listbox`}
+                    aria-activedescendant={selectedIndex >= 0 ? `${listboxId}-option-${selectedIndex}` : undefined}
+                    aria-autocomplete="list"
+                    aria-haspopup="listbox"
                 />
 
                 {/* Loading/Clear indicator */}
@@ -248,9 +256,19 @@ export default function LocationSearchInput({
                     ref={suggestionsRef}
                     className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
                 >
-                    <ul className="p-2">
+                    <ul
+                        className="p-2"
+                        role="listbox"
+                        id={`${listboxId}-listbox`}
+                        aria-label="Location suggestions"
+                    >
                         {suggestions.map((suggestion, index) => (
-                            <li key={suggestion.id}>
+                            <li
+                                key={suggestion.id}
+                                role="option"
+                                id={`${listboxId}-option-${index}`}
+                                aria-selected={index === selectedIndex}
+                            >
                                 <button
                                     type="button"
                                     onClick={() => handleSelectSuggestion(suggestion)}
@@ -258,6 +276,7 @@ export default function LocationSearchInput({
                                         ? 'bg-zinc-100 dark:bg-zinc-800'
                                         : 'hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80'
                                         }`}
+                                    tabIndex={-1}
                                 >
                                     <MapPin className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getPlaceTypeIcon(suggestion.place_type)}`} />
                                     <div className="flex-1 min-w-0">

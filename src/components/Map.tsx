@@ -19,8 +19,10 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Home, Loader2, MapPin, X } from 'lucide-react';
 import { Button } from './ui/button';
-import { Checkbox } from './ui/checkbox';
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from './SearchForm';
+import { useListingFocus } from '@/contexts/ListingFocusContext';
+import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
+import { cn } from '@/lib/utils';
 
 interface Listing {
     id: string;
@@ -130,8 +132,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [areTilesLoading, setAreTilesLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+    const { hoveredId, setActive, requestScrollTo } = useListingFocus();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const transitionContext = useSearchTransitionSafe();
     const mapRef = useRef<any>(null);
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
     const lastSearchTimeRef = useRef<number>(0);
@@ -140,6 +144,29 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
     // Minimum interval between map searches (prevents 429 rate limiting)
     const MIN_SEARCH_INTERVAL_MS = 2000;
+
+    // E2E testing instrumentation - track map instance for persistence tests
+    // Only runs when NEXT_PUBLIC_E2E=true to avoid polluting production
+    useEffect(() => {
+        if (process.env.NEXT_PUBLIC_E2E === 'true') {
+            // Namespace to avoid global collisions
+            const roomshare = ((window as unknown as Record<string, unknown>).__roomshare || {}) as Record<string, unknown>;
+            (window as unknown as Record<string, unknown>).__roomshare = roomshare;
+
+            // Only set mapInstanceId once on mount (persists across re-renders)
+            if (!roomshare.mapInstanceId) {
+                roomshare.mapInstanceId = crypto.randomUUID();
+            }
+
+            // Increment init count each time component mounts
+            roomshare.mapInitCount = ((roomshare.mapInitCount as number) || 0) + 1;
+
+            console.log('[Map E2E] Component mounted', {
+                instanceId: roomshare.mapInstanceId,
+                initCount: roomshare.mapInitCount
+            });
+        }
+    }, []); // Empty deps = only on mount
 
     // Detect dark mode
     useEffect(() => {
@@ -374,8 +401,16 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     }, []);
 
     // Clear searching state when listings update from SSR
+    // Also update E2E marker count tracking
     useEffect(() => {
         setIsSearching(false);
+
+        // E2E testing: expose marker count for test verification
+        if (process.env.NEXT_PUBLIC_E2E === 'true') {
+            const roomshare = ((window as unknown as Record<string, unknown>).__roomshare || {}) as Record<string, unknown>;
+            (window as unknown as Record<string, unknown>).__roomshare = roomshare;
+            roomshare.markerCount = listings.length;
+        }
     }, [listings]);
 
     // Cleanup timers on unmount
@@ -412,7 +447,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         // Remove single point coordinates since we now have bounds
         params.delete('lat');
         params.delete('lng');
+        // Reset pagination state when bounds change (keyset + offset)
         params.delete('page');
+        params.delete('cursor');
+        params.delete('cursorStack');
+        params.delete('pageNumber');
 
         params.set('minLng', bounds.minLng.toString());
         params.set('maxLng', bounds.maxLng.toString());
@@ -422,8 +461,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         lastSearchTimeRef.current = Date.now();
         pendingBoundsRef.current = null;
         setIsSearching(true);
-        router.push(`/search?${params.toString()}`);
-    }, [router, searchParams]);
+        // Use replace to update bounds without creating history entries
+        // This prevents Back button from stepping through each map pan position
+        const url = `/search?${params.toString()}`;
+        if (transitionContext) {
+            transitionContext.replaceWithTransition(url);
+        } else {
+            router.replace(url);
+        }
+    }, [router, searchParams, transitionContext]);
 
     const handleMoveEnd = (e: ViewStateChangeEvent) => {
         // Update unclustered listings for rendering individual markers
@@ -563,7 +609,22 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 )}
 
                 {/* Individual price markers - shown for unclustered points or when not clustering */}
-                {markerPositions.map((position) => (
+                {markerPositions.map((position) => {
+                    // Shared click handler for both Marker and inner content
+                    const handleMarkerClick = () => {
+                        setSelectedListing(position.listing);
+                        // Set active listing for card highlight and scroll-to
+                        setActive(position.listing.id);
+                        requestScrollTo(position.listing.id);
+                        // Smooth pan to center popup both horizontally and vertically
+                        mapRef.current?.easeTo({
+                            center: [position.lng, position.lat],
+                            offset: [0, -150], // NEGATIVE Y pushes marker UP, centering popup below it
+                            duration: 400
+                        });
+                    };
+
+                    return (
                     <Marker
                         key={position.listing.id}
                         longitude={position.lng}
@@ -571,28 +632,43 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         anchor="bottom"
                         onClick={(e: any) => {
                             e.originalEvent.stopPropagation();
-                            setSelectedListing(position.listing);
-
-                            // Smooth pan to center popup both horizontally and vertically
-                            mapRef.current?.easeTo({
-                                center: [position.lng, position.lat],
-                                offset: [0, -150], // NEGATIVE Y pushes marker UP, centering popup below it
-                                duration: 400
-                            });
+                            handleMarkerClick();
                         }}
                     >
-                        <div className="relative cursor-pointer group/marker">
+                        <div
+                            className={cn(
+                                "relative cursor-pointer group/marker transition-all duration-200",
+                                hoveredId === position.listing.id && "scale-110 z-10"
+                            )}
+                            data-listing-id={position.listing.id}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkerClick();
+                            }}
+                        >
                             {/* Pin body with price - Softer corners to match card aesthetic */}
-                            <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-3 py-1.5 rounded-xl shadow-lg group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200 group-hover/marker:scale-105 transition-all duration-200 font-semibold text-sm whitespace-nowrap relative">
+                            <div className={cn(
+                                "px-3 py-1.5 rounded-xl shadow-lg font-semibold text-sm whitespace-nowrap relative transition-all duration-200",
+                                "group-hover/marker:scale-105",
+                                hoveredId === position.listing.id
+                                    ? "bg-rose-500 text-white ring-2 ring-white dark:ring-zinc-900 scale-105"
+                                    : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
+                            )}>
                                 ${position.listing.price}
                             </div>
                             {/* Pin tail/pointer - Properly styled triangle */}
-                            <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200 transition-colors"></div>
+                            <div className={cn(
+                                "absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] transition-colors",
+                                hoveredId === position.listing.id
+                                    ? "border-t-rose-500"
+                                    : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
+                            )}></div>
                             {/* Shadow under the pin for depth */}
                             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]"></div>
                         </div>
                     </Marker>
-                ))}
+                    );
+                })}
 
                 {selectedListing && (
                     <Popup

@@ -35,6 +35,8 @@ interface SearchTransitionContextValue {
   isSlowTransition: boolean;
   /** Navigate to a URL within a transition (keeps old UI visible) */
   navigateWithTransition: (url: string, options?: { scroll?: boolean }) => void;
+  /** Navigate with replace (for map - avoids history pollution) */
+  replaceWithTransition: (url: string, options?: { scroll?: boolean }) => void;
   /** Raw startTransition for custom transition logic */
   startTransition: TransitionStartFunction;
 }
@@ -77,12 +79,23 @@ export function SearchTransitionProvider({
     [router, startTransition],
   );
 
+  const replaceWithTransition = useCallback(
+    (url: string, options?: { scroll?: boolean }) => {
+      startTransition(() => {
+        // Use replace to avoid history pollution (e.g., map panning)
+        router.replace(url, { scroll: options?.scroll ?? false });
+      });
+    },
+    [router, startTransition],
+  );
+
   return (
     <SearchTransitionContext.Provider
       value={{
         isPending,
         isSlowTransition,
         navigateWithTransition,
+        replaceWithTransition,
         startTransition,
       }}
     >

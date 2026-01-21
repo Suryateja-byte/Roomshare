@@ -41,10 +41,28 @@ import {
 } from "@/lib/search/ranking";
 import type { SearchV2Response } from "@/lib/search/types";
 import type { PaginatedResultHybrid, ListingData } from "@/lib/data";
+import {
+  clampBoundsToMaxSpan,
+  MAX_LAT_SPAN,
+  MAX_LNG_SPAN,
+} from "@/lib/validation";
+
+/**
+ * Extract first value from a param that may be string, string[], or undefined.
+ * Used for single-value params like cursor, searchDoc, ranker, debugRank.
+ */
+function getFirstValue(
+  value: string | string[] | undefined,
+): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+}
 
 export interface SearchV2Params {
   /** Raw search params from URL (will be parsed internally) */
-  rawParams: Record<string, string>;
+  rawParams: Record<string, string | string[] | undefined>;
   /** Items per page (optional, defaults to service's internal default) */
   limit?: number;
 }
@@ -77,8 +95,25 @@ export async function executeSearchV2(
     // Parse and validate search params
     const parsed = parseSearchParams(params.rawParams);
 
+    // Clamp bounds if they exceed max span (security: prevent expensive wide-area queries)
+    // Unlike map-listings which rejects oversized bounds, we silently clamp for list queries
+    if (parsed.filterParams.bounds) {
+      const { minLat, maxLat, minLng, maxLng } = parsed.filterParams.bounds;
+      const latSpan = maxLat - minLat;
+      const crossesAntimeridian = minLng > maxLng;
+      const lngSpan = crossesAntimeridian
+        ? (180 - minLng) + (maxLng + 180)
+        : maxLng - minLng;
+
+      if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
+        parsed.filterParams.bounds = clampBoundsToMaxSpan(parsed.filterParams.bounds);
+      }
+    }
+
     // Check if features are enabled
-    const useSearchDoc = isSearchDocEnabled(params.rawParams.searchDoc);
+    const useSearchDoc = isSearchDocEnabled(
+      getFirstValue(params.rawParams.searchDoc),
+    );
     const useKeyset = features.searchKeyset && useSearchDoc;
 
     // Get sort option from parsed params (default to recommended)
@@ -86,7 +121,7 @@ export async function executeSearchV2(
       (parsed.filterParams.sort as SortOption) || "recommended";
 
     // Handle cursor-based pagination
-    const cursorStr = params.rawParams.cursor;
+    const cursorStr = getFirstValue(params.rawParams.cursor);
     let page = parsed.requestedPage;
     let keysetCursor: KeysetCursor | null = null;
 
@@ -171,8 +206,14 @@ export async function executeSearchV2(
     const listItems = transformToListItems(listResult.items);
 
     // Check if ranking is enabled (URL override or env flag)
-    const rankerEnabled = isRankingEnabled(params.rawParams.ranker);
-    const debugRank = params.rawParams.debugRank === "1";
+    const rankerEnabled = isRankingEnabled(
+      getFirstValue(params.rawParams.ranker),
+    );
+    // Debug output only allowed when searchDebugRanking is enabled (non-production or explicit env flag)
+    // This prevents production users from accessing debug signals via ?debugRank=1
+    const debugRank =
+      features.searchDebugRanking &&
+      getFirstValue(params.rawParams.debugRank) === "1";
 
     // Compute scoreMap for pin tiering when ranking is enabled and in pins mode
     let scoreMap: Map<string, number> | undefined;
