@@ -103,9 +103,11 @@ export function useMapPreference() {
     ? preference.mobile === "map"
     : preference.desktop === "split";
 
-  // Map should only render if user wants to see it
+  // Map should only render if user wants to see it AND we've hydrated
   // This is the key for cost savings - don't mount MapGL until needed
-  const shouldRenderMap = shouldShowMap;
+  // CRITICAL: Gate on isHydrated to prevent mobile devices from initializing
+  // the map during SSR/hydration when isMobile incorrectly defaults to false
+  const shouldRenderMap = isHydrated && shouldShowMap;
 
   const toggleMap = useCallback(() => {
     setPreference((prev) => {

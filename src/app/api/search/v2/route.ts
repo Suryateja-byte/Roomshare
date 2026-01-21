@@ -9,29 +9,21 @@
  * - meta.mode: 'geojson' (>=50 mapListings) or 'pins' (<50 mapListings)
  * - map.geojson: ALWAYS present (GeoJSON FeatureCollection for Mapbox clustering)
  * - map.pins: ONLY present when mode='pins' (tiered pins for sparse results)
+ *
+ * This route delegates to the shared v2 service (search-v2-service.ts)
+ * which handles searchDoc, keyset pagination, and ranking features.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { features } from "@/lib/env";
-import { getListingsPaginated, getMapListings } from "@/lib/data";
-import { parseSearchParams } from "@/lib/search-params";
+import { buildRawParamsFromSearchParams } from "@/lib/search-params";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import {
   createContextFromHeaders,
   runWithRequestContext,
   getRequestId,
 } from "@/lib/request-context";
-import {
-  generateQueryHash,
-  encodeCursor,
-  decodeCursor,
-} from "@/lib/search/hash";
-import {
-  transformToListItems,
-  transformToMapResponse,
-  determineMode,
-} from "@/lib/search/transform";
-import type { SearchV2Response } from "@/lib/search/types";
+import { executeSearchV2 } from "@/lib/search/search-v2-service";
 
 /**
  * Check if v2 is enabled via feature flag or URL param.
@@ -71,78 +63,45 @@ export async function GET(request: NextRequest) {
       });
       if (rateLimitResponse) return rateLimitResponse;
 
-      // Parse and validate search params
+      // Build raw params from URL search params
       const searchParams = request.nextUrl.searchParams;
-      const rawParams = Object.fromEntries(searchParams.entries());
-      const parsed = parseSearchParams(rawParams);
+      const rawParams = buildRawParamsFromSearchParams(searchParams);
 
-      // Handle cursor-based pagination
-      const cursor = searchParams.get("cursor");
-      let page = parsed.requestedPage;
+      // Delegate to shared v2 service (handles searchDoc, keyset, ranking)
+      const result = await executeSearchV2({ rawParams });
 
-      if (cursor) {
-        const decodedPage = decodeCursor(cursor);
-        if (decodedPage !== null) {
-          page = decodedPage;
-        }
+      // Handle unbounded search (text query without geographic bounds)
+      // This is not an error - it's a signal to the client to prompt for location
+      if (result.unboundedSearch) {
+        return NextResponse.json(
+          {
+            unboundedSearch: true,
+            list: null,
+            map: null,
+            meta: { mode: "pins", queryHash: null, generatedAt: new Date().toISOString() },
+          },
+          {
+            status: 200,
+            headers: {
+              "Cache-Control": "no-cache, no-store",
+              "x-request-id": requestId,
+            },
+          },
+        );
       }
 
-      // Build filter params with page
-      const filterParams = {
-        ...parsed.filterParams,
-        page,
-      };
+      // Handle service error
+      if (result.error || !result.response) {
+        return NextResponse.json(
+          { error: result.error || "Search temporarily unavailable" },
+          {
+            status: 503,
+            headers: { "x-request-id": requestId },
+          },
+        );
+      }
 
-      // Fetch list and map data in parallel
-      const [listResult, mapListings] = await Promise.all([
-        getListingsPaginated(filterParams),
-        getMapListings(filterParams),
-      ]);
-
-      // Determine mode based on mapListings count (not list total)
-      const mode = determineMode(mapListings.length);
-
-      // Generate query hash for caching (excludes pagination)
-      const queryHash = generateQueryHash({
-        query: parsed.filterParams.query,
-        minPrice: parsed.filterParams.minPrice,
-        maxPrice: parsed.filterParams.maxPrice,
-        amenities: parsed.filterParams.amenities,
-        houseRules: parsed.filterParams.houseRules,
-        languages: parsed.filterParams.languages,
-        roomType: parsed.filterParams.roomType,
-        leaseDuration: parsed.filterParams.leaseDuration,
-        moveInDate: parsed.filterParams.moveInDate,
-        bounds: parsed.filterParams.bounds,
-        nearMatches: parsed.filterParams.nearMatches,
-      });
-
-      // Transform list items
-      const listItems = transformToListItems(listResult.items);
-
-      // Transform map data (geojson always, pins only when sparse)
-      const mapResponse = transformToMapResponse(mapListings);
-
-      // Build next cursor if more pages available
-      const hasNextPage = listResult.page < listResult.totalPages;
-      const nextCursor = hasNextPage ? encodeCursor(page + 1) : null;
-
-      // Build response
-      const response: SearchV2Response = {
-        meta: {
-          queryHash,
-          generatedAt: new Date().toISOString(),
-          mode,
-        },
-        list: {
-          items: listItems,
-          nextCursor,
-          total: listResult.total,
-        },
-        map: mapResponse,
-      };
-
-      return NextResponse.json(response, {
+      return NextResponse.json(result.response, {
         headers: {
           // CDN caching for search results
           "Cache-Control":

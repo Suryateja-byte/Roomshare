@@ -40,8 +40,11 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         } else {
             params.set('sort', newSort);
         }
-        // Reset to page 1 when sorting changes
+        // Reset pagination state when sort changes (keyset + offset)
         params.delete('page');
+        params.delete('cursor');
+        params.delete('cursorStack');
+        params.delete('pageNumber');
         router.push(`/search?${params.toString()}`);
     };
 

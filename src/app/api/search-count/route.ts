@@ -19,7 +19,10 @@ import {
   runWithRequestContext,
   getRequestId,
 } from "@/lib/request-context";
-import { parseSearchParams } from "@/lib/search-params";
+import {
+  parseSearchParams,
+  buildRawParamsFromSearchParams,
+} from "@/lib/search-params";
 import { getLimitedCount } from "@/lib/data";
 import { logger } from "@/lib/logger";
 
@@ -43,22 +46,7 @@ export async function GET(request: NextRequest) {
     try {
       // Parse URL search params using same logic as main search
       const { searchParams } = request.nextUrl;
-      const rawParams: Record<string, string | string[] | undefined> = {};
-
-      // Convert URLSearchParams to raw params object
-      searchParams.forEach((value, key) => {
-        const existing = rawParams[key];
-        if (existing) {
-          // Handle multiple values for same key
-          if (Array.isArray(existing)) {
-            existing.push(value);
-          } else {
-            rawParams[key] = [existing, value];
-          }
-        } else {
-          rawParams[key] = value;
-        }
-      });
+      const rawParams = buildRawParamsFromSearchParams(searchParams);
 
       // Parse and validate using same logic as main search
       const { filterParams } = parseSearchParams(rawParams);

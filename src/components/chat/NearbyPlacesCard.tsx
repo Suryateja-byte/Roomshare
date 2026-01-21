@@ -95,7 +95,7 @@ export function NearbyPlacesCard({
     // P0-B27 FIX: If rate limited, don't even try to load Places API
     // This sync is needed because canSearch prop can change after initial render
     if (!canSearch) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setStatus('rate-limited');
       return;
     }

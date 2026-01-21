@@ -1,20 +1,20 @@
 import { auth } from '@/auth';
-import { getListingsPaginated, getMapListings, getSavedListingIds, analyzeFilterImpact, MapListingData } from '@/lib/data';
-import { isDataError } from '@/lib/errors';
+import { getListingsPaginated, getSavedListingIds, analyzeFilterImpact, PaginatedResult, PaginatedResultHybrid, ListingData } from '@/lib/data';
 import { Suspense } from 'react';
-import DynamicMap from '@/components/DynamicMap';
 import ListingCard from '@/components/listings/ListingCard';
 import Pagination from '@/components/Pagination';
 import SortSelect from '@/components/SortSelect';
 import SaveSearchButton from '@/components/SaveSearchButton';
 import ZeroResultsSuggestions from '@/components/ZeroResultsSuggestions';
-import { SearchErrorBanner } from '@/components/SearchErrorBanner';
 import Link from 'next/link';
-import { Search, Map, List, Clock } from 'lucide-react';
-import SearchViewToggle from '@/components/SearchViewToggle';
+import { Search, Clock } from 'lucide-react';
 import { headers } from 'next/headers';
 import { checkServerComponentRateLimit } from '@/lib/with-rate-limit';
-import { parseSearchParams } from '@/lib/search-params';
+import { parseSearchParams, buildRawParamsFromSearchParams } from '@/lib/search-params';
+import { executeSearchV2 } from '@/lib/search/search-v2-service';
+import { V2MapDataSetter } from '@/components/search/V2MapDataSetter';
+import type { V2MapData } from '@/contexts/SearchV2DataContext';
+import { features } from '@/lib/env';
 
 // Skeleton component for listing cards during loading
 function ListingSkeleton() {
@@ -74,6 +74,8 @@ export default async function SearchPage({
         lng?: string;
         page?: string;
         sort?: string;
+        cursor?: string;
+        v2?: string;
     }>;
 }) {
     const rawParams = await searchParams;
@@ -107,47 +109,119 @@ export default async function SearchPage({
 
     const { q, filterParams, requestedPage, sortOption } = parseSearchParams(rawParams);
 
-    // Critical data - let errors bubble up to error boundary
-    const paginatedResult = await getListingsPaginated({ ...filterParams, page: requestedPage, limit: ITEMS_PER_PAGE });
+    // Fetch saved listings in parallel (non-blocking)
+    const savedPromise = userId ? getSavedListingIds(userId) : Promise.resolve([]);
 
-    // Non-critical data - graceful degradation with Promise.allSettled
-    const [mapResult, savedResult] = await Promise.allSettled([
-        getMapListings(filterParams), // Optimized for map - SQL-level bounds, minimal fields, LIMIT 200
-        userId ? getSavedListingIds(userId) : Promise.resolve([])
-    ]);
+    // Track whether v2 was used successfully
+    let usedV2 = false;
+    let v2MapData: V2MapData | null = null;
+    let paginatedResult: PaginatedResult<ListingData> | PaginatedResultHybrid<ListingData> | undefined;
 
-    // Handle map data with graceful fallback
-    let mapListings: MapListingData[] = [];
-    let mapError: { message: string; retryable: boolean } | null = null;
-    if (mapResult.status === 'fulfilled') {
-        mapListings = mapResult.value;
-    } else {
-        if (isDataError(mapResult.reason)) {
-            mapResult.reason.log({ route: '/search', phase: 'mapListings' });
-            mapError = {
-                message: 'Map data temporarily unavailable',
-                retryable: mapResult.reason.retryable
-            };
-        } else {
-            mapError = { message: 'Map data temporarily unavailable', retryable: true };
+    // Check if v2 is enabled via feature flag OR query param override (?v2=1)
+    const v2Override = rawParams.v2 === '1' || rawParams.v2 === 'true';
+    const useV2Search = features.searchV2 || v2Override;
+
+    // Try v2 orchestration if enabled
+    if (useV2Search) {
+        try {
+            // Build raw params for v2 service (handles repeated params properly)
+            const rawParamsForV2 = buildRawParamsFromSearchParams(new URLSearchParams(
+                Object.entries(rawParams).flatMap(([key, value]) =>
+                    Array.isArray(value) ? value.map(v => [key, v]) : value ? [[key, value]] : []
+                )
+            ));
+
+            const v2Result = await executeSearchV2({
+                rawParams: rawParamsForV2,
+                limit: ITEMS_PER_PAGE,
+            });
+
+            // Handle unbounded search: user entered text but no location
+            if (v2Result.unboundedSearch) {
+                return (
+                    <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
+                        <div className="text-center py-12">
+                            <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                                <Search className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
+                                Please select a location
+                            </h2>
+                            <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6">
+                                To search for &ldquo;{q}&rdquo;, please select a location from the dropdown suggestions.
+                                This helps us find relevant listings in your area.
+                            </p>
+                            <Link
+                                href="/"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
+                            >
+                                <Search className="w-4 h-4" />
+                                Try a new search
+                            </Link>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (v2Result.response && v2Result.paginatedResult) {
+                // V2 succeeded - use its data
+                usedV2 = true;
+                paginatedResult = v2Result.paginatedResult;
+
+                // Construct v2MapData for context injection
+                // PersistentMapWrapper (in layout) will read this via SearchV2DataContext
+                v2MapData = {
+                    geojson: v2Result.response.map.geojson,
+                    pins: v2Result.response.map.pins,
+                    mode: v2Result.response.meta.mode,
+                };
+            }
+        } catch (error) {
+            // V2 failed - will fall back to v1 below
+            console.warn('[search/page] V2 orchestration failed, falling back to v1:', {
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
         }
     }
 
-    // Handle saved listings with graceful fallback
-    const savedListingIds = savedResult.status === 'fulfilled' ? savedResult.value : [];
+    // V1 fallback path (when v2 disabled or failed)
+    // Note: Map data is fetched by PersistentMapWrapper independently via /api/map-listings
+    if (!usedV2) {
+        // Critical data - let errors bubble up to error boundary
+        paginatedResult = await getListingsPaginated({ ...filterParams, page: requestedPage, limit: ITEMS_PER_PAGE });
+    }
 
-    const { items: listings, total, totalPages, page: currentPage } = paginatedResult;
+    // Handle saved listings result
+    const savedListingIds = await savedPromise.catch(() => [] as string[]);
 
-    // Analyze filter impact when there are no results
-    const filterSuggestions = total === 0 ? await analyzeFilterImpact(filterParams) : [];
+    // Ensure paginatedResult is defined (should always be set by v2 or v1 path)
+    if (!paginatedResult) {
+        throw new Error('Failed to fetch search results');
+    }
+
+    const { items: listings, total: rawTotal, totalPages: rawTotalPages, page: currentPage } = paginatedResult;
+    // Handle potential null values from PaginatedResultHybrid (v2 path)
+    // IMPORTANT: Keep null distinct from 0 - null means "unknown count (>100 results)"
+    // whereas 0 means "confirmed zero results"
+    const total = rawTotal; // Keep null for >100 results (hybrid count optimization)
+    const totalPages = rawTotalPages ?? 1;
+
+    // Only show zero-results UI when we have confirmed zero results (total === 0)
+    // Not when total is null (unknown count, >100 results)
+    const hasConfirmedZeroResults = total !== null && total === 0;
+
+    // Analyze filter impact only when there are confirmed zero results
+    const filterSuggestions = hasConfirmedZeroResults ? await analyzeFilterImpact(filterParams) : [];
 
     const listContent = (
         <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-[840px] mx-auto pb-24 md:pb-6">
             {/* Screen reader announcement for search results */}
             <div aria-live="polite" aria-atomic="true" className="sr-only">
-                {total === 0
+                {hasConfirmedZeroResults
                     ? `No listings found${q ? ` for "${q}"` : ''}`
-                    : `Found ${total} ${total === 1 ? 'listing' : 'listings'}${q ? ` for "${q}"` : ''}`
+                    : total === null
+                        ? `Found more than 100 listings${q ? ` for "${q}"` : ''}`
+                        : `Found ${total} ${total === 1 ? 'listing' : 'listings'}${q ? ` for "${q}"` : ''}`
                 }
             </div>
 
@@ -159,7 +233,7 @@ export default async function SearchPage({
                         tabIndex={-1}
                         className="text-lg sm:text-xl font-semibold text-zinc-900 dark:text-white tracking-tight outline-none"
                     >
-                        {total} {total === 1 ? 'place' : 'places'} {q ? `in "${q}"` : 'available'}
+                        {total === null ? '100+' : total} {total === 1 ? 'place' : 'places'} {q ? `in "${q}"` : 'available'}
                     </h1>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
                         Book a place that fits your lifestyle.
@@ -172,7 +246,7 @@ export default async function SearchPage({
                 </div>
             </div>
 
-            {total === 0 ? (
+            {hasConfirmedZeroResults ? (
                 <div className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50">
                     <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm mb-4">
                         <Search className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-400" />
@@ -217,6 +291,10 @@ export default async function SearchPage({
                             totalPages={totalPages}
                             totalItems={total}
                             itemsPerPage={ITEMS_PER_PAGE}
+                            nextCursor={'nextCursor' in paginatedResult ? paginatedResult.nextCursor : undefined}
+                            prevCursor={'prevCursor' in paginatedResult ? paginatedResult.prevCursor : undefined}
+                            hasNextPage={'hasNextPage' in paginatedResult ? paginatedResult.hasNextPage : undefined}
+                            hasPrevPage={'hasPrevPage' in paginatedResult ? paginatedResult.hasPrevPage : undefined}
                         />
                     </Suspense>
                 </>
@@ -224,25 +302,12 @@ export default async function SearchPage({
         </div>
     );
 
-    const mapContent = (
-        <div className="relative h-full">
-            {mapError && (
-                <div className="absolute top-4 left-4 right-4 z-10">
-                    <SearchErrorBanner
-                        message={mapError.message}
-                        retryable={mapError.retryable}
-                    />
-                </div>
-            )}
-            <DynamicMap listings={mapListings} />
-        </div>
-    );
-
     return (
-        <div className="h-screen-safe flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-20">
-            <SearchViewToggle mapComponent={mapContent}>
-                {listContent}
-            </SearchViewToggle>
-        </div>
+        <>
+            {/* Inject v2 map data into context for PersistentMapWrapper to consume */}
+            {/* PersistentMapWrapper (in SearchLayoutView) reads this via SearchV2DataContext */}
+            {v2MapData && <V2MapDataSetter data={v2MapData} />}
+            {listContent}
+        </>
     );
 }

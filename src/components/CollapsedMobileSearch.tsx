@@ -45,6 +45,17 @@ export default function CollapsedMobileSearch({
       count++;
     if (searchParams.get("roomType") && searchParams.get("roomType") !== "any")
       count++;
+    // Count gender preferences
+    if (
+      searchParams.get("genderPreference") &&
+      searchParams.get("genderPreference") !== "any"
+    )
+      count++;
+    if (
+      searchParams.get("householdGender") &&
+      searchParams.get("householdGender") !== "any"
+    )
+      count++;
     // Count amenities
     searchParams.getAll("amenities").forEach(() => count++);
     // Count house rules

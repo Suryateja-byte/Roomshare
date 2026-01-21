@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Star, Home, Globe } from 'lucide-react';
 import FavoriteButton from '../FavoriteButton';
+import { ImageCarousel } from './ImageCarousel';
 import { cn } from '@/lib/utils';
 import { getLanguageName } from '@/lib/languages';
+import { useListingFocus, useIsListingFocused } from '@/contexts/ListingFocusContext';
 
 export interface Listing {
     id: string;
@@ -87,13 +88,23 @@ interface ListingCardProps {
 }
 
 export default function ListingCard({ listing, isSaved, className }: ListingCardProps) {
-    const [imageError, setImageError] = useState(false);
+    const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+    const { setHovered } = useListingFocus();
+    const { isActive } = useIsListingFocused(listing.id);
 
-    // Use listing's first image if available, otherwise use placeholder
-    const hasListingImage = listing.images && listing.images.length > 0 && listing.images[0];
+    // Track image errors by index
+    const handleImageError = useCallback((index: number) => {
+        setImageErrors(prev => new Set(prev).add(index));
+    }, []);
+
+    // Get valid images (filter out errored ones)
+    const validImages = (listing.images || []).filter((_, i) => !imageErrors.has(i));
+    const hasValidImages = validImages.length > 0;
+
+    // Fallback to placeholder if no valid images
     const placeholderIndex = listing.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % PLACEHOLDER_IMAGES.length;
-    const imageUrl = hasListingImage && !imageError ? listing.images![0] : PLACEHOLDER_IMAGES[placeholderIndex];
-    const showImagePlaceholder = !hasListingImage || imageError;
+    const displayImages = hasValidImages ? validImages : [PLACEHOLDER_IMAGES[placeholderIndex]];
+    const showImagePlaceholder = !hasValidImages;
 
     const isAvailable = listing.availableSlots > 0;
 
@@ -103,28 +114,30 @@ export default function ListingCard({ listing, isSaved, className }: ListingCard
     return (
         <Link
             href={`/listings/${listing.id}`}
+            data-testid="listing-card"
+            data-listing-id={listing.id}
+            onMouseEnter={() => setHovered(listing.id)}
+            onMouseLeave={() => setHovered(null)}
             className={cn(
                 "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 rounded-xl",
+                isActive && "ring-2 ring-blue-500 ring-offset-2",
                 className
             )}
         >
             <div className="relative bg-white dark:bg-zinc-900 flex flex-col rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden transition-all duration-normal hover:-translate-y-0.5 hover:shadow-lg hover:border-zinc-300 dark:hover:border-zinc-700">
                 {/* Image Area */}
                 <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-                    {/* Actual image or placeholder */}
-                    <Image
-                        src={imageUrl}
+                    {/* Image Carousel or single image */}
+                    <ImageCarousel
+                        images={displayImages}
                         alt={displayTitle}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-normal ease-out"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        onError={() => setImageError(true)}
-                        loading="lazy"
+                        className="h-full w-full group-hover:scale-105 transition-transform duration-normal ease-out"
+                        onImageError={handleImageError}
                     />
 
                     {/* Empty state overlay - Intentional waiting state */}
                     {showImagePlaceholder && (
-                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-150 dark:from-zinc-800 dark:to-zinc-850 flex flex-col items-center justify-center">
+                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-150 dark:from-zinc-800 dark:to-zinc-850 flex flex-col items-center justify-center pointer-events-none">
                             <div className="w-14 h-14 rounded-2xl bg-zinc-200/80 dark:bg-zinc-700/80 flex items-center justify-center mb-2">
                                 <Home className="w-7 h-7 text-zinc-400 dark:text-zinc-500" strokeWidth={1.5} fill="currentColor" fillOpacity={0.1} />
                             </div>
@@ -133,12 +146,12 @@ export default function ListingCard({ listing, isSaved, className }: ListingCard
                     )}
 
                     {/* Favorite Button */}
-                    <div className="absolute top-3 right-3 z-10">
+                    <div className="absolute top-3 right-3 z-20">
                         <FavoriteButton listingId={listing.id} initialIsSaved={isSaved} />
                     </div>
 
                     {/* Availability Badge - Inside image with glassmorphism */}
-                    <div className="absolute top-3 left-3 z-10">
+                    <div className="absolute top-3 left-3 z-20">
                         <span className={cn(
                             "inline-flex items-center px-2.5 py-1 rounded-md text-2xs font-bold uppercase tracking-wide shadow-sm",
                             isAvailable

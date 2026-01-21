@@ -300,6 +300,15 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const handleSearch = useCallback((e: React.FormEvent) => {
         e.preventDefault();
 
+        // Prevent unbounded searches: if user typed location but didn't select from dropdown,
+        // don't submit (this prevents full-table scans on the server)
+        const trimmedLocation = location.trim();
+        if (trimmedLocation.length > 2 && !selectedCoords) {
+            // User needs to select a location from dropdown
+            // The warning is already shown via showLocationWarning
+            return;
+        }
+
         // Clear any pending search timeout
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
@@ -316,7 +325,6 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         params.delete('pageNumber');
 
         // Only include query if it has actual content (not just whitespace)
-        const trimmedLocation = location.trim();
         if (trimmedLocation && trimmedLocation.length >= 2) {
             params.set('q', trimmedLocation);
         }

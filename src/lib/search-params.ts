@@ -57,11 +57,46 @@ export interface ParsedSearchParams {
   requestedPage: number;
   sortOption: SortOption;
   filterParams: FilterParams;
+  /**
+   * True when a text query exists but no geographic bounds were provided.
+   * This indicates an unbounded search that would cause full-table scans.
+   * Callers should block or warn about such searches.
+   */
+  boundsRequired: boolean;
 }
 
 export const MAX_SAFE_PRICE = 1000000000;
 export const MAX_SAFE_PAGE = 100;
 export const MAX_ARRAY_ITEMS = 20;
+
+/**
+ * Convert URLSearchParams to a raw params object, preserving duplicate keys as arrays.
+ * This is needed because Object.fromEntries(searchParams.entries()) loses duplicates.
+ *
+ * Example: ?amenities=Wifi&amenities=AC → { amenities: ['Wifi', 'AC'] }
+ * Example: ?amenities=Wifi → { amenities: 'Wifi' } (single values stay as strings)
+ */
+export function buildRawParamsFromSearchParams(
+  searchParams: URLSearchParams,
+): Record<string, string | string[] | undefined> {
+  const rawParams: Record<string, string | string[] | undefined> = {};
+
+  searchParams.forEach((value, key) => {
+    const existing = rawParams[key];
+    if (existing) {
+      // Handle multiple values for same key
+      if (Array.isArray(existing)) {
+        existing.push(value);
+      } else {
+        rawParams[key] = [existing, value];
+      }
+    } else {
+      rawParams[key] = value;
+    }
+  });
+
+  return rawParams;
+}
 
 export const VALID_AMENITIES = [
   "Wifi",
@@ -407,11 +442,16 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     nearMatches,
   };
 
+  // Flag unbounded searches: text query without geographic bounds
+  // This would cause full-table scans and should be blocked
+  const boundsRequired = !!q && !bounds;
+
   return {
     q,
     requestedPage,
     sortOption,
     filterParams,
+    boundsRequired,
   };
 }
 

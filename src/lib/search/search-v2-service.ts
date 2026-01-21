@@ -77,6 +77,11 @@ export interface SearchV2Result {
   paginatedResult: PaginatedResultHybrid<ListingData> | null;
   /** Error message if failed */
   error?: string;
+  /**
+   * True when the search was blocked because it had a text query but no
+   * geographic bounds. UI should prompt user to select a location.
+   */
+  unboundedSearch?: boolean;
 }
 
 /**
@@ -108,6 +113,16 @@ export async function executeSearchV2(
       if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
         parsed.filterParams.bounds = clampBoundsToMaxSpan(parsed.filterParams.bounds);
       }
+    }
+
+    // Block unbounded searches: text query without geographic bounds
+    // This prevents full-table scans that are expensive and not useful
+    if (parsed.boundsRequired) {
+      return {
+        response: null,
+        paginatedResult: null,
+        unboundedSearch: true,
+      };
     }
 
     // Check if features are enabled
