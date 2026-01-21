@@ -726,6 +726,14 @@ export async function getMapListings(
     householdGender,
   } = params;
 
+  // Defense in depth: block unbounded text searches
+  // This prevents full-table scans that are expensive and not useful
+  if (query && !bounds) {
+    throw new Error(
+      "Unbounded text search not allowed: geographic bounds required when query is present",
+    );
+  }
+
   // Build WHERE conditions dynamically
   const conditions: string[] = [
     'l."availableSlots" > 0',
@@ -932,6 +940,14 @@ export async function getListingsPaginated(
   } = params;
 
   try {
+    // Defense in depth: block unbounded text searches
+    // This prevents full-table scans that are expensive and not useful
+    if (query && !bounds) {
+      throw new Error(
+        "Unbounded text search not allowed: geographic bounds required when query is present",
+      );
+    }
+
     // Build dynamic WHERE conditions for SQL
     const conditions: string[] = [
       'l."availableSlots" > 0',
@@ -1167,7 +1183,7 @@ export async function getListingsPaginated(
     );
 
     // Map results and apply JS-level filters for amenities/house rules/languages
-    let results = listings.map((l) => ({
+    const results = listings.map((l) => ({
       id: l.id,
       title: l.title,
       description: l.description,

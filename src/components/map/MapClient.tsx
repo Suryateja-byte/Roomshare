@@ -375,13 +375,15 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                             });
                         }}
                     >
-                        <div className="relative cursor-pointer group">
-                            {/* Pin body with price */}
-                            <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-3 py-1.5 rounded-lg shadow-lg hover:scale-110 transition-all duration-200 border border-zinc-800 dark:border-zinc-200 font-bold text-sm whitespace-nowrap group-hover:bg-zinc-800 dark:group-hover:bg-zinc-200">
+                        <div className="relative cursor-pointer group/marker">
+                            {/* Pin body with price - Pill style matching card aesthetic */}
+                            <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-3 py-1.5 rounded-xl shadow-lg group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200 group-hover/marker:scale-105 transition-all duration-200 font-semibold text-sm whitespace-nowrap relative">
                                 ${position.listing.price}
                             </div>
-                            {/* Pin point */}
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-zinc-900 dark:border-t-white group-hover:border-t-zinc-800 dark:group-hover:border-t-zinc-200"></div>
+                            {/* Pin tail/pointer */}
+                            <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200 transition-colors"></div>
+                            {/* Shadow under the pin for depth */}
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]"></div>
                         </div>
                     </Marker>
                 ))}

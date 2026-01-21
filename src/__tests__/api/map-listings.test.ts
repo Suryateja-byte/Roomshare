@@ -265,7 +265,8 @@ describe("Map Listings API", () => {
             query: "cozy room",
             minPrice: 500,
             maxPrice: 1500,
-            amenities: ["WiFi", "AC"],
+            // Canonical parser normalizes amenities to allowlist casing: "WiFi" -> "Wifi"
+            amenities: ["Wifi", "AC"],
             bounds: {
               minLng: -122.5,
               maxLng: -122.0,

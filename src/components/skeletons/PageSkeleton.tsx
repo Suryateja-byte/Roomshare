@@ -176,6 +176,24 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
         </div>
       </header>
 
+      {/* Filter Bar Skeleton */}
+      <div className="w-full border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3">
+          <div className="flex items-center gap-3">
+            {/* Category tabs skeleton */}
+            <div className="flex gap-2">
+              <Skeleton variant="rounded" width={70} height={32} />
+              <Skeleton variant="rounded" width={90} height={32} />
+              <Skeleton variant="rounded" width={80} height={32} />
+            </div>
+            <div className="h-8 w-px bg-zinc-200 dark:bg-zinc-700 hidden sm:block" />
+            <div className="flex-1" />
+            {/* More filters button */}
+            <Skeleton variant="rounded" width={110} height={36} className="rounded-full" />
+          </div>
+        </div>
+      </div>
+
       {/* Results Skeleton */}
       <div className="flex-1 overflow-auto">
         <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-[840px] mx-auto pb-24 md:pb-6">
@@ -187,32 +205,68 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <Skeleton variant="rounded" width={100} height={36} />
-              <Skeleton variant="rounded" width={120} height={36} />
             </div>
           </div>
 
           {/* Listing Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
             {Array.from({ length: count }).map((_, i) => (
-              <div key={i} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden">
-                <Skeleton variant="rectangular" className="aspect-[4/3] w-full" />
-                <div className="p-4">
-                  <div className="flex justify-between items-start gap-3 mb-1">
-                    <Skeleton variant="text" width="70%" height={18} />
-                    <Skeleton variant="text" width={40} height={16} />
-                  </div>
-                  <Skeleton variant="text" width="45%" height={14} className="mb-3" />
-                  <div className="flex gap-1.5 mb-4">
-                    <Skeleton variant="rounded" width={60} height={20} />
-                    <Skeleton variant="rounded" width={50} height={20} />
-                    <Skeleton variant="rounded" width={45} height={20} />
-                  </div>
-                  <Skeleton variant="text" width={80} height={24} />
-                </div>
-              </div>
+              <ListingCardSkeleton key={i} />
             ))}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Individual listing card skeleton matching the ListingCard component structure
+ */
+export function ListingCardSkeleton() {
+  return (
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden">
+      {/* Image area with carousel dots */}
+      <div className="relative aspect-[4/3] bg-zinc-100 dark:bg-zinc-800">
+        <Skeleton variant="rectangular" className="absolute inset-0" />
+        {/* Availability badge skeleton */}
+        <div className="absolute top-3 left-3">
+          <Skeleton variant="rounded" width={70} height={24} />
+        </div>
+        {/* Favorite button skeleton */}
+        <div className="absolute top-3 right-3">
+          <Skeleton variant="circular" width={32} height={32} />
+        </div>
+        {/* Carousel dots skeleton */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} variant="circular" width={6} height={6} />
+          ))}
+        </div>
+      </div>
+      {/* Content area */}
+      <div className="p-4">
+        {/* Title and rating row */}
+        <div className="flex justify-between items-start gap-3 mb-0.5">
+          <Skeleton variant="text" width="70%" height={18} />
+          <Skeleton variant="text" width={40} height={16} />
+        </div>
+        {/* Location */}
+        <Skeleton variant="text" width="45%" height={14} className="mb-3" />
+        {/* Amenities */}
+        <div className="flex gap-1.5 mb-2">
+          <Skeleton variant="rounded" width={60} height={20} />
+          <Skeleton variant="rounded" width={50} height={20} />
+          <Skeleton variant="rounded" width={45} height={20} />
+        </div>
+        {/* Languages */}
+        <div className="flex items-center gap-1.5 mb-4">
+          <Skeleton variant="circular" width={14} height={14} />
+          <Skeleton variant="rounded" width={55} height={18} />
+          <Skeleton variant="rounded" width={50} height={18} />
+        </div>
+        {/* Price */}
+        <Skeleton variant="text" width={80} height={24} />
       </div>
     </div>
   );

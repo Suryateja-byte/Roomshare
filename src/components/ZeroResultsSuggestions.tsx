@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Search, X, MapPin, SlidersHorizontal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { FilterSuggestion } from '@/lib/data';
 
 interface ZeroResultsSuggestionsProps {
@@ -56,51 +58,96 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
 
     if (suggestions.length === 0) {
         return (
-            <div className="text-center py-4">
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm">
-                    No listings match your criteria{query ? ` for "${query}"` : ''}.
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+                {/* Empty state illustration */}
+                <div className="w-20 h-20 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-6">
+                    <Search className="w-10 h-10 text-zinc-400 dark:text-zinc-500" strokeWidth={1.5} />
+                </div>
+
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+                    No listings found
+                </h3>
+
+                <p className="text-zinc-500 dark:text-zinc-400 text-center max-w-sm mb-6">
+                    {query
+                        ? `We couldn't find any listings matching "${query}".`
+                        : "We couldn't find any listings matching your criteria."
+                    }
                 </p>
-                <p className="text-zinc-400 dark:text-zinc-500 text-sm mt-1">
-                    Try a different location or remove all filters.
-                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={handleClearAll}
+                        className="gap-2"
+                    >
+                        <X className="w-4 h-4" />
+                        Clear filters
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => router.push('/search')}
+                        className="gap-2"
+                    >
+                        <MapPin className="w-4 h-4" />
+                        Browse all
+                    </Button>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="mt-4 p-4 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800">
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
-                Try adjusting your filters:
-            </p>
-            <ul className="space-y-2">
+        <div className="py-8 px-4">
+            {/* Header with illustration */}
+            <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-16 h-16 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center mb-4">
+                    <SlidersHorizontal className="w-8 h-8 text-amber-500 dark:text-amber-400" strokeWidth={1.5} />
+                </div>
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+                    No exact matches
+                </h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    Try adjusting your filters to see more results
+                </p>
+            </div>
+
+            {/* Suggestions */}
+            <div className="max-w-sm mx-auto space-y-2">
                 {suggestions.slice(0, 3).map((item) => (
-                    <li key={item.filter}>
-                        <button
-                            onClick={() => handleRemoveFilter(item.filter)}
-                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-white dark:hover:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-all group"
-                        >
-                            <span className="text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white">
+                    <button
+                        key={item.filter}
+                        onClick={() => handleRemoveFilter(item.filter)}
+                        className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-sm transition-all group"
+                    >
+                        <div className="text-left">
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white block">
                                 {item.suggestion}
                             </span>
-                            <span className="block text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
+                            <span className="text-xs text-zinc-400 dark:text-zinc-500">
                                 Remove: {item.label}
                             </span>
-                        </button>
-                    </li>
+                        </div>
+                        <X className="w-4 h-4 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />
+                    </button>
                 ))}
-            </ul>
-            {suggestions.length > 3 && (
-                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-3 text-center">
-                    +{suggestions.length - 3} more suggestion{suggestions.length - 3 > 1 ? 's' : ''}
-                </p>
-            )}
-            <div className="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-700">
-                <button
+
+                {suggestions.length > 3 && (
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center pt-2">
+                        +{suggestions.length - 3} more suggestion{suggestions.length - 3 > 1 ? 's' : ''}
+                    </p>
+                )}
+            </div>
+
+            {/* Clear all button */}
+            <div className="flex justify-center mt-6">
+                <Button
+                    variant="ghost"
                     onClick={handleClearAll}
-                    className="w-full text-center text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                    className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 >
                     Clear all filters
-                </button>
+                </Button>
             </div>
         </div>
     );

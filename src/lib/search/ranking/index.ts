@@ -54,17 +54,21 @@ export const RANKING_VERSION = "v1-heuristic";
 
 /**
  * Check if ranking is enabled.
- * Supports URL override for dev testing.
+ * Supports URL override for dev testing (gated to non-production).
  *
  * @param urlRanker - Value of ?ranker= query param (optional)
  * @returns true if ranking should be applied
  */
 export function isRankingEnabled(urlRanker?: string | null): boolean {
-  // URL override (dev only) - explicit enable
-  if (urlRanker === "1" || urlRanker === "true") return true;
+  // URL override only allowed when debug mode is permitted
+  // This prevents production users from enabling/disabling ranking via URL
+  if (features.searchDebugRanking) {
+    // URL override - explicit enable
+    if (urlRanker === "1" || urlRanker === "true") return true;
 
-  // URL override (dev only) - explicit disable
-  if (urlRanker === "0" || urlRanker === "false") return false;
+    // URL override - explicit disable
+    if (urlRanker === "0" || urlRanker === "false") return false;
+  }
 
   // Fall back to env feature flag
   return features.searchRanking;

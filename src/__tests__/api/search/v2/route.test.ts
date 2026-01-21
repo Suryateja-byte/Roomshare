@@ -80,6 +80,16 @@ function createRequest(params: Record<string, string> = {}): NextRequest {
   return request;
 }
 
+// Helper to create a mock NextRequest with multi-value params (for repeated keys like amenities=X&amenities=Y)
+function createRequestWithMultiParams(params: [string, string][]): NextRequest {
+  const searchParams = new URLSearchParams();
+  params.forEach(([key, value]) => searchParams.append(key, value));
+  return {
+    nextUrl: { searchParams },
+    headers: new Headers(),
+  } as unknown as NextRequest;
+}
+
 // Mock listing data factory
 function createMockListingData(
   id: string,
@@ -543,7 +553,9 @@ describe("Search API v2 route", () => {
       mockFeatures.searchV2 = true;
     });
 
-    it("should return 500 when data fetch fails", async () => {
+    it("should return 503 when v2 service returns error", async () => {
+      // When the service catches an internal error, it returns a graceful error response
+      // The route converts this to 503 (Service Unavailable)
       (getListingsPaginated as jest.Mock).mockRejectedValue(
         new Error("Database error"),
       );
@@ -553,8 +565,160 @@ describe("Search API v2 route", () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(503);
       expect(data.error).toBe("Failed to fetch search results");
+    });
+  });
+
+  describe("Multi-select filter handling", () => {
+    const mockListResult: PaginatedResultHybrid<ListingData> = {
+      items: [],
+      hasNextPage: false,
+      hasPrevPage: false,
+      total: 0,
+      totalPages: 0,
+      page: 1,
+      limit: 20,
+    };
+
+    beforeEach(() => {
+      mockFeatures.searchV2 = true;
+      jest.clearAllMocks();
+      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
+      (getMapListings as jest.Mock).mockResolvedValue([]);
+    });
+
+    it("should preserve multiple amenities from repeated URL params", async () => {
+      const request = createRequestWithMultiParams([
+        ["amenities", "Wifi"],
+        ["amenities", "AC"],
+        ["amenities", "Parking"],
+      ]);
+
+      await GET(request);
+
+      expect(getListingsPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amenities: expect.arrayContaining(["Wifi", "AC", "Parking"]),
+        }),
+      );
+    });
+
+    it("should preserve multiple languages from repeated URL params", async () => {
+      const request = createRequestWithMultiParams([
+        ["languages", "English"],
+        ["languages", "Telugu"],
+      ]);
+
+      await GET(request);
+
+      expect(getListingsPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          languages: expect.arrayContaining(["en", "te"]),
+        }),
+      );
+    });
+
+    it("should preserve multiple houseRules from repeated URL params", async () => {
+      const request = createRequestWithMultiParams([
+        ["houseRules", "Pets allowed"],
+        ["houseRules", "Smoking allowed"],
+      ]);
+
+      await GET(request);
+
+      expect(getListingsPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          houseRules: expect.arrayContaining(["Pets allowed", "Smoking allowed"]),
+        }),
+      );
+    });
+  });
+
+  describe("Unbounded search blocking", () => {
+    beforeEach(() => {
+      mockFeatures.searchV2 = true;
+      jest.clearAllMocks();
+    });
+
+    it("should return empty results with unboundedSearch flag when query without bounds", async () => {
+      // This simulates ?q=Boston without lat/lng or bounds
+      const request = createRequest({ q: "Boston" });
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      // Should return 200 with empty results and unboundedSearch indicator
+      expect(response.status).toBe(200);
+      expect(data.unboundedSearch).toBe(true);
+      expect(data.list).toBeNull();
+      expect(data.map).toBeNull();
+
+      // getListingsPaginated should NOT be called for unbounded searches
+      expect(getListingsPaginated).not.toHaveBeenCalled();
+      expect(getMapListings).not.toHaveBeenCalled();
+    });
+
+    it("should proceed normally when query has bounds", async () => {
+      const mockListResult: PaginatedResultHybrid<ListingData> = {
+        items: [],
+        hasNextPage: false,
+        hasPrevPage: false,
+        total: 0,
+        totalPages: 0,
+        page: 1,
+        limit: 20,
+      };
+
+      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
+      (getMapListings as jest.Mock).mockResolvedValue([]);
+
+      // This simulates ?q=Boston&lat=42.36&lng=-71.06
+      const request = createRequest({
+        q: "Boston",
+        lat: "42.36",
+        lng: "-71.06",
+      });
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      // Should return 200 with results
+      expect(response.status).toBe(200);
+      expect(data.unboundedSearch).toBeUndefined();
+      expect(data.list).toBeDefined();
+      expect(data.map).toBeDefined();
+
+      // getListingsPaginated should be called with bounds
+      expect(getListingsPaginated).toHaveBeenCalled();
+    });
+
+    it("should proceed normally when no query (browse mode)", async () => {
+      const mockListResult: PaginatedResultHybrid<ListingData> = {
+        items: [],
+        hasNextPage: false,
+        hasPrevPage: false,
+        total: 0,
+        totalPages: 0,
+        page: 1,
+        limit: 20,
+      };
+
+      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
+      (getMapListings as jest.Mock).mockResolvedValue([]);
+
+      // No query, no bounds - browse mode (allowed)
+      const request = createRequest({});
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.unboundedSearch).toBeUndefined();
+      expect(data.list).toBeDefined();
+
+      // getListingsPaginated should be called
+      expect(getListingsPaginated).toHaveBeenCalled();
     });
   });
 });

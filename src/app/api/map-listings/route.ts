@@ -14,6 +14,10 @@ import {
   runWithRequestContext,
   getRequestId,
 } from "@/lib/request-context";
+import {
+  buildRawParamsFromSearchParams,
+  parseSearchParams,
+} from "@/lib/search-params";
 
 export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
@@ -50,30 +54,26 @@ export async function GET(request: NextRequest) {
 
       const bounds = boundsResult.bounds;
 
-      /** Get multi-value param supporting both repeated keys and CSV format */
-      const getMultiValue = (key: string): string[] | undefined => {
-        const values = searchParams.getAll(key);
-        if (values.length === 0) return undefined;
-        const result = values.flatMap((v: string) => v.split(",")).filter(Boolean);
-        return result.length > 0 ? result : undefined;
-      };
+      // Use canonical parsing for all filter params
+      // This handles: repeated params, CSV splitting, alias resolution,
+      // numeric validation, and allowlist filtering
+      const rawParams = buildRawParamsFromSearchParams(searchParams);
+      const parsed = parseSearchParams(rawParams);
 
-      // Extract filters
+      // Build filter params from canonical parsed values with validated bounds
       const filterParams = {
-        query: searchParams.get("q") || undefined,
-        minPrice: searchParams.get("minPrice")
-          ? parseInt(searchParams.get("minPrice")!)
-          : undefined,
-        maxPrice: searchParams.get("maxPrice")
-          ? parseInt(searchParams.get("maxPrice")!)
-          : undefined,
+        query: parsed.filterParams.query,
+        minPrice: parsed.filterParams.minPrice,
+        maxPrice: parsed.filterParams.maxPrice,
         bounds,
-        amenities: getMultiValue("amenities"),
-        languages: getMultiValue("languages"),
-        houseRules: getMultiValue("houseRules"),
-        moveInDate: searchParams.get("moveInDate") || undefined,
-        leaseDuration: searchParams.get("leaseDuration") || undefined,
-        roomType: searchParams.get("roomType") || undefined,
+        amenities: parsed.filterParams.amenities,
+        languages: parsed.filterParams.languages,
+        houseRules: parsed.filterParams.houseRules,
+        moveInDate: parsed.filterParams.moveInDate,
+        leaseDuration: parsed.filterParams.leaseDuration,
+        roomType: parsed.filterParams.roomType,
+        genderPreference: parsed.filterParams.genderPreference,
+        householdGender: parsed.filterParams.householdGender,
       };
 
       // Fetch listings using existing data function
