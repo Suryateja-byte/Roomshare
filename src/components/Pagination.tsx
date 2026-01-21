@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTransition, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { encodeStack, decodeStack } from '@/lib/search/cursor';
+import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 
 interface PaginationProps {
     currentPage: number;
@@ -33,7 +34,12 @@ export default function Pagination({
 }: PaginationProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [isPending, startTransition] = useTransition();
+
+    // Use shared transition context if available, fall back to local transition for standalone use
+    const transitionContext = useSearchTransitionSafe();
+    const [localIsPending, localStartTransition] = useTransition();
+    const isPending = transitionContext?.isPending ?? localIsPending;
+    const startTransition = transitionContext?.startTransition ?? localStartTransition;
 
     // Determine if we're using keyset pagination (cursor available)
     // Note: We detect keyset mode by checking if nextCursor is explicitly provided (even if null)
@@ -72,82 +78,96 @@ export default function Pagination({
 
     // Handle offset-based page navigation (clicking specific page number)
     const handlePageChange = (page: number) => {
-        startTransition(() => {
-            const params = new URLSearchParams(searchParams.toString());
-            params.set('page', page.toString());
-            // Clear keyset pagination params when using offset pagination
-            params.delete('cursor');
-            params.delete('cursorStack');
-            params.delete('pageNumber');
-            router.push(`?${params.toString()}`, { scroll: false });
-        });
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('page', page.toString());
+        // Clear keyset pagination params when using offset pagination
+        params.delete('cursor');
+        params.delete('cursorStack');
+        params.delete('pageNumber');
+        const url = `?${params.toString()}`;
+
+        // Use shared navigation if available (shows loading overlay across all search components)
+        if (transitionContext) {
+            transitionContext.navigateWithTransition(url, { scroll: false });
+        } else {
+            startTransition(() => {
+                router.push(url, { scroll: false });
+            });
+        }
     };
 
     // Handle cursor-based navigation (next/prev with keyset)
     const handleCursorNavigation = (direction: 'next' | 'prev') => {
-        startTransition(() => {
-            const params = new URLSearchParams(searchParams.toString());
-            const currentCursor = searchParams.get('cursor');
+        const params = new URLSearchParams(searchParams.toString());
+        const currentCursor = searchParams.get('cursor');
 
-            if (direction === 'next') {
-                // Going forward: push current cursor onto stack, advance to next cursor
-                if (nextCursor) {
-                    const newStack = [...cursorStack];
-                    if (currentCursor) {
-                        newStack.push(currentCursor);
-                    }
-
-                    params.set('cursor', nextCursor);
-                    if (newStack.length > 0) {
-                        params.set('cursorStack', encodeStack(newStack));
-                    } else {
-                        params.delete('cursorStack');
-                    }
-                    params.set('pageNumber', (pageNumber + 1).toString());
-                    params.delete('page'); // Clear offset pagination
-                } else {
-                    // Fallback to offset if no next cursor
-                    const targetPage = pageNumber + 1;
-                    params.set('page', targetPage.toString());
-                    params.delete('cursor');
-                    params.delete('cursorStack');
-                    params.delete('pageNumber');
+        if (direction === 'next') {
+            // Going forward: push current cursor onto stack, advance to next cursor
+            if (nextCursor) {
+                const newStack = [...cursorStack];
+                if (currentCursor) {
+                    newStack.push(currentCursor);
                 }
+
+                params.set('cursor', nextCursor);
+                if (newStack.length > 0) {
+                    params.set('cursorStack', encodeStack(newStack));
+                } else {
+                    params.delete('cursorStack');
+                }
+                params.set('pageNumber', (pageNumber + 1).toString());
+                params.delete('page'); // Clear offset pagination
             } else {
-                // Going back: pop cursor from stack, navigate to popped cursor
-                if (cursorStack.length > 0) {
-                    const newStack = [...cursorStack];
-                    const prevCursorFromStack = newStack.pop();
-
-                    if (prevCursorFromStack) {
-                        params.set('cursor', prevCursorFromStack);
-                    } else {
-                        // First page - clear cursor
-                        params.delete('cursor');
-                    }
-
-                    if (newStack.length > 0) {
-                        params.set('cursorStack', encodeStack(newStack));
-                    } else {
-                        params.delete('cursorStack');
-                    }
-                    params.set('pageNumber', Math.max(1, pageNumber - 1).toString());
-                    params.delete('page');
-                } else if (pageNumber > 1) {
-                    // Stack is empty but we're not on page 1 - go to page 1
-                    params.delete('cursor');
-                    params.delete('cursorStack');
-                    params.set('pageNumber', '1');
-                    params.delete('page');
-                } else {
-                    // Already on page 1, nothing to do
-                    console.warn('[Pagination] Cannot go back: already on first page');
-                    return;
-                }
+                // Fallback to offset if no next cursor
+                const targetPage = pageNumber + 1;
+                params.set('page', targetPage.toString());
+                params.delete('cursor');
+                params.delete('cursorStack');
+                params.delete('pageNumber');
             }
+        } else {
+            // Going back: pop cursor from stack, navigate to popped cursor
+            if (cursorStack.length > 0) {
+                const newStack = [...cursorStack];
+                const prevCursorFromStack = newStack.pop();
 
-            router.push(`?${params.toString()}`, { scroll: false });
-        });
+                if (prevCursorFromStack) {
+                    params.set('cursor', prevCursorFromStack);
+                } else {
+                    // First page - clear cursor
+                    params.delete('cursor');
+                }
+
+                if (newStack.length > 0) {
+                    params.set('cursorStack', encodeStack(newStack));
+                } else {
+                    params.delete('cursorStack');
+                }
+                params.set('pageNumber', Math.max(1, pageNumber - 1).toString());
+                params.delete('page');
+            } else if (pageNumber > 1) {
+                // Stack is empty but we're not on page 1 - go to page 1
+                params.delete('cursor');
+                params.delete('cursorStack');
+                params.set('pageNumber', '1');
+                params.delete('page');
+            } else {
+                // Already on page 1, nothing to do
+                console.warn('[Pagination] Cannot go back: already on first page');
+                return;
+            }
+        }
+
+        const url = `?${params.toString()}`;
+
+        // Use shared navigation if available (shows loading overlay across all search components)
+        if (transitionContext) {
+            transitionContext.navigateWithTransition(url, { scroll: false });
+        } else {
+            startTransition(() => {
+                router.push(url, { scroll: false });
+            });
+        }
     };
 
     // Generate page numbers to show

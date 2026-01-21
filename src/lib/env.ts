@@ -264,6 +264,15 @@ export const features = {
   searchV2: true as const,
   searchKeyset: true as const,
   searchRanking: true as const,
+  // Search debug ranking (only allowed in non-production, or with explicit env override)
+  // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals
+  get searchDebugRanking() {
+    const e = getServerEnv();
+    // Allow debug in non-production environments
+    if (e.NODE_ENV !== "production") return true;
+    // In production, require explicit env flag (for staging/preview debugging)
+    return process.env.SEARCH_DEBUG_RANKING === "true";
+  },
 };
 
 // P1-25 FIX: Log startup warnings for missing optional services
