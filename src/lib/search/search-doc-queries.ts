@@ -1280,6 +1280,7 @@ export function isSearchDocEnabled(urlSearchDoc?: string | null): boolean {
     return false;
   }
 
-  // Use typed env via features.searchDoc
-  return features.searchDoc;
+  // Read directly from process.env to avoid caching issues in tests
+  // The typed features.searchDoc getter caches values, which breaks test isolation
+  return process.env.ENABLE_SEARCH_DOC === "true";
 }
