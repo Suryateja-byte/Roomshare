@@ -513,6 +513,13 @@ export async function getSearchDocLimitedCount(
 async function getSearchDocMapListingsInternal(
   params: FilterParams,
 ): Promise<MapListingData[]> {
+  // Defense in depth: block unbounded text searches
+  if (params.query && !params.bounds) {
+    throw new Error(
+      "Unbounded text search not allowed: geographic bounds required when query is present",
+    );
+  }
+
   const {
     conditions,
     params: queryParams,
@@ -593,6 +600,13 @@ async function getSearchDocListingsPaginatedInternal(
   params: FilterParams = {},
 ): Promise<PaginatedResultHybrid<ListingData>> {
   const { sort = "recommended", page = 1, limit = 12, nearMatches } = params;
+
+  // Defense in depth: block unbounded text searches
+  if (params.query && !params.bounds) {
+    throw new Error(
+      "Unbounded text search not allowed: geographic bounds required when query is present",
+    );
+  }
 
   try {
     const {
@@ -827,6 +841,13 @@ export async function getSearchDocListingsWithKeyset(
   params: FilterParams = {},
   cursor: KeysetCursor | null = null,
 ): Promise<KeysetPaginatedResult<ListingData>> {
+  // Defense in depth: block unbounded text searches
+  if (params.query && !params.bounds) {
+    throw new Error(
+      "Unbounded text search not allowed: geographic bounds required when query is present",
+    );
+  }
+
   const { sort = "recommended", limit = 12 } = params;
   const sortOption = sort as SortOption;
 
@@ -952,7 +973,7 @@ export async function getSearchDocListingsWithKeyset(
     const hasNextPage = results.length > limit;
 
     // Only return `limit` items
-    let items: ListingData[] = hasNextPage ? results.slice(0, limit) : results;
+    const items: ListingData[] = hasNextPage ? results.slice(0, limit) : results;
 
     // Build nextCursor from the last item
     let nextCursor: string | null = null;
@@ -1019,6 +1040,13 @@ export async function getSearchDocListingsWithKeyset(
 export async function getSearchDocListingsFirstPage(
   params: FilterParams = {},
 ): Promise<KeysetPaginatedResult<ListingData>> {
+  // Defense in depth: block unbounded text searches
+  if (params.query && !params.bounds) {
+    throw new Error(
+      "Unbounded text search not allowed: geographic bounds required when query is present",
+    );
+  }
+
   const { sort = "recommended", limit = 12, nearMatches } = params;
   const sortOption = sort as SortOption;
 
@@ -1237,8 +1265,11 @@ export async function getSearchDocListingsFirstPage(
 /**
  * Check if SearchDoc feature is enabled.
  * Controlled by:
- * - ENABLE_SEARCH_DOC env var (global enable)
+ * - ENABLE_SEARCH_DOC env var (global enable via features.searchDoc)
  * - ?searchDoc=1 URL param (per-request override for testing)
+ *
+ * CRITICAL: When disabled, falls back to slow LIKE queries.
+ * In production, this should always be enabled for performance.
  */
 export function isSearchDocEnabled(urlSearchDoc?: string | null): boolean {
   // URL override for testing (allows ?searchDoc=1 to enable on specific requests)
@@ -1249,6 +1280,6 @@ export function isSearchDocEnabled(urlSearchDoc?: string | null): boolean {
     return false;
   }
 
-  // Global env var
-  return process.env.ENABLE_SEARCH_DOC === "true";
+  // Use typed env via features.searchDoc
+  return features.searchDoc;
 }
