@@ -701,6 +701,8 @@ export interface MapListingData {
     lat: number;
     lng: number;
   };
+  /** Pin tier for V2 mode: primary = larger pin, mini = smaller pin */
+  tier?: "primary" | "mini";
 }
 
 // Maximum map markers to return (prevents UI performance issues)

@@ -37,6 +37,8 @@ interface Listing {
         lat: number;
         lng: number;
     };
+    /** Pin tier for differentiated styling: primary = larger, mini = smaller */
+    tier?: "primary" | "mini";
 }
 
 interface MarkerPosition {
@@ -762,25 +764,42 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                 handleMarkerClick();
                             }}
                         >
-                            {/* Pin body with price - Softer corners to match card aesthetic */}
+                            {/* Pin body with price - Differentiated by tier */}
+                            {/* Primary tier (or no tier): Full size price pill */}
+                            {/* Mini tier: Smaller, more compact marker */}
                             <div className={cn(
-                                "px-3 py-1.5 rounded-xl shadow-lg font-semibold text-sm whitespace-nowrap relative transition-all duration-200",
+                                "shadow-lg font-semibold whitespace-nowrap relative transition-all duration-200",
                                 "group-hover/marker:scale-105",
+                                // Size differentiation based on tier
+                                position.listing.tier === "mini"
+                                    ? "px-2 py-1 rounded-lg text-xs"  // Mini: smaller
+                                    : "px-3 py-1.5 rounded-xl text-sm",  // Primary/default: normal
+                                // Color based on hover/active state
                                 hoveredId === position.listing.id
                                     ? "bg-rose-500 text-white ring-2 ring-white dark:ring-zinc-900 scale-105"
                                     : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
                             )}>
                                 ${position.listing.price}
                             </div>
-                            {/* Pin tail/pointer - Properly styled triangle */}
+                            {/* Pin tail/pointer - Scaled based on tier */}
                             <div className={cn(
-                                "absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] transition-colors",
+                                "absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-transparent border-r-transparent transition-colors",
+                                // Size differentiation based on tier
+                                position.listing.tier === "mini"
+                                    ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"  // Mini: smaller tail
+                                    : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",  // Primary/default: normal tail
+                                // Color based on hover/active state
                                 hoveredId === position.listing.id
                                     ? "border-t-rose-500"
                                     : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
                             )}></div>
-                            {/* Shadow under the pin for depth */}
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]"></div>
+                            {/* Shadow under the pin for depth - Scaled based on tier */}
+                            <div className={cn(
+                                "absolute left-1/2 -translate-x-1/2 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]",
+                                position.listing.tier === "mini"
+                                    ? "-bottom-[2px] w-2 h-0.5"  // Mini: smaller shadow
+                                    : "-bottom-1 w-3 h-1"  // Primary/default: normal shadow
+                            )}></div>
                         </div>
                     </Marker>
                     );

@@ -155,8 +155,19 @@ function MapTransitionOverlay() {
  * - title: for popup/tooltip
  * - availableSlots: for "N Available" / "Filled" badge in popup
  * - ownerId: for showing "Message" button in popup
+ * - tier: for differentiated pin styling (primary = larger, mini = smaller)
  */
 function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
+  // Build lookup map from pins for tier data (O(1) lookups)
+  const pinTierMap = new Map<string, "primary" | "mini">();
+  if (v2MapData.pins) {
+    for (const pin of v2MapData.pins) {
+      if (pin.tier) {
+        pinTierMap.set(pin.id, pin.tier);
+      }
+    }
+  }
+
   return v2MapData.geojson.features.map((feature) => ({
     id: feature.properties.id,
     title: feature.properties.title ?? "",
@@ -168,6 +179,8 @@ function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
       lng: feature.geometry.coordinates[0],
       lat: feature.geometry.coordinates[1],
     },
+    // Add tier from pins lookup (defaults to undefined if not in pins mode)
+    tier: pinTierMap.get(feature.properties.id),
   }));
 }
 
