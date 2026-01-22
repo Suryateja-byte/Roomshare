@@ -76,12 +76,12 @@ jobs:
           flags: components
           fail_ci_if_error: false
 
-  # API and action tests
+  # API and action tests - run sequentially to manage memory
   test-api:
     name: API & Action Tests
     runs-on: ubuntu-latest
     env:
-      NODE_OPTIONS: '--max-old-space-size=8192'
+      NODE_OPTIONS: '--max-old-space-size=4096'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -89,13 +89,10 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - run: npx jest --ci --coverage --testPathPatterns="src/__tests__/api/" --testPathPatterns="src/__tests__/actions/"
-      - uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          files: ./coverage/lcov.info
-          flags: api
-          fail_ci_if_error: false
+      - name: Run API tests (sequential)
+        run: npx jest --ci --runInBand --testPathPatterns="src/__tests__/api/"
+      - name: Run Action tests (sequential)
+        run: npx jest --ci --runInBand --testPathPatterns="src/__tests__/actions/"
 
   # Filter system tests - integration, property-based, and E2E
   test-filters:
