@@ -32,6 +32,13 @@ const CACHE_TTL_MS = 30_000; // 30 seconds
 // Debounce delay
 const DEBOUNCE_MS = 300;
 
+/**
+ * Clear the count cache (exported for testing only)
+ */
+export function clearCountCache(): void {
+  countCache.clear();
+}
+
 export interface UseDebouncedFilterCountOptions {
   /** Pending filter values (not yet applied) */
   pending: BatchedFilterValues;
@@ -52,6 +59,8 @@ export interface UseDebouncedFilterCountReturn {
   isLoading: boolean;
   /** Human-readable count string for button */
   formattedCount: string;
+  /** P3b: Whether bounds selection is required before showing count */
+  boundsRequired: boolean;
 }
 
 /**
@@ -165,6 +174,8 @@ export function useDebouncedFilterCount({
   const [previousCount, setPreviousCount] = useState<number | null>(null);
   const [baselineCount, setBaselineCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // P3b: Track when API indicates bounds selection is required
+  const [boundsRequired, setBoundsRequired] = useState(false);
 
   // Track if we've captured the baseline for this drawer session
   const baselineCapturedRef = useRef(false);
@@ -213,6 +224,8 @@ export function useDebouncedFilterCount({
 
       const data = await response.json();
       const newCount = data.count as number | null;
+      // P3b: Parse boundsRequired from API response
+      const newBoundsRequired = data.boundsRequired === true;
 
       // Cache the result
       setCachedCount(cacheKey, newCount);
@@ -220,6 +233,7 @@ export function useDebouncedFilterCount({
       // Only update state if not aborted
       if (!abortController.signal.aborted) {
         setCount(newCount);
+        setBoundsRequired(newBoundsRequired);
         setIsLoading(false);
       }
     } catch (error) {
@@ -238,11 +252,13 @@ export function useDebouncedFilterCount({
     }
   }, [cacheKey, pending, searchParams]);
 
-  // Reset baseline when drawer closes
+  // Reset baseline and boundsRequired when drawer closes
   useEffect(() => {
     if (!isDrawerOpen) {
       baselineCapturedRef.current = false;
       setBaselineCount(null);
+      // P3-NEW-a: Reset boundsRequired when drawer closes
+      setBoundsRequired(false);
     }
   }, [isDrawerOpen]);
 
@@ -259,6 +275,8 @@ export function useDebouncedFilterCount({
       // Reset count when drawer closes or filters become clean
       setCount(null);
       setIsLoading(false);
+      // P3-NEW-a: Reset boundsRequired when filters are not dirty
+      setBoundsRequired(false);
       return;
     }
 
@@ -305,6 +323,10 @@ export function useDebouncedFilterCount({
 
   // Format count for display
   const formattedCount = useMemo(() => {
+    // P3b: Prioritize boundsRequired over count display
+    if (boundsRequired) {
+      return "Select a location";
+    }
     if (isLoading) {
       return "listings";
     }
@@ -315,7 +337,7 @@ export function useDebouncedFilterCount({
       return "1 listing";
     }
     return `${count} listings`;
-  }, [count, isLoading]);
+  }, [boundsRequired, count, isLoading]);
 
   return {
     count,
@@ -323,5 +345,6 @@ export function useDebouncedFilterCount({
     baselineCount,
     isLoading,
     formattedCount,
+    boundsRequired,
   };
 }

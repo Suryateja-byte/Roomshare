@@ -206,15 +206,20 @@ describe("/api/search/facets", () => {
     });
 
     it("should apply text search filter", async () => {
+      // Note: P1 fix requires bounds when query is present
       const request = createRequest({
         q: "austin",
+        minLng: "-97.8",
+        maxLng: "-97.6",
+        minLat: "30.2",
+        maxLat: "30.4",
       });
 
       await GET(request);
 
-      // All queries should include text search
+      // All queries should include text search (using FTS after P2a fix)
       const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
-      expect(amenitiesQuery.toLowerCase()).toContain("like");
+      expect(amenitiesQuery).toContain("plainto_tsquery");
     });
   });
 
@@ -284,6 +289,216 @@ describe("/api/search/facets", () => {
 
       expect(response.status).toBe(429);
     });
+  });
+});
+
+describe("bounds validation (P1 - DoS prevention)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("returns 400 with boundsRequired when query present without bounds", async () => {
+    // No DB calls should happen - validation should reject early
+    const request = createRequest({ q: "austin" }); // no bounds
+    const response = await GET(request);
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.boundsRequired).toBe(true);
+    expect(data.error).toBeDefined();
+  });
+
+  it("allows query with valid bounds (200 status)", async () => {
+    // Setup mocks for DB calls
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
+      .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
+      .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+
+    const request = createRequest({
+      q: "austin",
+      minLng: "-97.8",
+      maxLng: "-97.6",
+      minLat: "30.2",
+      maxLat: "30.4",
+    });
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    // Verify DB was actually queried
+    expect(mockQueryRawUnsafe).toHaveBeenCalled();
+  });
+
+  it("clamps oversized bounds silently and proceeds with 200", async () => {
+    // Setup mocks for DB calls - should succeed after clamping
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
+      .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
+      .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+
+    const request = createRequest({
+      q: "austin",
+      minLng: "-180",
+      maxLng: "180", // 360° span - way oversized
+      minLat: "-85",
+      maxLat: "85", // 170° span - way oversized
+    });
+    const response = await GET(request);
+
+    // Should clamp silently and proceed, not return 400
+    expect(response.status).toBe(200);
+    // Verify DB was queried (bounds were clamped, not rejected)
+    expect(mockQueryRawUnsafe).toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid coordinate values (NaN)", async () => {
+    const request = createRequest({
+      q: "austin",
+      minLng: "invalid",
+      maxLng: "-97.6",
+      minLat: "30.2",
+      maxLat: "30.4",
+    });
+    const response = await GET(request);
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBeDefined();
+  });
+
+  it("allows facet queries without bounds when no text query", async () => {
+    // Setup mocks for DB calls
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
+      .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
+      .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+
+    // No query param, no bounds - should be allowed (not a DoS vector without text search)
+    const request = createRequest({});
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+  });
+});
+
+describe("FTS text search (P2a - semantic alignment)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Setup default mocks for all facet queries
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
+      .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
+      .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+  });
+
+  it("uses plainto_tsquery for text search instead of LIKE", async () => {
+    const request = createRequest({
+      q: "austin",
+      minLng: "-97.8",
+      maxLng: "-97.6",
+      minLat: "30.2",
+      maxLat: "30.4",
+    });
+
+    await GET(request);
+
+    // Verify FTS is used (plainto_tsquery) instead of LIKE
+    const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
+    expect(amenitiesQuery).toContain("plainto_tsquery");
+    expect(amenitiesQuery.toLowerCase()).not.toContain("like");
+  });
+
+  it("uses search_tsv column for FTS", async () => {
+    const request = createRequest({
+      q: "downtown",
+      minLng: "-97.8",
+      maxLng: "-97.6",
+      minLat: "30.2",
+      maxLat: "30.4",
+    });
+
+    await GET(request);
+
+    const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
+    expect(amenitiesQuery).toContain("search_tsv");
+    expect(amenitiesQuery).toContain("@@");
+  });
+
+  it("handles multi-word queries with FTS", async () => {
+    const request = createRequest({
+      q: "downtown austin",
+      minLng: "-97.8",
+      maxLng: "-97.6",
+      minLat: "30.2",
+      maxLat: "30.4",
+    });
+
+    await GET(request);
+
+    // Multi-word queries should still use FTS
+    const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
+    expect(amenitiesQuery).toContain("plainto_tsquery");
+  });
+});
+
+describe("P2-NEW: lat/lng bounds derivation", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Setup default mocks for all facet queries
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
+      .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
+      .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+  });
+
+  it("accepts q+lat+lng without explicit bounds (normal SearchForm flow)", async () => {
+    const request = createRequest({
+      q: "austin",
+      lat: "30.2672",
+      lng: "-97.7431",
+      // No explicit minLat/maxLat/minLng/maxLng - should derive from lat/lng
+    });
+    const response = await GET(request);
+
+    // Should succeed - parseSearchParams derives bounds from lat/lng
+    expect(response.status).toBe(200);
+    // Verify DB was queried
+    expect(mockQueryRawUnsafe).toHaveBeenCalled();
+  });
+
+  it("still returns 400 for q with no location info at all", async () => {
+    mockQueryRawUnsafe.mockReset(); // Should not be called
+
+    const request = createRequest({
+      q: "austin",
+      // No lat/lng, no bounds - should fail
+    });
+    const response = await GET(request);
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.boundsRequired).toBe(true);
+    // DB should NOT be queried - validation rejects early
+    expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("uses derived bounds (~10km radius) from lat/lng in query", async () => {
+    const request = createRequest({
+      q: "test",
+      lat: "30.0",
+      lng: "-97.0",
+    });
+    await GET(request);
+
+    // Verify query uses derived bounds (ST_MakeEnvelope call)
+    expect(mockQueryRawUnsafe).toHaveBeenCalled();
+    const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0];
+    expect(amenitiesQuery).toContain("ST_MakeEnvelope");
   });
 });
 

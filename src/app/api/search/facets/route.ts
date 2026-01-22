@@ -30,6 +30,12 @@ import {
   isValidQuery,
   crossesAntimeridian,
 } from "@/lib/data";
+import {
+  clampBoundsToMaxSpan,
+  MAX_LAT_SPAN,
+  MAX_LNG_SPAN,
+} from "@/lib/validation";
+import { logger } from "@/lib/logger";
 
 // Cache TTL in seconds
 const CACHE_TTL = 30;
@@ -138,18 +144,15 @@ function buildFacetWhereConditions(
     }
   }
 
-  // Text search filter
+  // Text search filter using FTS (aligned with search-doc-queries.ts)
+  // Uses plainto_tsquery for semantic search consistency
   if (query && isValidQuery(query)) {
     const sanitizedQuery = sanitizeSearchQuery(query);
     if (sanitizedQuery) {
-      const searchPattern = `%${sanitizedQuery}%`;
-      conditions.push(`(
-        LOWER(d.title) LIKE LOWER($${paramIndex}) OR
-        LOWER(d.description) LIKE LOWER($${paramIndex}) OR
-        LOWER(d.city) LIKE LOWER($${paramIndex}) OR
-        LOWER(d.state) LIKE LOWER($${paramIndex})
-      )`);
-      params.push(searchPattern);
+      // P2a Fix: Use FTS instead of LIKE for semantic alignment
+      // plainto_tsquery handles multi-word queries as AND by default
+      conditions.push(`d.search_tsv @@ plainto_tsquery('english', $${paramIndex})`);
+      params.push(sanitizedQuery);
       paramIndex++;
     }
   }
@@ -441,6 +444,75 @@ export async function GET(request: NextRequest) {
       });
 
       const { filterParams } = parseSearchParams(rawParams);
+
+      // P1 Fix: Validate bounds when text query is present (DoS prevention)
+      // Text search without bounds allows full-table scans - block early
+      // P2-NEW Fix: Use filterParams.bounds (which derives bounds from lat/lng)
+      // instead of raw URL params. parseSearchParams() creates ~10km radius
+      // bounds from lat/lng, enabling normal SearchForm flow (q+lat+lng).
+      if (filterParams.query) {
+        // Check if bounds are missing (neither explicit bounds nor derived from lat/lng)
+        if (!filterParams.bounds) {
+          logger.warn("[search/facets] Query without bounds rejected", {
+            hasQuery: true,
+            hasBounds: false,
+          });
+          return NextResponse.json(
+            {
+              error: "Please select a location",
+              boundsRequired: true,
+            },
+            {
+              status: 400,
+              headers: { "Cache-Control": "private, no-store" },
+            },
+          );
+        }
+
+        // Validate coordinate values from filterParams.bounds
+        const { bounds } = filterParams;
+
+        // Check for NaN/Infinity (invalid coordinates)
+        if (
+          !Number.isFinite(bounds.minLng) ||
+          !Number.isFinite(bounds.maxLng) ||
+          !Number.isFinite(bounds.minLat) ||
+          !Number.isFinite(bounds.maxLat)
+        ) {
+          logger.warn("[search/facets] Invalid coordinates rejected", {
+            minLng: bounds.minLng,
+            maxLng: bounds.maxLng,
+            minLat: bounds.minLat,
+            maxLat: bounds.maxLat,
+          });
+          return NextResponse.json(
+            { error: "Invalid coordinate values" },
+            {
+              status: 400,
+              headers: { "Cache-Control": "private, no-store" },
+            },
+          );
+        }
+
+        // Check if bounds are oversized and clamp silently if needed
+        const latSpan = bounds.maxLat - bounds.minLat;
+        const lngSpan = crossesAntimeridian(bounds.minLng, bounds.maxLng)
+          ? 180 - bounds.minLng + (bounds.maxLng + 180)
+          : bounds.maxLng - bounds.minLng;
+
+        if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
+          // Clamp bounds silently (user preference: silent clamp over rejection)
+          const clampedBounds = clampBoundsToMaxSpan(bounds);
+          filterParams.bounds = clampedBounds;
+          logger.debug("[search/facets] Oversized bounds clamped", {
+            original: { latSpan: latSpan.toFixed(2), lngSpan: lngSpan.toFixed(2) },
+            clamped: {
+              latSpan: (clampedBounds.maxLat - clampedBounds.minLat).toFixed(2),
+              lngSpan: (clampedBounds.maxLng - clampedBounds.minLng).toFixed(2),
+            },
+          });
+        }
+      }
 
       // Build cache key and fetch with caching
       const cacheKey = generateFacetsCacheKey(filterParams);

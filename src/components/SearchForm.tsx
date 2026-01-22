@@ -21,6 +21,7 @@ import {
 } from '@/lib/search-params';
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { useRecentSearches, type RecentSearch, type RecentSearchFilters } from '@/hooks/useRecentSearches';
+import { useDebouncedFilterCount } from '@/hooks/useDebouncedFilterCount';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -448,6 +449,27 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         moveInDateCount > 0
     );
 
+    // P3-NEW-b: Get dynamic count for FilterModal button
+    const {
+        formattedCount,
+        isLoading: isCountLoading,
+        boundsRequired,
+    } = useDebouncedFilterCount({
+        pending: {
+            minPrice,
+            maxPrice,
+            roomType,
+            leaseDuration,
+            moveInDate,
+            amenities,
+            houseRules,
+            languages,
+        },
+        // Always fetch counts when drawer is open
+        isDirty: showFilters,
+        isDrawerOpen: showFilters,
+    });
+
     // Handler for removing individual filters from FilterBar pills
     const handleRemoveFilter = useCallback((type: string, value?: string) => {
         switch (type) {
@@ -776,6 +798,10 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 minMoveInDate={minMoveInDate}
                 amenityOptions={AMENITY_OPTIONS}
                 houseRuleOptions={HOUSE_RULE_OPTIONS}
+                // P3-NEW-b: Dynamic count props from useDebouncedFilterCount
+                formattedCount={formattedCount}
+                isCountLoading={isCountLoading}
+                boundsRequired={boundsRequired}
             />
         </div>
     );

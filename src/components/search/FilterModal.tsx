@@ -52,6 +52,11 @@ interface FilterModalProps {
   minMoveInDate: string;
   amenityOptions: readonly string[];
   houseRuleOptions: readonly string[];
+
+  // P3-NEW-b: Dynamic count display from useDebouncedFilterCount
+  formattedCount?: string;
+  isCountLoading?: boolean;
+  boundsRequired?: boolean;
 }
 
 /**
@@ -89,6 +94,10 @@ export function FilterModal({
   minMoveInDate,
   amenityOptions,
   houseRuleOptions,
+  // P3-NEW-b: Dynamic count props
+  formattedCount,
+  isCountLoading,
+  boundsRequired,
 }: FilterModalProps) {
   if (!isOpen || typeof document === 'undefined') {
     return null;
@@ -361,9 +370,18 @@ export function FilterModal({
             <Button
               type="button"
               onClick={onApply}
-              className="flex-1 rounded-xl h-12 bg-zinc-900 text-white hover:bg-zinc-800 shadow-md"
+              disabled={boundsRequired}
+              className="flex-1 rounded-xl h-12 bg-zinc-900 text-white hover:bg-zinc-800 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="filter-modal-apply"
             >
-              Show Results
+              {isCountLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {formattedCount || 'listings'}
+                </span>
+              ) : (
+                formattedCount || 'Show Results'
+              )}
             </Button>
           </div>
         </div>
