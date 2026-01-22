@@ -26,10 +26,10 @@ interface Listing {
     avgRating?: number;
     reviewCount?: number;
     location: {
-        address: string;
+        address?: string;
         city: string;
         state: string;
-        zip: string;
+        zip?: string;
         lat: number;
         lng: number;
     };
