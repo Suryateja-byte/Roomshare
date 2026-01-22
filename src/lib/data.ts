@@ -1,7 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { wrapDatabaseError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { getSearchDocLimitedCount } from "@/lib/search/search-doc-queries";
+import {
+  getSearchDocLimitedCount,
+  isSearchDocEnabled,
+} from "@/lib/search/search-doc-queries";
+import {
+  clampBoundsToMaxSpan,
+  MAX_LAT_SPAN,
+  MAX_LNG_SPAN,
+} from "@/lib/validation";
 
 // Re-export for API routes
 export { getSearchDocLimitedCount as getLimitedCount };
@@ -25,10 +33,10 @@ export interface ListingData {
   moveInDate?: Date;
   ownerId?: string;
   location: {
-    address: string;
+    address?: string; // Optional - only included in listing detail, not search
     city: string;
     state: string;
-    zip: string;
+    zip?: string; // Optional - only included in listing detail, not search
     lat: number;
     lng: number;
   };
@@ -933,11 +941,25 @@ export async function getListingsPaginated(
     languages,
     genderPreference,
     householdGender,
-    bounds,
+    bounds: rawBounds,
     sort = "recommended",
     page = 1,
     limit = 12,
   } = params;
+
+  // Clamp oversized bounds to prevent DoS via world-spanning queries
+  // This ensures database queries always operate on a bounded geographic area
+  let bounds = rawBounds;
+  if (rawBounds) {
+    const latSpan = rawBounds.maxLat - rawBounds.minLat;
+    const lngSpan = crossesAntimeridian(rawBounds.minLng, rawBounds.maxLng)
+      ? 180 - rawBounds.minLng + (rawBounds.maxLng + 180)
+      : rawBounds.maxLng - rawBounds.minLng;
+
+    if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
+      bounds = clampBoundsToMaxSpan(rawBounds);
+    }
+  }
 
   try {
     // Defense in depth: block unbounded text searches
@@ -1154,13 +1176,10 @@ export async function getListingsPaginated(
             l."leaseDuration",
             l."roomType",
             l."moveInDate",
-            l."ownerId",
             l."createdAt",
             l."viewCount",
-            loc.address,
             loc.city,
             loc.state,
-            loc.zip,
             ST_X(loc.coords::geometry) as lng,
             ST_Y(loc.coords::geometry) as lat,
             COALESCE(AVG(r.rating), 0) as avg_rating,
@@ -1200,16 +1219,13 @@ export async function getListingsPaginated(
       leaseDuration: l.leaseDuration,
       roomType: l.roomType,
       moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      ownerId: l.ownerId,
       createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
       viewCount: Number(l.viewCount) || 0,
       avgRating: Number(l.avg_rating) || 0,
       reviewCount: Number(l.review_count) || 0,
       location: {
-        address: l.address,
         city: l.city,
         state: l.state,
-        zip: l.zip,
         lat: Number(l.lat) || 0,
         lng: Number(l.lng) || 0,
       },
@@ -1427,8 +1443,16 @@ async function getListingsCountEfficient(
 }
 
 // Safe wrapper for count queries in filter analysis - graceful degradation
+// Uses SearchDoc count when enabled to match main search behavior (FTS vs LIKE consistency)
 async function safeGetCount(params: FilterParams): Promise<number | null> {
   try {
+    // Use SearchDoc count when feature is enabled for consistency with main search
+    if (isSearchDocEnabled()) {
+      // Returns null if >100 results (hybrid optimization) - skip suggestion
+      return await getSearchDocLimitedCount(params);
+    }
+
+    // Fall back to base table count when SearchDoc is disabled
     return await getListingsCountEfficient(params);
   } catch (error) {
     logger.sync.warn("Filter analysis count failed", {
