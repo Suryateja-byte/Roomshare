@@ -457,9 +457,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         const urlRoomType = searchParams.get('roomType') || '';
         const urlLeaseDuration = searchParams.get('leaseDuration') || '';
         const urlMoveInDate = searchParams.get('moveInDate') || '';
-        const urlAmenities = (searchParams.get('amenities') || '').split(',').filter(Boolean).sort();
-        const urlHouseRules = (searchParams.get('houseRules') || '').split(',').filter(Boolean).sort();
-        const urlLanguages = (searchParams.get('languages') || '').split(',').filter(Boolean).sort();
+        const urlAmenities = searchParams.getAll('amenities').sort();
+        const urlHouseRules = searchParams.getAll('houseRules').sort();
+        const urlLanguages = searchParams.getAll('languages').sort();
         const urlGenderPreference = searchParams.get('genderPreference') || '';
         const urlHouseholdGender = searchParams.get('householdGender') || '';
 
