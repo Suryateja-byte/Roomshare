@@ -97,6 +97,8 @@ function createSearchDocCountCacheKey(params: FilterParams): string {
     roomType: params.roomType?.toLowerCase() || "",
     leaseDuration: params.leaseDuration?.toLowerCase() || "",
     moveInDate: params.moveInDate || "",
+    genderPreference: params.genderPreference || "",
+    householdGender: params.householdGender || "",
     bounds: params.bounds
       ? `${params.bounds.minLng.toFixed(4)},${params.bounds.minLat.toFixed(4)},${params.bounds.maxLng.toFixed(4)},${params.bounds.maxLat.toFixed(4)}`
       : "",
@@ -288,6 +290,8 @@ function buildSearchDocWhereConditions(
     houseRules,
     roomType,
     languages,
+    genderPreference,
+    householdGender,
     bounds,
   } = filterParams;
 
@@ -409,6 +413,18 @@ function buildSearchDocWhereConditions(
       conditions.push(`d.house_rules_lower @> $${paramIndex++}::text[]`);
       params.push(normalizedRules);
     }
+  }
+
+  // Gender preference filter - matches exact enum value (excludes 'any')
+  if (genderPreference && genderPreference !== "any") {
+    conditions.push(`d.gender_preference = $${paramIndex++}`);
+    params.push(genderPreference);
+  }
+
+  // Household gender filter - matches exact enum value (excludes 'any')
+  if (householdGender && householdGender !== "any") {
+    conditions.push(`d.household_gender = $${paramIndex++}`);
+    params.push(householdGender);
   }
 
   return { conditions, params, paramIndex, ftsQueryParamIndex };
@@ -657,13 +673,10 @@ async function getSearchDocListingsPaginatedInternal(
         d.lease_duration as "leaseDuration",
         d.room_type as "roomType",
         d.move_in_date as "moveInDate",
-        d.owner_id as "ownerId",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
-        d.address,
         d.city,
         d.state,
-        d.zip,
         d.lat,
         d.lng,
         d.avg_rating as "avgRating",
@@ -697,16 +710,13 @@ async function getSearchDocListingsPaginatedInternal(
       leaseDuration: l.leaseDuration,
       roomType: l.roomType,
       moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      ownerId: l.ownerId,
       createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
       viewCount: Number(l.viewCount) || 0,
       avgRating: Number(l.avgRating) || 0,
       reviewCount: Number(l.reviewCount) || 0,
       location: {
-        address: l.address,
         city: l.city,
         state: l.state,
-        zip: l.zip,
         lat: Number(l.lat) || 0,
         lng: Number(l.lng) || 0,
       },
@@ -908,13 +918,10 @@ export async function getSearchDocListingsWithKeyset(
         d.lease_duration as "leaseDuration",
         d.room_type as "roomType",
         d.move_in_date as "moveInDate",
-        d.owner_id as "ownerId",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
-        d.address,
         d.city,
         d.state,
-        d.zip,
         d.lat,
         d.lng,
         d.avg_rating as "avgRating",
@@ -954,16 +961,13 @@ export async function getSearchDocListingsWithKeyset(
       leaseDuration: l.leaseDuration,
       roomType: l.roomType,
       moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      ownerId: l.ownerId,
       createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
       viewCount: Number(l.viewCount) || 0,
       avgRating: Number(l.avgRating) || 0,
       reviewCount: Number(l.reviewCount) || 0,
       location: {
-        address: l.address,
         city: l.city,
         state: l.state,
-        zip: l.zip,
         lat: Number(l.lat) || 0,
         lng: Number(l.lng) || 0,
       },
@@ -1098,13 +1102,10 @@ export async function getSearchDocListingsFirstPage(
         d.lease_duration as "leaseDuration",
         d.room_type as "roomType",
         d.move_in_date as "moveInDate",
-        d.owner_id as "ownerId",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
-        d.address,
         d.city,
         d.state,
-        d.zip,
         d.lat,
         d.lng,
         d.avg_rating as "avgRating",
@@ -1144,16 +1145,13 @@ export async function getSearchDocListingsFirstPage(
       leaseDuration: l.leaseDuration,
       roomType: l.roomType,
       moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      ownerId: l.ownerId,
       createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
       viewCount: Number(l.viewCount) || 0,
       avgRating: Number(l.avgRating) || 0,
       reviewCount: Number(l.reviewCount) || 0,
       location: {
-        address: l.address,
         city: l.city,
         state: l.state,
-        zip: l.zip,
         lat: Number(l.lat) || 0,
         lng: Number(l.lng) || 0,
       },

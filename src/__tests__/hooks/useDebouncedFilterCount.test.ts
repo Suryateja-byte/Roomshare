@@ -30,6 +30,8 @@ describe("useDebouncedFilterCount", () => {
     amenities: [] as string[],
     houseRules: [] as string[],
     languages: [] as string[],
+    genderPreference: "",
+    householdGender: "",
   };
 
   beforeEach(() => {

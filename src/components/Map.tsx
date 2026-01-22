@@ -224,7 +224,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 ownerId: listing.ownerId || '',
                 images: JSON.stringify(listing.images || []),
                 lat: listing.location.lat,
-                lng: listing.location.lng
+                lng: listing.location.lng,
+                // P3a: Include tier for differentiated pin styling (primary = larger, mini = smaller)
+                tier: listing.tier
             }
         }))
     }), [listings]);
@@ -279,7 +281,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             location: {
                 lat: f.properties.lat,
                 lng: f.properties.lng
-            }
+            },
+            tier: f.properties.tier
         }));
 
         // Deduplicate by id

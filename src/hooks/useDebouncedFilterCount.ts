@@ -22,6 +22,7 @@ import type { BatchedFilterValues } from "./useBatchedFilters";
 // Cache entry with expiration
 interface CacheEntry {
   count: number | null;
+  boundsRequired: boolean;
   expiresAt: number;
 }
 
@@ -80,6 +81,8 @@ function generateCacheKey(
     `amenities=${[...pending.amenities].sort().join(",")}`,
     `houseRules=${[...pending.houseRules].sort().join(",")}`,
     `languages=${[...pending.languages].sort().join(",")}`,
+    `genderPreference=${pending.genderPreference}`,
+    `householdGender=${pending.householdGender}`,
   ];
 
   // Add committed bounds from URL (these don't change with pending filters)
@@ -120,6 +123,12 @@ function buildCountUrl(
   if (pending.languages.length > 0) {
     params.set("languages", pending.languages.join(","));
   }
+  if (pending.genderPreference) {
+    params.set("genderPreference", pending.genderPreference);
+  }
+  if (pending.householdGender) {
+    params.set("householdGender", pending.householdGender);
+  }
 
   // Add committed location/bounds from URL
   const locationParams = [
@@ -140,9 +149,9 @@ function buildCountUrl(
 }
 
 /**
- * Get cached count if valid
+ * Get cached entry if valid (returns full entry including boundsRequired)
  */
-function getCachedCount(cacheKey: string): number | null | undefined {
+function getCachedEntry(cacheKey: string): CacheEntry | undefined {
   const entry = countCache.get(cacheKey);
   if (!entry) return undefined;
 
@@ -151,15 +160,20 @@ function getCachedCount(cacheKey: string): number | null | undefined {
     return undefined;
   }
 
-  return entry.count;
+  return entry;
 }
 
 /**
- * Set cached count
+ * Set cached entry (stores both count and boundsRequired)
  */
-function setCachedCount(cacheKey: string, count: number | null): void {
+function setCachedEntry(
+  cacheKey: string,
+  count: number | null,
+  boundsRequired: boolean,
+): void {
   countCache.set(cacheKey, {
     count,
+    boundsRequired,
     expiresAt: Date.now() + CACHE_TTL_MS,
   });
 }
@@ -192,10 +206,11 @@ export function useDebouncedFilterCount({
 
   // Fetch count function
   const fetchCount = useCallback(async () => {
-    // Check cache first
-    const cached = getCachedCount(cacheKey);
+    // Check cache first (restores both count and boundsRequired)
+    const cached = getCachedEntry(cacheKey);
     if (cached !== undefined) {
-      setCount(cached);
+      setCount(cached.count);
+      setBoundsRequired(cached.boundsRequired);
       setIsLoading(false);
       return;
     }
@@ -227,8 +242,8 @@ export function useDebouncedFilterCount({
       // P3b: Parse boundsRequired from API response
       const newBoundsRequired = data.boundsRequired === true;
 
-      // Cache the result
-      setCachedCount(cacheKey, newCount);
+      // Cache the result (stores both count and boundsRequired)
+      setCachedEntry(cacheKey, newCount, newBoundsRequired);
 
       // Only update state if not aborted
       if (!abortController.signal.aborted) {
@@ -286,14 +301,15 @@ export function useDebouncedFilterCount({
       baselineCapturedRef.current = true;
     }
 
-    // Check cache immediately
-    const cached = getCachedCount(cacheKey);
+    // Check cache immediately (restores both count and boundsRequired)
+    const cached = getCachedEntry(cacheKey);
     if (cached !== undefined) {
-      setCount(cached);
+      setCount(cached.count);
+      setBoundsRequired(cached.boundsRequired);
       setIsLoading(false);
       // Capture baseline from cache if we haven't yet
       if (!baselineCapturedRef.current) {
-        setBaselineCount(cached);
+        setBaselineCount(cached.count);
         baselineCapturedRef.current = true;
       }
       return;

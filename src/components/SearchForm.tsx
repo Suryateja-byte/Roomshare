@@ -449,6 +449,35 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         moveInDateCount > 0
     );
 
+    // P3c: Compute actual isDirty by comparing pending state to committed URL params
+    const filtersDirty = useMemo(() => {
+        // Get URL values (committed state)
+        const urlMinPrice = searchParams.get('minPrice') || '';
+        const urlMaxPrice = searchParams.get('maxPrice') || '';
+        const urlRoomType = searchParams.get('roomType') || '';
+        const urlLeaseDuration = searchParams.get('leaseDuration') || '';
+        const urlMoveInDate = searchParams.get('moveInDate') || '';
+        const urlAmenities = (searchParams.get('amenities') || '').split(',').filter(Boolean).sort();
+        const urlHouseRules = (searchParams.get('houseRules') || '').split(',').filter(Boolean).sort();
+        const urlLanguages = (searchParams.get('languages') || '').split(',').filter(Boolean).sort();
+        const urlGenderPreference = searchParams.get('genderPreference') || '';
+        const urlHouseholdGender = searchParams.get('householdGender') || '';
+
+        // Compare pending (local state) vs committed (URL)
+        return (
+            minPrice !== urlMinPrice ||
+            maxPrice !== urlMaxPrice ||
+            roomType !== urlRoomType ||
+            leaseDuration !== urlLeaseDuration ||
+            moveInDate !== urlMoveInDate ||
+            [...amenities].sort().join(',') !== urlAmenities.join(',') ||
+            [...houseRules].sort().join(',') !== urlHouseRules.join(',') ||
+            [...languages].sort().join(',') !== urlLanguages.join(',') ||
+            genderPreference !== urlGenderPreference ||
+            householdGender !== urlHouseholdGender
+        );
+    }, [searchParams, minPrice, maxPrice, roomType, leaseDuration, moveInDate, amenities, houseRules, languages, genderPreference, householdGender]);
+
     // P3-NEW-b: Get dynamic count for FilterModal button
     const {
         formattedCount,
@@ -464,9 +493,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             amenities,
             houseRules,
             languages,
+            genderPreference,
+            householdGender,
         },
-        // Always fetch counts when drawer is open
-        isDirty: showFilters,
+        // P3c: Use computed dirty state instead of just drawer open state
+        isDirty: filtersDirty,
         isDrawerOpen: showFilters,
     });
 

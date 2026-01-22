@@ -13,6 +13,8 @@ export interface BatchedFilterValues {
   amenities: string[];
   houseRules: string[];
   languages: string[];
+  genderPreference: string;
+  householdGender: string;
 }
 
 /**
@@ -27,6 +29,8 @@ export const emptyFilterValues: BatchedFilterValues = {
   amenities: [],
   houseRules: [],
   languages: [],
+  genderPreference: "",
+  householdGender: "",
 };
 
 /**
