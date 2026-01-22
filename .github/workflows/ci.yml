@@ -81,7 +81,7 @@ jobs:
     name: API & Action Tests
     runs-on: ubuntu-latest
     env:
-      NODE_OPTIONS: '--max-old-space-size=4096'
+      NODE_OPTIONS: '--max-old-space-size=8192'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
