@@ -13,6 +13,7 @@ import { checkServerComponentRateLimit } from '@/lib/with-rate-limit';
 import { parseSearchParams, buildRawParamsFromSearchParams } from '@/lib/search-params';
 import { executeSearchV2 } from '@/lib/search/search-v2-service';
 import { V2MapDataSetter } from '@/components/search/V2MapDataSetter';
+import { V1PathResetSetter } from '@/components/search/V1PathResetSetter';
 import type { V2MapData } from '@/contexts/SearchV2DataContext';
 import { features } from '@/lib/env';
 
@@ -306,9 +307,14 @@ export default async function SearchPage({
 
     return (
         <>
-            {/* Inject v2 map data into context for PersistentMapWrapper to consume */}
-            {/* PersistentMapWrapper (in SearchLayoutView) reads this via SearchV2DataContext */}
-            {v2MapData && <V2MapDataSetter data={v2MapData} />}
+            {/* Inject map data context for PersistentMapWrapper to consume */}
+            {/* V2MapDataSetter: signals v2 mode active, injects v2 map data */}
+            {/* V1PathResetSetter: signals v1 mode active, resets stale v2 state */}
+            {v2MapData ? (
+                <V2MapDataSetter data={v2MapData} />
+            ) : (
+                <V1PathResetSetter />
+            )}
             {listContent}
         </>
     );
