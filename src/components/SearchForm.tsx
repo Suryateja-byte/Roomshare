@@ -19,13 +19,11 @@ import {
     LEASE_DURATION_ALIASES,
     ROOM_TYPE_ALIASES,
 } from '@/lib/search-params';
+import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
+import { useRecentSearches, type RecentSearch, type RecentSearchFilters } from '@/hooks/useRecentSearches';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
-
-// Recent searches config
-const RECENT_SEARCHES_KEY = 'roomshare-recent-searches';
-const MAX_RECENT_SEARCHES = 5;
 
 // Re-export canonical allowlists with legacy names for backwards compatibility within this component
 // This allows gradual migration without breaking existing code
@@ -78,12 +76,6 @@ const validateMoveInDate = (value: string | null): string => {
 
     return trimmed;
 };
-
-interface RecentSearch {
-    location: string;
-    coords?: { lat: number; lng: number };
-    timestamp: number;
-}
 
 // Custom event for map fly-to
 export const MAP_FLY_TO_EVENT = 'mapFlyToLocation';
@@ -185,57 +177,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastSearchRef = useRef<string>(''); // Track last search to prevent duplicates
 
-    // Recent searches state
-    const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+    // Recent searches from canonical hook (handles localStorage, migration, enhanced format)
+    const { recentSearches, saveRecentSearch, clearRecentSearches } = useRecentSearches();
     const [showRecentSearches, setShowRecentSearches] = useState(false);
-
-    // Load recent searches from localStorage on mount
-    useEffect(() => {
-        try {
-            const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
-            if (stored) {
-                setRecentSearches(JSON.parse(stored));
-            }
-        } catch (e) {
-            // Ignore localStorage errors
-        }
-    }, []);
-
-    // Save a search to recent searches
-    const saveRecentSearch = useCallback((loc: string, coords?: { lat: number; lng: number }) => {
-        if (!loc.trim()) return;
-
-        const newSearch: RecentSearch = {
-            location: loc.trim(),
-            coords,
-            timestamp: Date.now()
-        };
-
-        setRecentSearches(prev => {
-            // Remove duplicates and add new search at the beginning
-            const filtered = prev.filter(s => s.location.toLowerCase() !== loc.toLowerCase());
-            const updated = [newSearch, ...filtered].slice(0, MAX_RECENT_SEARCHES);
-
-            // Persist to localStorage
-            try {
-                localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
-            } catch (e) {
-                // Ignore localStorage errors
-            }
-
-            return updated;
-        });
-    }, []);
-
-    // Clear all recent searches
-    const clearRecentSearches = useCallback(() => {
-        setRecentSearches([]);
-        try {
-            localStorage.removeItem(RECENT_SEARCHES_KEY);
-        } catch (e) {
-            // Ignore localStorage errors
-        }
-    }, []);
 
     // Select a recent search
     const selectRecentSearch = useCallback((search: RecentSearch) => {
@@ -276,6 +220,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     }, [searchParams]);
 
     const router = useRouter();
+    const transitionContext = useSearchTransitionSafe();
 
     const handleLocationSelect = (locationData: {
         name: string;
@@ -334,6 +279,16 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         ];
         filterParamsToDelete.forEach(param => params.delete(param));
 
+        // Clear bounds when a new location was selected from autocomplete
+        // This allows the map to fly to and set bounds for the new location
+        // (bounds are preserved for filter-only changes to maintain current map view)
+        if (selectedCoords) {
+            params.delete('minLat');
+            params.delete('maxLat');
+            params.delete('minLng');
+            params.delete('maxLng');
+        }
+
         // Only include query if it has actual content (not just whitespace)
         if (trimmedLocation && trimmedLocation.length >= 2) {
             params.set('q', trimmedLocation);
@@ -382,16 +337,32 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setIsSearching(true);
         lastSearchRef.current = searchUrl;
 
-        // Save to recent searches when navigating
+        // Save to recent searches when navigating (with filters for enhanced format)
         if (trimmedLocation) {
-            saveRecentSearch(trimmedLocation, selectedCoords || undefined);
+            const activeFilters: Partial<RecentSearchFilters> = {};
+            if (minPrice) activeFilters.minPrice = minPrice;
+            if (maxPrice) activeFilters.maxPrice = maxPrice;
+            if (roomType) activeFilters.roomType = roomType;
+            if (leaseDuration) activeFilters.leaseDuration = leaseDuration;
+            if (amenities.length > 0) activeFilters.amenities = amenities;
+            if (houseRules.length > 0) activeFilters.houseRules = houseRules;
+
+            saveRecentSearch(
+                trimmedLocation,
+                selectedCoords || undefined,
+                Object.keys(activeFilters).length > 0 ? activeFilters : undefined
+            );
         }
 
         // Close filter drawer on search
         setShowFilters(false);
 
         searchTimeoutRef.current = setTimeout(() => {
-            router.push(searchUrl);
+            if (transitionContext) {
+                transitionContext.navigateWithTransition(searchUrl);
+            } else {
+                router.push(searchUrl);
+            }
             // Reset searching state after navigation starts
             setTimeout(() => setIsSearching(false), 500);
         }, SEARCH_DEBOUNCE_MS);
@@ -439,7 +410,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setGenderPreference('');
         setHouseholdGender('');
         // Navigate to clean search page
-        router.push('/search');
+        if (transitionContext) {
+            transitionContext.navigateWithTransition('/search');
+        } else {
+            router.push('/search');
+        }
     };
 
     // Count active filters for badge - split into two parts to avoid hydration mismatch
