@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import SearchViewToggle from "./SearchViewToggle";
 import PersistentMapWrapper from "./PersistentMapWrapper";
+import ListScrollBridge from "./listings/ListScrollBridge";
 import { useMapPreference } from "@/hooks/useMapPreference";
 import { useMapMovedBanner } from "@/contexts/MapBoundsContext";
 import { MapMovedBanner } from "./map/MapMovedBanner";
@@ -42,21 +43,26 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
   const { showBanner, showLocationConflict, onSearch, onReset } = useMapMovedBanner();
 
   return (
-    <SearchViewToggle
-      mapComponent={<PersistentMapWrapper shouldRenderMap={shouldRenderMap} />}
-      shouldShowMap={shouldShowMap}
-      onToggle={toggleMap}
-      isLoading={isLoading}
-    >
-      {/* List variant banner - shows above results when map is hidden or on mobile */}
-      {(showBanner || showLocationConflict) && (
-        <MapMovedBanner
-          variant="list"
-          onSearch={onSearch}
-          onReset={onReset}
-        />
-      )}
-      {children}
-    </SearchViewToggle>
+    <>
+      {/* Bridge: Scrolls listing card into view when map marker is clicked */}
+      <ListScrollBridge />
+
+      <SearchViewToggle
+        mapComponent={<PersistentMapWrapper shouldRenderMap={shouldRenderMap} />}
+        shouldShowMap={shouldShowMap}
+        onToggle={toggleMap}
+        isLoading={isLoading}
+      >
+        {/* List variant banner - shows above results when map is hidden or on mobile */}
+        {(showBanner || showLocationConflict) && (
+          <MapMovedBanner
+            variant="list"
+            onSearch={onSearch}
+            onReset={onReset}
+          />
+        )}
+        {children}
+      </SearchViewToggle>
+    </>
   );
 }
