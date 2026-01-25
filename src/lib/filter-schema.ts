@@ -399,9 +399,9 @@ export function normalizeFilters(input: unknown): NormalizedFilters {
   let minPrice = normalizePrice(raw.minPrice);
   let maxPrice = normalizePrice(raw.maxPrice);
 
-  // Swap if inverted
+  // P1-13 FIX: Throw validation error instead of silent swap
   if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) {
-    [minPrice, maxPrice] = [maxPrice, minPrice];
+    throw new Error('minPrice cannot exceed maxPrice');
   }
 
   // Normalize array filters
@@ -668,8 +668,10 @@ export function validateFilters(
   try {
     const normalized = normalizeFilters(input);
     return { success: true, data: normalized };
-  } catch {
-    return { success: false, errors: ['Invalid filter input'] };
+  } catch (error) {
+    // P1-13 FIX: Return specific error message for better user feedback
+    const message = error instanceof Error ? error.message : 'Invalid filter input';
+    return { success: false, errors: [message] };
   }
 }
 

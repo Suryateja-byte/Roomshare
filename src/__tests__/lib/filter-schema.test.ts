@@ -126,10 +126,17 @@ describe('normalizeFilters - price', () => {
     expect(result.minPrice).toBe(MAX_SAFE_PRICE);
   });
 
-  it('swaps if minPrice > maxPrice', () => {
-    const result = normalizeFilters({ minPrice: 2000, maxPrice: 1000 });
-    expect(result.minPrice).toBe(1000);
-    expect(result.maxPrice).toBe(2000);
+  // P1-13 FIX: minPrice > maxPrice should throw validation error, not silent swap
+  it('throws error if minPrice > maxPrice', () => {
+    expect(() => normalizeFilters({ minPrice: 2000, maxPrice: 1000 })).toThrow(
+      'minPrice cannot exceed maxPrice'
+    );
+  });
+
+  it('allows minPrice equal to maxPrice (exact price filter)', () => {
+    const result = normalizeFilters({ minPrice: 1500, maxPrice: 1500 });
+    expect(result.minPrice).toBe(1500);
+    expect(result.maxPrice).toBe(1500);
   });
 
   it('parses string prices', () => {
@@ -553,6 +560,15 @@ describe('validateFilters', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.minPrice).toBeUndefined();
+    }
+  });
+
+  // P1-13 FIX: validateFilters should return error for invalid price range
+  it('returns error when minPrice exceeds maxPrice', () => {
+    const result = validateFilters({ minPrice: 2000, maxPrice: 1000 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errors).toContain('minPrice cannot exceed maxPrice');
     }
   });
 });
