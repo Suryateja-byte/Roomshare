@@ -96,6 +96,12 @@ export async function sendMessage(conversationId: string, content: string) {
         return { error: 'Conversation not found' };
     }
 
+    // P1-17 FIX: Verify user is a participant in the conversation (IDOR protection)
+    const isParticipant = conversation.participants.some(p => p.id === session.user.id);
+    if (!isParticipant) {
+        return { error: 'Unauthorized' };
+    }
+
     // Check for blocks between participants
     const { checkBlockBeforeAction } = await import('./block');
     const otherParticipant = conversation.participants.find(p => p.id !== session.user.id);
