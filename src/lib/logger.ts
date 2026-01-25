@@ -60,9 +60,21 @@ const REDACTED_FIELDS = new Set([
 ]);
 
 // Patterns to redact from string values
-const REDACT_PATTERNS = [
-  /Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/gi, // JWT tokens
-  /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}/g, // Email addresses (optional)
+// P1-14 FIX: Added phone number and address patterns for comprehensive PII redaction
+const REDACT_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
+  // JWT tokens
+  { pattern: /Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/gi, replacement: '[REDACTED]' },
+  // Email addresses
+  { pattern: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}/g, replacement: '[REDACTED]' },
+  // Phone numbers - international format with country code (+1-555-123-4567)
+  { pattern: /\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g, replacement: '[REDACTED_PHONE]' },
+  // Phone numbers - US format with parentheses (555) 123-4567
+  { pattern: /\(\d{3}\)\s*\d{3}[-.\s]?\d{4}/g, replacement: '[REDACTED_PHONE]' },
+  // Phone numbers - US format with dashes or dots 555-123-4567 or 555.123.4567
+  { pattern: /\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/g, replacement: '[REDACTED_PHONE]' },
+  // Street addresses - matches "123 Main Street", "456 Oak Ave", etc.
+  // Pattern: number + street name + common suffix (with optional apartment/unit)
+  { pattern: /\b\d+\s+[A-Za-z]+(?:\s+[A-Za-z]+)*\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Court|Ct|Circle|Cir|Way|Place|Pl|Terrace|Ter|Trail|Trl|Parkway|Pkwy|Highway|Hwy|Alley|Aly)\.?(?:\s*,?\s*(?:Apt|Apartment|Suite|Ste|Unit|#|No\.?)\s*\w+)?\b/gi, replacement: '[REDACTED_ADDRESS]' },
 ];
 
 /**
@@ -75,8 +87,9 @@ function redactSensitive(obj: unknown, depth = 0): unknown {
 
   if (typeof obj === 'string') {
     let result = obj;
-    for (const pattern of REDACT_PATTERNS) {
-      result = result.replace(pattern, '[REDACTED]');
+    // P1-14 FIX: Use custom replacement strings for different PII types
+    for (const { pattern, replacement } of REDACT_PATTERNS) {
+      result = result.replace(pattern, replacement);
     }
     return result;
   }
