@@ -119,8 +119,8 @@ describe('rate-limit-redis', () => {
       restoreRatelimitMock();
       // Dynamic import to get fresh module with mocks
       jest.resetModules();
-      const module = await import('@/lib/rate-limit-redis');
-      checkChatRateLimit = module.checkChatRateLimit;
+      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      checkChatRateLimit = rateLimitModule.checkChatRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
@@ -163,9 +163,9 @@ describe('rate-limit-redis', () => {
       Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true });
 
       jest.resetModules();
-      const module = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import('@/lib/rate-limit-redis');
 
-      const result = await module.checkChatRateLimit('127.0.0.1');
+      const result = await rateLimitModule.checkChatRateLimit('127.0.0.1');
 
       expect(result.success).toBe(false);
       expect(result.retryAfter).toBe(60);
@@ -177,9 +177,9 @@ describe('rate-limit-redis', () => {
       Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', writable: true });
 
       jest.resetModules();
-      const module = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import('@/lib/rate-limit-redis');
 
-      const result = await module.checkChatRateLimit('127.0.0.1');
+      const result = await rateLimitModule.checkChatRateLimit('127.0.0.1');
 
       expect(result.success).toBe(true);
     });
@@ -196,11 +196,11 @@ describe('rate-limit-redis', () => {
     it('allows requests in development on Redis error', async () => {
       Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', writable: true });
       jest.resetModules();
-      const module = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import('@/lib/rate-limit-redis');
 
       mockLimit.mockRejectedValue(new Error('Redis connection failed'));
 
-      const result = await module.checkChatRateLimit('127.0.0.1');
+      const result = await rateLimitModule.checkChatRateLimit('127.0.0.1');
 
       expect(result.success).toBe(true);
     });
@@ -216,8 +216,8 @@ describe('rate-limit-redis', () => {
       const timeoutWrapper = await import('@/lib/timeout-wrapper');
       withTimeout = timeoutWrapper.withTimeout as jest.Mock;
 
-      const module = await import('@/lib/rate-limit-redis');
-      checkChatRateLimit = module.checkChatRateLimit;
+      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      checkChatRateLimit = rateLimitModule.checkChatRateLimit;
       restoreRuntimeMocks();
     });
 
@@ -252,8 +252,8 @@ describe('rate-limit-redis', () => {
       const circuitBreakerModule = await import('@/lib/circuit-breaker');
       circuitBreakers = circuitBreakerModule.circuitBreakers as unknown as { redis: { execute: jest.Mock } };
 
-      const module = await import('@/lib/rate-limit-redis');
-      checkChatRateLimit = module.checkChatRateLimit;
+      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      checkChatRateLimit = rateLimitModule.checkChatRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
@@ -285,8 +285,8 @@ describe('rate-limit-redis', () => {
       // Restore MockRatelimit BEFORE resetModules - instances created at module load time
       restoreRatelimitMock();
       jest.resetModules();
-      const module = await import('@/lib/rate-limit-redis');
-      checkMetricsRateLimit = module.checkMetricsRateLimit;
+      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      checkMetricsRateLimit = rateLimitModule.checkMetricsRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
@@ -315,8 +315,8 @@ describe('rate-limit-redis', () => {
       // Restore MockRatelimit BEFORE resetModules - instances created at module load time
       restoreRatelimitMock();
       jest.resetModules();
-      const module = await import('@/lib/rate-limit-redis');
-      checkMapRateLimit = module.checkMapRateLimit;
+      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      checkMapRateLimit = rateLimitModule.checkMapRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
@@ -345,8 +345,8 @@ describe('rate-limit-redis', () => {
       // Restore MockRatelimit BEFORE resetModules - instances created at module load time
       restoreRatelimitMock();
       jest.resetModules();
-      const module = await import('@/lib/rate-limit-redis');
-      checkSearchCountRateLimit = module.checkSearchCountRateLimit;
+      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      checkSearchCountRateLimit = rateLimitModule.checkSearchCountRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
