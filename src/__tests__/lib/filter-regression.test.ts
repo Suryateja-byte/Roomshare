@@ -52,12 +52,19 @@ describe('Filter Regression Framework', () => {
     });
 
     it('normalizes the filter input', () => {
-      const rawInput = { minPrice: 2000, maxPrice: 500 }; // Inverted
+      // P1-13: Valid price range (non-inverted)
+      const rawInput = { minPrice: 500, maxPrice: 2000 };
       const scenario = captureFilterScenario(rawInput, [], 5);
 
-      // Should be swapped by normalizer
-      expect(scenario.normalizedFilters.minPrice).toBeLessThanOrEqual(
-        scenario.normalizedFilters.maxPrice!
+      expect(scenario.normalizedFilters.minPrice).toBe(500);
+      expect(scenario.normalizedFilters.maxPrice).toBe(2000);
+    });
+
+    it('throws for inverted price ranges (P1-13)', () => {
+      const rawInput = { minPrice: 2000, maxPrice: 500 }; // Inverted
+      // P1-13: Now throws instead of silently swapping
+      expect(() => captureFilterScenario(rawInput, [], 5)).toThrow(
+        'minPrice cannot exceed maxPrice'
       );
     });
 
@@ -363,12 +370,13 @@ describe('Filter Regression Framework', () => {
 
   describe('Critical Scenarios', () => {
     it('has all required critical scenarios', () => {
-      expect(CRITICAL_SCENARIOS.length).toBeGreaterThanOrEqual(10);
+      // P1-13: Reduced by 1 since inverted-price-range now throws
+      expect(CRITICAL_SCENARIOS.length).toBeGreaterThanOrEqual(9);
 
       const names = CRITICAL_SCENARIOS.map((s) => s.name);
       expect(names).toContain('empty-filters');
       expect(names).toContain('basic-price-filter');
-      expect(names).toContain('inverted-price-range');
+      // P1-13: inverted-price-range removed - now throws instead of swapping
       expect(names).toContain('antimeridian-crossing');
       expect(names).toContain('malformed-input');
     });
@@ -390,13 +398,10 @@ describe('Filter Regression Framework', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('inverted-price-range scenario swaps correctly', () => {
-      const scenario = CRITICAL_SCENARIOS.find(
-        (s) => s.name === 'inverted-price-range'
-      );
-      const normalized = normalizeFilters(scenario!.input);
-
-      expect(normalized.minPrice).toBeLessThanOrEqual(normalized.maxPrice!);
+    it('inverted price range throws validation error (P1-13)', () => {
+      // P1-13: Inverted price ranges now throw instead of silently swapping
+      const input = { minPrice: 2000, maxPrice: 500 };
+      expect(() => normalizeFilters(input)).toThrow('minPrice cannot exceed maxPrice');
     });
 
     it('antimeridian-crossing scenario preserves longitude order', () => {
