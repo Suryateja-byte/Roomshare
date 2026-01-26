@@ -14,12 +14,12 @@
         "@modelcontextprotocol/server-memory"
       ]
     },
-    "fetch": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch"
-      ]
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer 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"
+      }
     }
   }
 }

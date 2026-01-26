@@ -51,6 +51,32 @@ export async function GET(request: NextRequest) {
       // Parse and validate using same logic as main search
       const { filterParams } = parseSearchParams(rawParams);
 
+      // Block unbounded text searches - require bounds when query present
+      // This prevents full-table scans that are expensive and not useful
+      if (filterParams.query && !filterParams.bounds) {
+        return NextResponse.json(
+          { count: null, boundsRequired: true },
+          {
+            headers: {
+              "Cache-Control": "private, no-store",
+            },
+          },
+        );
+      }
+
+      // Handle unbounded browse (no query, no bounds)
+      // Return null count with browseMode flag to indicate capped results
+      if (!filterParams.query && !filterParams.bounds) {
+        return NextResponse.json(
+          { count: null, browseMode: true },
+          {
+            headers: {
+              "Cache-Control": "private, no-store",
+            },
+          },
+        );
+      }
+
       // Get count using existing getLimitedCount function
       // Returns exact count if ≤100, null if >100
       const count = await getLimitedCount(filterParams);

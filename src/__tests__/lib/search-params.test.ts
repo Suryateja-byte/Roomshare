@@ -1,4 +1,11 @@
-import { parseSearchParams, MAX_SAFE_PAGE } from "@/lib/search-params";
+import {
+  parseSearchParams,
+  validateSearchFilters,
+  buildRawParamsFromSearchParams,
+  MAX_SAFE_PAGE,
+  MAX_SAFE_PRICE,
+  MAX_ARRAY_ITEMS,
+} from "@/lib/search-params";
 
 const formatLocalDate = (date: Date) => {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -427,5 +434,353 @@ describe("parseSearchParams - page cases", () => {
   test.each(cases)("%s", (_label, page, expected) => {
     const result = parseSearchParams({ page });
     expect(result.requestedPage).toBe(expected);
+  });
+});
+
+/**
+ * Tests for validateSearchFilters - server action validation
+ */
+describe("validateSearchFilters - server action validation", () => {
+  describe("input validation", () => {
+    it("returns empty object for null input", () => {
+      expect(validateSearchFilters(null)).toEqual({});
+    });
+
+    it("returns empty object for undefined input", () => {
+      expect(validateSearchFilters(undefined)).toEqual({});
+    });
+
+    it("returns empty object for non-object input (string)", () => {
+      expect(validateSearchFilters("not an object")).toEqual({});
+    });
+
+    it("returns empty object for non-object input (number)", () => {
+      expect(validateSearchFilters(42)).toEqual({});
+    });
+
+    it("returns empty object for non-object input (array)", () => {
+      expect(validateSearchFilters([1, 2, 3])).toEqual({});
+    });
+  });
+
+  describe("query validation", () => {
+    it("accepts valid query string", () => {
+      const result = validateSearchFilters({ query: "downtown apartment" });
+      expect(result.query).toBe("downtown apartment");
+    });
+
+    it("trims query whitespace", () => {
+      const result = validateSearchFilters({ query: "  spacious room  " });
+      expect(result.query).toBe("spacious room");
+    });
+
+    it("rejects query > 200 chars", () => {
+      const longQuery = "a".repeat(201);
+      const result = validateSearchFilters({ query: longQuery });
+      expect(result.query).toBeUndefined();
+    });
+
+    it("accepts query exactly 200 chars", () => {
+      const exactQuery = "a".repeat(200);
+      const result = validateSearchFilters({ query: exactQuery });
+      expect(result.query).toBe(exactQuery);
+    });
+
+    it("rejects empty string query", () => {
+      const result = validateSearchFilters({ query: "" });
+      expect(result.query).toBeUndefined();
+    });
+
+    it("rejects whitespace-only query", () => {
+      const result = validateSearchFilters({ query: "   " });
+      expect(result.query).toBeUndefined();
+    });
+
+    it("rejects non-string query", () => {
+      const result = validateSearchFilters({ query: 123 });
+      expect(result.query).toBeUndefined();
+    });
+  });
+
+  describe("price validation with MAX_SAFE_PRICE", () => {
+    it("clamps minPrice to MAX_SAFE_PRICE (1B)", () => {
+      const result = validateSearchFilters({ minPrice: 2000000000 });
+      expect(result.minPrice).toBe(MAX_SAFE_PRICE);
+    });
+
+    it("clamps maxPrice to MAX_SAFE_PRICE (1B)", () => {
+      const result = validateSearchFilters({ maxPrice: 5000000000 });
+      expect(result.maxPrice).toBe(MAX_SAFE_PRICE);
+    });
+
+    it("clamps negative minPrice to 0", () => {
+      const result = validateSearchFilters({ minPrice: -100 });
+      expect(result.minPrice).toBe(0);
+    });
+
+    it("clamps negative maxPrice to 0", () => {
+      const result = validateSearchFilters({ maxPrice: -500 });
+      expect(result.maxPrice).toBe(0);
+    });
+
+    it("swaps min/max if inverted", () => {
+      const result = validateSearchFilters({ minPrice: 2000, maxPrice: 1000 });
+      expect(result.minPrice).toBe(1000);
+      expect(result.maxPrice).toBe(2000);
+    });
+
+    it("rejects Infinity", () => {
+      const result = validateSearchFilters({
+        minPrice: Infinity,
+        maxPrice: -Infinity,
+      });
+      expect(result.minPrice).toBeUndefined();
+      expect(result.maxPrice).toBeUndefined();
+    });
+
+    it("rejects NaN", () => {
+      const result = validateSearchFilters({ minPrice: NaN, maxPrice: NaN });
+      expect(result.minPrice).toBeUndefined();
+      expect(result.maxPrice).toBeUndefined();
+    });
+
+    it("accepts valid price range", () => {
+      const result = validateSearchFilters({ minPrice: 500, maxPrice: 1500 });
+      expect(result.minPrice).toBe(500);
+      expect(result.maxPrice).toBe(1500);
+    });
+
+    it("accepts zero prices", () => {
+      const result = validateSearchFilters({ minPrice: 0, maxPrice: 0 });
+      expect(result.minPrice).toBe(0);
+      expect(result.maxPrice).toBe(0);
+    });
+
+    it("rejects non-number prices", () => {
+      const result = validateSearchFilters({
+        minPrice: "500",
+        maxPrice: "1500",
+      });
+      expect(result.minPrice).toBeUndefined();
+      expect(result.maxPrice).toBeUndefined();
+    });
+  });
+
+  describe("array field validation (amenities)", () => {
+    it("validates amenities against allowlist", () => {
+      const result = validateSearchFilters({ amenities: ["Wifi", "Parking"] });
+      expect(result.amenities).toEqual(["Wifi", "Parking"]);
+    });
+
+    it("normalizes amenity case", () => {
+      const result = validateSearchFilters({ amenities: ["wifi", "PARKING"] });
+      expect(result.amenities).toEqual(["Wifi", "Parking"]);
+    });
+
+    it("deduplicates amenities", () => {
+      const result = validateSearchFilters({
+        amenities: ["Wifi", "wifi", "WIFI"],
+      });
+      expect(result.amenities).toEqual(["Wifi"]);
+    });
+
+    it("limits amenities to MAX_ARRAY_ITEMS (20)", () => {
+      const manyAmenities = Array(25).fill("Wifi");
+      const result = validateSearchFilters({ amenities: manyAmenities });
+      // Since all are duplicates, result should be just ["Wifi"]
+      expect(result.amenities).toEqual(["Wifi"]);
+    });
+
+    it("drops invalid amenities", () => {
+      const result = validateSearchFilters({
+        amenities: ["Wifi", "InvalidAmenity", "Parking"],
+      });
+      expect(result.amenities).toEqual(["Wifi", "Parking"]);
+    });
+
+    it("returns undefined when all amenities are invalid", () => {
+      const result = validateSearchFilters({
+        amenities: ["Invalid1", "Invalid2"],
+      });
+      expect(result.amenities).toBeUndefined();
+    });
+
+    it("returns undefined for non-array amenities", () => {
+      const result = validateSearchFilters({ amenities: "Wifi" });
+      expect(result.amenities).toBeUndefined();
+    });
+  });
+
+  describe("bounds validation", () => {
+    it("accepts valid bounds", () => {
+      const result = validateSearchFilters({
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+      });
+      expect(result.bounds).toEqual({
+        minLat: 37.7,
+        maxLat: 37.8,
+        minLng: -122.5,
+        maxLng: -122.4,
+      });
+    });
+
+    it("clamps lat to valid range [-90, 90]", () => {
+      const result = validateSearchFilters({
+        bounds: { minLat: -100, maxLat: 100, minLng: 0, maxLng: 1 },
+      });
+      expect(result.bounds?.minLat).toBe(-90);
+      expect(result.bounds?.maxLat).toBe(90);
+    });
+
+    it("clamps lng to valid range [-180, 180]", () => {
+      const result = validateSearchFilters({
+        bounds: { minLat: 0, maxLat: 1, minLng: -200, maxLng: 200 },
+      });
+      expect(result.bounds?.minLng).toBe(-180);
+      expect(result.bounds?.maxLng).toBe(180);
+    });
+
+    it("swaps inverted lat bounds", () => {
+      const result = validateSearchFilters({
+        bounds: { minLat: 38, maxLat: 37, minLng: -122, maxLng: -121 },
+      });
+      expect(result.bounds?.minLat).toBe(37);
+      expect(result.bounds?.maxLat).toBe(38);
+    });
+
+    it("rejects incomplete bounds (missing minLng)", () => {
+      const result = validateSearchFilters({
+        bounds: { minLat: 37, maxLat: 38, maxLng: -121 },
+      });
+      expect(result.bounds).toBeUndefined();
+    });
+
+    it("rejects bounds with non-number values", () => {
+      const result = validateSearchFilters({
+        bounds: { minLat: "37", maxLat: 38, minLng: -122, maxLng: -121 },
+      });
+      expect(result.bounds).toBeUndefined();
+    });
+
+    it("rejects bounds with Infinity", () => {
+      const result = validateSearchFilters({
+        bounds: { minLat: 37, maxLat: Infinity, minLng: -122, maxLng: -121 },
+      });
+      expect(result.bounds).toBeUndefined();
+    });
+
+    it("rejects bounds with NaN", () => {
+      const result = validateSearchFilters({
+        bounds: { minLat: NaN, maxLat: 38, minLng: -122, maxLng: -121 },
+      });
+      expect(result.bounds).toBeUndefined();
+    });
+  });
+
+  describe("combined validation", () => {
+    it("validates multiple fields simultaneously", () => {
+      const result = validateSearchFilters({
+        query: "  downtown  ",
+        minPrice: 500,
+        maxPrice: 1500,
+        amenities: ["wifi", "PARKING"],
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+      });
+
+      expect(result.query).toBe("downtown");
+      expect(result.minPrice).toBe(500);
+      expect(result.maxPrice).toBe(1500);
+      expect(result.amenities).toEqual(["Wifi", "Parking"]);
+      expect(result.bounds).toBeDefined();
+    });
+
+    it("ignores invalid fields while keeping valid ones", () => {
+      const result = validateSearchFilters({
+        query: "valid query",
+        minPrice: "invalid", // Invalid - not a number
+        maxPrice: 1500, // Valid
+        amenities: "not-an-array", // Invalid - not an array
+      });
+
+      expect(result.query).toBe("valid query");
+      expect(result.minPrice).toBeUndefined();
+      expect(result.maxPrice).toBe(1500);
+      expect(result.amenities).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * Tests for buildRawParamsFromSearchParams - URL param parsing utility
+ */
+describe("buildRawParamsFromSearchParams", () => {
+  it("converts single values to strings", () => {
+    const searchParams = new URLSearchParams("q=downtown&minPrice=500");
+    const result = buildRawParamsFromSearchParams(searchParams);
+
+    expect(result.q).toBe("downtown");
+    expect(result.minPrice).toBe("500");
+  });
+
+  it("converts duplicate keys to arrays", () => {
+    const searchParams = new URLSearchParams(
+      "amenities=Wifi&amenities=Parking",
+    );
+    const result = buildRawParamsFromSearchParams(searchParams);
+
+    expect(result.amenities).toEqual(["Wifi", "Parking"]);
+  });
+
+  it("handles mixed single and duplicate keys", () => {
+    const searchParams = new URLSearchParams(
+      "q=downtown&amenities=Wifi&amenities=AC&minPrice=500",
+    );
+    const result = buildRawParamsFromSearchParams(searchParams);
+
+    expect(result.q).toBe("downtown");
+    expect(result.amenities).toEqual(["Wifi", "AC"]);
+    expect(result.minPrice).toBe("500");
+  });
+
+  it("handles empty URLSearchParams", () => {
+    const searchParams = new URLSearchParams();
+    const result = buildRawParamsFromSearchParams(searchParams);
+
+    expect(result).toEqual({});
+  });
+
+  it("handles three or more duplicate values", () => {
+    const searchParams = new URLSearchParams(
+      "amenities=Wifi&amenities=AC&amenities=Parking&amenities=Kitchen",
+    );
+    const result = buildRawParamsFromSearchParams(searchParams);
+
+    expect(result.amenities).toEqual(["Wifi", "AC", "Parking", "Kitchen"]);
+  });
+
+  it("preserves order of values", () => {
+    const searchParams = new URLSearchParams(
+      "languages=en&languages=es&languages=fr",
+    );
+    const result = buildRawParamsFromSearchParams(searchParams);
+
+    expect(result.languages).toEqual(["en", "es", "fr"]);
+  });
+
+  it("handles empty string values", () => {
+    const searchParams = new URLSearchParams("q=&minPrice=");
+    const result = buildRawParamsFromSearchParams(searchParams);
+
+    expect(result.q).toBe("");
+    expect(result.minPrice).toBe("");
+  });
+
+  it("handles special characters in values", () => {
+    const searchParams = new URLSearchParams("q=Austin%2C+TX&sort=price_asc");
+    const result = buildRawParamsFromSearchParams(searchParams);
+
+    // URLSearchParams automatically decodes the values
+    expect(result.q).toBe("Austin, TX");
+    expect(result.sort).toBe("price_asc");
   });
 });

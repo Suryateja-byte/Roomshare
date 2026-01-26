@@ -106,22 +106,38 @@ const futureDateArb = fc.integer({ min: 1, max: 365 }).map((daysFromNow) => {
 const queryArb = fc.string({ minLength: 1, maxLength: 100 }).filter((s) => s.trim().length > 0);
 
 /**
- * Generate valid filter params (for property testing)
+ * Generate valid price range (ensures minPrice <= maxPrice)
  */
-const validFilterParamsArb = fc.record(
-  {
-    query: fc.option(queryArb, { nil: undefined }),
-    minPrice: fc.option(priceArb, { nil: undefined }),
-    maxPrice: fc.option(priceArb, { nil: undefined }),
-    roomType: fc.option(roomTypeArb, { nil: undefined }),
-    amenities: fc.option(fc.array(amenityArb, { maxLength: 5 }), { nil: undefined }),
-    houseRules: fc.option(fc.array(houseRuleArb, { maxLength: 3 }), { nil: undefined }),
-    languages: fc.option(fc.array(languageCodeArb, { maxLength: 5 }), { nil: undefined }),
-    sort: fc.option(sortArb, { nil: undefined }),
-    page: fc.option(fc.integer({ min: 1, max: 10 }), { nil: undefined }),
-    limit: fc.option(fc.integer({ min: 1, max: 50 }), { nil: undefined }),
-  },
-  { requiredKeys: [] }
+const validPriceRangeArb = fc.tuple(priceArb, priceArb).map(([p1, p2]) => ({
+  minPrice: Math.min(p1, p2),
+  maxPrice: Math.max(p1, p2),
+}));
+
+/**
+ * Generate valid filter params (for property testing)
+ * Note: Uses validPriceRangeArb to ensure minPrice <= maxPrice (P1-13 fix throws on inverted ranges)
+ */
+const validFilterParamsArb = validPriceRangeArb.chain((priceRange) =>
+  fc.record(
+    {
+      query: fc.option(queryArb, { nil: undefined }),
+      minPrice: fc.constant(priceRange.minPrice) as fc.Arbitrary<number | undefined>,
+      maxPrice: fc.constant(priceRange.maxPrice) as fc.Arbitrary<number | undefined>,
+      roomType: fc.option(roomTypeArb, { nil: undefined }),
+      amenities: fc.option(fc.array(amenityArb, { maxLength: 5 }), { nil: undefined }),
+      houseRules: fc.option(fc.array(houseRuleArb, { maxLength: 3 }), { nil: undefined }),
+      languages: fc.option(fc.array(languageCodeArb, { maxLength: 5 }), { nil: undefined }),
+      sort: fc.option(sortArb, { nil: undefined }),
+      page: fc.option(fc.integer({ min: 1, max: 10 }), { nil: undefined }),
+      limit: fc.option(fc.integer({ min: 1, max: 50 }), { nil: undefined }),
+    },
+    { requiredKeys: [] }
+  ).map((filters) => ({
+    ...filters,
+    // Apply price range only if both are defined, otherwise use undefined
+    minPrice: filters.minPrice !== undefined ? priceRange.minPrice : undefined,
+    maxPrice: filters.maxPrice !== undefined ? priceRange.maxPrice : undefined,
+  }))
 );
 
 // ============================================
@@ -482,14 +498,21 @@ describe('Invariant 7: Sorting Correctness', () => {
 });
 
 // ============================================
-// Invariant 8: Safety (No Crashes)
+// Invariant 8: Safety (No Crashes on Valid Input)
 // ============================================
 
 describe('Invariant 8: Safety', () => {
-  it('normalizeFilters never throws on any input', () => {
+  it('normalizeFilters handles arbitrary input gracefully (throws only for invalid price ranges)', () => {
     fc.assert(
       fc.property(fc.anything(), (input) => {
-        expect(() => normalizeFilters(input)).not.toThrow();
+        try {
+          const result = normalizeFilters(input);
+          expect(result).toBeDefined();
+        } catch (error) {
+          // P1-13: Only expected error is for inverted price ranges
+          expect(error).toBeInstanceOf(Error);
+          expect((error as Error).message).toContain('minPrice cannot exceed maxPrice');
+        }
       }),
       { numRuns: 100 }
     );
@@ -512,6 +535,12 @@ describe('Invariant 8: Safety', () => {
       expect(() => normalizeFilters({ minPrice: extreme })).not.toThrow();
       expect(() => normalizeFilters({ page: extreme })).not.toThrow();
     }
+  });
+
+  it('throws for inverted price ranges (P1-13 security fix)', () => {
+    expect(() => normalizeFilters({ minPrice: 1000, maxPrice: 500 })).toThrow(
+      'minPrice cannot exceed maxPrice'
+    );
   });
 
   it('handles malformed objects gracefully', () => {
@@ -737,7 +766,7 @@ describe('Invariant 12: SQL Injection Resistance', () => {
 // ============================================
 
 describe('Fuzz Testing', () => {
-  it('random filter combinations do not crash', () => {
+  it('random filter combinations handle gracefully (throw only for invalid price ranges)', () => {
     fc.assert(
       fc.property(
         fc.record(
@@ -760,22 +789,33 @@ describe('Fuzz Testing', () => {
           { requiredKeys: [] }
         ),
         (input) => {
-          expect(() => normalizeFilters(input)).not.toThrow();
-
-          const normalized = normalizeFilters(input);
-          expect(normalized).toBeDefined();
-          expect(typeof normalized.page).toBe('number');
-          expect(typeof normalized.limit).toBe('number');
+          try {
+            const normalized = normalizeFilters(input);
+            expect(normalized).toBeDefined();
+            expect(typeof normalized.page).toBe('number');
+            expect(typeof normalized.limit).toBe('number');
+          } catch (error) {
+            // P1-13: Only expected error is for inverted price ranges
+            expect(error).toBeInstanceOf(Error);
+            expect((error as Error).message).toContain('minPrice cannot exceed maxPrice');
+          }
         }
       ),
       { numRuns: 100 }
     );
   });
 
-  it('completely random objects do not crash', () => {
+  it('completely random objects handle gracefully (throw only for invalid price ranges)', () => {
     fc.assert(
       fc.property(fc.anything(), (input) => {
-        expect(() => normalizeFilters(input)).not.toThrow();
+        try {
+          const result = normalizeFilters(input);
+          expect(result).toBeDefined();
+        } catch (error) {
+          // P1-13: Only expected error is for inverted price ranges
+          expect(error).toBeInstanceOf(Error);
+          expect((error as Error).message).toContain('minPrice cannot exceed maxPrice');
+        }
       }),
       { numRuns: 200 }
     );

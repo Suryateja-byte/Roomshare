@@ -10,6 +10,7 @@
     "database-design@claude-code-workflows": true,
     "code-refactoring@claude-code-workflows": true,
     "context-management@claude-code-workflows": true,
-    "typescript-lsp@claude-plugins-official": true
+    "typescript-lsp@claude-plugins-official": true,
+    "cicd-automation@claude-code-workflows": true
   }
 }

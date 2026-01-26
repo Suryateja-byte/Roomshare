@@ -15,6 +15,15 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { haversineMiles } from "@/lib/geo/distance";
+import {
+  fetchWithTimeout,
+  DEFAULT_TIMEOUTS,
+  isTimeoutError,
+} from "@/lib/timeout-wrapper";
+import {
+  circuitBreakers,
+  isCircuitOpenError,
+} from "@/lib/circuit-breaker";
 import type {
   NearbyPlace,
   RadarSearchResponse,
@@ -665,13 +674,47 @@ export async function POST(request: Request) {
       // Request more results for local filtering since Autocomplete doesn't support radius parameter
       radarUrl.searchParams.set("limit", Math.min(limit * 3, 100).toString());
 
-      const radarResponse = await fetch(radarUrl.toString(), {
-        method: "GET",
-        headers: {
-          Authorization: radarSecretKey,
-          "Content-Type": "application/json",
-        },
-      });
+      // P1-09/P1-10 FIX: Use circuit breaker + timeout for Radar API resilience
+      let radarResponse: Response;
+      try {
+        radarResponse = await circuitBreakers.radar.execute(() =>
+          fetchWithTimeout(
+            radarUrl.toString(),
+            {
+              method: "GET",
+              headers: {
+                Authorization: radarSecretKey,
+                "Content-Type": "application/json",
+              },
+            },
+            DEFAULT_TIMEOUTS.EXTERNAL_API,
+            "Radar Autocomplete API"
+          )
+        );
+      } catch (error) {
+        // Handle circuit breaker or timeout errors
+        if (isCircuitOpenError(error)) {
+          console.error("Radar API circuit breaker open - service unavailable");
+          return NextResponse.json(
+            {
+              error: "Nearby search temporarily unavailable",
+              details: "Service is recovering, please try again later",
+            },
+            { status: 503 }
+          );
+        }
+        if (isTimeoutError(error)) {
+          console.error(`Radar API timeout: ${error.message}`);
+          return NextResponse.json(
+            {
+              error: "Nearby search timed out",
+              details: "The request took too long, please try again",
+            },
+            { status: 504 }
+          );
+        }
+        throw error; // Re-throw unexpected errors
+      }
 
       if (!radarResponse.ok) {
         const errorText = await radarResponse.text();
@@ -801,14 +844,47 @@ export async function POST(request: Request) {
       radarUrl.searchParams.set("query", query);
     }
 
-    // Call Radar API
-    const radarResponse = await fetch(radarUrl.toString(), {
-      method: "GET",
-      headers: {
-        Authorization: radarSecretKey,
-        "Content-Type": "application/json",
-      },
-    });
+    // P1-09/P1-10 FIX: Use circuit breaker + timeout for Radar API resilience
+    let radarResponse: Response;
+    try {
+      radarResponse = await circuitBreakers.radar.execute(() =>
+        fetchWithTimeout(
+          radarUrl.toString(),
+          {
+            method: "GET",
+            headers: {
+              Authorization: radarSecretKey,
+              "Content-Type": "application/json",
+            },
+          },
+          DEFAULT_TIMEOUTS.EXTERNAL_API,
+          "Radar Places Search API"
+        )
+      );
+    } catch (error) {
+      // Handle circuit breaker or timeout errors
+      if (isCircuitOpenError(error)) {
+        console.error("Radar API circuit breaker open - service unavailable");
+        return NextResponse.json(
+          {
+            error: "Nearby search temporarily unavailable",
+            details: "Service is recovering, please try again later",
+          },
+          { status: 503 }
+        );
+      }
+      if (isTimeoutError(error)) {
+        console.error(`Radar API timeout: ${error.message}`);
+        return NextResponse.json(
+          {
+            error: "Nearby search timed out",
+            details: "The request took too long, please try again",
+          },
+          { status: 504 }
+        );
+      }
+      throw error; // Re-throw unexpected errors
+    }
 
     if (!radarResponse.ok) {
       const errorText = await radarResponse.text();

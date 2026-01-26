@@ -173,6 +173,7 @@ model Booking {
   status          BookingStatus @default(PENDING)
   totalPrice      Float
   rejectionReason String?       // Optional reason when host rejects booking
+  version         Int           @default(1) // P0-04: Optimistic locking for race-safe updates
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -414,15 +415,19 @@ model TypingStatus {
 
 // Idempotency Keys for preventing duplicate submissions (e.g., booking, payment)
 // Keys are stored with cached results and expire after 24 hours
+// P0-04: Uses INSERT ON CONFLICT + FOR UPDATE for atomic claim with no race window
 model IdempotencyKey {
-  id         String   @id @default(cuid())
-  key        String   @unique // Client-provided unique key
-  userId     String   // User who made the request
-  endpoint   String   // Which endpoint (e.g., "createBooking")
-  resultData Json?    // Cached result of the operation
-  createdAt  DateTime @default(now())
-  expiresAt  DateTime // Auto-expire after 24 hours
+  id          String   @id @default(cuid())
+  key         String   // Client-provided key (unique per user+endpoint)
+  userId      String   // User who made the request
+  endpoint    String   // Which endpoint (e.g., "createBooking")
+  status      String   @default("processing") // 'processing' | 'completed'
+  requestHash String   // SHA-256 hash of request body for replay detection
+  resultData  Json?    // Cached result of the operation
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime // Auto-expire after 24 hours
 
+  @@unique([userId, endpoint, key], map: "IdempotencyKey_user_endpoint_key_idx")
   @@index([expiresAt])
   @@index([userId, endpoint])
 }

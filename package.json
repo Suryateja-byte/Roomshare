@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "postinstall": "prisma generate && cp node_modules/mapbox-gl/dist/mapbox-gl-csp-worker.js public/mapbox-gl-csp-worker.js",
+    "postinstall": "prisma generate && node -e \"require('fs').copyFileSync('node_modules/mapbox-gl/dist/mapbox-gl-csp-worker.js','public/mapbox-gl-csp-worker.js')\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -26,7 +26,8 @@
     "test:filters:perf": "jest src/__tests__/performance/ --testTimeout=60000",
     "test:filters:all": "jest src/__tests__/lib/filter-schema.test.ts src/__tests__/lib/filter-regression.test.ts src/__tests__/integration/ src/__tests__/property/ src/__tests__/e2e/ src/__tests__/performance/ --testTimeout=60000",
     "clean:next-locks": "rm -rf .next/dev/lock 2>/dev/null || true",
-    "test:e2e": "npm run clean:next-locks && playwright test",
+    "test:e2e": "pnpm run clean:next-locks && playwright test",
+    "test:e2e:ci": "playwright test --project=chromium --reporter=list,html",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",

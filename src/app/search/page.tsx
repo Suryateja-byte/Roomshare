@@ -108,7 +108,7 @@ export default async function SearchPage({
     const session = await auth();
     const userId = session?.user?.id;
 
-    const { q, filterParams, requestedPage, sortOption, boundsRequired } = parseSearchParams(rawParams);
+    const { q, filterParams, requestedPage, sortOption, boundsRequired, browseMode } = parseSearchParams(rawParams);
 
     // Fetch saved listings in parallel (non-blocking)
     const savedPromise = userId ? getSavedListingIds(userId) : Promise.resolve([]);
@@ -117,27 +117,33 @@ export default async function SearchPage({
     // This ensures friendly UX regardless of V2/V1 path or failures
     if (boundsRequired) {
         return (
-            <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
-                <div className="text-center py-12">
-                    <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
-                        <Search className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+            <>
+                {/* P2b Fix: Reset v2 context state on bounds-required path.
+                    Without this, isV2Enabled stays true from a previous v2 search,
+                    causing PersistentMapWrapper's race guard to loop forever. */}
+                <V1PathResetSetter />
+                <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
+                    <div className="text-center py-12">
+                        <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                            <Search className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
+                            Please select a location
+                        </h2>
+                        <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6">
+                            To search for &ldquo;{q}&rdquo;, please select a location from the dropdown suggestions.
+                            This helps us find relevant listings in your area.
+                        </p>
+                        <Link
+                            href="/"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
+                        >
+                            <Search className="w-4 h-4" />
+                            Try a new search
+                        </Link>
                     </div>
-                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
-                        Please select a location
-                    </h2>
-                    <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6">
-                        To search for &ldquo;{q}&rdquo;, please select a location from the dropdown suggestions.
-                        This helps us find relevant listings in your area.
-                    </p>
-                    <Link
-                        href="/"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
-                    >
-                        <Search className="w-4 h-4" />
-                        Try a new search
-                    </Link>
                 </div>
-            </div>
+            </>
         );
     }
 
@@ -207,7 +213,9 @@ export default async function SearchPage({
     // IMPORTANT: Keep null distinct from 0 - null means "unknown count (>100 results)"
     // whereas 0 means "confirmed zero results"
     const total = rawTotal; // Keep null for >100 results (hybrid count optimization)
-    const totalPages = rawTotalPages ?? 1;
+    // P3b Fix: Keep null totalPages - don't default to 1
+    // Pagination component handles null by showing "Page X" without "of Y"
+    const totalPages = rawTotalPages;
 
     // Only show zero-results UI when we have confirmed zero results (total === 0)
     // Not when total is null (unknown count, >100 results)
@@ -241,6 +249,11 @@ export default async function SearchPage({
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
                         Book a place that fits your lifestyle.
                     </p>
+                    {browseMode && (
+                        <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+                            Showing top listings. Select a location for more results.
+                        </p>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2 sm:gap-3">

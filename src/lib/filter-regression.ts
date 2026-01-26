@@ -454,11 +454,9 @@ export const CRITICAL_SCENARIOS: GoldenScenario[] = [
     'Simple price range filter',
     { minPrice: 500, maxPrice: 2000 }
   ),
-  createGoldenScenario(
-    'inverted-price-range',
-    'Inverted price range should be swapped',
-    { minPrice: 2000, maxPrice: 500 }
-  ),
+  // P1-13: Inverted price range now throws an error instead of swapping
+  // This scenario is replaced with a test that validates the error behavior
+  // See filter-properties.test.ts "throws for inverted price ranges" test
   createGoldenScenario(
     'complex-filter-combo',
     'Multiple filters combined',

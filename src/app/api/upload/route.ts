@@ -201,8 +201,12 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'No path provided' }, { status: 400 });
         }
 
-        // Verify the path belongs to the user
-        if (!path.includes(session.user.id)) {
+        // P0-01 FIX: Strict prefix validation to prevent path traversal attacks
+        // Before: path.includes() was bypassable with "../" sequences
+        // After: Strict startsWith() with expected prefix structure
+        const folder = path.startsWith('profiles/') ? 'profiles' : 'listings';
+        const expectedPrefix = `${folder}/${session.user.id}/`;
+        if (!path.startsWith(expectedPrefix)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 

@@ -43,6 +43,42 @@ const MAX_LAT_SPAN = 5;
 const MAX_LNG_SPAN = 5;
 
 /**
+ * P3a Fix: Extract only map-relevant params from URLSearchParams
+ * Excludes pagination (page, cursor) and sort params that don't affect map markers.
+ * This prevents unnecessary map re-fetches when user paginates or changes sort order.
+ */
+const MAP_RELEVANT_KEYS = [
+  "q",
+  "minLat",
+  "maxLat",
+  "minLng",
+  "maxLng",
+  "lat",
+  "lng",
+  "minPrice",
+  "maxPrice",
+  "amenities",
+  "moveInDate",
+  "leaseDuration",
+  "houseRules",
+  "languages",
+  "roomType",
+  "genderPreference",
+  "householdGender",
+] as const;
+
+function getMapRelevantParams(searchParams: URLSearchParams): string {
+  const filtered = new URLSearchParams();
+  for (const key of MAP_RELEVANT_KEYS) {
+    const values = searchParams.getAll(key);
+    values.forEach((v) => filtered.append(key, v));
+  }
+  // Sort for consistent comparison (URLSearchParams order isn't guaranteed)
+  filtered.sort();
+  return filtered.toString();
+}
+
+/**
  * Get user-friendly error message based on HTTP status
  */
 function getStatusErrorMessage(status: number, serverMessage?: string): string {
@@ -104,13 +140,17 @@ function MapErrorBanner({
   onRetry: () => void;
 }) {
   return (
-    <div className="absolute top-4 left-4 right-4 z-10 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex items-center justify-between gap-2">
-      <span className="text-sm text-amber-700 dark:text-amber-300">
+    <div
+      role="alert"
+      aria-live="polite"
+      className="absolute top-4 left-4 right-4 z-50 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex items-center justify-between gap-2"
+    >
+      <span className="text-sm text-amber-700 dark:text-amber-300 block">
         {message}
       </span>
       <button
         onClick={onRetry}
-        className="text-sm font-medium text-amber-800 dark:text-amber-200 hover:underline"
+        className="text-sm font-medium text-amber-800 dark:text-amber-200 hover:underline flex-shrink-0"
       >
         Retry
       </button>
@@ -300,6 +340,26 @@ export default function PersistentMapWrapper({
       return;
     }
 
+    // VIEWPORT VALIDATION: Check bounds validity FIRST, before any v2 checks.
+    // This ensures "Zoom in further" error shows regardless of data source (v1 or v2).
+    const hasBounds =
+      searchParams.has("minLng") &&
+      searchParams.has("maxLng") &&
+      searchParams.has("minLat") &&
+      searchParams.has("maxLat");
+
+    if (hasBounds) {
+      // Client-side bounds validation - applies to both v1 and v2 paths
+      const validation = isValidViewport(searchParams);
+      if (!validation.valid) {
+        setError(validation.error || "Invalid viewport");
+        setIsFetchingMapData(false);
+        return;
+      }
+      // Clear error if viewport is now valid
+      setError(null);
+    }
+
     // RACE GUARD: If v2 mode is signaled but data hasn't arrived yet,
     // delay the v1 fetch to give the setter time to run.
     // This prevents double-fetch and flicker.
@@ -314,12 +374,12 @@ export default function PersistentMapWrapper({
 
     // Skip v1 fetch entirely if v2 data is provided via context
     if (hasV2Data) {
-      // Clear any stale v1 state
-      setError(null);
       return;
     }
 
-    const paramsString = searchParams.toString();
+    // P3a Fix: Use only map-relevant params for deduplication
+    // This prevents re-fetching when page/sort changes (which don't affect markers)
+    const paramsString = getMapRelevantParams(searchParams);
 
     // Skip if we've already fetched for these exact params
     if (paramsString === lastFetchedParamsRef.current) {
@@ -327,30 +387,12 @@ export default function PersistentMapWrapper({
     }
 
     // Skip if bounds are missing - wait for map to set them
-    const hasBounds =
-      searchParams.has("minLng") &&
-      searchParams.has("maxLng") &&
-      searchParams.has("minLat") &&
-      searchParams.has("maxLat");
-
     if (!hasBounds) {
       // Don't fetch without bounds - map will set them after load
       // Clear loading state so map is interactive
       setIsFetchingMapData(false);
       return;
     }
-
-    // Client-side bounds validation to prevent unnecessary API requests
-    const validation = isValidViewport(searchParams);
-    if (!validation.valid) {
-      setError(validation.error || "Invalid viewport");
-      setIsFetchingMapData(false);
-      lastFetchedParamsRef.current = paramsString; // Prevent re-validation spam
-      return;
-    }
-
-    // Clear error if viewport is now valid
-    setError(null);
 
     // Clear any pending fetch timeout
     if (fetchTimeoutRef.current) {
@@ -385,7 +427,7 @@ export default function PersistentMapWrapper({
     // Force a refetch by clearing the last fetched ref
     lastFetchedParamsRef.current = null;
     setError(null);
-    fetchListings(searchParams.toString());
+    fetchListings(getMapRelevantParams(searchParams));
   }, [searchParams, fetchListings]);
 
   // CRITICAL: Don't render map component if shouldRenderMap is false
@@ -396,16 +438,23 @@ export default function PersistentMapWrapper({
 
   // Show loading placeholder while waiting for v2 data (race guard)
   // This prevents showing an empty map before v2MapData arrives
+  // IMPORTANT: If there's an error (e.g., viewport too large), show error banner instead
+  // NOTE: min-h-[300px] ensures error banner is visible even when parent chain has
+  // zero height (h-full chain issue) combined with overflow-hidden clipping
   if (isV2Enabled && !hasV2Data) {
     return (
-      <div className="relative h-full">
-        <MapLoadingPlaceholder />
+      <div className="relative w-full h-full min-h-[300px]">
+        {error ? (
+          <MapErrorBanner message={error} onRetry={handleRetry} />
+        ) : (
+          <MapLoadingPlaceholder />
+        )}
       </div>
     );
   }
 
   return (
-    <div className="relative h-full">
+    <div className="relative w-full h-full min-h-[300px]">
       {error && <MapErrorBanner message={error} onRetry={handleRetry} />}
       {/* Coordinated loading overlay - shows when list is transitioning (filter change) */}
       {isListTransitioning && <MapTransitionOverlay />}

@@ -32,9 +32,37 @@ jest.mock('@/lib/with-rate-limit', () => ({
 const mockFetch = jest.fn()
 global.fetch = mockFetch
 
+// Mock timeout-wrapper module
+jest.mock('@/lib/timeout-wrapper', () => {
+  const actual = jest.requireActual('@/lib/timeout-wrapper')
+  return {
+    ...actual,
+    fetchWithTimeout: jest.fn((url, options) => global.fetch(url, options)),
+  }
+})
+
+// Mock circuit-breaker module
+const mockCircuitExecute = jest.fn((fn: () => Promise<unknown>) => fn())
+jest.mock('@/lib/circuit-breaker', () => {
+  const actual = jest.requireActual('@/lib/circuit-breaker')
+  return {
+    ...actual,
+    circuitBreakers: {
+      ...actual.circuitBreakers,
+      radar: {
+        execute: (fn: () => Promise<unknown>) => mockCircuitExecute(fn),
+        getState: jest.fn(() => 'CLOSED'),
+        reset: jest.fn(),
+      },
+    },
+  }
+})
+
 import { POST } from '@/app/api/nearby/route'
 import { auth } from '@/auth'
 import { withRateLimit } from '@/lib/with-rate-limit'
+import { TimeoutError, fetchWithTimeout } from '@/lib/timeout-wrapper'
+import { CircuitOpenError } from '@/lib/circuit-breaker'
 
 describe('POST /api/nearby', () => {
   const mockSession = {
@@ -385,6 +413,65 @@ describe('POST /api/nearby', () => {
 
       expect(consoleSpy).toHaveBeenCalled()
       consoleSpy.mockRestore()
+    })
+  })
+
+  describe('P1-09/P1-10: timeout and circuit breaker protection', () => {
+    beforeEach(() => {
+      // Reset the circuit breaker mock to default behavior
+      mockCircuitExecute.mockImplementation((fn: () => Promise<unknown>) => fn())
+    })
+
+    it('returns 504 when Radar API times out', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
+
+      // Mock circuit breaker to throw TimeoutError
+      mockCircuitExecute.mockRejectedValue(
+        new TimeoutError('Radar Autocomplete API', 5000)
+      )
+
+      const response = await POST(createRequest(validRequestBody))
+      const data = await response.json()
+
+      expect(response.status).toBe(504)
+      expect(data.error).toBe('Nearby search timed out')
+      expect(data.details).toContain('too long')
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('timeout'))
+
+      consoleSpy.mockRestore()
+    })
+
+    it('returns 503 when circuit breaker is open', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
+
+      // Mock circuit breaker to throw CircuitOpenError
+      mockCircuitExecute.mockRejectedValue(
+        new CircuitOpenError('radar')
+      )
+
+      const response = await POST(createRequest(validRequestBody))
+      const data = await response.json()
+
+      expect(response.status).toBe(503)
+      expect(data.error).toBe('Nearby search temporarily unavailable')
+      expect(data.details).toContain('recovering')
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('circuit breaker'))
+
+      consoleSpy.mockRestore()
+    })
+
+    it('uses circuit breaker for Radar API calls', async () => {
+      await POST(createRequest(validRequestBody))
+
+      // Verify circuit breaker was called
+      expect(mockCircuitExecute).toHaveBeenCalled()
+    })
+
+    it('uses fetchWithTimeout for Radar API calls', async () => {
+      await POST(createRequest(validRequestBody))
+
+      // Verify fetchWithTimeout was called
+      expect(fetchWithTimeout).toHaveBeenCalled()
     })
   })
 })

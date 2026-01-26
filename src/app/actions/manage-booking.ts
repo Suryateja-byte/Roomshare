@@ -7,8 +7,13 @@ import { createNotification } from './notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from './suspension';
 import { logger } from '@/lib/logger';
+import {
+    validateTransition,
+    isInvalidStateTransitionError,
+    type BookingStatus,
+} from '@/lib/booking-state-machine';
 
-export type BookingStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+export type { BookingStatus } from '@/lib/booking-state-machine';
 
 export async function updateBookingStatus(
     bookingId: string,
@@ -63,6 +68,20 @@ export async function updateBookingStatus(
             return { error: 'Only the listing owner can accept or reject bookings' };
         }
 
+        // P0-03 FIX: Validate state transition before proceeding
+        // Prevents invalid transitions like CANCELLED → ACCEPTED
+        try {
+            validateTransition(booking.status as BookingStatus, status);
+        } catch (error) {
+            if (isInvalidStateTransitionError(error)) {
+                return {
+                    error: `Cannot change booking from ${booking.status} to ${status}`,
+                    code: 'INVALID_STATE_TRANSITION'
+                };
+            }
+            throw error;
+        }
+
         // Handle ACCEPTED status with atomic transaction to prevent double-booking
         if (status === 'ACCEPTED') {
             try {
@@ -98,11 +117,22 @@ export async function updateBookingStatus(
                         throw new Error('CAPACITY_EXCEEDED');
                     }
 
-                    // Atomically update booking status and decrement slots
-                    await tx.booking.update({
-                        where: { id: bookingId },
-                        data: { status: 'ACCEPTED' }
+                    // P0-04 FIX: Atomically update booking status with optimistic locking
+                    // If version changed since we read it, another process modified it
+                    const updateResult = await tx.booking.updateMany({
+                        where: {
+                            id: bookingId,
+                            version: booking.version, // Optimistic lock check
+                        },
+                        data: {
+                            status: 'ACCEPTED',
+                            version: { increment: 1 },
+                        }
                     });
+
+                    if (updateResult.count === 0) {
+                        throw new Error('CONCURRENT_MODIFICATION');
+                    }
 
                     await tx.listing.update({
                         where: { id: booking.listing.id },
@@ -117,6 +147,13 @@ export async function updateBookingStatus(
                     }
                     if (error.message === 'CAPACITY_EXCEEDED') {
                         return { error: 'Cannot accept: all slots for these dates are already booked' };
+                    }
+                    // P0-04: Handle concurrent modification (optimistic lock failure)
+                    if (error.message === 'CONCURRENT_MODIFICATION') {
+                        return {
+                            error: 'Booking was modified by another request. Please refresh and try again.',
+                            code: 'CONCURRENT_MODIFICATION'
+                        };
                     }
                 }
                 throw error; // Re-throw unexpected errors
@@ -145,13 +182,25 @@ export async function updateBookingStatus(
 
         // Handle REJECTED status
         if (status === 'REJECTED') {
-            await prisma.booking.update({
-                where: { id: bookingId },
+            // P0-04 FIX: Use optimistic locking to prevent concurrent modifications
+            const updateResult = await prisma.booking.updateMany({
+                where: {
+                    id: bookingId,
+                    version: booking.version, // Optimistic lock check
+                },
                 data: {
-                    status,
-                    rejectionReason: rejectionReason?.trim() || null
+                    status: 'REJECTED',
+                    rejectionReason: rejectionReason?.trim() || null,
+                    version: { increment: 1 },
                 }
             });
+
+            if (updateResult.count === 0) {
+                return {
+                    error: 'Booking was modified by another request. Please refresh and try again.',
+                    code: 'CONCURRENT_MODIFICATION'
+                };
+            }
 
             // Build rejection message with optional reason
             const reasonText = rejectionReason?.trim()
@@ -181,23 +230,57 @@ export async function updateBookingStatus(
         // Handle CANCELLED status - wrap in transaction for data integrity
         if (status === 'CANCELLED') {
             if (booking.status === 'ACCEPTED') {
-                // Atomically update booking and increment slots
-                await prisma.$transaction(async (tx) => {
-                    await tx.booking.update({
-                        where: { id: bookingId },
-                        data: { status: 'CANCELLED' }
+                // P0-04 FIX: Atomically update booking with optimistic lock and increment slots
+                try {
+                    await prisma.$transaction(async (tx) => {
+                        const updateResult = await tx.booking.updateMany({
+                            where: {
+                                id: bookingId,
+                                version: booking.version, // Optimistic lock check
+                            },
+                            data: {
+                                status: 'CANCELLED',
+                                version: { increment: 1 },
+                            }
+                        });
+
+                        if (updateResult.count === 0) {
+                            throw new Error('CONCURRENT_MODIFICATION');
+                        }
+
+                        await tx.listing.update({
+                            where: { id: booking.listing.id },
+                            data: { availableSlots: { increment: 1 } }
+                        });
                     });
-                    await tx.listing.update({
-                        where: { id: booking.listing.id },
-                        data: { availableSlots: { increment: 1 } }
-                    });
-                });
+                } catch (error) {
+                    if (error instanceof Error && error.message === 'CONCURRENT_MODIFICATION') {
+                        return {
+                            error: 'Booking was modified by another request. Please refresh and try again.',
+                            code: 'CONCURRENT_MODIFICATION'
+                        };
+                    }
+                    throw error;
+                }
             } else {
-                // Just update the booking status for non-accepted bookings
-                await prisma.booking.update({
-                    where: { id: bookingId },
-                    data: { status: 'CANCELLED' }
+                // P0-04 FIX: Use optimistic locking for non-accepted bookings too
+                const updateResult = await prisma.booking.updateMany({
+                    where: {
+                        id: bookingId,
+                        version: booking.version, // Optimistic lock check
+                    },
+                    data: {
+                        status: 'CANCELLED',
+                        version: { increment: 1 },
+                    }
                 });
+
+                if (updateResult.count === 0) {
+                    return {
+                        error: 'Booking was modified by another request. Please refresh and try again.',
+                        code: 'CONCURRENT_MODIFICATION'
+                    };
+                }
             }
 
 

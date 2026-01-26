@@ -6,7 +6,8 @@ import { withRateLimit } from '@/lib/with-rate-limit';
 
 const resetPasswordSchema = z.object({
     token: z.string().min(1, 'Token is required'),
-    password: z.string().min(6, 'Password must be at least 6 characters')
+    // P0-02 FIX: Enforce same 12-char minimum as register endpoint
+    password: z.string().min(12, 'Password must be at least 12 characters')
 });
 
 export async function POST(request: NextRequest) {

@@ -8,7 +8,8 @@ import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 
 interface PaginationProps {
     currentPage: number;
-    totalPages: number;
+    /** Total pages - null means "unknown count (>100 results)" for hybrid count optimization */
+    totalPages: number | null;
     /** Total items - null means "unknown count (>100 results)" for hybrid count optimization */
     totalItems: number | null;
     itemsPerPage: number;
@@ -67,14 +68,21 @@ export default function Pagination({
     // - On page 1→2, currentCursor is null so nothing gets pushed to stack
     // - pageNumber accurately tracks position regardless of stack state
     // - The prev handler correctly clears cursor when returning to page 1
+    // For offset pagination with unknown totals, rely on hasNextPage if available
+    // Otherwise assume there's a next page (server will return empty if not)
     const canGoNext = useKeysetPagination
         ? (hasNextPage ?? false) && (nextCursor !== null && nextCursor !== undefined)
-        : currentPage < totalPages;
+        : totalPages !== null ? currentPage < totalPages : (hasNextPage ?? true);
     const canGoPrev = useKeysetPagination
         ? pageNumber > 1
         : currentPage > 1;
 
-    if (totalPages <= 1 && !useKeysetPagination) return null;
+    // Don't hide pagination in keyset mode (even with unknown totals)
+    // Only hide in offset mode when we KNOW there's just 1 page
+    const hasKnownSinglePage = totalPages !== null && totalPages <= 1;
+    if (hasKnownSinglePage && !useKeysetPagination) return null;
+    // For keyset mode with unknown totals, hide only if no navigation possible
+    if (useKeysetPagination && !canGoNext && !canGoPrev) return null;
 
     // Handle offset-based page navigation (clicking specific page number)
     const handlePageChange = (page: number) => {
@@ -171,7 +179,13 @@ export default function Pagination({
     };
 
     // Generate page numbers to show
-    const getPageNumbers = () => {
+    // Returns null when totalPages is unknown (keyset mode with >100 results)
+    const getPageNumbers = (): (number | string)[] | null => {
+        // When total is unknown, don't show numbered page buttons
+        if (totalPages === null) {
+            return null;
+        }
+
         const pages: (number | string)[] = [];
         const showEllipsis = totalPages > 7;
 
@@ -247,33 +261,47 @@ export default function Pagination({
                     )}
                 </button>
 
-                {/* Page numbers - only show when we have valid page numbers (offset mode or keyset with known page) */}
-                {/* In pure keyset mode, we can only go prev/next, not jump to arbitrary pages */}
-                {(!useKeysetPagination || (pageNumber !== null && Number.isFinite(pageNumber))) && (
-                    <div className="flex items-center gap-0.5 sm:gap-1">
-                        {getPageNumbers().map((page, index) => (
-                            typeof page === 'number' ? (
-                                <button
-                                    key={index}
-                                    onClick={() => handlePageChange(page)}
-                                    disabled={isPending}
-                                    aria-label={`Page ${page}`}
-                                    aria-current={page === pageNumber ? 'page' : undefined}
-                                    className={`min-w-[40px] sm:min-w-[36px] h-10 sm:h-9 px-2 sm:px-3 rounded-lg text-sm font-medium transition-colors touch-target disabled:cursor-not-allowed ${page === pageNumber
-                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
-                                            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:hover:bg-transparent'
-                                        }`}
-                                >
-                                    {page}
-                                </button>
-                            ) : (
-                                <span key={index} className="px-1 sm:px-2 text-zinc-400 " aria-hidden="true">
-                                    {page}
+                {/* Page numbers or simple page indicator */}
+                {/* When totalPages is unknown, show "Page X" indicator instead of numbered buttons */}
+                {(() => {
+                    const pageNumbers = getPageNumbers();
+                    // Unknown total: show simple "Page X" indicator
+                    if (pageNumbers === null) {
+                        return (
+                            <div className="flex items-center px-3">
+                                <span className="text-sm font-medium text-zinc-900 dark:text-white">
+                                    Page {pageNumber}
                                 </span>
-                            )
-                        ))}
-                    </div>
-                )}
+                            </div>
+                        );
+                    }
+                    // Known total: show clickable page numbers
+                    return (
+                        <div className="flex items-center gap-0.5 sm:gap-1">
+                            {pageNumbers.map((page, index) => (
+                                typeof page === 'number' ? (
+                                    <button
+                                        key={index}
+                                        onClick={() => handlePageChange(page)}
+                                        disabled={isPending}
+                                        aria-label={`Page ${page}`}
+                                        aria-current={page === pageNumber ? 'page' : undefined}
+                                        className={`min-w-[40px] sm:min-w-[36px] h-10 sm:h-9 px-2 sm:px-3 rounded-lg text-sm font-medium transition-colors touch-target disabled:cursor-not-allowed ${page === pageNumber
+                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                                                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white disabled:hover:bg-transparent'
+                                            }`}
+                                    >
+                                        {page}
+                                    </button>
+                                ) : (
+                                    <span key={index} className="px-1 sm:px-2 text-zinc-400 " aria-hidden="true">
+                                        {page}
+                                    </span>
+                                )
+                            ))}
+                        </div>
+                    );
+                })()}
 
                 {/* Next button */}
                 <button

@@ -194,6 +194,8 @@ export const RATE_LIMITS = {
   search: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
   // Nearby places search (Radar API)
   nearbySearch: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
+  // P1-05: Rate limit for reviews GET endpoint
+  getReviews: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
 } as const;
 
 /**

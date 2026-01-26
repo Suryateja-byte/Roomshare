@@ -42,6 +42,11 @@ const MAX_MAP_MARKERS = 200;
 // Threshold for full COUNT vs hybrid mode
 const HYBRID_COUNT_THRESHOLD = 100;
 
+// Maximum results for unbounded browse-all queries (no query, no bounds)
+// Prevents full-table scans while allowing homepage browsing.
+// 48 = 4 pages of 12 items - enough for initial exploration
+export const MAX_UNBOUNDED_RESULTS = 48;
+
 // ============================================
 // Cache Key Generators
 // ============================================
@@ -478,6 +483,12 @@ function buildOrderByClause(
 async function getSearchDocLimitedCountInternal(
   params: FilterParams,
 ): Promise<number | null> {
+  // Defense in depth: Return null for unbounded browse (no query, no bounds)
+  // This prevents COUNT(*) full-table scans on listing_search_docs
+  if (!params.query && !params.bounds) {
+    return null;
+  }
+
   const { conditions, params: queryParams } =
     buildSearchDocWhereConditions(params);
   const whereClause = conditions.join(" AND ");
@@ -529,10 +540,11 @@ export async function getSearchDocLimitedCount(
 async function getSearchDocMapListingsInternal(
   params: FilterParams,
 ): Promise<MapListingData[]> {
-  // Defense in depth: block unbounded text searches
-  if (params.query && !params.bounds) {
+  // Defense in depth: map listings ALWAYS require geographic bounds
+  // This prevents full-table scans and ensures map has a defined viewport
+  if (!params.bounds) {
     throw new Error(
-      "Unbounded text search not allowed: geographic bounds required when query is present",
+      "Geographic bounds required for map listings",
     );
   }
 
@@ -624,6 +636,12 @@ async function getSearchDocListingsPaginatedInternal(
     );
   }
 
+  // Cap limit for unbounded browse (no query, no bounds) to prevent full-table scans
+  const isUnboundedBrowse = !params.query && !params.bounds;
+  const effectiveLimit = isUnboundedBrowse
+    ? Math.min(limit, MAX_UNBOUNDED_RESULTS)
+    : limit;
+
   try {
     const {
       conditions,
@@ -641,7 +659,7 @@ async function getSearchDocListingsPaginatedInternal(
 
     const total = limitedCount;
     const totalPages =
-      limitedCount !== null ? Math.ceil(limitedCount / limit) : null;
+      limitedCount !== null ? Math.ceil(limitedCount / effectiveLimit) : null;
 
     // Calculate safe page
     let safePage: number;
@@ -650,10 +668,10 @@ async function getSearchDocListingsPaginatedInternal(
     } else {
       safePage = Math.max(1, page);
     }
-    const offset = (safePage - 1) * limit;
+    const offset = (safePage - 1) * effectiveLimit;
 
     // Fetch limit+1 items to determine hasNextPage
-    const fetchLimit = limit + 1;
+    const fetchLimit = effectiveLimit + 1;
     let paramIndex = startParamIndex;
 
     // Main query - reads from denormalized SearchDoc
@@ -723,10 +741,11 @@ async function getSearchDocListingsPaginatedInternal(
     }));
 
     // Determine hasNextPage using limit+1 pattern
-    const hasNextPage = results.length > limit;
+    // Use effectiveLimit for unbounded browse cap
+    const hasNextPage = results.length > effectiveLimit;
 
-    // Only return `limit` items
-    let items: ListingData[] = hasNextPage ? results.slice(0, limit) : results;
+    // Only return `effectiveLimit` items (capped for unbounded browse)
+    let items: ListingData[] = hasNextPage ? results.slice(0, effectiveLimit) : results;
 
     // Near-match expansion: if enabled and low results on page 1, fetch near matches
     let nearMatchCount = 0;

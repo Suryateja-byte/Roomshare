@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import {
   getSearchDocLimitedCount,
   isSearchDocEnabled,
+  MAX_UNBOUNDED_RESULTS,
 } from "@/lib/search/search-doc-queries";
 import {
   clampBoundsToMaxSpan,
@@ -11,8 +12,28 @@ import {
   MAX_LNG_SPAN,
 } from "@/lib/validation";
 
-// Re-export for API routes
-export { getSearchDocLimitedCount as getLimitedCount };
+// Unified count function for API routes
+// Gates behind isSearchDocEnabled() to support V1 fallback
+// Returns null for unbounded browse (no query, no bounds) or >100 results
+export async function getLimitedCount(
+  params: FilterParams,
+): Promise<number | null> {
+  // Unbounded browse protection - return null (unknown count)
+  // Prevents full-table scans on both SearchDoc and V1 paths
+  const isUnboundedBrowse = !params.query && !params.bounds;
+  if (isUnboundedBrowse) {
+    return null;
+  }
+
+  if (isSearchDocEnabled()) {
+    return getSearchDocLimitedCount(params);
+  }
+
+  // V1 fallback: use efficient count query
+  // Note: getListingsCountEfficient returns exact count, not limited to 100
+  // This is acceptable for V1 as it's a fallback path
+  return getListingsCountEfficient(params);
+}
 
 export interface ListingData {
   id: string;
@@ -963,6 +984,15 @@ export async function getListingsPaginated(
     }
   }
 
+  // P1 Fix: Cap unbounded browse queries to prevent full-table scans
+  // Browse mode = no query AND no bounds (user is just browsing, no location selected)
+  const isUnboundedBrowse = !query && !bounds;
+  const MAX_BROWSE_PAGES = Math.ceil(MAX_UNBOUNDED_RESULTS / 12);
+  const effectiveLimit = isUnboundedBrowse
+    ? Math.min(limit, MAX_UNBOUNDED_RESULTS)
+    : limit;
+  const effectivePage = isUnboundedBrowse ? Math.min(page, MAX_BROWSE_PAGES) : page;
+
   try {
     // Defense in depth: block unbounded text searches
     // This prevents full-table scans that are expensive and not useful
@@ -1153,11 +1183,16 @@ export async function getListingsPaginated(
       countQuery,
       ...queryParams,
     );
-    const total = Number(countResult[0]?.total || 0);
-    const totalPages = Math.ceil(total / limit);
+    const rawTotal = Number(countResult[0]?.total || 0);
+
+    // P1 Fix: Cap total for unbounded browse to prevent deep pagination
+    const total = isUnboundedBrowse
+      ? Math.min(rawTotal, MAX_UNBOUNDED_RESULTS)
+      : rawTotal;
+    const totalPages = Math.ceil(total / effectiveLimit);
     const safePage =
-      totalPages > 0 ? Math.max(1, Math.min(page, totalPages)) : 1;
-    const offset = (safePage - 1) * limit;
+      totalPages > 0 ? Math.max(1, Math.min(effectivePage, totalPages)) : 1;
+    const offset = (safePage - 1) * effectiveLimit;
 
     // Execute main query with LIMIT/OFFSET
     const dataQuery = `
@@ -1195,8 +1230,8 @@ export async function getListingsPaginated(
         LIMIT $${paramIndex++} OFFSET $${paramIndex++}
     `;
 
-    // Add limit and offset to params
-    const dataParams = [...queryParams, limit, offset];
+    // Add limit and offset to params (using effective values for browse mode cap)
+    const dataParams = [...queryParams, effectiveLimit, offset];
 
     const listings = await prisma.$queryRawUnsafe<any[]>(
       dataQuery,
@@ -1242,7 +1277,7 @@ export async function getListingsPaginated(
       items: results,
       total,
       page: safePage,
-      limit,
+      limit: effectiveLimit,
       totalPages,
     };
   } catch (error) {

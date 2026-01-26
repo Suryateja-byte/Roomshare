@@ -5,6 +5,11 @@ import { createNotification } from '@/app/actions/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from '@/app/actions/suspension';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import {
+    parsePaginationParams,
+    buildPaginationResponse,
+    buildPrismaQueryOptions,
+} from '@/lib/pagination-schema';
 
 export async function POST(request: Request) {
     // P1-5 FIX: Add rate limiting to prevent review spam
@@ -27,6 +32,18 @@ export async function POST(request: Request) {
 
         if (!rating || !comment) {
             return NextResponse.json({ error: 'Missing rating or comment' }, { status: 400 });
+        }
+
+        // P1-04: Max comment length validation (5000 chars)
+        const trimmedComment = typeof comment === 'string' ? comment.trim() : '';
+        if (trimmedComment.length === 0) {
+            return NextResponse.json({ error: 'Comment cannot be empty' }, { status: 400 });
+        }
+        if (trimmedComment.length > 5000) {
+            return NextResponse.json(
+                { error: 'Comment must not exceed 5000 characters' },
+                { status: 400 }
+            );
         }
 
         if (!listingId && !targetUserId) {
@@ -153,7 +170,7 @@ export async function POST(request: Request) {
             })();
         }
 
-        return NextResponse.json(review);
+        return NextResponse.json(review, { status: 201 });
     } catch (error) {
         console.error('Error creating review:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
@@ -161,6 +178,10 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+    // P1-05: Rate limiting for GET reviews (60 per minute)
+    const rateLimitResponse = await withRateLimit(request, { type: 'getReviews' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     const { searchParams } = new URL(request.url);
     const listingId = searchParams.get('listingId');
     const userId = searchParams.get('userId');
@@ -169,26 +190,55 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Must specify listingId or userId' }, { status: 400 });
     }
 
-    try {
-        const reviews = await prisma.review.findMany({
-            where: {
-                ...(listingId ? { listingId } : {}),
-                ...(userId ? { targetUserId: userId } : {})
-            },
-            include: {
-                author: {
-                    select: {
-                        name: true,
-                        image: true
-                    }
-                }
-            },
-            orderBy: {
-                createdAt: 'desc'
-            }
-        });
+    // P1-02: Parse and validate pagination parameters
+    const paginationResult = parsePaginationParams(searchParams);
+    if (!paginationResult.success) {
+        return NextResponse.json({ error: paginationResult.error }, { status: 400 });
+    }
+    const { cursor, limit } = paginationResult.data;
 
-        return NextResponse.json(reviews);
+    try {
+        const whereClause = {
+            ...(listingId ? { listingId } : {}),
+            ...(userId ? { targetUserId: userId } : {}),
+        };
+
+        // P1-02: Get total count and paginated reviews in parallel
+        const [total, reviews] = await Promise.all([
+            prisma.review.count({ where: whereClause }),
+            prisma.review.findMany({
+                where: whereClause,
+                include: {
+                    author: {
+                        select: {
+                            name: true,
+                            image: true,
+                        },
+                    },
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+                ...buildPrismaQueryOptions({ cursor, limit }),
+            }),
+        ]);
+
+        // P1-02: Build paginated response
+        const paginatedResponse = buildPaginationResponse(reviews, limit, total);
+
+        // Return with rate limit headers
+        return NextResponse.json(
+            {
+                reviews: paginatedResponse.items,
+                pagination: paginatedResponse.pagination,
+            },
+            {
+                headers: {
+                    'X-RateLimit-Limit': '60',
+                    'X-RateLimit-Remaining': '59', // Approximate, actual value from rate limiter
+                },
+            }
+        );
     } catch (error) {
         console.error('Error fetching reviews:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

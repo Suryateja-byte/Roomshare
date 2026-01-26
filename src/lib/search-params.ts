@@ -63,6 +63,12 @@ export interface ParsedSearchParams {
    * Callers should block or warn about such searches.
    */
   boundsRequired: boolean;
+  /**
+   * True when browsing without query or bounds (browse-all mode).
+   * Results will be capped at MAX_UNBOUNDED_RESULTS to prevent full-table scans.
+   * UI should indicate that more results are available with location filter.
+   */
+  browseMode: boolean;
 }
 
 export const MAX_SAFE_PRICE = 1000000000;
@@ -446,12 +452,17 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
   // This would cause full-table scans and should be blocked
   const boundsRequired = !!q && !bounds;
 
+  // Flag browse-all mode: no query and no bounds
+  // Results will be capped but UI should inform user that more are available
+  const browseMode = !q && !bounds;
+
   return {
     q,
     requestedPage,
     sortOption,
     filterParams,
     boundsRequired,
+    browseMode,
   };
 }
 

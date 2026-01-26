@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { checkChatRateLimit } from '@/lib/rate-limit-redis';
 import { getClientIP } from '@/lib/rate-limit';
 import { checkFairHousingPolicy, POLICY_REFUSAL_MESSAGE } from '@/lib/fair-housing-policy';
+import { DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
 
 /**
  * Neighborhood Chat API Route
@@ -384,55 +385,83 @@ export async function POST(request: Request) {
       });
     }
 
-    const result = streamText({
-      model: groq('llama-3.1-8b-instant'),
-      system: `You are a helpful assistant for a room rental listing. You can answer general questions about the property and neighborhood.
+    // P0-05 FIX: Add timeout protection to prevent indefinite LLM hangs
+    // AbortController ensures we can cancel the stream if it takes too long
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, DEFAULT_TIMEOUTS.LLM_STREAM);
+
+    try {
+      const result = streamText({
+        model: groq('llama-3.1-8b-instant'),
+        system: `You are a helpful assistant for a room rental listing. You can answer general questions about the property and neighborhood.
 
 For questions about nearby places (restaurants, gyms, grocery stores, transit, etc.), use the nearbyPlaceSearch tool. DO NOT try to provide specific place names, addresses, or distances - the tool will handle displaying that information.
 
 Be friendly and concise. Focus on being helpful without making up specific information about places you don't know about.`,
-      messages: simpleMessages,
-      tools: {
-        /**
-         * Fallback tool for nearby place searches.
-         * Returns a structured action that the client interprets to render
-         * the NearbyPlacesCard component.
-         *
-         * CRITICAL: This tool does NOT call Google Places API.
-         * It only returns the action metadata - no place data.
-         */
-        nearbyPlaceSearch: tool({
-          description:
-            'Trigger a search for nearby places like restaurants, gyms, grocery stores, parks, transit stations, etc. Use this when users ask about places near the listing.',
-          inputSchema: zodSchema(
-            z.object({
-              query: z
-                .string()
-                .describe(
-                  'The type of place or specific query (e.g., "gym", "indian grocery", "Starbucks")'
-                ),
-            })
-          ),
-          execute: async ({ query }: { query: string }) => {
-            const { searchType, includedTypes } = determineSearchParams(query);
+        messages: simpleMessages,
+        tools: {
+          /**
+           * Fallback tool for nearby place searches.
+           * Returns a structured action that the client interprets to render
+           * the NearbyPlacesCard component.
+           *
+           * CRITICAL: This tool does NOT call Google Places API.
+           * It only returns the action metadata - no place data.
+           */
+          nearbyPlaceSearch: tool({
+            description:
+              'Trigger a search for nearby places like restaurants, gyms, grocery stores, parks, transit stations, etc. Use this when users ask about places near the listing.',
+            inputSchema: zodSchema(
+              z.object({
+                query: z
+                  .string()
+                  .describe(
+                    'The type of place or specific query (e.g., "gym", "indian grocery", "Starbucks")'
+                  ),
+              })
+            ),
+            execute: async ({ query }: { query: string }) => {
+              const { searchType, includedTypes } = determineSearchParams(query);
 
-            // Return structured action - NO place data
-            return {
-              action: 'NEARBY_UI_KIT',
-              query,
-              searchType,
-              includedTypes,
-              // The client will use these coordinates to configure the search
-              coordinates: { lat: coordResult.lat, lng: coordResult.lng },
-            };
-          },
-        }),
-      },
-      // Allow up to 5 steps for: 1) parse, 2) tool call, 3) receive results, 4) respond, 5) buffer
-      stopWhen: stepCountIs(5),
-    });
+              // Return structured action - NO place data
+              return {
+                action: 'NEARBY_UI_KIT',
+                query,
+                searchType,
+                includedTypes,
+                // The client will use these coordinates to configure the search
+                coordinates: { lat: coordResult.lat, lng: coordResult.lng },
+              };
+            },
+          }),
+        },
+        // Allow up to 5 steps for: 1) parse, 2) tool call, 3) receive results, 4) respond, 5) buffer
+        stopWhen: stepCountIs(5),
+        // P0-05 FIX: Pass abort signal to allow timeout cancellation
+        abortSignal: abortController.signal,
+      });
 
-    return result.toUIMessageStreamResponse();
+      // Clear timeout once we have a result object (stream has started)
+      clearTimeout(timeoutId);
+
+      return result.toUIMessageStreamResponse();
+    } catch (streamError) {
+      clearTimeout(timeoutId);
+
+      // P0-05: Handle abort/timeout specifically
+      if (streamError instanceof Error && streamError.name === 'AbortError') {
+        console.error('[Chat] LLM streaming timed out after', DEFAULT_TIMEOUTS.LLM_STREAM, 'ms');
+        return new Response(JSON.stringify({ error: 'Chat response timed out. Please try again.' }), {
+          status: 504,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Re-throw other errors to be caught by outer catch
+      throw streamError;
+    }
   } catch (error) {
     // Log error without user content - sanitize for privacy
     console.error('[Chat] API error:', error instanceof Error ? error.message : 'Unknown error');

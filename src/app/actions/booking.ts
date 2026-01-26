@@ -10,6 +10,7 @@ import { createBookingSchema } from '@/lib/schemas';
 import { z } from 'zod';
 import { checkSuspension, checkEmailVerified } from './suspension';
 import { logger } from '@/lib/logger';
+import { withIdempotency } from '@/lib/idempotency';
 
 // Booking result type for structured error handling
 export type BookingResult = {
@@ -19,6 +20,232 @@ export type BookingResult = {
     code?: string;
     fieldErrors?: Record<string, string>;
 };
+
+// Internal result type with side effect data (not exposed to callers)
+type InternalBookingResult =
+    | { success: false; error: string; code?: string; fieldErrors?: Record<string, string> }
+    | {
+        success: true;
+        bookingId: string;
+        listingId: string;
+        listingTitle: string;
+        listingOwnerId: string;
+        ownerEmail: string | null;
+        ownerName: string | null;
+        tenantName: string | null;
+      };
+
+// Prisma transaction client type for withIdempotency
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Core booking logic that runs inside a transaction.
+ * Returns InternalBookingResult with all data needed for side effects.
+ */
+async function executeBookingTransaction(
+    tx: TransactionClient,
+    userId: string,
+    listingId: string,
+    startDate: Date,
+    endDate: Date,
+    totalPrice: number
+): Promise<InternalBookingResult> {
+    // Check for existing duplicate booking (same tenant, listing, dates)
+    // This serves as server-side idempotency - if same booking already exists, treat as duplicate
+    const existingDuplicate = await tx.booking.findFirst({
+        where: {
+            tenantId: userId,
+            listingId,
+            startDate,
+            endDate,
+            status: { in: ['PENDING', 'ACCEPTED'] }
+        }
+    });
+
+    if (existingDuplicate) {
+        return {
+            success: false,
+            error: 'You already have a booking request for these exact dates.'
+        };
+    }
+
+    // Get the listing with FOR UPDATE lock to prevent concurrent booking race conditions
+    // This locks the row until the transaction completes, ensuring atomic check-and-create
+    const [listing] = await tx.$queryRaw<Array<{
+        id: string;
+        title: string;
+        ownerId: string;
+        totalSlots: number;
+        availableSlots: number;
+        status: string;
+    }>>`
+        SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status"
+        FROM "Listing"
+        WHERE "id" = ${listingId}
+        FOR UPDATE
+    `;
+
+    if (!listing) {
+        return { success: false, error: 'Listing not found' };
+    }
+
+    // Fetch owner details separately (no lock needed, read-only)
+    const owner = await tx.user.findUnique({
+        where: { id: listing.ownerId },
+        select: { id: true, name: true, email: true }
+    });
+
+    if (!owner) {
+        return { success: false, error: 'Listing owner not found' };
+    }
+
+    // Prevent owners from booking their own listings
+    if (listing.ownerId === userId) {
+        return {
+            success: false,
+            error: 'You cannot book your own listing.'
+        };
+    }
+
+    // Check for blocks between tenant and host
+    const { checkBlockBeforeAction } = await import('./block');
+    const blockCheck = await checkBlockBeforeAction(owner.id);
+    if (!blockCheck.allowed) {
+        return {
+            success: false,
+            error: blockCheck.message || 'Unable to book this listing'
+        };
+    }
+
+    // Check if listing is available for booking
+    if (listing.status !== 'ACTIVE') {
+        return {
+            success: false,
+            error: 'This listing is not currently available for booking.'
+        };
+    }
+
+    // Count overlapping ACCEPTED bookings for capacity check
+    // PENDING bookings don't occupy slots yet - only ACCEPTED ones do
+    const overlappingAcceptedBookings = await tx.booking.count({
+        where: {
+            listingId,
+            status: 'ACCEPTED',
+            AND: [
+                { startDate: { lte: endDate } },
+                { endDate: { gte: startDate } }
+            ]
+        }
+    });
+
+    // Check if there's capacity available
+    if (overlappingAcceptedBookings >= listing.totalSlots) {
+        return {
+            success: false,
+            error: 'No available slots for these dates. All rooms are booked.',
+            fieldErrors: { startDate: 'No availability', endDate: 'No availability' }
+        };
+    }
+
+    // Check if the current user already has a pending/accepted booking for overlapping dates
+    const userExistingBooking = await tx.booking.findFirst({
+        where: {
+            listingId,
+            tenantId: userId,
+            status: { in: ['PENDING', 'ACCEPTED'] },
+            AND: [
+                { startDate: { lte: endDate } },
+                { endDate: { gte: startDate } }
+            ]
+        }
+    });
+
+    if (userExistingBooking) {
+        return {
+            success: false,
+            error: 'You already have a booking request for overlapping dates.',
+            fieldErrors: { startDate: 'Existing booking', endDate: 'Existing booking' }
+        };
+    }
+
+    // Get tenant info
+    const tenant = await tx.user.findUnique({
+        where: { id: userId },
+        select: { name: true }
+    });
+
+    // Create the booking within the transaction
+    const booking = await tx.booking.create({
+        data: {
+            listingId,
+            tenantId: userId,
+            startDate,
+            endDate,
+            totalPrice,
+            status: 'PENDING'
+        }
+    });
+
+    return {
+        success: true,
+        bookingId: booking.id,
+        listingId: listing.id,
+        listingTitle: listing.title,
+        listingOwnerId: listing.ownerId,
+        ownerEmail: owner.email,
+        ownerName: owner.name,
+        tenantName: tenant?.name || null
+    };
+}
+
+/**
+ * Run side effects (notifications, email, revalidation) after successful booking.
+ * Only called when booking is newly created (not from cache).
+ */
+async function runBookingSideEffects(
+    result: Extract<InternalBookingResult, { success: true }>,
+    startDate: Date,
+    endDate: Date
+): Promise<void> {
+    // Create in-app notification for host
+    await createNotification({
+        userId: result.listingOwnerId,
+        type: 'BOOKING_REQUEST',
+        title: 'New Booking Request',
+        message: `${result.tenantName || 'Someone'} requested to book "${result.listingTitle}"`,
+        link: '/bookings'
+    });
+
+    // Send email notification to host (respecting preferences)
+    if (result.ownerEmail) {
+        await sendNotificationEmailWithPreference('bookingRequest', result.listingOwnerId, result.ownerEmail, {
+            hostName: result.ownerName || 'Host',
+            tenantName: result.tenantName || 'A user',
+            listingTitle: result.listingTitle,
+            startDate: startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+            endDate: endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+            listingId: result.listingId
+        });
+    }
+
+    revalidatePath(`/listings/${result.listingId}`);
+    revalidatePath('/bookings');
+}
+
+/**
+ * Convert InternalBookingResult to BookingResult (strips side effect data).
+ */
+function toBookingResult(result: InternalBookingResult): BookingResult {
+    if (!result.success) {
+        return {
+            success: false,
+            error: result.error,
+            code: result.code,
+            fieldErrors: result.fieldErrors
+        };
+    }
+    return { success: true, bookingId: result.bookingId };
+}
 
 export async function createBooking(
     listingId: string,
@@ -43,35 +270,6 @@ export async function createBooking(
     }
 
     const userId = session.user.id;
-
-    // Check for existing idempotency key and return cached result if valid
-    // This prevents duplicate bookings on page refresh during submission
-    if (idempotencyKey) {
-        try {
-            const existingKey = await prisma.idempotencyKey.findUnique({
-                where: { key: idempotencyKey }
-            });
-
-            if (existingKey && existingKey.expiresAt > new Date()) {
-                // Return cached result - this is a duplicate request
-                return existingKey.resultData as BookingResult;
-            }
-
-            // If key exists but expired, delete it to allow reuse
-            if (existingKey && existingKey.expiresAt <= new Date()) {
-                await prisma.idempotencyKey.delete({
-                    where: { key: idempotencyKey }
-                });
-            }
-        } catch (error: unknown) {
-            // Log but don't fail - idempotency is a safety net, not critical path
-            logger.sync.warn('Idempotency key check failed', {
-                action: 'createBooking',
-                step: 'idempotency_check',
-                error: error instanceof Error ? error.message : 'Unknown error',
-            });
-        }
-    }
 
     // Validate input with Zod schema
     try {
@@ -104,244 +302,77 @@ export async function createBooking(
     const pricePerDay = pricePerMonth / 30;
     const totalPrice = Math.round(diffDays * pricePerDay * 100) / 100;
 
-    // Retry configuration for serialization failures
+    // Request body for idempotency hash (deterministic across retries)
+    const requestBody = { listingId, startDate: startDate.toISOString(), endDate: endDate.toISOString(), pricePerMonth };
+
+    // P0-04 FIX: Use withIdempotency wrapper for atomic idempotency handling
+    // This ensures idempotency key is claimed BEFORE transaction runs, not after
+    if (idempotencyKey) {
+        const idempotencyResult = await withIdempotency<InternalBookingResult>(
+            idempotencyKey,
+            userId,
+            'createBooking',
+            requestBody,
+            async (tx) => executeBookingTransaction(tx, userId, listingId, startDate, endDate, totalPrice)
+        );
+
+        // Handle idempotency wrapper errors (400 for hash mismatch, 500 for lock failure)
+        if (!idempotencyResult.success) {
+            logger.sync.warn('Idempotency check failed', {
+                action: 'createBooking',
+                status: idempotencyResult.status,
+                error: idempotencyResult.error,
+            });
+            return {
+                success: false,
+                error: idempotencyResult.error,
+                code: idempotencyResult.status === 400 ? 'IDEMPOTENCY_MISMATCH' : 'IDEMPOTENCY_ERROR'
+            };
+        }
+
+        // Run side effects only for NEW bookings (not cached responses)
+        if (!idempotencyResult.cached && idempotencyResult.result.success) {
+            try {
+                await runBookingSideEffects(idempotencyResult.result, startDate, endDate);
+            } catch (sideEffectError) {
+                // Side effect failures should not fail the booking
+                logger.sync.error('Side effect failed after booking', {
+                    action: 'createBooking',
+                    bookingId: idempotencyResult.result.bookingId,
+                    error: sideEffectError instanceof Error ? sideEffectError.message : 'Unknown error',
+                });
+            }
+        }
+
+        return toBookingResult(idempotencyResult.result);
+    }
+
+    // Fallback: No idempotency key provided - use direct transaction with retry
+    // This maintains backwards compatibility for clients not using idempotency
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 50;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            // Use transaction with SERIALIZABLE isolation level to make conflict check and creation atomic
-            // This prevents race conditions where two rapid submissions could both pass the check
-            // Combined with FOR UPDATE lock on the listing row for defense-in-depth
-            const result = await prisma.$transaction(async (tx) => {
-                // Note: idempotencyKey is used for client-side duplicate prevention via sessionStorage
-                // Server-side duplicate prevention uses tenant+listing+dates check below
+            const result = await prisma.$transaction(
+                async (tx) => executeBookingTransaction(tx, userId, listingId, startDate, endDate, totalPrice),
+                { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+            );
 
-                // Check for existing duplicate booking (same tenant, listing, dates)
-                // This serves as server-side idempotency - if same booking already exists, treat as duplicate
-                const existingDuplicate = await tx.booking.findFirst({
-                    where: {
-                        tenantId: userId,
-                        listingId,
-                        startDate,
-                        endDate,
-                        status: { in: ['PENDING', 'ACCEPTED'] }
-                    }
-                });
-
-                if (existingDuplicate) {
-                    return {
-                        success: false as const,
-                        error: 'You already have a booking request for these exact dates.'
-                    };
-                }
-
-                // Check for booking date conflicts (overlapping dates)
-                // For listings with multiple slots, we need to count overlapping ACCEPTED bookings
-                // and compare against available capacity
-
-                // Get the listing with FOR UPDATE lock to prevent concurrent booking race conditions
-                // This locks the row until the transaction completes, ensuring atomic check-and-create
-                const [listing] = await tx.$queryRaw<Array<{
-                    id: string;
-                    title: string;
-                    ownerId: string;
-                    totalSlots: number;
-                    availableSlots: number;
-                    status: string;
-                }>>`
-                SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status"
-                FROM "Listing"
-                WHERE "id" = ${listingId}
-                FOR UPDATE
-            `;
-
-                if (!listing) {
-                    return { success: false as const, error: 'Listing not found' };
-                }
-
-                // Fetch owner details separately (no lock needed, read-only)
-                const owner = await tx.user.findUnique({
-                    where: { id: listing.ownerId },
-                    select: { id: true, name: true, email: true }
-                });
-
-                if (!owner) {
-                    return { success: false as const, error: 'Listing owner not found' };
-                }
-
-                // Prevent owners from booking their own listings
-                if (listing.ownerId === userId) {
-                    return {
-                        success: false as const,
-                        error: 'You cannot book your own listing.'
-                    };
-                }
-
-                // Check for blocks between tenant and host
-                const { checkBlockBeforeAction } = await import('./block');
-                const blockCheck = await checkBlockBeforeAction(owner.id);
-                if (!blockCheck.allowed) {
-                    return {
-                        success: false as const,
-                        error: blockCheck.message || 'Unable to book this listing'
-                    };
-                }
-
-                // Check if listing is available for booking
-                if (listing.status !== 'ACTIVE') {
-                    return {
-                        success: false as const,
-                        error: 'This listing is not currently available for booking.'
-                    };
-                }
-
-                // Count overlapping ACCEPTED bookings for capacity check
-                // PENDING bookings don't occupy slots yet - only ACCEPTED ones do
-                const overlappingAcceptedBookings = await tx.booking.count({
-                    where: {
-                        listingId,
-                        status: 'ACCEPTED',
-                        AND: [
-                            { startDate: { lte: endDate } },
-                            { endDate: { gte: startDate } }
-                        ]
-                    }
-                });
-
-                // Check if there's capacity available
-                // availableSlots represents current available capacity
-                // We compare overlapping accepted bookings against total slots
-                if (overlappingAcceptedBookings >= listing.totalSlots) {
-                    return {
-                        success: false as const,
-                        error: 'No available slots for these dates. All rooms are booked.',
-                        fieldErrors: { startDate: 'No availability', endDate: 'No availability' }
-                    };
-                }
-
-                // Also check if there are too many pending bookings that might fill up slots
-                // This is a soft warning - hosts can still accept/reject
-                const overlappingPendingBookings = await tx.booking.count({
-                    where: {
-                        listingId,
-                        status: 'PENDING',
-                        AND: [
-                            { startDate: { lte: endDate } },
-                            { endDate: { gte: startDate } }
-                        ]
-                    }
-                });
-
-                // If accepted + pending would exceed capacity, still allow but we're tracking demand
-                const totalOverlapping = overlappingAcceptedBookings + overlappingPendingBookings;
-
-                // Check if the current user already has a pending/accepted booking for overlapping dates
-                const userExistingBooking = await tx.booking.findFirst({
-                    where: {
-                        listingId,
-                        tenantId: userId,
-                        status: { in: ['PENDING', 'ACCEPTED'] },
-                        AND: [
-                            { startDate: { lte: endDate } },
-                            { endDate: { gte: startDate } }
-                        ]
-                    }
-                });
-
-                if (userExistingBooking) {
-                    return {
-                        success: false as const,
-                        error: 'You already have a booking request for overlapping dates.',
-                        fieldErrors: { startDate: 'Existing booking', endDate: 'Existing booking' }
-                    };
-                }
-
-                // Get tenant info
-                const tenant = await tx.user.findUnique({
-                    where: { id: userId },
-                    select: { name: true }
-                });
-
-                // Create the booking within the transaction
-                const booking = await tx.booking.create({
-                    data: {
-                        listingId,
-                        tenantId: userId,
-                        startDate,
-                        endDate,
-                        totalPrice,
-                        status: 'PENDING'
-                    }
-                });
-
-                return {
-                    success: true as const,
-                    booking,
-                    listing,
-                    owner,
-                    tenant
-                };
-            }, {
-                isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-            });
-
-            // If transaction failed with an error, return it
-            if (!result.success) {
-                return result;
-            }
-
-            const { booking, listing, owner, tenant } = result;
-
-            // Create in-app notification for host
-            await createNotification({
-                userId: listing.ownerId,
-                type: 'BOOKING_REQUEST',
-                title: 'New Booking Request',
-                message: `${tenant?.name || 'Someone'} requested to book "${listing.title}"`,
-                link: '/bookings'
-            });
-
-            // Send email notification to host (respecting preferences)
-            if (owner.email) {
-                await sendNotificationEmailWithPreference('bookingRequest', listing.ownerId, owner.email, {
-                    hostName: owner.name || 'Host',
-                    tenantName: tenant?.name || 'A user',
-                    listingTitle: listing.title,
-                    startDate: startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-                    endDate: endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-                    listingId: listing.id
-                });
-            }
-
-            revalidatePath(`/listings/${listingId}`);
-            revalidatePath('/bookings');
-
-            const successResult: BookingResult = { success: true, bookingId: booking.id };
-
-            // Store idempotency key with result for duplicate detection
-            if (idempotencyKey) {
+            // Run side effects for successful booking
+            if (result.success) {
                 try {
-                    await prisma.idempotencyKey.create({
-                        data: {
-                            key: idempotencyKey,
-                            userId,
-                            endpoint: 'createBooking',
-                            resultData: successResult,
-                            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-                        }
-                    });
-                } catch (keyError: unknown) {
-                    // If key already exists (race condition), that's fine - result is already stored
-                    logger.sync.debug('Idempotency key storage skipped', {
+                    await runBookingSideEffects(result, startDate, endDate);
+                } catch (sideEffectError) {
+                    logger.sync.error('Side effect failed after booking', {
                         action: 'createBooking',
-                        step: 'idempotency_store',
-                        error: keyError instanceof Error ? keyError.message : 'Unknown error',
+                        bookingId: result.bookingId,
+                        error: sideEffectError instanceof Error ? sideEffectError.message : 'Unknown error',
                     });
                 }
             }
 
-            return successResult;
+            return toBookingResult(result);
         } catch (error: unknown) {
             // P1-16 FIX: Use type guard for Prisma error checking
             const isPrismaError = (err: unknown): err is { code: string } => {
@@ -356,7 +387,7 @@ export async function createBooking(
                     maxRetries: MAX_RETRIES,
                 });
                 await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
-                continue; // Retry the transaction
+                continue;
             }
 
             logger.sync.error('Failed to create booking', {

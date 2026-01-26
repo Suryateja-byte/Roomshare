@@ -6,6 +6,7 @@
 import { emailTemplates } from './email-templates';
 import { prisma } from '@/lib/prisma';
 import { fetchWithTimeout, FetchTimeoutError } from './fetch-with-timeout';
+import { circuitBreakers, isCircuitOpenError } from './circuit-breaker';
 
 // Timeout for email API requests (15 seconds - emails can be slow)
 const EMAIL_TIMEOUT_MS = 15000;
@@ -56,7 +57,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Use Resend's testing domain by default (can only send to your own email in test mode)
 const FROM_EMAIL = process.env.FROM_EMAIL || 'RoomShare <onboarding@resend.dev>';
 
-// Email sending function with retry logic
+// Email sending function with retry logic and circuit breaker protection
 export async function sendEmail({ to, subject, html, text }: EmailOptions): Promise<{ success: boolean; error?: string }> {
     if (!RESEND_API_KEY) {
         console.warn('RESEND_API_KEY not configured. Email not sent:', { to, subject });
@@ -65,78 +66,98 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
         return { success: true }; // Return success in dev mode
     }
 
-    let lastError: string | undefined;
-
-    // P1-23 FIX: Implement retry with exponential backoff
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        try {
-            const response = await fetchWithTimeout('https://api.resend.com/emails', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${RESEND_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    from: FROM_EMAIL,
-                    to,
-                    subject,
-                    html,
-                    text: text || html.replace(/<[^>]*>/g, ''),
-                    // Disable click tracking to prevent Resend from wrapping links
-                    // This fixes issues with resend-clicks.com connection errors
-                    headers: {
-                        'X-Entity-Ref-ID': new Date().getTime().toString(),
-                    },
-                    // Disable tracking features that wrap links
-                    tags: [{ name: 'category', value: 'transactional' }],
-                }),
-                timeout: EMAIL_TIMEOUT_MS,
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-
-                // Don't retry 4xx client errors (validation failures, etc.)
-                if (response.status >= 400 && response.status < 500) {
-                    console.error('Failed to send email (non-retryable):', errorText);
-                    return { success: false, error: errorText };
-                }
-
-                // 5xx errors are retryable
-                if (isRetryableError(null, response) && attempt < MAX_RETRIES - 1) {
-                    const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-                    console.warn(`Email send failed (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms...`);
-                    await sleep(delay);
-                    lastError = errorText;
-                    continue;
-                }
-
-                console.error('Failed to send email:', errorText);
-                return { success: false, error: errorText };
-            }
-
-            return { success: true };
-        } catch (error) {
-            const errorMessage = error instanceof FetchTimeoutError
-                ? `Email request timed out after ${EMAIL_TIMEOUT_MS}ms`
-                : String(error);
-
-            // Check if error is retryable
-            if (isRetryableError(error) && attempt < MAX_RETRIES - 1) {
-                const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-                console.warn(`Email send error (attempt ${attempt + 1}/${MAX_RETRIES}): ${errorMessage}, retrying in ${delay}ms...`);
-                await sleep(delay);
-                lastError = errorMessage;
-                continue;
-            }
-
-            console.error('Error sending email:', error);
-            return { success: false, error: errorMessage };
-        }
+    // P0-06 FIX: Check circuit breaker state first - fail fast if email service is unhealthy
+    if (!circuitBreakers.email.isAllowingRequests()) {
+        console.warn('Email circuit breaker is open - service unavailable, skipping email');
+        return { success: false, error: 'Email service temporarily unavailable (circuit breaker open)' };
     }
 
-    // This should only be reached if all retries failed
-    return { success: false, error: lastError || 'Failed after multiple retries' };
+    // P1-23 FIX: Implement retry with exponential backoff
+    // P0-06 FIX: Wrap with circuit breaker to track failures and prevent cascading issues
+    try {
+        return await circuitBreakers.email.execute(async () => {
+            let lastError: string | undefined;
+
+            for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+                try {
+                    const response = await fetchWithTimeout('https://api.resend.com/emails', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${RESEND_API_KEY}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            from: FROM_EMAIL,
+                            to,
+                            subject,
+                            html,
+                            text: text || html.replace(/<[^>]*>/g, ''),
+                            // Disable click tracking to prevent Resend from wrapping links
+                            // This fixes issues with resend-clicks.com connection errors
+                            headers: {
+                                'X-Entity-Ref-ID': new Date().getTime().toString(),
+                            },
+                            // Disable tracking features that wrap links
+                            tags: [{ name: 'category', value: 'transactional' }],
+                        }),
+                        timeout: EMAIL_TIMEOUT_MS,
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+
+                        // Don't retry 4xx client errors (validation failures, etc.)
+                        if (response.status >= 400 && response.status < 500) {
+                            console.error('Failed to send email (non-retryable):', errorText);
+                            return { success: false, error: errorText };
+                        }
+
+                        // 5xx errors are retryable
+                        if (isRetryableError(null, response) && attempt < MAX_RETRIES - 1) {
+                            const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+                            console.warn(`Email send failed (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms...`);
+                            await sleep(delay);
+                            lastError = errorText;
+                            continue;
+                        }
+
+                        console.error('Failed to send email:', errorText);
+                        return { success: false, error: errorText };
+                    }
+
+                    return { success: true };
+                } catch (error) {
+                    const errorMessage = error instanceof FetchTimeoutError
+                        ? `Email request timed out after ${EMAIL_TIMEOUT_MS}ms`
+                        : String(error);
+
+                    // Check if error is retryable
+                    if (isRetryableError(error) && attempt < MAX_RETRIES - 1) {
+                        const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+                        console.warn(`Email send error (attempt ${attempt + 1}/${MAX_RETRIES}): ${errorMessage}, retrying in ${delay}ms...`);
+                        await sleep(delay);
+                        lastError = errorMessage;
+                        continue;
+                    }
+
+                    console.error('Error sending email:', error);
+                    return { success: false, error: errorMessage };
+                }
+            }
+
+            // This should only be reached if all retries failed
+            return { success: false, error: lastError || 'Failed after multiple retries' };
+        });
+    } catch (error) {
+        // P0-06 FIX: Handle circuit breaker errors gracefully
+        if (isCircuitOpenError(error)) {
+            console.warn('Email circuit breaker opened during request - service unhealthy');
+            return { success: false, error: 'Email service temporarily unavailable' };
+        }
+        // Re-throw unexpected errors
+        console.error('Unexpected error in sendEmail:', error);
+        return { success: false, error: String(error) };
+    }
 }
 
 // Helper to send notification email based on type

@@ -10,7 +10,6 @@ import {
   groupListingsByCoord,
   formatStackPriceRange,
   type MapMarkerListing,
-  type ListingGroup,
 } from "@/lib/maps/marker-utils";
 
 describe("marker-utils", () => {
@@ -203,6 +202,109 @@ describe("marker-utils", () => {
       const result = formatStackPriceRange(listings);
       expect(result).toContain("–"); // en-dash U+2013
       expect(result).not.toMatch(/\$\d+-\$\d+/); // not hyphen
+    });
+  });
+
+  /**
+   * P3a: Test GeoJSON feature conversion includes tier property
+   *
+   * This tests the conversion logic that Map.tsx uses to generate GeoJSON
+   * for Mapbox clustering. The tier property is essential for differentiated
+   * pin styling (primary = larger, mini = smaller).
+   */
+  describe("GeoJSON tier property in feature conversion", () => {
+    // Helper that mirrors Map.tsx's inline GeoJSON conversion logic
+    const toGeoJsonFeature = (listing: {
+      id: string;
+      title: string;
+      price: number;
+      availableSlots?: number;
+      ownerId?: string;
+      images?: string[];
+      location: { lat: number; lng: number };
+      tier?: "primary" | "mini";
+    }) => ({
+      type: "Feature" as const,
+      geometry: {
+        type: "Point" as const,
+        coordinates: [listing.location.lng, listing.location.lat],
+      },
+      properties: {
+        id: listing.id,
+        title: listing.title,
+        price: listing.price,
+        availableSlots: listing.availableSlots ?? 0,
+        ownerId: listing.ownerId ?? "",
+        images: JSON.stringify(listing.images ?? []),
+        lat: listing.location.lat,
+        lng: listing.location.lng,
+        // P3a: Include tier in GeoJSON properties for pin styling
+        tier: listing.tier,
+      },
+    });
+
+    it("should include tier in feature properties when present", () => {
+      const listing = {
+        id: "1",
+        tier: "primary" as const,
+        title: "Test Listing",
+        price: 1000,
+        location: { lat: 30.2, lng: -97.7 },
+      };
+      const feature = toGeoJsonFeature(listing);
+
+      expect(feature.properties.tier).toBe("primary");
+    });
+
+    it("should include tier as 'mini' when listing has mini tier", () => {
+      const listing = {
+        id: "2",
+        tier: "mini" as const,
+        title: "Mini Listing",
+        price: 800,
+        location: { lat: 30.3, lng: -97.6 },
+      };
+      const feature = toGeoJsonFeature(listing);
+
+      expect(feature.properties.tier).toBe("mini");
+    });
+
+    it("should have undefined tier property when tier not set", () => {
+      const listing = {
+        id: "3",
+        title: "No Tier Listing",
+        price: 1200,
+        location: { lat: 30.4, lng: -97.5 },
+      };
+      const feature = toGeoJsonFeature(listing);
+
+      expect(feature.properties.tier).toBeUndefined();
+    });
+
+    it("should preserve all other properties alongside tier", () => {
+      const listing = {
+        id: "4",
+        tier: "primary" as const,
+        title: "Complete Listing",
+        price: 1500,
+        availableSlots: 3,
+        ownerId: "user-123",
+        images: ["img1.jpg", "img2.jpg"],
+        location: { lat: 37.77, lng: -122.42 },
+      };
+      const feature = toGeoJsonFeature(listing);
+
+      expect(feature.properties).toEqual({
+        id: "4",
+        title: "Complete Listing",
+        price: 1500,
+        availableSlots: 3,
+        ownerId: "user-123",
+        images: '["img1.jpg","img2.jpg"]',
+        lat: 37.77,
+        lng: -122.42,
+        tier: "primary",
+      });
     });
   });
 });

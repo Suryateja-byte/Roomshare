@@ -32,8 +32,15 @@ export async function POST(request: Request) {
             where: { email },
         });
 
+        // P1-06/P1-07 FIX: Prevent user enumeration with generic error message
+        // and timing-safe delay to prevent timing attacks
         if (existingUser) {
-            return NextResponse.json({ error: 'User already exists' }, { status: 400 });
+            // Add artificial delay to match successful registration timing
+            await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 50));
+            return NextResponse.json(
+                { error: 'Registration failed. Please try again or use forgot password if you already have an account.' },
+                { status: 400 }
+            );
         }
 
         // Hash password

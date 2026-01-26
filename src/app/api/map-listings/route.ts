@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
       const searchParams = request.nextUrl.searchParams;
 
-      // Validate and parse bounds (required - prevents full-table scans)
+      // Validate and parse explicit bounds first
       const boundsResult = validateAndParseBounds(
         searchParams.get("minLng"),
         searchParams.get("maxLng"),
@@ -42,17 +42,48 @@ export async function GET(request: NextRequest) {
         searchParams.get("maxLat"),
       );
 
-      if (!boundsResult.valid) {
+      let bounds = boundsResult.valid ? boundsResult.bounds : null;
+
+      // P2b Fix: Derive bounds from lat/lng when explicit bounds not provided
+      // Uses same logic as parseSearchParams (~10km radius)
+      if (!bounds) {
+        const latStr = searchParams.get("lat");
+        const lngStr = searchParams.get("lng");
+        const lat = latStr ? parseFloat(latStr) : NaN;
+        const lng = lngStr ? parseFloat(lngStr) : NaN;
+
+        if (
+          !isNaN(lat) &&
+          !isNaN(lng) &&
+          lat >= -90 &&
+          lat <= 90 &&
+          lng >= -180 &&
+          lng <= 180
+        ) {
+          // ~10km radius - same as parseSearchParams
+          const LAT_OFFSET = 0.09;
+          const cosLat = Math.cos((lat * Math.PI) / 180);
+          const LNG_OFFSET = cosLat < 0.01 ? 180 : LAT_OFFSET / cosLat;
+
+          bounds = {
+            minLat: Math.max(-90, lat - LAT_OFFSET),
+            maxLat: Math.min(90, lat + LAT_OFFSET),
+            minLng: Math.max(-180, lng - LNG_OFFSET),
+            maxLng: Math.min(180, lng + LNG_OFFSET),
+          };
+        }
+      }
+
+      // Bounds are required - prevents full-table scans
+      if (!bounds) {
         return NextResponse.json(
-          { error: boundsResult.error },
+          { error: boundsResult.error || "Bounds required: provide minLat/maxLat/minLng/maxLng or lat/lng" },
           {
             status: 400,
             headers: { "x-request-id": requestId },
           },
         );
       }
-
-      const bounds = boundsResult.bounds;
 
       // Use canonical parsing for all filter params
       // This handles: repeated params, CSV splitting, alias resolution,

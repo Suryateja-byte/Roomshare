@@ -11,6 +11,7 @@ import { SkipLink } from "@/components/ui/SkipLink";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import EmailVerificationWrapper from "@/components/EmailVerificationWrapper";
+import SuspensionBannerWrapper from "@/components/SuspensionBannerWrapper";
 import CustomScrollContainer from "@/components/ui/CustomScrollContainer";
 import { WebVitals } from "@/components/WebVitals";
 
@@ -72,6 +73,7 @@ export default async function RootLayout({
                 <Navbar />
               </NavbarWrapper>
               <EmailVerificationWrapper />
+              <SuspensionBannerWrapper />
               <MainLayout>
                 {children}
               </MainLayout>

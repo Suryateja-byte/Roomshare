@@ -1,6 +1,8 @@
 /**
  * Redis-backed rate limiting using Upstash.
  *
+ * P1-08 FIX: Added timeout and circuit breaker protection for Redis operations.
+ *
  * Provides burst and sustained rate limiters for:
  * - Chat API: 5/min burst, 30/hour sustained
  * - Metrics API: 100/min burst, 500/hour sustained
@@ -11,6 +13,8 @@
 
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { withTimeout, DEFAULT_TIMEOUTS, isTimeoutError } from "./timeout-wrapper";
+import { circuitBreakers, isCircuitOpenError } from "./circuit-breaker";
 
 // Initialize Redis client
 // Falls back gracefully if env vars not set (for local dev without Redis)
@@ -115,6 +119,27 @@ export const searchCountSustainedLimiter = new Ratelimit({
   analytics: true,
 });
 
+// ============ PROTECTED RATE LIMIT HELPER ============
+
+/**
+ * P1-08 FIX: Wraps rate limit operations with timeout and circuit breaker protection.
+ * - Circuit breaker prevents cascading failures when Redis is unhealthy
+ * - Timeout prevents indefinite hangs on slow Redis operations
+ */
+async function protectedRateLimitCheck(
+  limiter: Ratelimit,
+  ip: string,
+  operationName: string
+): Promise<{ success: boolean; reset: number }> {
+  return circuitBreakers.redis.execute(async () => {
+    return withTimeout(
+      limiter.limit(ip),
+      DEFAULT_TIMEOUTS.REDIS,
+      operationName
+    );
+  });
+}
+
 // ============ RATE LIMIT CHECK FUNCTIONS ============
 
 export interface RateLimitResult {
@@ -145,8 +170,13 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
   }
 
   try {
+    // P1-08 FIX: Use protected rate limit check with timeout and circuit breaker
     // Check burst limit first (more likely to be hit)
-    const burstResult = await chatBurstLimiter.limit(ip);
+    const burstResult = await protectedRateLimitCheck(
+      chatBurstLimiter,
+      ip,
+      "chat-burst-limit"
+    );
     if (!burstResult.success) {
       return {
         success: false,
@@ -155,7 +185,11 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
     }
 
     // Check sustained limit
-    const sustainedResult = await chatSustainedLimiter.limit(ip);
+    const sustainedResult = await protectedRateLimitCheck(
+      chatSustainedLimiter,
+      ip,
+      "chat-sustained-limit"
+    );
     if (!sustainedResult.success) {
       return {
         success: false,
@@ -165,7 +199,14 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
 
     return { success: true };
   } catch (error) {
-    console.error("[RateLimit] Redis error:", error);
+    // P1-08 FIX: Handle timeout and circuit breaker errors
+    if (isTimeoutError(error)) {
+      console.error("[RateLimit] Redis timeout:", error);
+    } else if (isCircuitOpenError(error)) {
+      console.error("[RateLimit] Circuit breaker open:", error);
+    } else {
+      console.error("[RateLimit] Redis error:", error);
+    }
     // FAIL CLOSED in production - security over availability
     if (process.env.NODE_ENV === "production") {
       return { success: false, retryAfter: 60 };
@@ -200,8 +241,13 @@ export async function checkMetricsRateLimit(
   }
 
   try {
+    // P1-08 FIX: Use protected rate limit check with timeout and circuit breaker
     // Check burst limit first
-    const burstResult = await metricsBurstLimiter.limit(ip);
+    const burstResult = await protectedRateLimitCheck(
+      metricsBurstLimiter,
+      ip,
+      "metrics-burst-limit"
+    );
     if (!burstResult.success) {
       return {
         success: false,
@@ -210,7 +256,11 @@ export async function checkMetricsRateLimit(
     }
 
     // Check sustained limit
-    const sustainedResult = await metricsSustainedLimiter.limit(ip);
+    const sustainedResult = await protectedRateLimitCheck(
+      metricsSustainedLimiter,
+      ip,
+      "metrics-sustained-limit"
+    );
     if (!sustainedResult.success) {
       return {
         success: false,
@@ -220,7 +270,14 @@ export async function checkMetricsRateLimit(
 
     return { success: true };
   } catch (error) {
-    console.error("[RateLimit] Redis error:", error);
+    // P1-08 FIX: Handle timeout and circuit breaker errors
+    if (isTimeoutError(error)) {
+      console.error("[RateLimit] Redis timeout:", error);
+    } else if (isCircuitOpenError(error)) {
+      console.error("[RateLimit] Circuit breaker open:", error);
+    } else {
+      console.error("[RateLimit] Redis error:", error);
+    }
     // FAIL CLOSED in production - even for metrics
     if (process.env.NODE_ENV === "production") {
       return { success: false, retryAfter: 60 };
@@ -252,8 +309,13 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
   }
 
   try {
+    // P1-08 FIX: Use protected rate limit check with timeout and circuit breaker
     // Check burst limit first
-    const burstResult = await mapBurstLimiter.limit(ip);
+    const burstResult = await protectedRateLimitCheck(
+      mapBurstLimiter,
+      ip,
+      "map-burst-limit"
+    );
     if (!burstResult.success) {
       return {
         success: false,
@@ -262,7 +324,11 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
     }
 
     // Check sustained limit
-    const sustainedResult = await mapSustainedLimiter.limit(ip);
+    const sustainedResult = await protectedRateLimitCheck(
+      mapSustainedLimiter,
+      ip,
+      "map-sustained-limit"
+    );
     if (!sustainedResult.success) {
       return {
         success: false,
@@ -272,7 +338,14 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
 
     return { success: true };
   } catch (error) {
-    console.error("[RateLimit] Redis error:", error);
+    // P1-08 FIX: Handle timeout and circuit breaker errors
+    if (isTimeoutError(error)) {
+      console.error("[RateLimit] Redis timeout:", error);
+    } else if (isCircuitOpenError(error)) {
+      console.error("[RateLimit] Circuit breaker open:", error);
+    } else {
+      console.error("[RateLimit] Redis error:", error);
+    }
     // FAIL CLOSED in production
     if (process.env.NODE_ENV === "production") {
       return { success: false, retryAfter: 60 };
@@ -306,8 +379,13 @@ export async function checkSearchCountRateLimit(
   }
 
   try {
+    // P1-08 FIX: Use protected rate limit check with timeout and circuit breaker
     // Check burst limit first
-    const burstResult = await searchCountBurstLimiter.limit(ip);
+    const burstResult = await protectedRateLimitCheck(
+      searchCountBurstLimiter,
+      ip,
+      "search-count-burst-limit"
+    );
     if (!burstResult.success) {
       return {
         success: false,
@@ -316,7 +394,11 @@ export async function checkSearchCountRateLimit(
     }
 
     // Check sustained limit
-    const sustainedResult = await searchCountSustainedLimiter.limit(ip);
+    const sustainedResult = await protectedRateLimitCheck(
+      searchCountSustainedLimiter,
+      ip,
+      "search-count-sustained-limit"
+    );
     if (!sustainedResult.success) {
       return {
         success: false,
@@ -326,11 +408,19 @@ export async function checkSearchCountRateLimit(
 
     return { success: true };
   } catch (error) {
-    console.error("[RateLimit] Redis error:", error);
-    // FAIL CLOSED in production
+    // P1-08 FIX: Handle timeout and circuit breaker errors
+    if (isTimeoutError(error)) {
+      console.error("[RateLimit] Redis timeout:", error);
+    } else if (isCircuitOpenError(error)) {
+      console.error("[RateLimit] Circuit breaker open:", error);
+    } else {
+      console.error("[RateLimit] Redis error:", error);
+    }
+    // FAIL CLOSED in production - security over availability
     if (process.env.NODE_ENV === "production") {
       return { success: false, retryAfter: 60 };
     }
+    // Allow in development for local testing without Redis
     return { success: true };
   }
 }

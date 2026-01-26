@@ -4,6 +4,11 @@ import { auth } from '@/auth';
 import { checkSuspension } from '@/app/actions/suspension';
 import { logger } from '@/lib/logger';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import {
+    parsePaginationParams,
+    buildPaginationResponse,
+    buildPrismaQueryOptions,
+} from '@/lib/pagination-schema';
 
 export async function GET(request: Request) {
     // P2-06 FIX: Add rate limiting to prevent abuse/scraping
@@ -19,9 +24,16 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const conversationId = searchParams.get('conversationId');
 
+        // P1-03: Parse and validate pagination parameters
+        const paginationResult = parsePaginationParams(searchParams);
+        if (!paginationResult.success) {
+            return NextResponse.json({ error: paginationResult.error }, { status: 400 });
+        }
+        const { cursor, limit } = paginationResult.data;
+
         if (conversationId) {
             // Fetch messages for a specific conversation
-            const conversation = await prisma.conversation.findUnique({
+            const conversation = await prisma.conversation.findFirst({
                 where: { id: conversationId },
                 include: { participants: { select: { id: true } } },
             });
@@ -31,16 +43,28 @@ export async function GET(request: Request) {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
             }
 
-            const messages = await prisma.message.findMany({
-                where: { conversationId },
-                orderBy: { createdAt: 'asc' },
-                include: {
-                    sender: { select: { id: true, name: true, image: true } },
-                }
+            // P1-03: Get total count and paginated messages in parallel
+            const [total, messages] = await Promise.all([
+                prisma.message.count({ where: { conversationId } }),
+                prisma.message.findMany({
+                    where: { conversationId },
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        sender: { select: { id: true, name: true, image: true } },
+                    },
+                    ...buildPrismaQueryOptions({ cursor, limit }),
+                }),
+            ]);
+
+            // P1-03: Build paginated response
+            const paginatedResponse = buildPaginationResponse(messages, limit, total);
+
+            return NextResponse.json({
+                messages: paginatedResponse.items,
+                pagination: paginatedResponse.pagination,
             });
-            return NextResponse.json(messages);
         } else {
-            // Fetch all conversations for the user
+            // P1-03: Fetch all conversations for the user with pagination
             const conversations = await prisma.conversation.findMany({
                 where: {
                     participants: {
@@ -56,30 +80,20 @@ export async function GET(request: Request) {
                         take: 1,
                     },
                     listing: {
-                        select: { title: true },
+                        select: { id: true, title: true, images: true },
                     },
                 },
                 orderBy: { updatedAt: 'desc' },
+                ...buildPrismaQueryOptions({ cursor, limit }),
             });
 
-            // Transform to match the expected format for MessageList component
-            const formattedConversations = conversations
-                .filter(conv => conv.messages.length > 0) // Only show conversations with messages
-                .map(conv => {
-                    // Get the other participant (not the current user)
-                    const otherUser = conv.participants.find(p => p.id !== userId);
-                    return {
-                        id: conv.id,
-                        user: otherUser || { id: '', name: 'Unknown', image: null },
-                        lastMessage: {
-                            content: conv.messages[0].content,
-                            createdAt: conv.messages[0].createdAt,
-                        },
-                        listing: conv.listing,
-                    };
-                });
+            // P1-03: Build paginated response for conversations
+            const paginatedResponse = buildPaginationResponse(conversations, limit, 0);
 
-            return NextResponse.json(formattedConversations);
+            return NextResponse.json({
+                conversations: paginatedResponse.items,
+                pagination: paginatedResponse.pagination,
+            });
         }
 
     } catch (error: unknown) {
@@ -115,6 +129,18 @@ export async function POST(request: Request) {
 
         if (!conversationId || !content) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        // P1-04: Max message length validation (2000 chars)
+        const trimmedContent = typeof content === 'string' ? content.trim() : '';
+        if (trimmedContent.length === 0) {
+            return NextResponse.json({ error: 'Message cannot be empty' }, { status: 400 });
+        }
+        if (trimmedContent.length > 2000) {
+            return NextResponse.json(
+                { error: 'Message must not exceed 2000 characters' },
+                { status: 400 }
+            );
         }
 
         // Verify user is a participant in this conversation

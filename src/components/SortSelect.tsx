@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SortOption } from '@/lib/data';
+import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import {
     Select,
     SelectContent,
@@ -27,6 +28,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
+    const transitionContext = useSearchTransitionSafe();
 
     // Prevent hydration mismatch from Radix UI generating different IDs on server vs client
     useEffect(() => {
@@ -45,7 +47,12 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         params.delete('cursor');
         params.delete('cursorStack');
         params.delete('pageNumber');
-        router.push(`/search?${params.toString()}`);
+        const url = `/search?${params.toString()}`;
+        if (transitionContext) {
+            transitionContext.navigateWithTransition(url);
+        } else {
+            router.push(url);
+        }
     };
 
     const currentLabel = sortOptions.find(opt => opt.value === currentSort)?.label || 'Recommended';
