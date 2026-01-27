@@ -52,7 +52,10 @@ export async function POST(request: Request) {
                     id: existing.id
                 }
             });
-            return NextResponse.json({ saved: false });
+            // P2-1: User-specific toggle must not be cached
+            const response = NextResponse.json({ saved: false });
+            response.headers.set('Cache-Control', 'private, no-store');
+            return response;
         } else {
             // Create
             await prisma.savedListing.create({
@@ -61,7 +64,10 @@ export async function POST(request: Request) {
                     listingId
                 }
             });
-            return NextResponse.json({ saved: true });
+            // P2-1: User-specific toggle must not be cached
+            const response = NextResponse.json({ saved: true });
+            response.headers.set('Cache-Control', 'private, no-store');
+            return response;
         }
 
     } catch (error) {

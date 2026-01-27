@@ -73,7 +73,8 @@ export async function GET() {
     checks.supabase = { status: 'ok' }; // Just check config exists
   }
 
-  return NextResponse.json(
+  // P2-1: Health checks must never be cached - always return fresh data
+  const response = NextResponse.json(
     {
       status: healthy ? 'ready' : 'unhealthy',
       timestamp: new Date().toISOString(),
@@ -82,6 +83,8 @@ export async function GET() {
     },
     { status: healthy ? 200 : 503 }
   );
+  response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  return response;
 }
 
 // Use nodejs runtime for Prisma access

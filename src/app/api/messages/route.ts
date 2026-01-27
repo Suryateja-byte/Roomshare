@@ -59,10 +59,13 @@ export async function GET(request: Request) {
             // P1-03: Build paginated response
             const paginatedResponse = buildPaginationResponse(messages, limit, total);
 
-            return NextResponse.json({
+            // P2-1: User-specific data must not be cached by CDN/browser
+            const response = NextResponse.json({
                 messages: paginatedResponse.items,
                 pagination: paginatedResponse.pagination,
             });
+            response.headers.set('Cache-Control', 'private, no-store');
+            return response;
         } else {
             // P1-03: Fetch all conversations for the user with pagination
             const conversations = await prisma.conversation.findMany({
@@ -90,10 +93,13 @@ export async function GET(request: Request) {
             // P1-03: Build paginated response for conversations
             const paginatedResponse = buildPaginationResponse(conversations, limit, 0);
 
-            return NextResponse.json({
+            // P2-1: User-specific data must not be cached by CDN/browser
+            const response = NextResponse.json({
                 conversations: paginatedResponse.items,
                 pagination: paginatedResponse.pagination,
             });
+            response.headers.set('Cache-Control', 'private, no-store');
+            return response;
         }
 
     } catch (error: unknown) {
@@ -172,7 +178,10 @@ export async function POST(request: Request) {
             })
         ]);
 
-        return NextResponse.json(message, { status: 201 });
+        // P2-1: Mutation responses must not be cached
+        const response = NextResponse.json(message, { status: 201 });
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
 
     } catch (error: unknown) {
         logger.sync.error('Failed to send message', {

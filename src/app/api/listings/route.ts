@@ -33,6 +33,8 @@ export async function GET(request: Request) {
         // Short TTL since listings can change frequently (new bookings, price updates)
         const response = NextResponse.json(listings);
         response.headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+        // P2-1: Vary header for proper CDN caching
+        response.headers.set('Vary', 'Accept-Encoding');
         return response;
     } catch (error) {
         logger.sync.error('Error fetching listings', {
@@ -188,7 +190,10 @@ export async function POST(request: Request) {
             durationMs: Date.now() - startTime,
         });
 
-        return NextResponse.json(result, { status: 201 });
+        // P2-1: Mutation responses must not be cached
+        const response = NextResponse.json(result, { status: 201 });
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
 
     } catch (error) {
         logger.sync.error('Error creating listing', {

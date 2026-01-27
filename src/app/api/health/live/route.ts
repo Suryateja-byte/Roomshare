@@ -11,7 +11,8 @@ import { NextResponse } from 'next/server';
  * use /api/health/ready instead (returns 503 when shutting down).
  */
 export async function GET() {
-  return NextResponse.json(
+  // P2-1: Health checks must never be cached - always return fresh data
+  const response = NextResponse.json(
     {
       status: 'alive',
       timestamp: new Date().toISOString(),
@@ -19,4 +20,6 @@ export async function GET() {
     },
     { status: 200 }
   );
+  response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  return response;
 }
