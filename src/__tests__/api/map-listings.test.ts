@@ -121,7 +121,10 @@ describe("Map Listings API", () => {
         expect(data.error).toBe("Invalid coordinate values");
       });
 
-      it("returns 400 for viewport too large (exceeds 5 degree span)", async () => {
+      it("clamps oversized viewport bounds instead of rejecting (P1-5)", async () => {
+        const mockListings = [{ id: "1", title: "Test Listing" }];
+        (getMapListings as jest.Mock).mockResolvedValue(mockListings);
+
         const request = createRequest({
           minLng: "-130.0",
           maxLng: "-120.0", // 10 degree span > 5 degree limit
@@ -131,9 +134,29 @@ describe("Map Listings API", () => {
 
         const response = await GET(request);
 
-        expect(response.status).toBe(400);
-        const data = await response.json();
-        expect(data.error).toContain("Viewport too large");
+        // P1-5: Should clamp and succeed, not reject
+        expect(response.status).toBe(200);
+
+        // Verify bounds were clamped to max span (5 degrees)
+        expect(getMapListings).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bounds: expect.objectContaining({
+              // Center preserved at -125, span reduced to 5
+              minLng: expect.any(Number),
+              maxLng: expect.any(Number),
+              // Center preserved at 36, span reduced to 5
+              minLat: expect.any(Number),
+              maxLat: expect.any(Number),
+            }),
+          }),
+        );
+
+        // Verify clamped spans are within limits
+        const call = (getMapListings as jest.Mock).mock.calls[0][0];
+        const lngSpan = call.bounds.maxLng - call.bounds.minLng;
+        const latSpan = call.bounds.maxLat - call.bounds.minLat;
+        expect(lngSpan).toBeLessThanOrEqual(5); // MAX_LNG_SPAN
+        expect(latSpan).toBeLessThanOrEqual(5); // MAX_LAT_SPAN
       });
 
       it("returns 400 for latitude out of range", async () => {
