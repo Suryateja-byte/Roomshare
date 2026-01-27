@@ -14,6 +14,7 @@ import {
   LNG_MAX,
   MAX_LAT_SPAN,
   MAX_LNG_SPAN,
+  LAT_OFFSET_DEGREES,
 } from './constants';
 
 // Re-export for backward compatibility
@@ -76,18 +77,11 @@ export function validateAndParseBounds(
     return { valid: false, error: "Invalid latitude range" };
   }
 
-  // Viewport size check (handle antimeridian crossing)
-  const crossesAntimeridian = parsed.minLng > parsed.maxLng;
-  const lngSpan = crossesAntimeridian
-    ? 180 - parsed.minLng + (parsed.maxLng + 180)
-    : parsed.maxLng - parsed.minLng;
-  const latSpan = parsed.maxLat - parsed.minLat;
+  // P1-5: Clamp oversized bounds instead of rejecting
+  // This provides consistent behavior and better UX
+  const clampedBounds = clampBoundsToMaxSpan(parsed);
 
-  if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
-    return { valid: false, error: "Viewport too large. Zoom in further." };
-  }
-
-  return { valid: true, bounds: parsed };
+  return { valid: true, bounds: clampedBounds };
 }
 
 /**
@@ -107,7 +101,12 @@ export function clampBoundsToMaxSpan(bounds: MapBounds): MapBounds {
     ? (180 - minLng) + (maxLng + 180)
     : maxLng - minLng;
 
-  // Calculate center
+  // If within limits, return unchanged (preserves antimeridian crossing)
+  if (latSpan <= MAX_LAT_SPAN && lngSpan <= MAX_LNG_SPAN) {
+    return bounds;
+  }
+
+  // Calculate center for clamping
   const centerLat = (minLat + maxLat) / 2;
   let centerLng: number;
   if (crossesAntimeridian) {
@@ -130,5 +129,33 @@ export function clampBoundsToMaxSpan(bounds: MapBounds): MapBounds {
     maxLat: Math.min(LAT_MAX, centerLat + halfLat),
     minLng: Math.max(LNG_MIN, centerLng - halfLng),
     maxLng: Math.min(LNG_MAX, centerLng + halfLng),
+  };
+}
+
+/**
+ * Derives bounding box from a single point with ~10km radius.
+ * Used when only lat/lng is provided without explicit bounds (P1-4).
+ *
+ * Uses LAT_OFFSET_DEGREES (~0.09°, ~10km) for latitude offset.
+ * Adjusts longitude offset based on latitude (cosine factor) to maintain
+ * approximately equal distance in both directions.
+ *
+ * @param lat - Latitude of center point
+ * @param lng - Longitude of center point
+ * @returns MapBounds centered on the point with ~10km radius
+ */
+export function deriveBoundsFromPoint(lat: number, lng: number): MapBounds {
+  // Adjust longitude offset based on latitude
+  // At higher latitudes, need larger lng offset for same distance
+  const cosLat = Math.cos((lat * Math.PI) / 180);
+
+  // Prevent division by near-zero at poles
+  const lngOffset = cosLat < 0.01 ? 180 : LAT_OFFSET_DEGREES / cosLat;
+
+  return {
+    minLat: Math.max(LAT_MIN, lat - LAT_OFFSET_DEGREES),
+    maxLat: Math.min(LAT_MAX, lat + LAT_OFFSET_DEGREES),
+    minLng: Math.max(LNG_MIN, lng - lngOffset),
+    maxLng: Math.min(LNG_MAX, lng + lngOffset),
   };
 }
