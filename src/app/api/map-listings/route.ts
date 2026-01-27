@@ -18,6 +18,7 @@ import {
   buildRawParamsFromSearchParams,
   parseSearchParams,
 } from "@/lib/search-params";
+import { LAT_OFFSET_DEGREES } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
@@ -60,16 +61,15 @@ export async function GET(request: NextRequest) {
           lng >= -180 &&
           lng <= 180
         ) {
-          // ~10km radius - same as parseSearchParams
-          const LAT_OFFSET = 0.09;
+          // ~10km radius - use canonical LAT_OFFSET_DEGREES
           const cosLat = Math.cos((lat * Math.PI) / 180);
-          const LNG_OFFSET = cosLat < 0.01 ? 180 : LAT_OFFSET / cosLat;
+          const lngOffset = cosLat < 0.01 ? 180 : LAT_OFFSET_DEGREES / cosLat;
 
           bounds = {
-            minLat: Math.max(-90, lat - LAT_OFFSET),
-            maxLat: Math.min(90, lat + LAT_OFFSET),
-            minLng: Math.max(-180, lng - LNG_OFFSET),
-            maxLng: Math.min(180, lng + LNG_OFFSET),
+            minLat: Math.max(-90, lat - LAT_OFFSET_DEGREES),
+            maxLat: Math.min(90, lat + LAT_OFFSET_DEGREES),
+            minLng: Math.max(-180, lng - lngOffset),
+            maxLng: Math.min(180, lng + lngOffset),
           };
         }
       }

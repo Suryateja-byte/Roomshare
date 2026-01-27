@@ -1,4 +1,13 @@
 import { normalizeLanguages } from "./languages";
+import {
+  MAX_SAFE_PRICE,
+  MAX_SAFE_PAGE,
+  MAX_ARRAY_ITEMS,
+  LAT_OFFSET_DEGREES,
+} from "./constants";
+
+// Re-export for backward compatibility
+export { MAX_SAFE_PRICE, MAX_SAFE_PAGE, MAX_ARRAY_ITEMS };
 
 export type SortOption =
   | "recommended"
@@ -70,10 +79,6 @@ export interface ParsedSearchParams {
    */
   browseMode: boolean;
 }
-
-export const MAX_SAFE_PRICE = 1000000000;
-export const MAX_SAFE_PAGE = 100;
-export const MAX_ARRAY_ITEMS = 20;
 
 /**
  * Convert URLSearchParams to a raw params object, preserving duplicate keys as arrays.
@@ -329,12 +334,14 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     MAX_SAFE_PRICE,
   );
 
+  // P1-13: Reject inverted price ranges instead of silently swapping
+  // This matches the behavior in filter-schema.ts normalizeFilters()
   if (
     validMinPrice !== undefined &&
     validMaxPrice !== undefined &&
     validMinPrice > validMaxPrice
   ) {
-    [validMinPrice, validMaxPrice] = [validMaxPrice, validMinPrice];
+    throw new Error("minPrice cannot exceed maxPrice");
   }
 
   const validLat = safeParseFloat(getFirstValue(raw.lat), -90, 90);
@@ -383,12 +390,12 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
       maxLng: validMaxLng,
     };
   } else if (validLat !== undefined && validLng !== undefined) {
-    const latOffset = 0.09;
+    // Use canonical LAT_OFFSET_DEGREES (~10km radius)
     const cosLat = Math.cos((validLat * Math.PI) / 180);
-    const lngOffset = cosLat < 0.01 ? 180 : latOffset / cosLat;
+    const lngOffset = cosLat < 0.01 ? 180 : LAT_OFFSET_DEGREES / cosLat;
     bounds = {
-      minLat: Math.max(-90, validLat - latOffset),
-      maxLat: Math.min(90, validLat + latOffset),
+      minLat: Math.max(-90, validLat - LAT_OFFSET_DEGREES),
+      maxLat: Math.min(90, validLat + LAT_OFFSET_DEGREES),
       minLng: Math.max(-180, validLng - lngOffset),
       maxLng: Math.min(180, validLng + lngOffset),
     };
@@ -524,16 +531,14 @@ export function validateSearchFilters(filters: unknown): FilterParams {
     validated.maxPrice = Math.max(0, Math.min(input.maxPrice, MAX_SAFE_PRICE));
   }
 
-  // Swap if min > max
+  // P1-13: Reject inverted price ranges instead of silently swapping
+  // This matches the behavior in filter-schema.ts normalizeFilters() and parseSearchParams()
   if (
     validated.minPrice !== undefined &&
     validated.maxPrice !== undefined &&
     validated.minPrice > validated.maxPrice
   ) {
-    [validated.minPrice, validated.maxPrice] = [
-      validated.maxPrice,
-      validated.minPrice,
-    ];
+    throw new Error("minPrice cannot exceed maxPrice");
   }
 
   // Array field validation helper

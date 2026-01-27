@@ -7,18 +7,26 @@
 
 import { z } from 'zod';
 import { normalizeLanguages, isValidLanguageCode, LanguageCode } from './languages';
+import {
+  MAX_SAFE_PRICE,
+  MAX_SAFE_PAGE,
+  MAX_ARRAY_ITEMS,
+  MIN_QUERY_LENGTH,
+  MAX_QUERY_LENGTH,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+} from './constants';
 
-// ============================================
-// Constants
-// ============================================
-
-export const MAX_SAFE_PRICE = 1_000_000_000;
-export const MAX_SAFE_PAGE = 100;
-export const MAX_ARRAY_ITEMS = 20;
-export const MIN_QUERY_LENGTH = 2;
-export const MAX_QUERY_LENGTH = 200;
-export const DEFAULT_PAGE_SIZE = 12;
-export const MAX_PAGE_SIZE = 100;
+// Re-export constants for backward compatibility
+export {
+  MAX_SAFE_PRICE,
+  MAX_SAFE_PAGE,
+  MAX_ARRAY_ITEMS,
+  MIN_QUERY_LENGTH,
+  MAX_QUERY_LENGTH,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+};
 
 // ============================================
 // Valid Values (Enums)

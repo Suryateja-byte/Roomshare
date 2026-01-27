@@ -11,6 +11,13 @@ import {
   MAX_LAT_SPAN,
   MAX_LNG_SPAN,
 } from "@/lib/validation";
+import {
+  MIN_QUERY_LENGTH,
+  MAX_QUERY_LENGTH,
+} from "@/lib/constants";
+
+// Re-export for backward compatibility
+export { MIN_QUERY_LENGTH, MAX_QUERY_LENGTH };
 
 // Unified count function for API routes
 // Gates behind isSearchDocEnabled() to support V1 fallback
@@ -122,10 +129,6 @@ export type PaginatedResultHybrid<T> = {
   // Description of near-match expansion performed (e.g., "Showing rooms within $200 of your budget")
   nearMatchExpansion?: string;
 };
-
-// Constants for query validation
-export const MIN_QUERY_LENGTH = 2;
-export const MAX_QUERY_LENGTH = 200;
 
 // Helper function to sanitize search query and escape special characters
 // Supports international characters (unicode) while escaping SQL-dangerous chars

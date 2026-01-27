@@ -7,6 +7,18 @@
  * - Out-of-range coordinates
  */
 
+import {
+  LAT_MIN,
+  LAT_MAX,
+  LNG_MIN,
+  LNG_MAX,
+  MAX_LAT_SPAN,
+  MAX_LNG_SPAN,
+} from './constants';
+
+// Re-export for backward compatibility
+export { MAX_LAT_SPAN, MAX_LNG_SPAN };
+
 export interface MapBounds {
   minLng: number;
   maxLng: number;
@@ -19,18 +31,6 @@ export interface BoundsValidationResult {
   bounds?: MapBounds;
   error?: string;
 }
-
-// Web Mercator practical limits
-const LAT_MIN = -85;
-const LAT_MAX = 85;
-const LNG_MIN = -180;
-const LNG_MAX = 180;
-
-// Maximum viewport span (5° ~550km allows regional views with clustering)
-// Increased from 2 to match Airbnb-style behavior: show markers at wider zoom
-// Exported for reuse in search-v2-service bounds clamping
-export const MAX_LAT_SPAN = 5;
-export const MAX_LNG_SPAN = 5;
 
 /**
  * Validates and parses bounding box parameters from URL query string.
