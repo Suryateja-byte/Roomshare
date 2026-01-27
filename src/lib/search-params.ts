@@ -351,12 +351,13 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
   const validMinLng = safeParseFloat(getFirstValue(raw.minLng), -180, 180);
   const validMaxLng = safeParseFloat(getFirstValue(raw.maxLng), -180, 180);
 
+  // P1-3: Lat inversion now throws (consistent with price inversion)
   if (
     validMinLat !== undefined &&
     validMaxLat !== undefined &&
     validMinLat > validMaxLat
   ) {
-    [validMinLat, validMaxLat] = [validMaxLat, validMinLat];
+    throw new Error("minLat cannot exceed maxLat");
   }
 
   const amenitiesList = safeParseArray(raw.amenities, VALID_AMENITIES);
@@ -639,19 +640,17 @@ export function validateSearchFilters(filters: unknown): FilterParams {
       typeof b.maxLng === "number" &&
       Number.isFinite(b.maxLng)
     ) {
-      validated.bounds = {
+      const clampedBounds = {
         minLat: Math.max(-90, Math.min(90, b.minLat)),
         maxLat: Math.max(-90, Math.min(90, b.maxLat)),
         minLng: Math.max(-180, Math.min(180, b.minLng)),
         maxLng: Math.max(-180, Math.min(180, b.maxLng)),
       };
-      // Swap if min > max
-      if (validated.bounds.minLat > validated.bounds.maxLat) {
-        [validated.bounds.minLat, validated.bounds.maxLat] = [
-          validated.bounds.maxLat,
-          validated.bounds.minLat,
-        ];
+      // P1-3: Throw for inverted lat (consistent with price)
+      if (clampedBounds.minLat > clampedBounds.maxLat) {
+        throw new Error("minLat cannot exceed maxLat");
       }
+      validated.bounds = clampedBounds;
     }
   }
 

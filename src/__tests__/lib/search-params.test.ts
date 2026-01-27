@@ -90,7 +90,6 @@ describe("parseSearchParams - price cases", () => {
     ["negative min clamps", "-50", undefined, 0, undefined],
     ["negative max clamps", undefined, "-10", undefined, 0],
     ["normal range", "500", "1000", 500, 1000],
-    ["swap range", "2000", "1000", 1000, 2000],
     ["trim min", " 750 ", undefined, 750, undefined],
     ["trim max", undefined, " 2500 ", undefined, 2500],
     ["min too large clamps", "10000000000", undefined, 1000000000, undefined],
@@ -110,6 +109,12 @@ describe("parseSearchParams - price cases", () => {
       expect(result.filterParams.maxPrice).toBe(expectedMax);
     },
   );
+
+  // P1-13: Inverted price ranges now throw error instead of silently swapping
+  it("throws error for inverted price range", () => {
+    expect(() => parseSearchParams({ minPrice: "2000", maxPrice: "1000" }))
+      .toThrow("minPrice cannot exceed maxPrice");
+  });
 });
 
 describe("parseSearchParams - amenity cases", () => {
@@ -334,19 +339,16 @@ describe("parseSearchParams - bounds cases", () => {
     expect(result.filterParams.bounds).toBeUndefined();
   });
 
-  test("explicit bounds swap min/max lat", () => {
-    const result = parseSearchParams({
-      minLat: "20",
-      maxLat: "10",
-      minLng: "3",
-      maxLng: "4",
-    });
-    expect(result.filterParams.bounds).toEqual({
-      minLat: 10,
-      maxLat: 20,
-      minLng: 3,
-      maxLng: 4,
-    });
+  test("explicit bounds throw for inverted lat (P1-3: consistent with price)", () => {
+    // P1-3: Lat inversion now throws like price inversion
+    expect(() =>
+      parseSearchParams({
+        minLat: "20",
+        maxLat: "10",
+        minLng: "3",
+        maxLng: "4",
+      })
+    ).toThrow("minLat cannot exceed maxLat");
   });
 
   test("explicit bounds preserve antimeridian lng", () => {
@@ -523,10 +525,10 @@ describe("validateSearchFilters - server action validation", () => {
       expect(result.maxPrice).toBe(0);
     });
 
-    it("swaps min/max if inverted", () => {
-      const result = validateSearchFilters({ minPrice: 2000, maxPrice: 1000 });
-      expect(result.minPrice).toBe(1000);
-      expect(result.maxPrice).toBe(2000);
+    // P1-13: Inverted price ranges now throw error instead of silently swapping
+    it("throws error for inverted min/max", () => {
+      expect(() => validateSearchFilters({ minPrice: 2000, maxPrice: 1000 }))
+        .toThrow("minPrice cannot exceed maxPrice");
     });
 
     it("rejects Infinity", () => {
@@ -640,12 +642,13 @@ describe("validateSearchFilters - server action validation", () => {
       expect(result.bounds?.maxLng).toBe(180);
     });
 
-    it("swaps inverted lat bounds", () => {
-      const result = validateSearchFilters({
-        bounds: { minLat: 38, maxLat: 37, minLng: -122, maxLng: -121 },
-      });
-      expect(result.bounds?.minLat).toBe(37);
-      expect(result.bounds?.maxLat).toBe(38);
+    it("throws for inverted lat bounds (P1-3: consistent with price)", () => {
+      // P1-3: Lat inversion now throws like price inversion
+      expect(() =>
+        validateSearchFilters({
+          bounds: { minLat: 38, maxLat: 37, minLng: -122, maxLng: -121 },
+        })
+      ).toThrow("minLat cannot exceed maxLat");
     });
 
     it("rejects incomplete bounds (missing minLng)", () => {
