@@ -5,11 +5,29 @@ import { createNotification } from '@/app/actions/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from '@/app/actions/suspension';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
 import {
     parsePaginationParams,
     buildPaginationResponse,
     buildPrismaQueryOptions,
 } from '@/lib/pagination-schema';
+
+// P2-2: Zod schemas for request validation
+const createReviewSchema = z.object({
+    listingId: z.string().max(100).optional(),
+    targetUserId: z.string().max(100).optional(),
+    rating: z.number().int().min(1).max(5),
+    comment: z.string().min(1).max(5000),
+}).refine(data => data.listingId || data.targetUserId, {
+    message: 'Must specify listingId or targetUserId',
+});
+
+const updateReviewSchema = z.object({
+    reviewId: z.string().min(1).max(100),
+    rating: z.number().int().min(1).max(5),
+    comment: z.string().min(1).max(5000),
+});
 
 export async function POST(request: Request) {
     // P1-5 FIX: Add rate limiting to prevent review spam
@@ -28,35 +46,17 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { listingId, targetUserId, rating, comment } = body;
 
-        if (!rating || !comment) {
-            return NextResponse.json({ error: 'Missing rating or comment' }, { status: 400 });
-        }
-
-        // P1-04: Max comment length validation (5000 chars)
-        const trimmedComment = typeof comment === 'string' ? comment.trim() : '';
-        if (trimmedComment.length === 0) {
-            return NextResponse.json({ error: 'Comment cannot be empty' }, { status: 400 });
-        }
-        if (trimmedComment.length > 5000) {
+        // P2-2: Zod validation
+        const parsed = createReviewSchema.safeParse(body);
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: 'Comment must not exceed 5000 characters' },
+                { error: 'Invalid request', details: parsed.error.flatten().fieldErrors },
                 { status: 400 }
             );
         }
 
-        if (!listingId && !targetUserId) {
-            return NextResponse.json({ error: 'Must specify listingId or targetUserId' }, { status: 400 });
-        }
-
-        // Rating validation: must be integer between 1-5
-        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-            return NextResponse.json(
-                { error: 'Rating must be an integer between 1 and 5' },
-                { status: 400 }
-            );
-        }
+        const { listingId, targetUserId, rating, comment } = parsed.data;
 
         // Check for existing review (duplicate prevention)
         if (listingId) {
@@ -165,14 +165,20 @@ export async function POST(request: Request) {
                     }
                 } catch (notificationError) {
                     // Log but don't fail - review was already created successfully
-                    console.error('Failed to send review notification:', notificationError);
+                    logger.sync.error('Failed to send review notification', {
+                        action: 'reviewNotification',
+                        error: notificationError instanceof Error ? notificationError.message : 'Unknown error',
+                    });
                 }
             })();
         }
 
         return NextResponse.json(review, { status: 201 });
     } catch (error) {
-        console.error('Error creating review:', error);
+        logger.sync.error('Error creating review', {
+            action: 'createReview',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
@@ -240,7 +246,10 @@ export async function GET(request: Request) {
             }
         );
     } catch (error) {
-        console.error('Error fetching reviews:', error);
+        logger.sync.error('Error fetching reviews', {
+            action: 'getReviews',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
@@ -254,23 +263,17 @@ export async function PUT(request: Request) {
         }
 
         const body = await request.json();
-        const { reviewId, rating, comment } = body;
 
-        if (!reviewId) {
-            return NextResponse.json({ error: 'Review ID is required' }, { status: 400 });
-        }
-
-        if (!rating || !comment) {
-            return NextResponse.json({ error: 'Missing rating or comment' }, { status: 400 });
-        }
-
-        // Rating validation: must be integer between 1-5
-        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        // P2-2: Zod validation
+        const parsed = updateReviewSchema.safeParse(body);
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: 'Rating must be an integer between 1 and 5' },
+                { error: 'Invalid request', details: parsed.error.flatten().fieldErrors },
                 { status: 400 }
             );
         }
+
+        const { reviewId, rating, comment } = parsed.data;
 
         // Check if the review exists and belongs to the current user
         const existingReview = await prisma.review.findUnique({
@@ -304,7 +307,10 @@ export async function PUT(request: Request) {
 
         return NextResponse.json(updatedReview);
     } catch (error) {
-        console.error('Error updating review:', error);
+        logger.sync.error('Error updating review', {
+            action: 'updateReview',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
@@ -344,7 +350,10 @@ export async function DELETE(request: Request) {
 
         return NextResponse.json({ success: true, message: 'Review deleted successfully' });
     } catch (error) {
-        console.error('Error deleting review:', error);
+        logger.sync.error('Error deleting review', {
+            action: 'deleteReview',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

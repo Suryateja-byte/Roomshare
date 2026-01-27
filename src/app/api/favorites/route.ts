@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { logger } from '@/lib/logger';
 import { z } from 'zod';
 
 // P2-4: Zod schema for request validation
@@ -71,7 +72,10 @@ export async function POST(request: Request) {
         }
 
     } catch (error) {
-        console.error('Error toggling favorite:', error);
+        logger.sync.error('Error toggling favorite', {
+            action: 'toggleFavorite',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

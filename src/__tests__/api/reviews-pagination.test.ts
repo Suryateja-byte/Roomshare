@@ -334,7 +334,9 @@ describe('Reviews Pagination (P1-02)', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toContain('5000');
+      // P2-2: Zod validation returns structured error with details
+      expect(data.error).toBe('Invalid request');
+      expect(data.details.comment).toBeDefined();
     });
 
     it('rejects empty comment', async () => {
