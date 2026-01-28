@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { LazyMotion, domAnimation, m, AnimatePresence } from 'framer-motion';
 import { Sparkles, ArrowUp, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChat } from '@ai-sdk/react';
@@ -639,7 +639,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
     const isUser = item.role === 'user';
 
     return (
-      <motion.div
+      <m.div
         key={item.id}
         initial={{ opacity: 0, y: 10, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -692,14 +692,14 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
             </div>
           )}
         </div>
-      </motion.div>
+      </m.div>
     );
   };
 
   return (
-    <>
+    <LazyMotion features={domAnimation}>
       {/* Toggle Button (Floating Action Button) */}
-      <motion.button
+      <m.button
         onClick={() => setIsOpen(!isOpen)}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
@@ -720,12 +720,12 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
         ) : (
           <Sparkles className="w-6 h-6" strokeWidth={1.5} />
         )}
-      </motion.button>
+      </m.button>
 
       {/* Chat Window Container */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20, scale: 0.95, filter: 'blur(10px)' }}
             animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
             exit={{ opacity: 0, y: 20, scale: 0.95, filter: 'blur(10px)' }}
@@ -793,7 +793,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                 {/* Loading indicator (typing) */}
                 {/* B11 FIX: Added role="status" and aria-label for screen reader accessibility */}
                 {isLoading && (
-                  <motion.div
+                  <m.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="flex justify-start"
@@ -806,12 +806,12 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                       <div className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce" aria-hidden="true" />
                       <span className="sr-only">Assistant is typing</span>
                     </div>
-                  </motion.div>
+                  </m.div>
                 )}
 
                 {/* B7 FIX: Timeout error with retry */}
                 {llmTimedOut && !error && (
-                  <motion.div
+                  <m.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="flex justify-center mb-4"
@@ -822,14 +822,14 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                     >
                       Response timed out. Tap to retry.
                     </button>
-                  </motion.div>
+                  </m.div>
                 )}
 
                 {/* Error message with retry */}
                 {error && (() => {
                   const errorInfo = getErrorInfo(error);
                   return (
-                    <motion.div
+                    <m.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       className="flex justify-center mb-4"
@@ -851,7 +851,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                           {errorInfo.message}
                         </button>
                       )}
-                    </motion.div>
+                    </m.div>
                   );
                 })()}
 
@@ -862,7 +862,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
             {/* Suggested Questions */}
             <AnimatePresence>
               {showSuggestions && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
@@ -887,7 +887,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                       <span>{q.text}</span>
                     </button>
                   ))}
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
 
@@ -921,9 +921,9 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                 <p className="text-[10px] text-zinc-300 dark:text-zinc-600 font-medium tracking-widest uppercase">AI Concierge</p>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
-    </>
+    </LazyMotion>
   );
 }

@@ -1,10 +1,13 @@
 'use client';
 
-import { Suspense, useRef } from 'react';
+import { Suspense, useRef, lazy } from 'react';
 import { LazyMotion, domAnimation, m, Variants } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import SearchForm from '@/components/SearchForm';
+
+// LCP optimization: Lazy-load SearchForm to defer its ~875-line bundle + heavy dependencies
+// This allows hero content and images to render before SearchForm JavaScript loads
+const SearchForm = lazy(() => import('@/components/SearchForm'));
 import { Button } from '@/components/ui/button';
 import { Shield, Users, Heart, ShieldCheck, Zap, Coffee, ArrowRight } from 'lucide-react';
 
@@ -90,12 +93,12 @@ export default function HomeClient({ isLoggedIn = false }: HomeClientProps) {
                                             </div>
                                             <div className="flex gap-2 items-center">
                                                 <Link href="/signup">
-                                                    <Button className="h-10 px-6 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-lg shadow-indigo-500/20 transition-all">
+                                                    <Button variant="accent" size="sm" className="px-6">
                                                         Sign Up Free
                                                     </Button>
                                                 </Link>
                                                 <Link href="/login">
-                                                    <Button variant="ghost" className="h-10 px-4 rounded-full text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-950 font-medium text-sm">
+                                                    <Button variant="accent-ghost" size="sm" className="px-4">
                                                         Log In
                                                     </Button>
                                                 </Link>
@@ -299,12 +302,12 @@ export default function HomeClient({ isLoggedIn = false }: HomeClientProps) {
 
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <Link href="/signup">
-                            <Button className="h-14 px-10 w-full sm:w-auto rounded-full bg-white text-zinc-950 font-medium text-base shadow-lg shadow-white/10 hover:shadow-xl transition-all duration-300 active:scale-[0.98] hover:bg-zinc-100">
+                            <Button variant="white" size="lg" className="w-full sm:w-auto shadow-lg shadow-white/10 hover:shadow-xl">
                                 Get Started
                             </Button>
                         </Link>
                         <Link href="/search" className="group">
-                            <Button variant="ghost" className="h-14 px-10 w-full sm:w-auto rounded-full text-zinc-400 hover:text-white hover:bg-white/10 font-medium text-base transition-all duration-200 flex items-center justify-center gap-2">
+                            <Button variant="ghost-inverse" size="lg" className="w-full sm:w-auto gap-2">
                                 Browse Listings <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                             </Button>
                         </Link>

@@ -52,7 +52,7 @@ const IconButton = ({
         </>
     );
 
-    const className = "p-2.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all relative";
+    const className = "p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all relative";
 
     if (href) {
         return (
@@ -301,7 +301,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
 
                         {/* CTA Button */}
                         <Link href="/listings/create">
-                            <Button className="flex items-center gap-2 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 px-5 py-2.5 rounded-full font-medium transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-zinc-900/20 dark:shadow-white/10 h-auto">
+                            <Button variant="primary" className="flex items-center gap-2 px-5 py-2.5 h-auto transform hover:scale-105 shadow-lg shadow-zinc-900/20 dark:shadow-white/10">
                                 <Plus size={18} />
                                 <span>List a Room</span>
                             </Button>
@@ -312,7 +312,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                             <div className="relative" ref={profileRef}>
                                 <button
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                    className={`flex items-center gap-2 p-1 pl-2 pr-1 rounded-full border transition-all ${isProfileOpen
+                                    className={`flex items-center gap-2 p-1 pl-2 pr-1 min-h-[44px] rounded-full border transition-all ${isProfileOpen
                                         ? 'border-indigo-500 ring-2 ring-indigo-100 dark:ring-indigo-900'
                                         : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
                                         }`}
@@ -370,7 +370,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                     Log in
                                 </Link>
                                 <Link href="/signup">
-                                    <Button className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium px-4 py-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700">
+                                    <Button variant="secondary" className="px-4 py-2 h-auto">
                                         Sign up
                                     </Button>
                                 </Link>
@@ -458,7 +458,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                         <hr className="border-zinc-100 dark:border-zinc-800" />
 
                         <Link href="/listings/create" onClick={() => setIsMobileMenuOpen(false)}>
-                            <Button className="w-full flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3 rounded-xl font-medium shadow-lg shadow-zinc-900/10 dark:shadow-white/10 h-auto hover:bg-zinc-800 dark:hover:bg-zinc-200">
+                            <Button variant="primary" className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl h-auto shadow-lg shadow-zinc-900/10 dark:shadow-white/10">
                                 <Plus size={18} />
                                 List a Room
                             </Button>
@@ -477,7 +477,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                     href="/signup"
                                     onClick={() => setIsMobileMenuOpen(false)}
                                 >
-                                    <Button className="w-full bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white py-3 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl h-auto">
+                                    <Button variant="secondary" className="w-full py-3 rounded-xl h-auto">
                                         Sign Up
                                     </Button>
                                 </Link>
