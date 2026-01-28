@@ -1,4 +1,8 @@
 /**
+ * @jest-environment node
+ */
+
+/**
  * Unit tests for /api/search/facets endpoint
  *
  * Tests facet counts for filter options (amenities, houseRules, roomTypes, priceRanges).
@@ -51,6 +55,16 @@ jest.mock("next/server", () => ({
 import { GET } from "@/app/api/search/facets/route";
 import { prisma } from "@/lib/prisma";
 import type { NextRequest } from "next/server";
+
+// Clean up Next.js 16 unhandledRejection listeners that cause recursive setImmediate
+// stack overflow during Jest teardown (see: next/src/server/node-environment-extensions)
+const initialListeners = process.listeners("unhandledRejection").length;
+afterAll(() => {
+  const listeners = process.listeners("unhandledRejection");
+  if (listeners.length > initialListeners) {
+    listeners.slice(initialListeners).forEach((l) => process.removeListener("unhandledRejection", l));
+  }
+});
 
 // Get the mocked function
 const mockQueryRawUnsafe = prisma.$queryRawUnsafe as jest.Mock;

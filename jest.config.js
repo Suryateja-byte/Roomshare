@@ -12,6 +12,8 @@ const customJestConfig = {
   testEnvironment: "jest-environment-jsdom",
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
+    // Stub Next.js 16 node-environment-extensions that cause stack overflow during Jest teardown
+    "next/dist/server/node-environment-extensions/(.*)": "<rootDir>/src/__tests__/utils/empty-module.js",
   },
   testPathIgnorePatterns: [
     "<rootDir>/node_modules/",
@@ -35,6 +37,8 @@ const customJestConfig = {
       statements: 5,
     },
   },
+  forceExit: true,
+  workerIdleMemoryLimit: "1GB",
   moduleDirectories: ["node_modules", "<rootDir>/"],
   testMatch: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)"],
   transformIgnorePatterns: [

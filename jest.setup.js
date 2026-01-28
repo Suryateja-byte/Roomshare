@@ -164,8 +164,8 @@ jest.mock('@/lib/prisma', () => ({
   },
 }))
 
-// Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
+// Mock window.matchMedia (only in jsdom environment)
+if (typeof window !== 'undefined') Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: jest.fn().mockImplementation(query => ({
     matches: false,
@@ -201,8 +201,8 @@ class MockResizeObserver {
 }
 global.ResizeObserver = MockResizeObserver
 
-// Mock scrollTo
-window.scrollTo = jest.fn()
+// Mock scrollTo (only in jsdom environment)
+if (typeof window !== 'undefined') window.scrollTo = jest.fn()
 
 // Suppress console errors in tests unless in debug mode
 const originalConsoleError = console.error
