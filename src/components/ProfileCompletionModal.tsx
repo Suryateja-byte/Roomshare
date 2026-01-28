@@ -2,6 +2,7 @@
 
 import { X, AlertCircle, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { FocusTrap } from '@/components/ui/FocusTrap';
 
 interface ProfileCompletionModalProps {
     isOpen: boolean;
@@ -31,10 +32,12 @@ export default function ProfileCompletionModal({
             />
 
             {/* Modal */}
+            <FocusTrap active={isOpen}>
             <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6">
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-1 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                    className="absolute top-4 right-4 p-1 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                    aria-label="Close modal"
                 >
                     <X className="w-5 h-5" />
                 </button>
@@ -107,6 +110,7 @@ export default function ProfileCompletionModal({
                     </Link>
                 </div>
             </div>
+            </FocusTrap>
         </div>
     );
 }

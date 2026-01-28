@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Heart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,8 @@ export default function FavoriteButton({ listingId, initialIsSaved = false, clas
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
-    const toggleFavorite = async (e: React.MouseEvent) => {
+    // P2-3: Memoize handler to improve INP by preventing function recreation on each render
+    const toggleFavorite = useCallback(async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
 
@@ -56,14 +57,16 @@ export default function FavoriteButton({ listingId, initialIsSaved = false, clas
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [isLoading, isSaved, listingId, router]);
 
     return (
         <button
             onClick={toggleFavorite}
             disabled={isLoading}
+            aria-label={isSaved ? "Remove from saved" : "Save listing"}
+            aria-pressed={isSaved}
             className={cn(
-                "p-2 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white transition-colors shadow-sm group",
+                "p-2 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white transition-colors shadow-sm group min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2",
                 isSaved ? "text-red-500" : "text-zinc-400 hover:text-red-500",
                 className
             )}

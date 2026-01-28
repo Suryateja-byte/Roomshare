@@ -60,12 +60,13 @@ export default function BlockUserButton({
                 <button
                     onClick={handleUnblock}
                     disabled={isLoading}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 transition-colors disabled:opacity-50"
+                    aria-busy={isLoading}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 transition-colors disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm"
                 >
                     {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                     ) : (
-                        <ShieldOff className="w-4 h-4" />
+                        <ShieldOff className="w-4 h-4" aria-hidden="true" />
                     )}
                     Unblock {userName}
                 </button>
@@ -75,7 +76,7 @@ export default function BlockUserButton({
         return (
             <button
                 onClick={() => setShowConfirm(true)}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm"
             >
                 <Ban className="w-4 h-4" />
                 Block {userName}
@@ -89,12 +90,13 @@ export default function BlockUserButton({
             <button
                 onClick={handleUnblock}
                 disabled={isLoading}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors disabled:opacity-50"
+                aria-busy={isLoading}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
             >
                 {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                 ) : (
-                    <ShieldOff className="w-4 h-4" />
+                    <ShieldOff className="w-4 h-4" aria-hidden="true" />
                 )}
                 Unblock
             </button>
@@ -105,7 +107,7 @@ export default function BlockUserButton({
         <>
             <button
                 onClick={() => setShowConfirm(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
             >
                 <Ban className="w-4 h-4" />
                 Block
@@ -118,8 +120,8 @@ export default function BlockUserButton({
                         className="absolute inset-0 bg-black/50"
                         onClick={() => setShowConfirm(false)}
                     />
-                    <div className="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-                        <h3 className="text-lg font-semibold text-zinc-900 mb-2">
+                    <div role="dialog" aria-modal="true" aria-labelledby="block-user-title" className="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+                        <h3 id="block-user-title" className="text-lg font-semibold text-zinc-900 mb-2">
                             Block {userName}?
                         </h3>
                         <p className="text-sm text-zinc-500 mb-6">
@@ -129,18 +131,19 @@ export default function BlockUserButton({
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setShowConfirm(false)}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleBlock}
                                 disabled={isLoading}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                aria-busy={isLoading}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
                             >
                                 {isLoading ? (
                                     <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                                         Blocking...
                                     </>
                                 ) : (

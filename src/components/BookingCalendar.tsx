@@ -115,7 +115,7 @@ export default function BookingCalendar({ bookings, onBookingClick, isLoading = 
                     </h2>
                     <button
                         onClick={goToToday}
-                        className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                        className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm"
                     >
                         Today
                     </button>
@@ -123,13 +123,15 @@ export default function BookingCalendar({ bookings, onBookingClick, isLoading = 
                 <div className="flex items-center gap-2">
                     <button
                         onClick={goToPreviousMonth}
-                        className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
+                        aria-label="Previous month"
                     >
                         <ChevronLeft className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                     </button>
                     <button
                         onClick={goToNextMonth}
-                        className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
+                        aria-label="Next month"
                     >
                         <ChevronRight className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                     </button>
@@ -141,9 +143,9 @@ export default function BookingCalendar({ bookings, onBookingClick, isLoading = 
                 <div className="flex-1 p-4 relative">
                     {/* Loading overlay */}
                     {isLoading && (
-                        <div className="absolute inset-0 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                        <div className="absolute inset-0 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg" role="status" aria-label="Loading bookings">
                             <div className="flex flex-col items-center gap-2">
-                                <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
+                                <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" aria-hidden="true" />
                                 <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading bookings...</span>
                             </div>
                         </div>
@@ -180,7 +182,7 @@ export default function BookingCalendar({ bookings, onBookingClick, isLoading = 
                                 <button
                                     key={day}
                                     onClick={() => setSelectedDate(new Date(year, month, day))}
-                                    className={`aspect-square p-1 rounded-lg relative transition-all ${isToday(day) ? 'ring-2 ring-zinc-900 dark:ring-white' : ''
+                                    className={`aspect-square p-1 rounded-lg relative transition-all focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 ${isToday(day) ? 'ring-2 ring-zinc-900 dark:ring-white' : ''
                                         } ${isSelected
                                             ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
                                             : 'text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800'

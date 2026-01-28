@@ -194,8 +194,8 @@ export default function ChatWindow({ conversationId, currentUserId }: { conversa
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-full p-8">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center h-full p-8" role="status" aria-label="Loading messages">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" aria-hidden="true" />
             </div>
         );
     }
@@ -244,7 +244,7 @@ export default function ChatWindow({ conversationId, currentUserId }: { conversa
                                     } ${isSendingMsg ? 'opacity-70' : ''}`}>
                                     <p>{msg.content}</p>
                                     <div className={`text-2xs flex items-center justify-end gap-1 mt-1 ${isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                                        {isSendingMsg && <Loader2 className="w-3 h-3 animate-spin" />}
+                                        {isSendingMsg && <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />}
                                         {isFailed && (
                                             <span className="text-red-500 dark:text-red-400 flex items-center gap-1">
                                                 <AlertCircle className="w-3 h-3" />
@@ -259,13 +259,13 @@ export default function ChatWindow({ conversationId, currentUserId }: { conversa
                                         <div className="flex gap-2 mt-2">
                                             <button
                                                 onClick={() => handleRetry(msg.id, msg.content)}
-                                                className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                                                className="text-xs text-red-600 dark:text-red-400 hover:underline focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm"
                                             >
                                                 Retry
                                             </button>
                                             <button
                                                 onClick={() => handleRemoveFailedMessage(msg.id)}
-                                                className="text-xs text-zinc-500 hover:underline"
+                                                className="text-xs text-zinc-500 hover:underline focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm"
                                             >
                                                 Remove
                                             </button>
@@ -293,11 +293,13 @@ export default function ChatWindow({ conversationId, currentUserId }: { conversa
                         type="submit"
                         size="icon"
                         disabled={isSending || isOffline || !newMessage.trim()}
+                        aria-label={isSending ? 'Sending message' : 'Send message'}
+                        aria-busy={isSending}
                     >
                         {isSending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                         ) : (
-                            <Send className="w-4 h-4" />
+                            <Send className="w-4 h-4" aria-hidden="true" />
                         )}
                     </Button>
                 </div>

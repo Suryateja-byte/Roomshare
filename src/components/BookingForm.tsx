@@ -352,10 +352,13 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
         const isAuthError = errorType === 'auth';
 
         return (
-            <div className={`rounded-xl p-4 ${errorType === 'server' || errorType === 'network'
-                ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
-                : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-                }`}>
+            <div
+                role="alert"
+                className={`rounded-xl p-4 ${errorType === 'server' || errorType === 'network'
+                    ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
+                    : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                }`}
+            >
                 <div className="flex items-start gap-3">
                     <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${errorType === 'server' || errorType === 'network'
                         ? 'bg-amber-100 dark:bg-amber-900/50'
@@ -380,7 +383,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                             <button
                                 type="button"
                                 onClick={handleRetry}
-                                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+                                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
                             >
                                 <RefreshCw className="w-3 h-3" />
                                 Try Again
@@ -516,6 +519,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase">Check-in</label>
                         <DatePicker
+                            id="booking-start-date"
                             value={startDate}
                             onChange={(date) => {
                                 setStartDate(date);
@@ -528,14 +532,17 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                             placeholder="Start date"
                             minDate={new Date().toISOString().split('T')[0]}
                             className={`p-2 text-sm ${fieldErrors.startDate ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                            aria-describedby={fieldErrors.startDate ? 'startDate-error' : undefined}
+                            aria-invalid={!!fieldErrors.startDate}
                         />
                         {fieldErrors.startDate && (
-                            <p className="text-xs text-red-500">{fieldErrors.startDate}</p>
+                            <p id="startDate-error" role="alert" className="text-xs text-red-500">{fieldErrors.startDate}</p>
                         )}
                     </div>
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase">Check-out</label>
                         <DatePicker
+                            id="booking-end-date"
                             value={endDate}
                             onChange={(date) => {
                                 setEndDate(date);
@@ -548,9 +555,11 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                             placeholder="End date"
                             minDate={startDate || new Date().toISOString().split('T')[0]}
                             className={`p-2 text-sm ${fieldErrors.endDate ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                            aria-describedby={fieldErrors.endDate ? 'endDate-error' : undefined}
+                            aria-invalid={!!fieldErrors.endDate}
                         />
                         {fieldErrors.endDate && (
-                            <p className="text-xs text-red-500">{fieldErrors.endDate}</p>
+                            <p id="endDate-error" role="alert" className="text-xs text-red-500">{fieldErrors.endDate}</p>
                         )}
                     </div>
                 </div>
@@ -565,7 +574,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
 
                 {/* Date Conflict Warning */}
                 {dateConflict?.overlaps && (
-                    <div className="rounded-xl p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                    <div role="alert" className="rounded-xl p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                         <p className="text-xs text-red-700 dark:text-red-300 font-medium">
                             ⚠️ Selected dates overlap with an existing booking
                         </p>
@@ -587,12 +596,14 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
 
                 <Button
                     type="submit"
-                    className="w-full h-12 text-lg font-semibold rounded-xl"
+                    size="lg"
+                    className="w-full rounded-xl"
                     disabled={isLoading || isOffline || hasSubmittedSuccessfully || (bookingInfo !== null && !bookingInfo.isValid) || (dateConflict?.overlaps ?? false)}
+                    aria-busy={isLoading}
                 >
                     {isLoading ? (
                         <span className="flex items-center justify-center gap-2">
-                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
                             Processing...
                         </span>
                     ) : (
@@ -674,8 +685,13 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     />
 
                     {/* Modal Content */}
-                    <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-700 max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200">
-                        <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="booking-confirm-title"
+                        className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-700 max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200"
+                    >
+                        <h3 id="booking-confirm-title" className="text-xl font-bold text-zinc-900 dark:text-white mb-4">
                             Confirm Your Booking Request
                         </h3>
 
@@ -758,10 +774,11 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                                 className="flex-1 h-11 font-semibold"
                                 onClick={confirmSubmit}
                                 disabled={isLoading}
+                                aria-busy={isLoading}
                             >
                                 {isLoading ? (
                                     <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                                         Processing...
                                     </>
                                 ) : (

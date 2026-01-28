@@ -114,9 +114,19 @@
     font-feature-settings: 'rlig' 1, 'calt' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-inter), 'Inter-fallback', ui-sans-serif, system-ui, sans-serif;
     /* Prevent Radix UI scroll lock from shifting content */
     padding-right: 0 !important;
+  }
+
+  /* Font fallback with size-adjust to minimize CLS during font swap */
+  @font-face {
+    font-family: 'Inter-fallback';
+    src: local('Arial');
+    size-adjust: 107%;
+    ascent-override: 90%;
+    descent-override: 22%;
+    line-gap-override: 0%;
   }
 }
 
@@ -320,6 +330,18 @@ textarea:focus-visible {
 
 .desktop-only {
   @apply hidden md:block;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Skeleton Shimmer Animation */

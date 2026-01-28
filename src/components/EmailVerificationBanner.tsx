@@ -70,7 +70,7 @@ export default function EmailVerificationBanner({ userEmail }: EmailVerification
                             <button
                                 onClick={handleResend}
                                 disabled={isResending}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-800/50 hover:bg-amber-200 dark:hover:bg-amber-800 rounded-md transition-colors disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-800/50 hover:bg-amber-200 dark:hover:bg-amber-800 rounded-md transition-colors disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
                             >
                                 {isResending ? (
                                     <>
@@ -88,7 +88,7 @@ export default function EmailVerificationBanner({ userEmail }: EmailVerification
 
                         <button
                             onClick={() => setIsVisible(false)}
-                            className="p-1 text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                            className="p-1 text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm"
                             aria-label="Dismiss"
                         >
                             <X className="w-4 h-4" />
@@ -97,7 +97,7 @@ export default function EmailVerificationBanner({ userEmail }: EmailVerification
                 </div>
 
                 {error && (
-                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+                    <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
                 )}
             </div>
         </div>

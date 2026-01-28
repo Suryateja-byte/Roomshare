@@ -52,7 +52,7 @@ const IconButton = ({
         </>
     );
 
-    const className = "p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all relative";
+    const className = "p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all relative focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2";
 
     if (href) {
         return (
@@ -84,7 +84,7 @@ const MenuItem = ({
     onClick?: () => void;
     href?: string;
 }) => {
-    const className = `w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${danger
+    const className = `w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 ${danger
         ? 'text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
         }`;
@@ -283,7 +283,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                         {/* Navigation Link */}
                         <Link
                             href="/search"
-                            className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-4 py-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all duration-200 mr-2"
+                            className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-4 py-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all duration-200 mr-2 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
                         >
                             Find a Room
                         </Link>
@@ -365,7 +365,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                             <div className="flex items-center gap-2 ml-2">
                                 <Link
                                     href="/login"
-                                    className="text-zinc-600 dark:text-zinc-400 font-medium hover:text-zinc-900 dark:hover:text-white px-3 py-2 transition-colors"
+                                    className="text-zinc-600 dark:text-zinc-400 font-medium hover:text-zinc-900 dark:hover:text-white px-3 py-2 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-md"
                                 >
                                     Log in
                                 </Link>
@@ -382,7 +382,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                     <div className="md:hidden flex items-center gap-4">
                         <button
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            className="text-zinc-900 dark:text-white p-2"
+                            className="text-zinc-900 dark:text-white p-2 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-md"
                             aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
                             aria-expanded={isMobileMenuOpen}
                         >

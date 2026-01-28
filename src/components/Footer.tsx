@@ -25,9 +25,9 @@ export default function Footer() {
                     <div>
                         <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Platform</h4>
                         <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
-                            <li><Link href="/search" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block">Browse</Link></li>
-                            <li><Link href="/listings/create" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block">List a Room</Link></li>
-                            <li><button onClick={() => toast.info('Trust & Safety page coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Trust & Safety</button></li>
+                            <li><Link href="/search" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Browse</Link></li>
+                            <li><Link href="/listings/create" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">List a Room</Link></li>
+                            <li><button onClick={() => toast.info('Trust & Safety page coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Trust & Safety</button></li>
                         </ul>
                     </div>
 
@@ -35,9 +35,9 @@ export default function Footer() {
                     <div>
                         <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Company</h4>
                         <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
-                            <li><Link href="/about" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block">About</Link></li>
-                            <li><button onClick={() => toast.info('Careers page coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Careers</button></li>
-                            <li><button onClick={() => toast.info('Blog coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Blog</button></li>
+                            <li><Link href="/about" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">About</Link></li>
+                            <li><button onClick={() => toast.info('Careers page coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Careers</button></li>
+                            <li><button onClick={() => toast.info('Blog coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Blog</button></li>
                         </ul>
                     </div>
 
@@ -45,8 +45,8 @@ export default function Footer() {
                     <div>
                         <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Support</h4>
                         <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
-                            <li><button onClick={() => toast.info('Help Center coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Help Center</button></li>
-                            <li><button onClick={() => toast.info('Contact support coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Contact</button></li>
+                            <li><button onClick={() => toast.info('Help Center coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Help Center</button></li>
+                            <li><button onClick={() => toast.info('Contact support coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Contact</button></li>
                         </ul>
                     </div>
 
@@ -54,8 +54,8 @@ export default function Footer() {
                     <div>
                         <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Legal</h4>
                         <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
-                            <li><button onClick={() => toast.info('Privacy Policy coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Privacy</button></li>
-                            <li><button onClick={() => toast.info('Terms of Service coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left">Terms</button></li>
+                            <li><button onClick={() => toast.info('Privacy Policy coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Privacy</button></li>
+                            <li><button onClick={() => toast.info('Terms of Service coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Terms</button></li>
                         </ul>
                     </div>
                 </div>
@@ -66,8 +66,8 @@ export default function Footer() {
                         © {new Date().getFullYear()} RoomShare Inc.
                     </p>
                     <nav className="flex items-center gap-6 text-xs text-zinc-500 dark:text-zinc-400 order-1 sm:order-2" aria-label="Legal links">
-                        <button onClick={() => toast.info('Privacy Policy coming soon!')} className="hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">Privacy</button>
-                        <button onClick={() => toast.info('Terms of Service coming soon!')} className="hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">Terms</button>
+                        <button onClick={() => toast.info('Privacy Policy coming soon!')} className="hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Privacy</button>
+                        <button onClick={() => toast.info('Terms of Service coming soon!')} className="hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Terms</button>
                     </nav>
                 </div>
             </div>
