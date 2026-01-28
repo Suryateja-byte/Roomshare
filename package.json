@@ -79,6 +79,8 @@
     "zod": "^4.2.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@napi-rs/canvas": "^0.1.88",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
