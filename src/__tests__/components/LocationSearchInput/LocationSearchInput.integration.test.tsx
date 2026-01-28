@@ -4,10 +4,17 @@
  * End-to-end integration tests covering complete user workflows,
  * dropdown lifecycle, click-outside behavior, and combined scenarios.
  */
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import React, { useState } from 'react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LocationSearchInput from '@/components/LocationSearchInput';
-import { clearCache } from '@/lib/geocoding-cache';
+
+// Mock geocoding cache to prevent caching between tests
+jest.mock('@/lib/geocoding-cache', () => ({
+  getCachedResults: jest.fn(() => null), // Always return cache miss
+  setCachedResults: jest.fn(),
+  clearCache: jest.fn(),
+}));
 
 // Mock fetch globally
 const mockFetch = jest.fn();
@@ -28,6 +35,42 @@ afterAll(() => {
   process.env = originalEnv;
 });
 
+// Controlled wrapper component that manages state for the LocationSearchInput
+// This is necessary because the component uses useDebounce(value, 300) where
+// value is a prop - the debounce only triggers when the prop changes
+interface WrapperProps {
+  initialValue?: string;
+  onChangeSpy?: jest.Mock;
+  onLocationSelectSpy?: jest.Mock;
+  placeholder?: string;
+  id?: string;
+}
+
+function ControlledWrapper({
+  initialValue = '',
+  onChangeSpy,
+  onLocationSelectSpy,
+  placeholder,
+  id,
+}: WrapperProps) {
+  const [value, setValue] = useState(initialValue);
+
+  return (
+    <LocationSearchInput
+      id={id}
+      value={value}
+      onChange={(newValue) => {
+        setValue(newValue);
+        onChangeSpy?.(newValue);
+      }}
+      onLocationSelect={(location) => {
+        onLocationSelectSpy?.(location);
+      }}
+      placeholder={placeholder}
+    />
+  );
+}
+
 const mockSuggestions = [
   { id: '1', place_name: 'San Francisco, CA, USA', center: [-122.4194, 37.7749], place_type: ['place'] },
   { id: '2', place_name: 'San Jose, CA, USA', center: [-121.8863, 37.3382], place_type: ['place'] },
@@ -44,7 +87,6 @@ describe('LocationSearchInput - Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
-    clearCache();
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -56,13 +98,14 @@ describe('LocationSearchInput - Integration Tests', () => {
     jest.useRealTimers();
   });
 
-  const renderInput = (props = {}) => {
+  const renderInput = (props: Partial<WrapperProps> = {}) => {
     return render(
-      <LocationSearchInput
-        value=""
-        onChange={mockOnChange}
-        onLocationSelect={mockOnLocationSelect}
-        {...props}
+      <ControlledWrapper
+        initialValue={props.initialValue ?? ''}
+        onChangeSpy={props.onChangeSpy ?? mockOnChange}
+        onLocationSelectSpy={props.onLocationSelectSpy ?? mockOnLocationSelect}
+        placeholder={props.placeholder}
+        id={props.id}
       />
     );
   };
@@ -115,12 +158,13 @@ describe('LocationSearchInput - Integration Tests', () => {
       await user.type(input, 'San');
       jest.advanceTimersByTime(350);
 
+      // Component splits place_name at comma: "San Diego" in first <p>, "CA, USA" in second
       await waitFor(() => {
-        expect(screen.getByText('San Diego, CA, USA')).toBeInTheDocument();
+        expect(screen.getByText('San Diego')).toBeInTheDocument();
       });
 
       // Click on option
-      await user.click(screen.getByText('San Diego, CA, USA'));
+      await user.click(screen.getByText('San Diego'));
 
       expect(mockOnLocationSelect).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -318,17 +362,18 @@ describe('LocationSearchInput - Integration Tests', () => {
         setExternalValue(location.name);
       });
 
-      const { rerender } = renderInput({ value: '' });
+      const { rerender } = renderInput({ initialValue: '' });
       const input = screen.getByRole('combobox');
 
       await user.type(input, 'San');
       jest.advanceTimersByTime(350);
 
+      // Component splits place_name at comma: "San Francisco" in first <p>, "CA, USA" in second
       await waitFor(() => {
-        expect(screen.getByText('San Francisco, CA, USA')).toBeInTheDocument();
+        expect(screen.getByText('San Francisco')).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText('San Francisco, CA, USA'));
+      await user.click(screen.getByText('San Francisco'));
 
       expect(mockOnLocationSelect).toHaveBeenCalled();
       expect(externalValue).toBe('San Francisco, CA, USA');
@@ -409,11 +454,12 @@ describe('LocationSearchInput - Integration Tests', () => {
       await user.type(input, 'California');
       jest.advanceTimersByTime(350);
 
+      // Component splits place_name at comma: "California" in first <p>, "USA" in second
       await waitFor(() => {
-        expect(screen.getByText('California, USA')).toBeInTheDocument();
+        expect(screen.getByText('California')).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText('California, USA'));
+      await user.click(screen.getByText('California'));
 
       expect(mockOnLocationSelect).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -454,8 +500,10 @@ describe('LocationSearchInput - Integration Tests', () => {
       await user.type(input, 'San');
       jest.advanceTimersByTime(350);
 
-      // Check aria-busy
-      expect(input).toHaveAttribute('aria-busy', 'true');
+      // Check aria-busy (use waitFor since state updates are async)
+      await waitFor(() => {
+        expect(input).toHaveAttribute('aria-busy', 'true');
+      });
 
       resolvePromise!({
         ok: true,
@@ -497,11 +545,12 @@ describe('LocationSearchInput - Integration Tests', () => {
       await user.type(input, 'San');
       jest.advanceTimersByTime(350);
 
+      // Component splits place_name at comma: "San Francisco" in first <p>, "CA, USA" in second
       await waitFor(() => {
-        expect(screen.getByText('San Francisco, CA, USA')).toBeInTheDocument();
+        expect(screen.getByText('San Francisco')).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText('San Francisco, CA, USA'));
+      await user.click(screen.getByText('San Francisco'));
 
       expect(mockOnLocationSelect).toHaveBeenCalledTimes(1);
 

@@ -9,6 +9,7 @@ jest.mock("@/lib/prisma", () => ({
       findUnique: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       count: jest.fn(),
     },
     listing: {
@@ -38,6 +39,42 @@ jest.mock("@/lib/email", () => ({
   sendNotificationEmailWithPreference: jest.fn(),
 }));
 
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: jest.fn(),
+}));
+
+jest.mock("@/lib/booking-state-machine", () => ({
+  validateTransition: jest.fn(),
+  isInvalidStateTransitionError: jest.fn(() => false),
+}));
+
+jest.mock("@/lib/logger", () => ({
+  logger: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    sync: {
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    },
+    child: jest.fn().mockReturnValue({
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      sync: {
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      },
+    }),
+  },
+}));
+
 import {
   updateBookingStatus,
   getMyBookings,
@@ -47,6 +84,8 @@ import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { createNotification } from "@/app/actions/notifications";
 import { sendNotificationEmailWithPreference } from "@/lib/email";
+import { checkSuspension } from "@/app/actions/suspension";
+import { validateTransition } from "@/lib/booking-state-machine";
 
 describe("manage-booking actions", () => {
   const mockSession = {
@@ -98,6 +137,7 @@ describe("manage-booking actions", () => {
     endDate: new Date("2025-05-01"),
     totalPrice: 2400,
     status: "PENDING",
+    version: 1,
     listing: mockListing,
     tenant: mockTenant,
   };
@@ -109,6 +149,8 @@ describe("manage-booking actions", () => {
     (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
       success: true,
     });
+    (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
+    (validateTransition as jest.Mock).mockImplementation(() => {});
     // Mock user.findUnique for suspension check
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: "user-123",
@@ -201,9 +243,9 @@ describe("manage-booking actions", () => {
                 ]),
               booking: {
                 count: jest.fn().mockResolvedValue(0),
-                update: jest
+                updateMany: jest
                   .fn()
-                  .mockResolvedValue({ ...mockBooking, status: "ACCEPTED" }),
+                  .mockResolvedValue({ count: 1 }),
               },
               listing: {
                 update: jest.fn().mockResolvedValue(mockListing),
@@ -220,9 +262,8 @@ describe("manage-booking actions", () => {
 
       it("allows tenant to cancel booking", async () => {
         (auth as jest.Mock).mockResolvedValue(mockTenantSession);
-        (prisma.booking.update as jest.Mock).mockResolvedValue({
-          ...mockBooking,
-          status: "CANCELLED",
+        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
+          count: 1,
         });
 
         const result = await updateBookingStatus("booking-123", "CANCELLED");
@@ -246,9 +287,9 @@ describe("manage-booking actions", () => {
             ]),
           booking: {
             count: jest.fn().mockResolvedValue(0),
-            update: jest
+            updateMany: jest
               .fn()
-              .mockResolvedValue({ ...mockBooking, status: "ACCEPTED" }),
+              .mockResolvedValue({ count: 1 }),
           },
           listing: {
             update: jest.fn().mockResolvedValue(mockListing),
@@ -324,9 +365,9 @@ describe("manage-booking actions", () => {
                 ]),
               booking: {
                 count: jest.fn().mockResolvedValue(0),
-                update: jest
+                updateMany: jest
                   .fn()
-                  .mockResolvedValue({ ...mockBooking, status: "ACCEPTED" }),
+                  .mockResolvedValue({ count: 1 }),
               },
               listing: { update: jest.fn() },
             };
@@ -356,9 +397,9 @@ describe("manage-booking actions", () => {
                 ]),
               booking: {
                 count: jest.fn().mockResolvedValue(0),
-                update: jest
+                updateMany: jest
                   .fn()
-                  .mockResolvedValue({ ...mockBooking, status: "ACCEPTED" }),
+                  .mockResolvedValue({ count: 1 }),
               },
               listing: { update: jest.fn() },
             };
@@ -390,9 +431,9 @@ describe("manage-booking actions", () => {
                 ]),
               booking: {
                 count: jest.fn().mockResolvedValue(0),
-                update: jest
+                updateMany: jest
                   .fn()
-                  .mockResolvedValue({ ...mockBooking, status: "ACCEPTED" }),
+                  .mockResolvedValue({ count: 1 }),
               },
               listing: { update: jest.fn() },
             };
@@ -410,18 +451,17 @@ describe("manage-booking actions", () => {
       beforeEach(() => {
         (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
-        (prisma.booking.update as jest.Mock).mockResolvedValue({
-          ...mockBooking,
-          status: "REJECTED",
+        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
+          count: 1,
         });
       });
 
       it("updates booking status to REJECTED", async () => {
         await updateBookingStatus("booking-123", "REJECTED");
 
-        expect(prisma.booking.update).toHaveBeenCalledWith({
-          where: { id: "booking-123" },
-          data: { status: "REJECTED", rejectionReason: null },
+        expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+          where: { id: "booking-123", version: 1 },
+          data: { status: "REJECTED", rejectionReason: null, version: { increment: 1 } },
         });
       });
 
@@ -465,9 +505,9 @@ describe("manage-booking actions", () => {
 
         const mockTx = {
           booking: {
-            update: jest
+            updateMany: jest
               .fn()
-              .mockResolvedValue({ ...acceptedBooking, status: "CANCELLED" }),
+              .mockResolvedValue({ count: 1 }),
           },
           listing: { update: jest.fn() },
         };
@@ -485,25 +525,23 @@ describe("manage-booking actions", () => {
 
       it("does not increment slots when cancelling pending booking", async () => {
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking); // status: PENDING
-        (prisma.booking.update as jest.Mock).mockResolvedValue({
-          ...mockBooking,
-          status: "CANCELLED",
+        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
+          count: 1,
         });
 
         await updateBookingStatus("booking-123", "CANCELLED");
 
-        expect(prisma.booking.update).toHaveBeenCalledWith({
-          where: { id: "booking-123" },
-          data: { status: "CANCELLED" },
+        expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+          where: { id: "booking-123", version: 1 },
+          data: { status: "CANCELLED", version: { increment: 1 } },
         });
         // Transaction not used for non-accepted bookings
       });
 
       it("creates notification for host on cancellation", async () => {
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
-        (prisma.booking.update as jest.Mock).mockResolvedValue({
-          ...mockBooking,
-          status: "CANCELLED",
+        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
+          count: 1,
         });
 
         await updateBookingStatus("booking-123", "CANCELLED");
@@ -526,12 +564,9 @@ describe("manage-booking actions", () => {
           async (callback) => {
             const tx = {
               booking: {
-                update: jest
+                updateMany: jest
                   .fn()
-                  .mockResolvedValue({
-                    ...acceptedBooking,
-                    status: "CANCELLED",
-                  }),
+                  .mockResolvedValue({ count: 1 }),
               },
               listing: { update: jest.fn() },
             };
@@ -549,9 +584,8 @@ describe("manage-booking actions", () => {
       beforeEach(() => {
         (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
-        (prisma.booking.update as jest.Mock).mockResolvedValue({
-          ...mockBooking,
-          status: "REJECTED",
+        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
+          count: 1,
         });
       });
 

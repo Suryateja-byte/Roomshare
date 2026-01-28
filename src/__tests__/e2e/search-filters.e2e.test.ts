@@ -564,14 +564,12 @@ describe('Edge Cases and Error Handling', () => {
     expect(results.length).toBe(ACTIVE_LISTINGS.length);
   });
 
-  it('handles inverted price range (normalizer swaps)', () => {
-    const filters = normalizeFilters({
+  it('handles inverted price range (throws validation error)', () => {
+    // P1-13: Inverted price ranges now throw error instead of silently swapping
+    expect(() => normalizeFilters({
       minPrice: 2000,
-      maxPrice: 1000, // Inverted - should be swapped
-    });
-
-    // After normalization, min should be <= max
-    expect(filters.minPrice).toBeLessThanOrEqual(filters.maxPrice!);
+      maxPrice: 1000, // Inverted - should throw error
+    })).toThrow('minPrice cannot exceed maxPrice');
   });
 
   it('handles inverted latitude bounds (normalizer swaps)', () => {

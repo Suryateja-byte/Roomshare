@@ -517,6 +517,16 @@ export const CRITICAL_SCENARIOS: GoldenScenario[] = [
       bounds: { minLat: -200, maxLat: 200, minLng: -400, maxLng: 400 },
     }
   ),
+  createGoldenScenario(
+    'gender-preference-filter',
+    'Gender preference filter normalization',
+    { genderPreference: 'female-only', leaseDuration: 'long-term' }
+  ),
+  createGoldenScenario(
+    'whitespace-trimming',
+    'Whitespace in string values should be trimmed',
+    { roomType: '  Private Room  ', amenities: [' Wifi ', 'AC'] }
+  ),
 ];
 
 /**

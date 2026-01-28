@@ -366,6 +366,13 @@ export default function LocationSearchInput({
     onFocus?.();
   }, [suggestions.length, value.length, onFocus]);
 
+  // Handle click on input to reopen suggestions when already focused
+  const handleInputClick = useCallback(() => {
+    if (suggestions.length > 0 && !showSuggestions) {
+      setShowSuggestions(true);
+    }
+  }, [suggestions.length, showSuggestions]);
+
   const handleInputBlur = useCallback(() => {
     // Small delay to allow click events on suggestions to fire first
     setTimeout(() => {
@@ -388,7 +395,7 @@ export default function LocationSearchInput({
 
   // Show "type more" hint when user has typed but not enough characters
   const sanitizedValue = sanitizeQuery(value);
-  const showTypeMoreHint = sanitizedValue.length > 0 && sanitizedValue.length < MIN_QUERY_LENGTH;
+  const showTypeMoreHint = sanitizedValue.length > 0 && sanitizedValue.length < MIN_QUERY_LENGTH && !isComposingRef.current;
 
   // Compute whether any popup is visible for aria-expanded
   const isPopupOpen = showSuggestions && (
@@ -407,13 +414,14 @@ export default function LocationSearchInput({
           type="text"
           value={value}
           onChange={handleInputChange}
+          onClick={handleInputClick}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           placeholder={placeholder}
-          className="w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none text-sm truncate pr-8"
+          className="w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:ring-0 focus:outline-none text-sm truncate pr-8"
           autoComplete="off"
           // ARIA combobox attributes for screen reader accessibility
           role="combobox"
@@ -426,17 +434,18 @@ export default function LocationSearchInput({
           }
           aria-autocomplete="list"
           aria-haspopup="listbox"
+          aria-busy={isLoading}
         />
 
         {/* Loading/Clear indicator */}
         <div className="absolute right-0 top-1/2 -translate-y-1/2">
           {isLoading ? (
-            <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
+            <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" aria-hidden="true" />
           ) : value ? (
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-full transition-colors"
+              className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-full transition-colors"
               aria-label="Clear search"
             >
               <X className="w-3 h-3 text-zinc-400" />

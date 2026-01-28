@@ -3,6 +3,11 @@
  * Pure function tests for email verification and route constants
  */
 
+// Mock next-auth/jwt to avoid ESM transformation issues
+jest.mock('next-auth/jwt', () => ({
+  getToken: jest.fn(),
+}));
+
 import { isGoogleEmailVerified, AUTH_ROUTES } from "@/lib/auth-helpers";
 
 describe("isGoogleEmailVerified", () => {

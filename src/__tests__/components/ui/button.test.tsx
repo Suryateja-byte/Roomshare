@@ -37,7 +37,7 @@ describe('Button', () => {
     it('renders ghost variant', () => {
       render(<Button variant="ghost">Ghost</Button>)
       const button = screen.getByRole('button')
-      expect(button).toHaveClass('text-zinc-500')
+      expect(button).toHaveClass('text-zinc-600')
     })
 
     it('renders white variant', () => {
@@ -57,26 +57,31 @@ describe('Button', () => {
     it('renders default size', () => {
       render(<Button size="default">Default</Button>)
       const button = screen.getByRole('button')
-      expect(button).toHaveClass('h-10')
+      expect(button).toHaveClass('h-11')
+      expect(button).toHaveClass('min-h-[44px]')
     })
 
     it('renders sm size', () => {
       render(<Button size="sm">Small</Button>)
       const button = screen.getByRole('button')
-      expect(button).toHaveClass('h-9')
+      expect(button).toHaveClass('h-11')
+      expect(button).toHaveClass('min-h-[44px]')
     })
 
     it('renders lg size', () => {
       render(<Button size="lg">Large</Button>)
       const button = screen.getByRole('button')
       expect(button).toHaveClass('h-12')
+      expect(button).toHaveClass('min-h-[44px]')
     })
 
     it('renders icon size', () => {
       render(<Button size="icon">Icon</Button>)
       const button = screen.getByRole('button')
-      expect(button).toHaveClass('h-10')
-      expect(button).toHaveClass('w-10')
+      expect(button).toHaveClass('h-11')
+      expect(button).toHaveClass('w-11')
+      expect(button).toHaveClass('min-h-[44px]')
+      expect(button).toHaveClass('min-w-[44px]')
     })
   })
 
@@ -85,7 +90,7 @@ describe('Button', () => {
       render(<Button disabled>Disabled</Button>)
       const button = screen.getByRole('button')
       expect(button).toBeDisabled()
-      expect(button).toHaveClass('disabled:opacity-50')
+      expect(button).toHaveClass('disabled:opacity-60')
     })
 
     it('handles click events', async () => {
