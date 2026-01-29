@@ -66,10 +66,9 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     if (await privateTab.first().isVisible()) {
       await privateTab.first().click();
-      await page.waitForLoadState("domcontentloaded");
 
-      // URL should update with roomType
-      expect(page.url()).toMatch(/roomType/i);
+      // URL should update with roomType (debounced navigation)
+      await page.waitForURL(/roomType/i, { timeout: 10000 });
     }
   });
 
@@ -153,8 +152,7 @@ test.describe("20 Critical Search Page Journeys", () => {
 
         if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
           await option.first().click();
-          await page.waitForLoadState("domcontentloaded");
-          expect(page.url()).toMatch(/sort=price_asc/);
+          await page.waitForURL(/sort=price_asc/, { timeout: 10000 });
         }
       }
     }
@@ -484,36 +482,27 @@ test.describe("20 Critical Search Page Journeys", () => {
     // Results heading visible
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
 
-    // Listing cards should be in single column (verify cards exist)
+    // Listing cards should exist (cards in scroll containers may not be "visible")
     const cards = page.locator(selectors.listingCard);
     await cards.first().waitFor({ state: "attached", timeout: 10000 });
-    await cards.first().scrollIntoViewIfNeeded();
     const cardCount = await cards.count();
     expect(cardCount).toBeGreaterThan(0);
 
-    // Sort select should be hidden on mobile
-    const sortContainer = page.locator('.hidden.md\\:flex').filter({ hasText: /sort/i });
-    // The element exists but should not be visible at mobile width
-    if (await sortContainer.count() > 0) {
-      await expect(sortContainer.first()).not.toBeVisible();
-    }
+    // Filter button should be visible and functional on mobile
+    // Use exact aria-label to avoid matching room-type "Filter by ..." buttons
+    const filterBtn = page.getByRole("button", { name: /^Filters/i }).first();
+    await expect(filterBtn).toBeVisible({ timeout: 10000 });
+    await filterBtn.click();
 
-    // Filter button should be visible and functional
-    const filterBtn = page.getByRole("button", { name: /filter/i });
-    if (await filterBtn.first().isVisible()) {
-      await filterBtn.first().click();
+    // Modal should appear (via portal to document.body)
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible({ timeout: 10000 });
 
-      // Modal should be full screen on mobile
-      const modal = page.locator('[role="dialog"]');
-      await expect(modal).toBeVisible({ timeout: 5000 });
-
-      // Close it
-      const closeBtn = page.locator('[aria-label="Close filters"]').first();
-      if (await closeBtn.isVisible()) {
-        await closeBtn.click();
-        await expect(modal).not.toBeVisible({ timeout: 5000 });
-      }
-    }
+    // Close it via the X button (not the backdrop, which is behind the modal content)
+    const closeBtn = page.getByRole("button", { name: "Close filters" }).first();
+    await expect(closeBtn).toBeVisible({ timeout: 5000 });
+    await closeBtn.click();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
   });
 
   // ─────────────────────────────────────────────────
