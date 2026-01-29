@@ -314,18 +314,15 @@ test.describe("30 Advanced Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   // J30: Invalid URL params are sanitized
   // ─────────────────────────────────────────────────
-  test("J30: Invalid URL parameters don't crash the page", async ({ page }) => {
-    // Inject invalid params — page should not crash
-    await page.goto(`/search?${BOUNDS_PARAMS}&minPrice=-100&maxPrice=abc&roomType=INVALID&sort=drop_tables`);
+  test("J30: Negative price in URL is clamped to zero in the UI", async ({ page }) => {
+    await page.goto(`/search?${BOUNDS_PARAMS}&minPrice=-500`);
     await page.waitForLoadState("domcontentloaded");
 
-    // Page should load without crashing
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
-    // Invalid sort and roomType should be ignored (not reflected in UI)
-    // Note: negative prices currently pass through — this is a known validation gap
-    const heading = await page.getByRole("heading", { level: 1 }).textContent();
-    expect(heading).toBeTruthy();
+    // Negative price should be clamped to 0 in the input
+    const minInput = page.getByLabel(/minimum budget/i);
+    await expect(minInput).toHaveValue("0", { timeout: 5000 });
   });
 
   // ─────────────────────────────────────────────────

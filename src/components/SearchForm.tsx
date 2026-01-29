@@ -88,6 +88,15 @@ export interface MapFlyToEventDetail {
     zoom?: number;
 }
 
+/** Clamp a price URL param to non-negative, returning '' for invalid values. */
+function clampPriceParam(raw: string | null): string {
+    if (!raw) return '';
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return '';
+    if (n < 0) return '0';
+    return raw;
+}
+
 export default function SearchForm({ variant = 'default' }: { variant?: 'default' | 'compact' }) {
     const searchParams = useSearchParams();
     const parseParamList = (key: string): string[] => {
@@ -139,8 +148,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         return { lat: parsedLat, lng: parsedLng };
     };
     const [location, setLocation] = useState(searchParams.get('q') || '');
-    const [minPrice, setMinPrice] = useState(searchParams.get('minPrice') || '');
-    const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') || '');
+    const [minPrice, setMinPrice] = useState(() => clampPriceParam(searchParams.get('minPrice')));
+    const [maxPrice, setMaxPrice] = useState(() => clampPriceParam(searchParams.get('maxPrice')));
     const [showFilters, setShowFilters] = useState(false);
 
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(parseCoords);
@@ -212,8 +221,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
         // Sync other form fields from URL
         setLocation(searchParams.get('q') || '');
-        setMinPrice(searchParams.get('minPrice') || '');
-        setMaxPrice(searchParams.get('maxPrice') || '');
+        setMinPrice(clampPriceParam(searchParams.get('minPrice')));
+        setMaxPrice(clampPriceParam(searchParams.get('maxPrice')));
         // Validate moveInDate to match server-side logic (reject past dates)
         setMoveInDate(validateMoveInDate(searchParams.get('moveInDate')));
         setLeaseDuration(parseEnumParam('leaseDuration', LEASE_DURATION_OPTIONS, LEASE_DURATION_ALIASES));
