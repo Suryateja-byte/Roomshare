@@ -80,7 +80,7 @@ export function FocusTrap({
   }, [active, returnFocus]);
 
   return (
-    <div ref={containerRef} role="dialog" aria-modal="true">
+    <div ref={containerRef}>
       {children}
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, Clock, Loader2, SlidersHorizontal, Home, Users, Building2, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -177,6 +177,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const [isSearching, setIsSearching] = useState(false);
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastSearchRef = useRef<string>(''); // Track last search to prevent duplicates
+    // Navigation version counter - ensures only the latest search executes navigation
+    // Incremented on each new search to invalidate stale timeout callbacks
+    const navigationVersionRef = useRef(0);
+    // AbortController for canceling in-flight async operations on rapid filter changes
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     // Recent searches from canonical hook (handles localStorage, migration, enhanced format)
     const { recentSearches, saveRecentSearch, clearRecentSearches } = useRecentSearches();
@@ -255,10 +260,20 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             return;
         }
 
-        // Clear any pending search timeout
+        // Clear any pending search timeout and invalidate any in-flight navigation
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
         }
+        // Increment navigation version to invalidate any stale timeout callbacks
+        // This prevents race conditions when filters change rapidly
+        navigationVersionRef.current++;
+
+        // Cancel any in-flight async operations from previous filter changes
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        // Create new AbortController for this search operation
+        abortControllerRef.current = new AbortController();
 
         // Clone existing URL params to preserve bounds, nearMatches, and sort
         // These are set by the map and should persist across filter changes
@@ -358,7 +373,16 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         // Close filter drawer on search
         setShowFilters(false);
 
+        // Capture current navigation version to check in timeout callback
+        const capturedVersion = navigationVersionRef.current;
+
         searchTimeoutRef.current = setTimeout(() => {
+            // Check if this navigation is still valid (not superseded by a newer search)
+            // This prevents race conditions when filters change rapidly
+            if (navigationVersionRef.current !== capturedVersion) {
+                return;
+            }
+
             if (transitionContext) {
                 transitionContext.navigateWithTransition(searchUrl);
             } else {
@@ -369,54 +393,89 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }, SEARCH_DEBOUNCE_MS);
     }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching, saveRecentSearch, searchParams]);
 
-    // Cleanup timeout on unmount
+    // Cleanup timeout and abort controller on unmount
     useEffect(() => {
         return () => {
             if (searchTimeoutRef.current) {
                 clearTimeout(searchTimeoutRef.current);
             }
+            // Cancel any in-flight operations
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
         };
     }, []);
 
-    const toggleAmenity = (amenity: string) => {
-        setAmenities(prev =>
-            prev.includes(amenity) ? prev.filter(a => a !== amenity) : [...prev, amenity]
-        );
-    };
+    // INP optimization: Wrap toggle functions in startTransition
+    // This marks state updates as non-urgent, allowing React to prioritize
+    // visual feedback (button press) over state computation
+    const toggleAmenity = useCallback((amenity: string) => {
+        startTransition(() => {
+            setAmenities(prev =>
+                prev.includes(amenity) ? prev.filter(a => a !== amenity) : [...prev, amenity]
+            );
+        });
+    }, []);
 
-    const toggleHouseRule = (rule: string) => {
-        setHouseRules(prev =>
-            prev.includes(rule) ? prev.filter(r => r !== rule) : [...prev, rule]
-        );
-    };
+    const toggleHouseRule = useCallback((rule: string) => {
+        startTransition(() => {
+            setHouseRules(prev =>
+                prev.includes(rule) ? prev.filter(r => r !== rule) : [...prev, rule]
+            );
+        });
+    }, []);
 
-    const toggleLanguage = (lang: string) => {
-        setLanguages(prev =>
-            prev.includes(lang) ? prev.filter(l => l !== lang) : [...prev, lang]
-        );
-    };
+    const toggleLanguage = useCallback((lang: string) => {
+        startTransition(() => {
+            setLanguages(prev =>
+                prev.includes(lang) ? prev.filter(l => l !== lang) : [...prev, lang]
+            );
+        });
+    }, []);
+
+    // INP optimization: Room type selection with startTransition
+    const handleRoomTypeSelect = useCallback((value: string) => {
+        startTransition(() => {
+            setRoomType(value === 'any' ? '' : value);
+        });
+    }, []);
+
+    // Room type selection from FilterBar CategoryTabs — sets state AND triggers search
+    const handleFilterBarRoomTypeChange = useCallback((value: string) => {
+        setRoomType(value === 'any' ? '' : value);
+        // Use queueMicrotask so React flushes the state update before form submission
+        queueMicrotask(() => {
+            const form = document.querySelector('form[role="search"]') as HTMLFormElement;
+            if (form) {
+                form.requestSubmit();
+            }
+        });
+    }, []);
 
     // Clear all filters and reset to defaults
-    const handleClearAllFilters = () => {
-        setLocation('');
-        setMinPrice('');
-        setMaxPrice('');
-        setSelectedCoords(null);
-        setMoveInDate('');
-        setLeaseDuration('');
-        setRoomType('');
-        setAmenities([]);
-        setHouseRules([]);
-        setLanguages([]);
-        setGenderPreference('');
-        setHouseholdGender('');
-        // Navigate to clean search page
+    // INP optimization: Batch state updates in startTransition
+    const handleClearAllFilters = useCallback(() => {
+        startTransition(() => {
+            setLocation('');
+            setMinPrice('');
+            setMaxPrice('');
+            setSelectedCoords(null);
+            setMoveInDate('');
+            setLeaseDuration('');
+            setRoomType('');
+            setAmenities([]);
+            setHouseRules([]);
+            setLanguages([]);
+            setGenderPreference('');
+            setHouseholdGender('');
+        });
+        // Navigate to clean search page (outside transition - navigation is user-facing)
         if (transitionContext) {
             transitionContext.navigateWithTransition('/search');
         } else {
             router.push('/search');
         }
-    };
+    }, [transitionContext, router]);
 
     // Count active filters for badge - split into two parts to avoid hydration mismatch
     // Base count excludes moveInDate (no Date() calls, safe for SSR)
@@ -502,30 +561,33 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     });
 
     // Handler for removing individual filters from FilterBar pills
+    // INP optimization: Wrap state updates in startTransition for responsiveness
     const handleRemoveFilter = useCallback((type: string, value?: string) => {
-        switch (type) {
-            case 'leaseDuration':
-                setLeaseDuration('');
-                break;
-            case 'moveInDate':
-                setMoveInDate('');
-                break;
-            case 'amenity':
-                if (value) setAmenities(prev => prev.filter(a => a !== value));
-                break;
-            case 'houseRule':
-                if (value) setHouseRules(prev => prev.filter(r => r !== value));
-                break;
-            case 'language':
-                if (value) setLanguages(prev => prev.filter(l => l !== value));
-                break;
-            case 'genderPreference':
-                setGenderPreference('');
-                break;
-            case 'householdGender':
-                setHouseholdGender('');
-                break;
-        }
+        startTransition(() => {
+            switch (type) {
+                case 'leaseDuration':
+                    setLeaseDuration('');
+                    break;
+                case 'moveInDate':
+                    setMoveInDate('');
+                    break;
+                case 'amenity':
+                    if (value) setAmenities(prev => prev.filter(a => a !== value));
+                    break;
+                case 'houseRule':
+                    if (value) setHouseRules(prev => prev.filter(r => r !== value));
+                    break;
+                case 'language':
+                    if (value) setLanguages(prev => prev.filter(l => l !== value));
+                    break;
+                case 'genderPreference':
+                    setGenderPreference('');
+                    break;
+                case 'householdGender':
+                    setHouseholdGender('');
+                    break;
+            }
+        });
     }, []);
 
     // Show warning when user has typed location but not selected from dropdown
@@ -559,8 +621,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         .toISOString()
         .split('T')[0];
 
+    // CLS fix: min-h matches Suspense fallback in SearchHeaderWrapper.tsx
     return (
-        <div className={`w-full mx-auto ${isCompact ? 'max-w-2xl' : 'max-w-4xl'}`}>
+        <div className={`w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? 'max-w-2xl' : 'max-w-4xl'}`}>
             <form
                 onSubmit={handleSearch}
                 className={`group relative flex flex-col md:flex-row md:items-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] border border-zinc-200/80 dark:border-zinc-700/80 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-[0_4px_20px_rgba(0,0,0,0.1),0_16px_48px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.3),0_16px_48px_rgba(0,0,0,0.2)] transition-all duration-200 w-full ${isCompact ? 'p-1' : 'p-1.5 md:p-2 md:pr-2'}`}
@@ -569,11 +632,12 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
                 <div className={`w-full md:flex-1 flex flex-col relative ${isCompact ? 'px-4 py-2' : 'px-5 sm:px-6 py-3 md:py-2'}`}>
                     {!isCompact && (
-                        <span className="text-2xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-1">
+                        <label htmlFor="search-location" className="text-2xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-1">
                             Where
-                        </span>
+                        </label>
                     )}
                     <LocationSearchInput
+                        id="search-location"
                         value={location}
                         onChange={(value) => {
                             setLocation(value);
@@ -602,17 +666,19 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                         <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 z-50 overflow-hidden">
                             <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-100 dark:border-zinc-800">
                                 <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase">Recent Searches</span>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="ghost"
+                                    size="sm"
                                     onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         clearRecentSearches();
                                     }}
-                                    className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                                    className="h-auto py-1 px-2 text-xs"
                                 >
                                     Clear
-                                </button>
+                                </Button>
                             </div>
                             <ul className="py-1">
                                 {recentSearches.map((search, idx) => (
@@ -660,7 +726,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             value={minPrice}
                             onChange={(e) => setMinPrice(e.target.value)}
                             placeholder="Min"
-                            className={`w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
+                            className={`w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
                             min="0"
                             step="50"
                             aria-label="Minimum budget"
@@ -674,7 +740,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             value={maxPrice}
                             onChange={(e) => setMaxPrice(e.target.value)}
                             placeholder="Max"
-                            className={`w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
+                            className={`w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
                             min="0"
                             step="50"
                             aria-label="Maximum budget"
@@ -701,16 +767,13 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                         <button
                                             key={value}
                                             type="button"
-                                            onClick={() => setRoomType(value === 'any' ? '' : value)}
-                                            className={`
-                                                flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium
-                                                transition-all duration-200
-                                                ${isSelected
-                                                    ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm'
-                                                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-900/50'
-                                                }
-                                            `}
+                                            onClick={() => handleRoomTypeSelect(value)}
+                                            className={`flex items-center justify-center gap-1 px-3 min-h-[44px] rounded-md text-xs font-medium transition-all duration-200 ${isSelected
+                                                ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm'
+                                                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-900/50'
+                                            }`}
                                             aria-pressed={isSelected}
+                                            aria-label={`Filter by ${label === 'All' ? 'all room types' : label + ' room'}`}
                                         >
                                             <Icon className="w-3.5 h-3.5" />
                                             <span className="hidden sm:inline">{label}</span>
@@ -727,19 +790,16 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
                         {/* Filters Button */}
                         <div className="flex items-center px-2">
-                            <button
+                            <Button
                                 type="button"
+                                variant="filter"
+                                size="sm"
                                 onClick={() => setShowFilters(true)}
-                                className={`
-                                    flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
-                                    transition-all duration-200 border
-                                    ${showFilters
-                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white'
-                                        : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-                                    }
-                                `}
+                                data-active={showFilters}
                                 aria-expanded={showFilters}
                                 aria-controls="search-filters"
+                                aria-label={activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : 'Filters'}
+                                className="gap-1.5 rounded-lg"
                             >
                                 <SlidersHorizontal className="w-4 h-4" />
                                 <span className="hidden sm:inline">Filters</span>
@@ -754,7 +814,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                         {activeFilterCount}
                                     </span>
                                 )}
-                            </button>
+                            </Button>
                         </div>
                     </>
                 )}
@@ -769,9 +829,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                         className={`rounded-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-md ${isCompact ? 'h-9 w-9 p-0' : 'h-11 sm:h-12 w-full md:w-12'}`}
                     >
                         {isSearching ? (
-                            <Loader2 className={`animate-spin ${isCompact ? 'w-4 h-4' : 'w-5 h-5'}`} />
+                            <Loader2 className={`animate-spin ${isCompact ? 'w-4 h-4' : 'w-5 h-5'}`} aria-hidden="true" />
                         ) : (
-                            <Search className={`${isCompact ? 'w-4 h-4' : 'w-[22px] h-[22px]'}`} strokeWidth={2.5} />
+                            <Search className={`${isCompact ? 'w-4 h-4' : 'w-[22px] h-[22px]'}`} strokeWidth={2.5} aria-hidden="true" />
                         )}
                         <span className={`md:hidden ml-2 font-medium text-sm ${isCompact ? 'hidden' : ''}`}>
                             {isSearching ? 'Searching...' : 'Search'}
@@ -798,11 +858,14 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 onClose={() => setShowFilters(false)}
                 onApply={() => {
                     setShowFilters(false);
-                    // Trigger search with current filters
-                    const form = document.querySelector('form[role="search"]') as HTMLFormElement;
-                    if (form) {
-                        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-                    }
+                    // Trigger search with current filters via requestSubmit
+                    // (dispatchEvent with new Event won't trigger React's onSubmit handler)
+                    queueMicrotask(() => {
+                        const form = document.querySelector('form[role="search"]') as HTMLFormElement;
+                        if (form) {
+                            form.requestSubmit();
+                        }
+                    });
                 }}
                 onClearAll={handleClearAllFilters}
                 hasActiveFilters={hasActiveFilters}
@@ -817,7 +880,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 householdGender={householdGender}
                 onMoveInDateChange={setMoveInDate}
                 onLeaseDurationChange={setLeaseDuration}
-                onRoomTypeChange={setRoomType}
+                onRoomTypeChange={handleFilterBarRoomTypeChange}
                 onToggleAmenity={toggleAmenity}
                 onToggleHouseRule={toggleHouseRule}
                 onToggleLanguage={toggleLanguage}
