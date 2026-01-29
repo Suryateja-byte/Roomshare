@@ -135,8 +135,13 @@ export function registerShutdownHandlers(): void {
     process.kill(process.pid, 'SIGUSR2');
   });
 
-  // Handle uncaught exceptions - log and exit
+  // Handle uncaught exceptions - log and exit (ignore benign connection resets)
   process.on('uncaughtException', async (error) => {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ECONNRESET' || code === 'ECONNABORTED' || code === 'EPIPE') {
+      // Benign: client disconnected mid-request (e.g. browser navigation)
+      return;
+    }
     console.error('[Shutdown] Uncaught exception:', error);
     await performShutdown('uncaughtException');
     process.exit(1);

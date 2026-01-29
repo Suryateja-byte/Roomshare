@@ -18,7 +18,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // H1 heading with result count
-    const heading = page.getByRole("heading", { level: 1 });
+    const heading = page.getByRole("heading", { level: 1 }).first();
     await expect(heading).toBeVisible({ timeout: 15000 });
     const headingText = await heading.textContent();
     expect(headingText).toMatch(/\d+\+?\s+place/i);
@@ -50,7 +50,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await expect(maxInput).toHaveValue("1500");
 
     // Results heading should be visible
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
   });
 
   // ─────────────────────────────────────────────────
@@ -377,7 +377,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.goto(`${SEARCH_URL_WITH_BOUNDS}&q=cozy`);
     await page.waitForLoadState("domcontentloaded");
 
-    const heading = page.getByRole("heading", { level: 1 });
+    const heading = page.getByRole("heading", { level: 1 }).first();
     await expect(heading).toBeVisible({ timeout: 15000 });
 
     // Heading should mention the query
@@ -393,7 +393,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Verify initial state
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Refresh
     await page.reload();
@@ -470,7 +470,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     // The page itself handles rate limiting server-side, so check for the message
     // or if results still load (server-side rate limit not triggered via mock)
     const rateLimitMsg = page.getByText(/too many requests/i);
-    const heading = page.getByRole("heading", { level: 1 });
+    const heading = page.getByRole("heading", { level: 1 }).first();
 
     // Either rate limit message or normal results should show
     await expect(rateLimitMsg.or(heading).first()).toBeVisible({ timeout: 15000 });
@@ -487,7 +487,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Results heading visible
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Listing cards should exist (cards in scroll containers may not be "visible")
     const cards = page.locator(selectors.listingCard);
@@ -518,7 +518,7 @@ test.describe("20 Critical Search Page Journeys", () => {
   test(`${tags.a11y} J-A11Y: Search page meets accessibility basics`, async ({ page, nav, assert }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Basic a11y checks
     await assert.basicA11y();
