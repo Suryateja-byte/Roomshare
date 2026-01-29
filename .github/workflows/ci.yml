@@ -175,9 +175,11 @@ jobs:
         run: pnpm jest --ci --testPathPatterns="src/__tests__/performance/" --testTimeout=60000
 
   # Playwright E2E tests (P1-10 fix: added browser testing)
+  # Requires TEST_DATABASE_URL secret — skipped when not configured
   test-e2e:
     name: E2E Tests (Playwright)
     runs-on: ubuntu-latest
+    if: ${{ secrets.TEST_DATABASE_URL != '' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -211,6 +213,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [lint, typecheck, test-unit, test-components, test-api, test-filters, test-filter-regression, test-performance, test-e2e]
+    # Allow build to proceed when test-e2e is skipped (no TEST_DATABASE_URL secret)
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
