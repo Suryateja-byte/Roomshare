@@ -78,10 +78,11 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J4: Filter modal - select amenities and apply", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Open more filters
     const moreFiltersBtn = page.getByRole("button", { name: /more filters|filters/i });
-    await expect(moreFiltersBtn.first()).toBeVisible({ timeout: 10000 });
+    await expect(moreFiltersBtn.first()).toBeEnabled({ timeout: 5000 });
     await moreFiltersBtn.first().click();
 
     // Filter modal should open
@@ -234,6 +235,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     // Start with filters
     await page.goto(`${SEARCH_URL_WITH_BOUNDS}&minPrice=800&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Click a listing
     const firstCard = page.locator(selectors.listingCard).first();
@@ -260,10 +262,11 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J11: Lease duration filter works", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Open filter modal
     const moreFiltersBtn = page.getByRole("button", { name: /more filters|filters/i });
-    await expect(moreFiltersBtn.first()).toBeVisible({ timeout: 10000 });
+    await expect(moreFiltersBtn.first()).toBeEnabled({ timeout: 5000 });
     await moreFiltersBtn.first().click();
 
     const modal = page.locator('[role="dialog"]');
@@ -295,9 +298,11 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J12: House rules filter toggles work", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Open filter modal
     const moreFiltersBtn = page.getByRole("button", { name: /more filters|filters/i });
+    await expect(moreFiltersBtn.first()).toBeEnabled({ timeout: 5000 });
     await moreFiltersBtn.first().click();
 
     const modal = page.locator('[role="dialog"]');
@@ -322,8 +327,10 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J13: Gender preference filter works", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     const moreFiltersBtn = page.getByRole("button", { name: /more filters|filters/i });
+    await expect(moreFiltersBtn.first()).toBeEnabled({ timeout: 5000 });
     await moreFiltersBtn.first().click();
 
     const modal = page.locator('[role="dialog"]');
