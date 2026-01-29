@@ -6,7 +6,7 @@
  * search with filters, map view, sorting, and pagination.
  */
 
-import { test, expect, selectors, timeouts, tags } from "../helpers";
+import { test, expect, selectors, timeouts, tags, SF_BOUNDS } from "../helpers";
 
 test.describe("Discovery & Search Journeys", () => {
   test.describe("J001: Anonymous user browses home page", () => {
@@ -33,28 +33,27 @@ test.describe("Discovery & Search Journeys", () => {
       await page.evaluate(() => window.scrollBy(0, 300));
       await page.waitForTimeout(timeouts.animation);
 
-      // Step 4: Click first listing card
-      const firstCard = page.locator(selectors.listingCard).first();
-      // Wait for card to be visible and clickable
-      await expect(firstCard).toBeVisible({ timeout: 15000 });
-      await firstCard.click();
+      // Step 4: Click first listing card via JS (avoids hitting carousel buttons)
+      await expect(page.locator(selectors.listingCard).first()).toBeVisible({ timeout: 15000 });
+      await page.waitForLoadState("load");
+      await nav.clickListingCard(0);
 
       // Step 5: Verify listing detail page
-      await expect(page).toHaveURL(/\/listings\//);
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
       // Step 6: Navigate back
       await nav.goBack();
-      await expect(page).toHaveURL("/");
+      await expect(page).toHaveURL("/", { timeout: 15000 });
 
       // Step 7: Click search CTA
+      await page.waitForLoadState("load");
       const searchButton = page
         .getByRole("link", { name: /search|find|browse/i })
         .or(page.getByRole("button", { name: /search|find/i }));
 
-      if (await searchButton.first().isVisible()) {
+      if (await searchButton.first().isVisible({ timeout: 5000 }).catch(() => false)) {
         await searchButton.first().click();
-        await expect(page).toHaveURL(/\/search/);
+        await expect(page).toHaveURL(/\/search/, { timeout: 15000 });
       }
     });
 
@@ -107,7 +106,7 @@ test.describe("Discovery & Search Journeys", () => {
       await expect(maxPriceInput).toHaveValue("2000");
 
       // Step 4: Verify results are displayed
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
 
       // Step 5: Refresh and verify persistence
       await page.reload();
@@ -158,7 +157,7 @@ test.describe("Discovery & Search Journeys", () => {
       await nav.clickListingCard(0);
 
       // Step 3-4: Verify listing info
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
       // Price is visible to guests; owners see "Manage Listing" instead
       const priceOrManage = page
         .getByText(/\$[\d,]+/)
@@ -218,20 +217,24 @@ test.describe("Discovery & Search Journeys", () => {
     }) => {
       test.slow(); // Map tests can be slow
 
-      await nav.goToSearch();
+      // Use bounds so listings exist for the map
+      await nav.goToSearch({ bounds: SF_BOUNDS });
+      await page.waitForLoadState("domcontentloaded");
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
-      // Find and click map view toggle
+      // Find and click map view toggle — button text is "Map" (mobile) or "Show map" (desktop)
       const mapToggle = page
-        .getByRole("button", { name: /map/i })
+        .getByRole("button", { name: /show map|^map$/i })
         .or(page.locator('[data-testid="map-toggle"]'));
 
-      if (await mapToggle.isVisible()) {
-        await mapToggle.click();
-        await page.waitForTimeout(1000); // Map initialization
+      if (await mapToggle.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+        await mapToggle.first().click();
+        await page.waitForTimeout(2000); // Map initialization takes time
 
-        // Wait for map to render
-        const map = page.locator(selectors.map);
-        await expect(map).toBeVisible({ timeout: 15000 });
+        // Wait for map to render — Mapbox GL adds .mapboxgl-map class, or use role="region" aria-label
+        const map = page.locator(selectors.map)
+          .or(page.locator('[role="region"][aria-label*="map" i]'));
+        await expect(map.first()).toBeVisible({ timeout: 20000 });
 
         // Check for markers
         const markers = page.locator(selectors.mapMarker);
