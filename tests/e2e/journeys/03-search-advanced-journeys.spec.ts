@@ -16,6 +16,7 @@ const BOUNDS_PARAMS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&min
 async function openFilterModal(page: import("@playwright/test").Page) {
   const btn = page.getByRole("button", { name: /more filters|^filters/i }).first();
   await expect(btn).toBeVisible({ timeout: 10000 });
+  await expect(btn).toBeEnabled({ timeout: 5000 });
   await btn.click();
   const modal = page.locator('[role="dialog"]');
   await expect(modal).toBeVisible({ timeout: 10000 });
@@ -57,6 +58,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
   test("J21: Combined price + amenity + lease filters reflect in URL", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Set price range
     const minInput = page.getByLabel(/minimum budget/i);
@@ -95,6 +97,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
   test("J22: Gender preference + household gender filters combined", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     const modal = await openFilterModal(page);
 
@@ -161,6 +164,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
   test("J24: Room type tab + price filter + sort all combined", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS, minPrice: 500, maxPrice: 1500 });
     await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Click a room type tab
     const privateTab = page.getByRole("button", { name: /private/i })
@@ -656,15 +660,16 @@ test.describe("30 Advanced Search Page Journeys", () => {
       await page.waitForURL(/roomType/i, { timeout: 10000 });
       const url2 = page.url();
 
-      // Go back
+      // Go back — URL should no longer have roomType
       await page.goBack();
       await page.waitForLoadState("domcontentloaded");
-      expect(page.url()).not.toMatch(/roomType/i);
+      await expect(async () => {
+        expect(page.url()).not.toMatch(/roomType/i);
+      }).toPass({ timeout: 10000 });
 
       // Go forward
       await page.goForward();
-      await page.waitForLoadState("domcontentloaded");
-      expect(page.url()).toMatch(/roomType/i);
+      await page.waitForURL(/roomType/i, { timeout: 10000 });
     }
   });
 
@@ -706,15 +711,15 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Search form should be visible
     const searchForm = page.locator('form[role="search"]');
     await expect(searchForm).toBeVisible();
 
-    // Cards should exist
+    // Cards should exist (tablet may take longer to render)
     const cards = page.locator(selectors.listingCard);
-    await cards.first().waitFor({ state: "attached", timeout: 10000 });
+    await cards.first().waitFor({ state: "attached", timeout: 15000 });
     expect(await cards.count()).toBeGreaterThan(0);
   });
 
