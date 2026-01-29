@@ -112,7 +112,8 @@ describe("Register API", () => {
 
       expect(response.status).toBe(400);
       const data = await response.json();
-      expect(data.error).toBe("User already exists");
+      // P1-06/P1-07: Generic message prevents user enumeration
+      expect(data.error).toBe("Registration failed. Please try again or use forgot password if you already have an account.");
     });
 
     it("creates user successfully", async () => {

@@ -22,6 +22,7 @@ jest.mock('@/lib/prisma', () => ({
       create: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      count: jest.fn(),
     },
     listing: {
       findUnique: jest.fn(),
@@ -125,7 +126,7 @@ describe('/api/reviews', () => {
         const data = await response.json()
 
         expect(response.status).toBe(400)
-        expect(data.error).toBe('Missing rating or comment')
+        expect(data.error).toBe('Invalid request')
       })
 
       it('returns 400 when comment is missing', async () => {
@@ -145,7 +146,7 @@ describe('/api/reviews', () => {
         const data = await response.json()
 
         expect(response.status).toBe(400)
-        expect(data.error).toBe('Must specify listingId or targetUserId')
+        expect(data.error).toBe('Invalid request')
       })
     })
 
@@ -169,7 +170,7 @@ describe('/api/reviews', () => {
         }))
         const data = await response.json()
 
-        expect(response.status).toBe(200)
+        expect(response.status).toBe(201)
         expect(data.id).toBe('review-123')
         expect(prisma.review.create).toHaveBeenCalledWith({
           data: {
@@ -194,7 +195,7 @@ describe('/api/reviews', () => {
           comment: 'Nice person!',
         }))
 
-        expect(response.status).toBe(200)
+        expect(response.status).toBe(201)
         expect(prisma.review.create).toHaveBeenCalledWith({
           data: expect.objectContaining({
             targetUserId: 'target-123',
@@ -325,6 +326,7 @@ describe('/api/reviews', () => {
 
     beforeEach(() => {
       ;(prisma.review.findMany as jest.Mock).mockResolvedValue(mockReviews)
+      ;(prisma.review.count as jest.Mock).mockResolvedValue(2)
     })
 
     it('returns 400 when no listingId or userId provided', async () => {
@@ -340,7 +342,7 @@ describe('/api/reviews', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data).toEqual(mockReviews)
+      expect(data.reviews).toEqual(mockReviews)
       expect(prisma.review.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { listingId: 'listing-123' },

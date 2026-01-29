@@ -104,8 +104,10 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: Run API tests
-        run: pnpm jest --ci --maxWorkers=2 --testPathPatterns="src/__tests__/api/"
+      - name: Run API tests (excluding facets)
+        run: pnpm jest --ci --maxWorkers=2 --testPathPatterns="src/__tests__/api/" --testPathIgnorePatterns="facets"
+      - name: Run facets tests (memory-intensive)
+        run: pnpm jest --ci --maxWorkers=1 --testPathPatterns="src/__tests__/api/search/facets/"
       - name: Run Action tests
         run: pnpm jest --ci --maxWorkers=2 --testPathPatterns="src/__tests__/actions/"
 

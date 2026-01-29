@@ -6,12 +6,15 @@ jest.mock('@/lib/prisma', () => ({
   prisma: {
     conversation: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
       update: jest.fn(),
     },
     message: {
       findMany: jest.fn(),
       create: jest.fn(),
+      count: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -78,19 +81,20 @@ describe('Messages API', () => {
         { id: 'msg-1', content: 'Hello', sender: { id: 'user-123', name: 'User', image: null } },
         { id: 'msg-2', content: 'Hi', sender: { id: 'user-456', name: 'Other', image: null } },
       ]
-      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
+      ;(prisma.conversation.findFirst as jest.Mock).mockResolvedValue(mockConversation)
       ;(prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages)
+      ;(prisma.message.count as jest.Mock).mockResolvedValue(2)
 
       const request = new Request('http://localhost/api/messages?conversationId=conv-123')
       const response = await GET(request)
 
       expect(response.status).toBe(200)
       const data = await response.json()
-      expect(data).toEqual(mockMessages)
+      expect(data.messages).toEqual(mockMessages)
     })
 
     it('returns 403 when user is not participant', async () => {
-      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+      ;(prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conv-123',
         participants: [{ id: 'other-1' }, { id: 'other-2' }],
       })
@@ -114,13 +118,14 @@ describe('Messages API', () => {
         },
       ]
       ;(prisma.conversation.findMany as jest.Mock).mockResolvedValue(mockConversations)
+      ;(prisma.conversation.count as jest.Mock).mockResolvedValue(1)
 
       const request = new Request('http://localhost/api/messages')
       const response = await GET(request)
 
       expect(response.status).toBe(200)
       const data = await response.json()
-      expect(data[0].id).toBe('conv-1')
+      expect(data.conversations[0].id).toBe('conv-1')
     })
 
     it('handles database errors', async () => {

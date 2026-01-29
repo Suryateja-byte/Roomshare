@@ -109,7 +109,7 @@ describe("Reset Password API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe("Password must be at least 6 characters");
+      expect(data.error).toBe("Password must be at least 12 characters");
     });
 
     it("returns error for invalid token", async () => {
