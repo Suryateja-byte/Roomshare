@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
+import { flushSync } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, Clock, Loader2, SlidersHorizontal, Home, Users, Building2, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -442,23 +443,27 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         });
     }, []);
 
-    // INP optimization: Room type selection with startTransition
+    // Room type selection — updates state and triggers search immediately
     const handleRoomTypeSelect = useCallback((value: string) => {
-        startTransition(() => {
+        flushSync(() => {
             setRoomType(value === 'any' ? '' : value);
         });
+        const form = document.querySelector('form[role="search"]') as HTMLFormElement;
+        if (form) {
+            form.requestSubmit();
+        }
     }, []);
 
     // Room type selection from FilterBar CategoryTabs — sets state AND triggers search
     const handleFilterBarRoomTypeChange = useCallback((value: string) => {
-        setRoomType(value === 'any' ? '' : value);
-        // Use queueMicrotask so React flushes the state update before form submission
-        queueMicrotask(() => {
-            const form = document.querySelector('form[role="search"]') as HTMLFormElement;
-            if (form) {
-                form.requestSubmit();
-            }
+        // flushSync ensures the state update is applied before requestSubmit reads it
+        flushSync(() => {
+            setRoomType(value === 'any' ? '' : value);
         });
+        const form = document.querySelector('form[role="search"]') as HTMLFormElement;
+        if (form) {
+            form.requestSubmit();
+        }
     }, []);
 
     // Clear all filters and reset to defaults
