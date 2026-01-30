@@ -1,6 +1,10 @@
-import { Star } from 'lucide-react';
+'use client';
+
+import { useState } from 'react';
+import { Star, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UserAvatar from '@/components/UserAvatar';
+import ReviewResponseForm from '@/components/ReviewResponseForm';
 
 interface Review {
     id: string;
@@ -11,9 +15,15 @@ interface Review {
         name: string | null;
         image: string | null;
     };
+    response?: {
+        id: string;
+        content: string;
+    } | null;
 }
 
-export default function ReviewList({ reviews }: { reviews: Review[] }) {
+export default function ReviewList({ reviews, isOwner = false }: { reviews: Review[]; isOwner?: boolean }) {
+    const [respondingTo, setRespondingTo] = useState<string | null>(null);
+
     if (reviews.length === 0) {
         return (
             <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
@@ -55,6 +65,38 @@ export default function ReviewList({ reviews }: { reviews: Review[] }) {
                     <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed pl-[52px]">
                         {review.comment}
                     </p>
+
+                    {/* Existing response */}
+                    {review.response && (
+                        <div className="ml-[52px] mt-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-100 dark:border-zinc-700">
+                            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Host response</p>
+                            <p className="text-sm text-zinc-700 dark:text-zinc-300">{review.response.content}</p>
+                        </div>
+                    )}
+
+                    {/* Respond button for owner */}
+                    {isOwner && !review.response && respondingTo !== review.id && (
+                        <div className="ml-[52px] mt-2">
+                            <button
+                                onClick={() => setRespondingTo(review.id)}
+                                className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                            >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                Respond
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Response form */}
+                    {respondingTo === review.id && (
+                        <div className="ml-[52px]">
+                            <ReviewResponseForm
+                                reviewId={review.id}
+                                existingResponse={review.response || undefined}
+                                onClose={() => setRespondingTo(null)}
+                            />
+                        </div>
+                    )}
                 </div>
             ))}
         </div>

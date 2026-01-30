@@ -1735,6 +1735,12 @@ export async function getReviews(listingId?: string, userId?: string) {
           image: true,
         },
       },
+      response: {
+        select: {
+          id: true,
+          content: true,
+        },
+      },
     },
     orderBy: {
       createdAt: "desc",

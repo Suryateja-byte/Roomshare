@@ -142,6 +142,82 @@ async function main() {
     console.log(`  ✓ Listing: ${data.title} (${listing.id})`);
   }
 
+  // 3b. Create a listing owned by REVIEWER (so test user sees booking form, not owner view)
+  const REVIEWER_LISTING = {
+    title: 'Reviewer Nob Hill Apartment',
+    description: 'Cozy apartment on Nob Hill. Great for visiting SF.',
+    price: 1500,
+    roomType: 'Entire Place',
+    lat: 37.7920, lng: -122.4130,
+    address: '1000 California St', city: 'San Francisco', state: 'CA', zip: '94108',
+  };
+
+  const existingReviewerListing = await prisma.listing.findFirst({
+    where: { title: REVIEWER_LISTING.title, ownerId: reviewer.id },
+  });
+
+  let reviewerListing;
+  if (existingReviewerListing) {
+    reviewerListing = existingReviewerListing;
+    console.log(`  ⏭ Reviewer listing exists: ${REVIEWER_LISTING.title}`);
+  } else {
+    reviewerListing = await prisma.listing.create({
+      data: {
+        ownerId: reviewer.id,
+        title: REVIEWER_LISTING.title,
+        description: REVIEWER_LISTING.description,
+        price: REVIEWER_LISTING.price,
+        roomType: REVIEWER_LISTING.roomType,
+        amenities: ['WiFi', 'Furnished', 'Laundry'],
+        houseRules: ['No Pets'],
+        householdLanguages: ['en'],
+        totalSlots: 1,
+        availableSlots: 1,
+        moveInDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        images: [
+          'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600',
+        ],
+        location: {
+          create: {
+            address: REVIEWER_LISTING.address,
+            city: REVIEWER_LISTING.city,
+            state: REVIEWER_LISTING.state,
+            zip: REVIEWER_LISTING.zip,
+          },
+        },
+      },
+    });
+    const point = `POINT(${REVIEWER_LISTING.lng} ${REVIEWER_LISTING.lat})`;
+    await prisma.$executeRaw`
+      UPDATE "Location"
+      SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
+      WHERE "listingId" = ${reviewerListing.id}
+    `;
+    console.log(`  ✓ Reviewer listing: ${REVIEWER_LISTING.title} (${reviewerListing.id})`);
+  }
+
+  // 3c. Create a COMPLETED booking for test user on reviewer's listing (enables review writing)
+  const existingCompletedBooking = await prisma.booking.findFirst({
+    where: { tenantId: user.id, listingId: reviewerListing.id },
+  });
+  if (!existingCompletedBooking) {
+    const pastStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const pastEnd = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    await prisma.booking.create({
+      data: {
+        listingId: reviewerListing.id,
+        tenantId: user.id,
+        startDate: pastStart,
+        endDate: pastEnd,
+        totalPrice: REVIEWER_LISTING.price * 2,
+        status: 'ACCEPTED',
+      },
+    });
+    console.log(`  ✓ COMPLETED booking for test user on reviewer's listing`);
+  } else {
+    console.log(`  ⏭ Completed booking exists`);
+  }
+
   // 4. Create admin user
   const admin = await prisma.user.upsert({
     where: { email: 'e2e-admin@roomshare.dev' },
@@ -190,7 +266,11 @@ async function main() {
       });
       console.log(`  ✓ Review added to: ${targetListing.title}`);
     } else {
-      console.log(`  ⏭ Review exists for: ${targetListing.title}`);
+      // Delete any existing response so J29 test can add one fresh
+      await prisma.reviewResponse.deleteMany({
+        where: { reviewId: existingReview.id },
+      });
+      console.log(`  ⏭ Review exists for: ${targetListing.title} (cleared responses)`);
     }
   }
 

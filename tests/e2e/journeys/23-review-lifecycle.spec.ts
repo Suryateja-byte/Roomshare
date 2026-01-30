@@ -14,12 +14,12 @@ test.describe("J28: Write a Review", () => {
     page,
     nav,
   }) => {
-    // Step 1: Find a listing
-    await nav.goToSearch({ bounds: SF_BOUNDS });
+    // Step 1: Find a listing NOT owned by test user (reviewer's listing)
+    await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
     const cards = page.locator(selectors.listingCard);
-    test.skip((await cards.count()) === 0, "No listings — skipping");
+    test.skip((await cards.count()) === 0, "Reviewer listing not found — skipping");
 
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
@@ -35,34 +35,32 @@ test.describe("J28: Write a Review", () => {
       await reviewSection.first().scrollIntoViewIfNeeded();
     }
 
-    // Step 4: Look for "Write a review" button or form
-    const writeBtn = page
-      .getByRole("button", { name: /write.*review|add.*review|leave.*review/i })
-      .or(page.locator('[data-testid="write-review"]'));
+    // Step 4: Look for review form — it's inline (always visible for eligible users)
+    // The form has an h3 "Write a Review" heading, star buttons, textarea, and "Post Review" button
+    const reviewFormHeading = page.getByText(/write a review/i);
+    const starButtons = page.locator('button[aria-label*="star"], button[aria-label*="Star"]');
+    const reviewTextarea = page.locator('textarea').last();
 
-    const canWrite = await writeBtn.first().isVisible().catch(() => false);
-    test.skip(!canWrite, "No write review button — may be own listing or already reviewed");
+    const hasForm = await reviewFormHeading.isVisible().catch(() => false);
+    const hasStars = (await starButtons.count()) > 0;
+    const hasTextarea = await reviewTextarea.isVisible().catch(() => false);
 
-    await writeBtn.first().click();
-    await page.waitForTimeout(1000);
+    test.skip(!hasForm && !hasStars && !hasTextarea, "No review form — may be own listing, no booking, or already reviewed");
 
     // Step 5: Fill review form
-    // Star rating
-    const stars = page.locator('[data-testid="star-rating"] button, [role="radio"], [aria-label*="star"]');
-    if ((await stars.count()) > 0) {
-      await stars.nth(4).click(); // 5 stars
+    // Click 5th star for 5-star rating
+    if (hasStars) {
+      await starButtons.nth(4).click();
+      await page.waitForTimeout(300);
     }
 
-    // Comment
-    const commentField = page
-      .locator("textarea")
-      .or(page.getByPlaceholder(/review|comment|feedback/i));
-    if (await commentField.first().isVisible().catch(() => false)) {
-      await commentField.first().fill("Excellent place! Very clean and well-maintained. E2E test review.");
+    // Fill comment
+    if (hasTextarea) {
+      await reviewTextarea.fill("Excellent place! Very clean and well-maintained. E2E test review.");
     }
 
-    // Submit
-    const submitBtn = page.getByRole("button", { name: /submit|post|save/i }).first();
+    // Submit via "Post Review" button
+    const submitBtn = page.getByRole("button", { name: /post review|submit|save/i }).first();
     if (await submitBtn.isVisible().catch(() => false)) {
       await submitBtn.click();
       await page.waitForTimeout(2000);

@@ -35,7 +35,14 @@ test.describe("J35: View Public User Profile", () => {
     test.skip(!hasHostLink, "No host profile link — skipping");
 
     await hostLink.first().click();
-    await page.waitForTimeout(2000);
+
+    // Wait for navigation to user profile page
+    try {
+      await page.waitForURL(/\/users\//, { timeout: 10000 });
+    } catch {
+      // May already be on user page or redirected
+      await page.waitForTimeout(2000);
+    }
 
     // Step 3: Verify profile page
     const onProfile = page.url().includes("/users/") || page.url().includes("/profile/");
@@ -78,7 +85,11 @@ test.describe("J36: Block a User", () => {
     test.skip(!hasHostLink, "No host profile link — skipping");
 
     await hostLink.first().click();
-    await page.waitForTimeout(2000);
+    try {
+      await page.waitForURL(/\/users\//, { timeout: 10000 });
+    } catch {
+      await page.waitForTimeout(2000);
+    }
 
     // Step 3: Look for block button
     const blockBtn = page
@@ -127,7 +138,7 @@ test.describe("J37: Edit Profile Fields", () => {
     await nav.goToProfile();
     await page.waitForTimeout(2000);
 
-    // Step 2: Click edit button or navigate to edit page
+    // Step 2: Click edit button or navigate to edit page directly
     const editBtn = page
       .getByRole("link", { name: /edit/i })
       .or(page.getByRole("button", { name: /edit/i }))
@@ -137,6 +148,10 @@ test.describe("J37: Edit Profile Fields", () => {
     const canEdit = await editBtn.first().isVisible().catch(() => false);
     if (canEdit) {
       await editBtn.first().click();
+      await page.waitForTimeout(1500);
+    } else {
+      // Fallback: navigate directly to edit page
+      await page.goto("/profile/edit");
       await page.waitForTimeout(1500);
     }
 

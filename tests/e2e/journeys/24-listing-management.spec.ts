@@ -107,40 +107,38 @@ test.describe("J32: Pause and Unpause Listing", () => {
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
     await page.waitForTimeout(1500);
 
-    // Step 2: Look for pause/deactivate toggle
-    const pauseBtn = page
-      .getByRole("button", { name: /pause|deactivate|hide|unpublish/i })
+    // Step 2: Look for status toggle dropdown (shows "Active", "Paused", or "Rented")
+    const statusToggle = page
+      .getByRole("button", { name: /active|paused|rented/i })
       .or(page.locator('[data-testid="pause-listing"]'));
 
-    const canPause = await pauseBtn.first().isVisible().catch(() => false);
-    test.skip(!canPause, "No pause button — skipping");
+    const canToggle = await statusToggle.first().isVisible().catch(() => false);
+    test.skip(!canToggle, "No status toggle — skipping");
 
-    // Step 3: Pause the listing
-    await pauseBtn.first().click();
-    await page.waitForTimeout(1500);
+    // Step 3: Open dropdown and select "Paused"
+    await statusToggle.first().click();
+    await page.waitForTimeout(500);
 
-    // Confirm if dialog
-    const confirmBtn = page.getByRole("button", { name: /confirm|yes/i }).first();
-    if (await confirmBtn.isVisible().catch(() => false)) {
-      await confirmBtn.click();
+    const pausedOption = page.getByText("Paused").first();
+    if (await pausedOption.isVisible().catch(() => false)) {
+      await pausedOption.click();
       await page.waitForTimeout(1500);
     }
 
-    // Step 4: Verify paused state
-    const pausedIndicator = page.getByText(/paused|inactive|hidden|deactivated/i).first();
-    const isPaused = await pausedIndicator.isVisible().catch(() => false);
+    // Step 4: Verify paused state — button should now show "Paused"
+    const pausedBtn = page.getByRole("button", { name: /paused/i }).first();
+    const isPaused = await pausedBtn.isVisible().catch(() => false);
     const hasToast = await page.locator(selectors.toast).isVisible().catch(() => false);
     expect(isPaused || hasToast).toBeTruthy();
 
-    // Step 5: Unpause
-    const unpauseBtn = page
-      .getByRole("button", { name: /unpause|activate|show|publish|resume/i })
-      .or(page.locator('[data-testid="unpause-listing"]'));
-    if (await unpauseBtn.first().isVisible().catch(() => false)) {
-      await unpauseBtn.first().click();
-      await page.waitForTimeout(1500);
-      if (await confirmBtn.isVisible().catch(() => false)) {
-        await confirmBtn.click();
+    // Step 5: Unpause — open dropdown and select "Active"
+    const currentToggle = page.getByRole("button", { name: /active|paused|rented/i }).first();
+    if (await currentToggle.isVisible().catch(() => false)) {
+      await currentToggle.click();
+      await page.waitForTimeout(500);
+      const activeOption = page.getByText("Active").first();
+      if (await activeOption.isVisible().catch(() => false)) {
+        await activeOption.click();
         await page.waitForTimeout(1500);
       }
     }

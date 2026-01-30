@@ -12,8 +12,18 @@
 
 import { test, expect, selectors, timeouts } from "../helpers";
 
-// Helper to login as admin
+// Helper to login as admin (must sign out first since chromium project has user auth)
 async function loginAsAdmin(page: import("@playwright/test").Page) {
+  // Sign out current user first
+  await page.goto("/api/auth/signout");
+  await page.waitForTimeout(1000);
+  // Click the signout confirmation if present
+  const signOutBtn = page.getByRole("button", { name: /sign out/i });
+  if (await signOutBtn.isVisible().catch(() => false)) {
+    await signOutBtn.click();
+    await page.waitForTimeout(2000);
+  }
+
   await page.goto("/login");
   await page.waitForTimeout(1500);
 
@@ -22,8 +32,8 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
     .or(page.locator('input[name="email"]'))
     .or(page.locator('input[type="email"]'));
   const passwordField = page
-    .getByLabel(/password/i)
-    .or(page.locator('input[name="password"]'))
+    .locator('input#password')
+    .or(page.getByLabel(/password/i))
     .or(page.locator('input[type="password"]'));
 
   const canLogin = await emailField.first().isVisible().catch(() => false);
@@ -38,7 +48,9 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
   await submitBtn.first().click();
   await page.waitForTimeout(3000);
 
-  return true;
+  // Verify not still on login page
+  const onLogin = page.url().includes("/login");
+  return !onLogin;
 }
 
 // ─── J38: Admin Dashboard Overview ────────────────────────────────────────────

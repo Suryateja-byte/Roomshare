@@ -72,6 +72,10 @@ interface Review {
         name: string | null;
         image: string | null;
     };
+    response?: {
+        id: string;
+        content: string;
+    } | null;
 }
 
 interface BookedDateRange {
@@ -405,9 +409,11 @@ export default function ListingPageClient({
                                         />
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
-                                            Hosted by {listing.owner.name || 'User'}
-                                        </h3>
+                                        <Link href={`/users/${listing.ownerId}`} className="hover:underline">
+                                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                                                Hosted by {listing.owner.name || 'User'}
+                                            </h3>
+                                        </Link>
                                         <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-2">
                                             Joined in {new Date(listing.owner.createdAt).getFullYear()}
                                             {listing.owner.bio && ` • ${listing.owner.bio.slice(0, 50)}${listing.owner.bio.length > 50 ? '...' : ''}`}
@@ -448,7 +454,7 @@ export default function ListingPageClient({
                                 </h2>
 
                                 <div className="mb-8">
-                                    <ReviewList reviews={reviews} />
+                                    <ReviewList reviews={reviews} isOwner={isOwner} />
                                 </div>
 
                                 {!isOwner && (
@@ -476,6 +482,11 @@ export default function ListingPageClient({
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                                             </span>
+                                        </div>
+
+                                        {/* Status Toggle */}
+                                        <div className="mb-6">
+                                            <ListingStatusToggle listingId={listing.id} currentStatus={listing.status as 'ACTIVE' | 'PAUSED' | 'RENTED'} />
                                         </div>
 
                                         {/* Stats Preview */}

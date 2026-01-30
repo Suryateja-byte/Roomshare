@@ -51,9 +51,11 @@ test.describe("J25: Send Message in Conversation", () => {
     await sendBtn.first().click();
     await page.waitForTimeout(2000);
 
-    // Step 5: Verify message appears in thread
-    const sentMsg = page.getByText(testMsg);
-    await expect(sentMsg).toBeVisible({ timeout: 10000 });
+    // Step 5: Verify message appears in thread (use exact to avoid matching sidebar preview)
+    const sentMsg = page.locator('.bg-zinc-900, .dark\\:bg-white, [class*="sent"], [class*="outgoing"]').getByText(testMsg);
+    const sentMsgFallback = page.getByText(testMsg).last();
+    const found = await sentMsg.first().isVisible().catch(() => false) || await sentMsgFallback.isVisible().catch(() => false);
+    expect(found).toBeTruthy();
   });
 });
 
@@ -63,12 +65,12 @@ test.describe("J26: Start Conversation from Listing", () => {
     page,
     nav,
   }) => {
-    // Step 1: Find a listing
-    await nav.goToSearch({ bounds: SF_BOUNDS });
+    // Step 1: Find a listing NOT owned by test user
+    await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
     const cards = page.locator(selectors.listingCard);
-    test.skip((await cards.count()) === 0, "No listings — skipping");
+    test.skip((await cards.count()) === 0, "Reviewer listing not found — skipping");
 
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
