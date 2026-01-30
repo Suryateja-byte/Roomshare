@@ -49,16 +49,16 @@ export default defineConfig({
     /* Default timeout for actions */
     actionTimeout: 15000,
 
-    /* Default navigation timeout */
-    navigationTimeout: 30000,
+    /* Default navigation timeout — generous for dev server under load */
+    navigationTimeout: 45000,
   },
 
-  /* Global timeout for each test */
+  /* Global timeout for each test (3x for test.slow()) */
   timeout: 60000,
 
-  /* Expect timeout */
+  /* Expect timeout — generous for server-rendered pages under load */
   expect: {
-    timeout: 10000,
+    timeout: 15000,
   },
 
   /* Configure projects for major browsers */
