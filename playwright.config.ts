@@ -13,6 +13,9 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 export default defineConfig({
   testDir: './tests/e2e',
 
+  /* Seed E2E test data before running tests */
+  globalSetup: './tests/e2e/global-setup.ts',
+
   /* Run tests in files in parallel */
   fullyParallel: true,
 
@@ -137,6 +140,10 @@ export default defineConfig({
     timeout: 180000,
     stdout: 'pipe',
     stderr: 'pipe',
+    // Forward dotenv-loaded vars (AUTH_SECRET, etc.) to the child process
+    env: Object.fromEntries(
+      Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] != null),
+    ),
   },
 
   /* Output folder for test artifacts */

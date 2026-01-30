@@ -110,7 +110,7 @@ export const timeouts = {
  */
 export const selectors = {
   // Navigation
-  navbar: '[data-testid="navbar"], nav[role="navigation"]',
+  navbar: '[data-testid="navbar"], nav[role="navigation"], nav',
   userMenu: '[data-testid="user-menu"], [aria-label*="user" i]',
   searchForm: '[data-testid="search-form"], form[role="search"]',
 

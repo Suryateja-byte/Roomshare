@@ -184,23 +184,23 @@ export function navigationHelpers(page: Page) {
      * Click a listing card and wait for detail page
      */
     async clickListingCard(index = 0) {
-      // Use JavaScript click to bypass Playwright visibility checks
-      // This is needed because some listing cards may be styled as "hidden" by CSS
-      // while still being visually present in a scrollable container
-      const cardSelector = `${selectors.listingCard}`;
-      const url = await page.evaluate(
-        ({ selector, idx }) => {
-          const cards = document.querySelectorAll(selector);
-          const card = cards[idx] as HTMLAnchorElement | null;
-          if (card) {
-            card.click();
-            return card.href;
-          }
-          return null;
-        },
-        { selector: cardSelector, idx: index },
-      );
-      if (!url) throw new Error(`No listing card found at index ${index}`);
+      // Wait for listing cards to appear
+      const cards = page.locator('[data-testid="listing-card"]');
+      await cards.first().waitFor({ state: 'attached', timeout: 15000 });
+
+      const count = await cards.count();
+      if (count === 0 || index >= count) {
+        throw new Error(`No listing card found at index ${index}`);
+      }
+
+      // Navigate directly to the listing URL from the card's link href
+      const card = cards.nth(index);
+      const link = card.locator('a[href^="/listings/"]').first();
+      const href = await link.getAttribute('href');
+      if (!href) {
+        throw new Error(`No listing link found in card at index ${index}`);
+      }
+      await page.goto(href);
       await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
     },
 

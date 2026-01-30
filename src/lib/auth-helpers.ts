@@ -117,7 +117,9 @@ export async function checkSuspension(request: NextRequest): Promise<NextRespons
   }
 
   // Get token to check suspension status
-  const token = await getToken({ req: request });
+  // Pass secret explicitly — Edge Runtime may not see process.env reliably
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  const token = await getToken({ req: request, secret });
 
   // No token means unauthenticated - let the route handler deal with it
   if (!token) {

@@ -10,13 +10,16 @@ export function assertionHelpers(page: Page) {
      * Assert page has loaded successfully (no error state)
      */
     async pageLoaded() {
-      // Check no error message is visible
+      // Check no error message is visible (ignore empty Next.js dev overlay alerts)
       const errorMessage = page.locator(selectors.errorMessage);
       const hasError = await errorMessage.isVisible().catch(() => false);
 
       if (hasError) {
-        const errorText = await errorMessage.textContent();
-        throw new Error(`Page loaded with error: ${errorText}`);
+        const errorText = (await errorMessage.textContent())?.trim();
+        // Skip empty alerts (Next.js dev overlay creates an empty [role="alert"])
+        if (errorText) {
+          throw new Error(`Page loaded with error: ${errorText}`);
+        }
       }
 
       // Wait for loading spinners to disappear
