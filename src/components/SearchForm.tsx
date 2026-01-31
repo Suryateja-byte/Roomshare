@@ -44,6 +44,7 @@ const ROOM_TYPE_TABS = [
     { value: 'Entire Place', label: 'Entire', icon: Building2 },
 ] as const;
 
+
 /**
  * Validate a move-in date string. Returns the date if valid (today or future, within 2 years),
  * otherwise returns empty string. This matches the server-side safeParseDate logic.
@@ -100,6 +101,7 @@ function clampPriceParam(raw: string | null): string {
 
 export default function SearchForm({ variant = 'default' }: { variant?: 'default' | 'compact' }) {
     const searchParams = useSearchParams();
+    const formRef = useRef<HTMLFormElement | null>(null);
     const parseParamList = (key: string): string[] => {
         const values = searchParams.getAll(key);
         if (values.length === 0) return [];
@@ -266,7 +268,15 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         const trimmedLocation = location.trim();
         if (trimmedLocation.length > 2 && !selectedCoords) {
             // User needs to select a location from dropdown
-            // The warning is already shown via showLocationWarning
+            // Scroll the warning into view and briefly shake it for emphasis
+            const warningEl = document.getElementById('location-warning');
+            if (warningEl) {
+                warningEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                warningEl.classList.remove('animate-shake');
+                // Force reflow to restart animation
+                void warningEl.offsetWidth;
+                warningEl.classList.add('animate-shake');
+            }
             return;
         }
 
@@ -448,10 +458,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         flushSync(() => {
             setRoomType(value === 'any' ? '' : value);
         });
-        const form = document.querySelector('form[role="search"]') as HTMLFormElement;
-        if (form) {
-            form.requestSubmit();
-        }
+        formRef.current?.requestSubmit();
     }, []);
 
     // Room type selection from FilterBar CategoryTabs — sets state AND triggers search
@@ -460,10 +467,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         flushSync(() => {
             setRoomType(value === 'any' ? '' : value);
         });
-        const form = document.querySelector('form[role="search"]') as HTMLFormElement;
-        if (form) {
-            form.requestSubmit();
-        }
+        formRef.current?.requestSubmit();
     }, []);
 
     // Clear all filters and reset to defaults
@@ -639,6 +643,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     return (
         <div className={`w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? 'max-w-2xl' : 'max-w-4xl'}`}>
             <form
+                ref={formRef}
                 onSubmit={handleSearch}
                 className={`group relative flex flex-col md:flex-row md:items-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] border border-zinc-200/80 dark:border-zinc-700/80 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-[0_4px_20px_rgba(0,0,0,0.1),0_16px_48px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.3),0_16px_48px_rgba(0,0,0,0.2)] transition-all duration-200 w-full ${isCompact ? 'p-1' : 'p-1.5 md:p-2 md:pr-2'}`}
                 role="search"
@@ -856,7 +861,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
             {/* Location warning when user hasn't selected from dropdown */}
             {showLocationWarning && !isCompact && (
-                <div className="mt-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2">
+                <div id="location-warning" className="mt-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2">
                     <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
@@ -875,10 +880,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                     // Trigger search with current filters via requestSubmit
                     // (dispatchEvent with new Event won't trigger React's onSubmit handler)
                     queueMicrotask(() => {
-                        const form = document.querySelector('form[role="search"]') as HTMLFormElement;
-                        if (form) {
-                            form.requestSubmit();
-                        }
+                        formRef.current?.requestSubmit();
                     });
                 }}
                 onClearAll={handleClearAllFilters}

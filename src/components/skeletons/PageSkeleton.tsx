@@ -1,4 +1,5 @@
 import { Skeleton, TextSkeleton, CardSkeleton } from "./Skeleton";
+import { ListingCardSkeleton } from "./ListingCardSkeleton";
 
 export function PageSkeleton() {
   return (
@@ -16,7 +17,7 @@ export function PageSkeleton() {
       </header>
 
       {/* Main content skeleton */}
-      <main className="mx-auto max-w-7xl px-4 py-8">
+      <div className="mx-auto max-w-7xl px-4 py-8">
         {/* Title section */}
         <div className="mb-8">
           <Skeleton variant="text" width={300} height={32} className="mb-2" />
@@ -29,7 +30,7 @@ export function PageSkeleton() {
             <CardSkeleton key={i} />
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -151,7 +152,7 @@ export function ListingSkeleton() {
 export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading listings">
-      <main className="mx-auto max-w-7xl px-4 py-8">
+      <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-8">
           <Skeleton variant="text" width={250} height={32} className="mb-2" />
           <Skeleton variant="text" width={180} height={18} />
@@ -161,14 +162,14 @@ export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
             <ListingSkeleton key={i} />
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
 
 export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-20" aria-busy="true" aria-label="Loading search results">
+    <div className="h-screen flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-[80px] sm:pt-[96px]" aria-busy="true" aria-label="Loading search results">
       {/* Search Header Skeleton */}
       <header className="w-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800">
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
@@ -220,62 +221,10 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
   );
 }
 
-/**
- * Individual listing card skeleton matching the ListingCard component structure
- */
-export function ListingCardSkeleton() {
-  return (
-    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden">
-      {/* Image area with carousel dots */}
-      <div className="relative aspect-[4/3] bg-zinc-100 dark:bg-zinc-800">
-        <Skeleton variant="rectangular" className="absolute inset-0" />
-        {/* Availability badge skeleton */}
-        <div className="absolute top-3 left-3">
-          <Skeleton variant="rounded" width={70} height={24} />
-        </div>
-        {/* Favorite button skeleton */}
-        <div className="absolute top-3 right-3">
-          <Skeleton variant="circular" width={32} height={32} />
-        </div>
-        {/* Carousel dots skeleton */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} variant="circular" width={6} height={6} />
-          ))}
-        </div>
-      </div>
-      {/* Content area */}
-      <div className="p-4">
-        {/* Title and rating row */}
-        <div className="flex justify-between items-start gap-3 mb-0.5">
-          <Skeleton variant="text" width="70%" height={18} />
-          <Skeleton variant="text" width={40} height={16} />
-        </div>
-        {/* Location */}
-        <Skeleton variant="text" width="45%" height={14} className="mb-3" />
-        {/* Amenities */}
-        <div className="flex gap-1.5 mb-2">
-          <Skeleton variant="rounded" width={60} height={20} />
-          <Skeleton variant="rounded" width={50} height={20} />
-          <Skeleton variant="rounded" width={45} height={20} />
-        </div>
-        {/* Languages */}
-        <div className="flex items-center gap-1.5 mb-4">
-          <Skeleton variant="circular" width={14} height={14} />
-          <Skeleton variant="rounded" width={55} height={18} />
-          <Skeleton variant="rounded" width={50} height={18} />
-        </div>
-        {/* Price */}
-        <Skeleton variant="text" width={80} height={24} />
-      </div>
-    </div>
-  );
-}
-
 export function MessageListSkeleton() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading messages">
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={200} height={32} className="mb-2" />
         </div>
@@ -291,7 +240,7 @@ export function MessageListSkeleton() {
             </div>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -299,7 +248,7 @@ export function MessageListSkeleton() {
 export function ChatSkeleton() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading chat">
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
           {/* Chat header */}
           <div className="flex items-center gap-4 p-4 border-b border-zinc-200 dark:border-zinc-700">
@@ -322,7 +271,7 @@ export function ChatSkeleton() {
             <Skeleton variant="rounded" height={44} />
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -330,7 +279,7 @@ export function ChatSkeleton() {
 export function AdminTableSkeleton() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading admin data">
-      <main className="mx-auto max-w-7xl px-4 py-8">
+      <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <Skeleton variant="text" width={200} height={32} />
           <Skeleton variant="rounded" width={120} height={40} />
@@ -351,7 +300,7 @@ export function AdminTableSkeleton() {
             </div>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -359,7 +308,7 @@ export function AdminTableSkeleton() {
 export function BookingsSkeleton() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading bookings">
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={180} height={32} className="mb-2" />
         </div>
@@ -379,7 +328,7 @@ export function BookingsSkeleton() {
             </div>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -387,7 +336,7 @@ export function BookingsSkeleton() {
 export function SettingsSkeleton() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading settings">
-      <main className="mx-auto max-w-2xl px-4 py-8">
+      <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-8">
           <Skeleton variant="text" width={150} height={32} />
         </div>
@@ -409,7 +358,7 @@ export function SettingsSkeleton() {
             </section>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -417,7 +366,7 @@ export function SettingsSkeleton() {
 export function SavedSearchesSkeleton() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading saved searches">
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={200} height={32} className="mb-2" />
         </div>
@@ -435,7 +384,7 @@ export function SavedSearchesSkeleton() {
             </div>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -443,7 +392,7 @@ export function SavedSearchesSkeleton() {
 export function NotificationsSkeleton() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading notifications">
-      <main className="mx-auto max-w-2xl px-4 py-8">
+      <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={180} height={32} />
         </div>
@@ -459,7 +408,7 @@ export function NotificationsSkeleton() {
             </div>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

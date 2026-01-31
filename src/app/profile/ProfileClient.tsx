@@ -146,7 +146,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
     if (!user || !user.id) {
         return (
             <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 font-sans pb-20 pt-20">
-                <main className="container mx-auto max-w-5xl px-4 sm:px-6 py-10">
+                <div className="container mx-auto max-w-5xl px-4 sm:px-6 py-10">
                     <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 shadow-sm border border-zinc-100 dark:border-zinc-800 mb-8">
                         <div className="flex flex-col md:flex-row gap-6 md:gap-8 md:items-start animate-pulse">
                             {/* Avatar skeleton */}
@@ -180,7 +180,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                             </div>
                         </div>
                     </div>
-                </main>
+                </div>
             </div>
         );
     }
@@ -190,7 +190,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
 
     return (
         <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black pb-20 pt-16">
-            <main className="container mx-auto max-w-5xl px-4 sm:px-6 py-6">
+            <div className="container mx-auto max-w-5xl px-4 sm:px-6 py-6">
 
                 {/* Profile Header */}
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 shadow-sm border border-zinc-100 dark:border-zinc-800 mb-8 relative overflow-hidden">
@@ -234,7 +234,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                                     <button
                                         onClick={handleEdit}
                                         disabled={isEditing}
-                                        className="h-10 px-6 rounded-full border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                        className="h-10 px-6 rounded-full border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2 disabled:opacity-60"
                                     >
                                         <Edit2 className="w-4 h-4" /> Edit Profile
                                     </button>
@@ -328,7 +328,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                         <button
                             onClick={handleLogout}
                             disabled={isLoggingOut}
-                            className="w-full py-4 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-2xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full py-4 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-2xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             {isLoggingOut ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -396,7 +396,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
 
                     </div>
                 </div>
-            </main>
+            </div>
         </div>
     );
 }

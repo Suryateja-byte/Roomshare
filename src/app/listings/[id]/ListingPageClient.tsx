@@ -228,7 +228,7 @@ export default function ListingPageClient({
             {/* Real-time freshness check for non-owners */}
             {!isOwner && <ListingFreshnessCheck listingId={listing.id} />}
 
-            <main className="pt-6">
+            <div className="pt-6">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
                     {/* Breadcrumbs & Title Header */}
@@ -489,6 +489,12 @@ export default function ListingPageClient({
                                             <ListingStatusToggle listingId={listing.id} currentStatus={listing.status as 'ACTIVE' | 'PAUSED' | 'RENTED'} />
                                         </div>
 
+                                        {/* Price */}
+                                        <div className="mb-6 text-center">
+                                            <span className="text-2xl font-bold text-zinc-900 dark:text-white">${listing.price?.toLocaleString()}</span>
+                                            <span className="text-sm text-zinc-500 dark:text-zinc-400">/mo</span>
+                                        </div>
+
                                         {/* Stats Preview */}
                                         <div className="grid grid-cols-2 gap-4 mb-6">
                                             <StatCard label="Views" value={listing.viewCount} />
@@ -552,7 +558,7 @@ export default function ListingPageClient({
 
                     </div>
                 </div>
-            </main>
+            </div>
 
             {/* Neighborhood AI Chat Widget */}
             {coordinates && (

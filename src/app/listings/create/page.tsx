@@ -55,7 +55,7 @@ export default async function CreateListingPage() {
                 </p>
             </div>
 
-            <main className="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
                 {/* Soft warning banner if profile is less than 60% complete */}
                 {profileCompletion.percentage < 60 && (
                     <ProfileWarningBanner
@@ -67,7 +67,7 @@ export default async function CreateListingPage() {
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 md:p-12 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800">
                     <CreateListingForm />
                 </div>
-            </main>
+            </div>
         </div>
     );
 }

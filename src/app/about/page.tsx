@@ -51,7 +51,7 @@ export default function AboutPage() {
     return (
         <div className="min-h-screen bg-white dark:bg-zinc-950 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black">
 
-            <main>
+            <div>
                 {/* Hero Section */}
                 <section className="relative pt-20 pb-32 px-6 overflow-hidden">
                     <div className="container mx-auto max-w-5xl text-center">
@@ -166,10 +166,10 @@ export default function AboutPage() {
 
                 {/* Minimal Footer */}
                 <footer className="py-8 px-6 bg-zinc-900 border-t border-zinc-800 text-center">
-                    <p className="text-xs text-zinc-500">© {new Date().getFullYear()} RoomShare Inc. Crafted with care.</p>
+                    <p className="text-xs text-zinc-400">© {new Date().getFullYear()} RoomShare Inc. Crafted with care.</p>
                 </footer>
 
-            </main>
+            </div>
         </div>
     );
 }

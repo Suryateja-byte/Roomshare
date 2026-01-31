@@ -256,6 +256,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
 
     return (
         <nav
+            aria-label="Main navigation"
             className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-300 ease-in-out ${isScrolled
                 ? 'py-3 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border-b border-zinc-200/80 dark:border-white/10 shadow-lg shadow-zinc-900/5 dark:shadow-black/20'
                 : 'py-4 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-md'

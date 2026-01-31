@@ -90,7 +90,7 @@ function LoginForm() {
                         </div>
                     </div>
                 </div>
-                <p className="relative z-10 text-sm text-zinc-500">© {new Date().getFullYear()} RoomShare Inc.</p>
+                <p className="relative z-10 text-sm text-zinc-400">© {new Date().getFullYear()} RoomShare Inc.</p>
             </div>
 
             {/* Right Form */}
@@ -131,7 +131,7 @@ function LoginForm() {
                             }
                         }}
                         disabled={googleLoading}
-                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors font-medium text-zinc-700 dark:text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors font-medium text-zinc-700 dark:text-white shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         {googleLoading ? (
                             <Loader2 className="w-5 h-5 animate-spin" />
@@ -163,7 +163,7 @@ function LoginForm() {
                             <div className="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
                         </div>
                         <div className="relative flex justify-center text-xs uppercase tracking-wider font-medium">
-                            <span className="bg-white dark:bg-zinc-950 px-4 text-zinc-400">or continue with email</span>
+                            <span className="bg-white dark:bg-zinc-950 px-4 text-zinc-600 dark:text-zinc-400">or continue with email</span>
                         </div>
                     </div>
 
@@ -215,7 +215,7 @@ function LoginForm() {
                                     onClick={() => setShowPassword(!showPassword)}
                                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
                                     tabIndex={-1}
-                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    aria-label="Toggle password visibility"
                                 >
                                     {showPassword ? (
                                         <EyeOff className="h-5 w-5" strokeWidth={1.5} />

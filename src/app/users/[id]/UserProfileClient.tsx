@@ -177,7 +177,7 @@ export default function UserProfileClient({ user, isOwnProfile, averageRating, c
 
     return (
         <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black pb-20 pt-24">
-            <main className="container mx-auto max-w-5xl px-6 py-10">
+            <div className="container mx-auto max-w-5xl px-6 py-10">
 
                 {/* Profile Header */}
                 <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 md:p-12 shadow-sm border border-zinc-100 dark:border-zinc-800 mb-8 relative overflow-hidden">
@@ -394,7 +394,7 @@ export default function UserProfileClient({ user, isOwnProfile, averageRating, c
                         )}
                     </div>
                 </div>
-            </main>
+            </div>
         </div>
     );
 }
