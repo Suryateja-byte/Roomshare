@@ -271,7 +271,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             // Scroll the warning into view and briefly shake it for emphasis
             const warningEl = document.getElementById('location-warning');
             if (warningEl) {
-                warningEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                warningEl.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
                 warningEl.classList.remove('animate-shake');
                 // Force reflow to restart animation
                 void warningEl.offsetWidth;
