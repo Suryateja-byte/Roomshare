@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import UserAvatar from '@/components/UserAvatar';
 import { startConversation } from '@/app/actions/chat';
+import BlockUserButton from '@/components/BlockUserButton';
 
 type UserWithDetails = {
     id: string;
@@ -241,6 +242,10 @@ export default function UserProfileClient({ user, isOwnProfile, averageRating, c
                                                     {isContactLoading ? 'Loading...' : 'Contact'}
                                                 </Button>
                                             )}
+                                            <BlockUserButton
+                                                userId={user.id}
+                                                userName={user.name || 'User'}
+                                            />
                                         </>
                                     )}
                                 </div>

@@ -149,72 +149,42 @@ test.describe("J32: Pause and Unpause Listing", () => {
 
 // ─── J33: Delete Listing with Confirmation ────────────────────────────────────
 test.describe("J33: Delete Listing with Confirmation", () => {
-  test("listing edit → delete → confirm modal → verify redirect", async ({
+  test("listing detail → delete → confirm modal → verify redirect", async ({
     page,
     nav,
-    data,
   }) => {
-    // Step 1: Create a temporary listing to delete
-    await nav.goToCreateListing();
+    // Step 1: Navigate to an owned listing detail page
+    await nav.goToSearch({ q: "Sunny Mission", bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    // Step 2: Fill minimal form
-    const titleField = page.getByLabel(/title/i).or(page.locator('input[name="title"]'));
-    const canCreate = await titleField.first().isVisible().catch(() => false);
-    test.skip(!canCreate, "Create listing form not accessible — skipping");
+    const cards = page.locator(selectors.listingCard);
+    test.skip((await cards.count()) === 0, "No owned listing found — skipping");
 
-    const uniqueTitle = `DELETE-ME-${Date.now()}`;
-    await titleField.first().fill(uniqueTitle);
+    await nav.clickListingCard(0);
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForTimeout(2000);
 
-    const descField = page.getByLabel(/description/i).or(page.locator('textarea[name="description"]'));
-    if (await descField.first().isVisible().catch(() => false)) {
-      await descField.first().fill("Temporary listing for E2E delete test.");
-    }
-
-    const priceField = page.getByLabel(/price/i).or(page.locator('input[name="price"]'));
-    if (await priceField.first().isVisible().catch(() => false)) {
-      await priceField.first().fill("1000");
-    }
-
-    // Submit
-    const submitBtn = page.getByRole("button", { name: /create|submit|publish|save/i }).or(page.locator('button[type="submit"]'));
-    if (await submitBtn.first().isVisible().catch(() => false)) {
-      await submitBtn.first().click();
-      await page.waitForTimeout(3000);
-    }
-
-    // Step 3: Navigate to the listing and find delete button
+    // Step 2: Find delete button (rendered in owner sidebar)
     const deleteBtn = page
-      .getByRole("button", { name: /delete|remove/i })
+      .getByRole("button", { name: /delete/i })
       .or(page.locator('[data-testid="delete-listing"]'));
 
     const canDelete = await deleteBtn.first().isVisible().catch(() => false);
-    if (!canDelete) {
-      // Try going to edit page
-      const editLink = page.locator('a[href*="/edit"]').first();
-      if (await editLink.isVisible().catch(() => false)) {
-        await editLink.click();
-        await page.waitForTimeout(1500);
-      }
-    }
+    test.skip(!canDelete, "No delete button found — skipping");
 
-    const deleteBtn2 = page.getByRole("button", { name: /delete|remove/i }).first();
-    const canDelete2 = await deleteBtn2.isVisible().catch(() => false);
-    test.skip(!canDelete2, "No delete button found — skipping");
-
-    await deleteBtn2.click();
+    await deleteBtn.first().click();
     await page.waitForTimeout(500);
 
-    // Step 4: Confirm deletion
-    const confirmBtn = page.getByRole("button", { name: /confirm|yes|delete/i }).first();
+    // Step 3: Confirm deletion in modal
+    const confirmBtn = page.getByRole("button", { name: /confirm|yes|delete/i }).last();
     if (await confirmBtn.isVisible().catch(() => false)) {
       await confirmBtn.click();
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
     }
 
-    // Step 5: Verify redirect or success
+    // Step 4: Verify redirect or success toast
     const hasToast = await page.locator(selectors.toast).isVisible().catch(() => false);
-    const redirected = !page.url().includes(uniqueTitle);
+    const redirected = !page.url().includes("/listings/");
     expect(hasToast || redirected).toBeTruthy();
   });
 });

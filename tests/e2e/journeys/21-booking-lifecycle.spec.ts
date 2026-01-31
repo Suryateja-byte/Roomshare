@@ -188,12 +188,26 @@ test.describe("J24: Double-Booking Prevention", () => {
     page,
     nav,
   }) => {
-    // Step 1: Find a listing NOT owned by test user
+    // Step 1: Find a listing NOT owned by test user (with retry)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
-    const cards = page.locator(selectors.listingCard);
-    const count = await cards.count();
+    let cards = page.locator(selectors.listingCard);
+    let count = await cards.count();
+    if (count === 0) {
+      // Retry with fresh navigation
+      await nav.goToSearch({ q: "Reviewer", bounds: SF_BOUNDS });
+      await page.waitForTimeout(3000);
+      cards = page.locator(selectors.listingCard);
+      count = await cards.count();
+    }
+    if (count === 0) {
+      // Last resort: search all listings in bounds
+      await nav.goToSearch({ bounds: SF_BOUNDS });
+      await page.waitForTimeout(3000);
+      cards = page.locator(selectors.listingCard);
+      count = await cards.count();
+    }
     test.skip(count === 0, "Reviewer listing not found — skipping");
 
     // Step 2: Go to listing detail

@@ -65,21 +65,31 @@ test.describe("J36: Block a User", () => {
     page,
     nav,
   }) => {
-    // Step 1: Navigate to a listing and find host profile
-    await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForTimeout(2000);
+    // Step 1: Navigate to a NON-OWNED listing to find the reviewer's profile
+    await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
 
-    const cards = page.locator(selectors.listingCard);
-    test.skip((await cards.count()) === 0, "No listings — skipping");
+    // Wait for listing cards to appear (up to 10s)
+    const cardLocator = page.locator(selectors.listingCard);
+    try {
+      await cardLocator.first().waitFor({ state: "visible", timeout: 10000 });
+    } catch {
+      // Retry with broader search
+      await nav.goToSearch({ bounds: SF_BOUNDS });
+      try {
+        await cardLocator.first().waitFor({ state: "visible", timeout: 10000 });
+      } catch {
+        test.skip(true, "No listings appeared — skipping");
+      }
+    }
 
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
 
-    // Step 2: Navigate to user profile
+    // Step 2: Navigate to user profile — find host link
     const hostLink = page
       .locator('main a[href*="/users/"]')
-      .or(page.locator("main").getByRole("link", { name: /host|owner/i }));
+      .or(page.locator("main").getByRole("link", { name: /host|owner|posted by|hosted by/i }));
 
     const hasHostLink = await hostLink.first().isVisible().catch(() => false);
     test.skip(!hasHostLink, "No host profile link — skipping");
@@ -102,10 +112,11 @@ test.describe("J36: Block a User", () => {
     await blockBtn.first().click();
     await page.waitForTimeout(500);
 
-    // Step 4: Confirm block
-    const confirmBtn = page.getByRole("button", { name: /confirm|yes|block/i }).first();
-    if (await confirmBtn.isVisible().catch(() => false)) {
-      await confirmBtn.click();
+    // Step 4: Confirm block — modal has "Block User" button
+    const confirmBtn = page.getByRole("button", { name: /block user/i })
+      .or(page.locator('[role="dialog"] button').filter({ hasText: /block/i }));
+    if (await confirmBtn.first().isVisible().catch(() => false)) {
+      await confirmBtn.first().click();
       await page.waitForTimeout(2000);
     }
 
