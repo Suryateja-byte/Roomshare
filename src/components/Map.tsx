@@ -869,8 +869,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         <div
                             className={cn(
                                 "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none",
-                                "transition-all duration-200 ease-out",
-                                hoveredId === position.listing.id && "scale-125 z-50",
+                                // Spring easing for scale: cubic-bezier(0.34, 1.56, 0.64, 1)
+                                "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
+                                hoveredId === position.listing.id && "scale-[1.15] z-50",
+                                activeId === position.listing.id && !hoveredId && "z-40",
                                 hoveredId && hoveredId !== position.listing.id && "opacity-60"
                             )}
                             data-listing-id={position.listing.id}
@@ -928,7 +930,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                                 ? "px-2 py-1 rounded-lg text-xs"
                                                 : "px-3 py-1.5 rounded-xl text-sm",
                                             isHovered
-                                                ? "bg-rose-500 text-white ring-2 ring-white dark:ring-zinc-900 scale-105"
+                                                ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ring-2 ring-zinc-900 dark:ring-white scale-105"
                                                 : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
                                         )}>
                                             ${position.listing.price}
@@ -940,7 +942,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                                 ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"
                                                 : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",
                                             isHovered
-                                                ? "border-t-rose-500"
+                                                ? "border-t-white dark:border-t-zinc-700"
                                                 : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
                                         )} />
                                         {/* Shadow under pin */}
@@ -953,9 +955,14 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                     </>
                                 );
                             })()}
-                            {/* Pulsing ring on hover for visibility on dense maps */}
-                            {hoveredId === position.listing.id && (
-                                <div className="absolute -inset-2 -top-2 rounded-full border-2 border-rose-400 animate-ping opacity-40 pointer-events-none motion-reduce:animate-none" />
+                            {/* Pulsing ring on hover/active for visibility on dense maps */}
+                            {(hoveredId === position.listing.id || activeId === position.listing.id) && (
+                                <div className={cn(
+                                    "absolute -inset-2 -top-2 rounded-full border-2 pointer-events-none motion-reduce:animate-none",
+                                    hoveredId === position.listing.id
+                                        ? "border-zinc-900 dark:border-white animate-ping opacity-40"
+                                        : "border-zinc-400 dark:border-zinc-500 animate-[pulse-ring_2s_ease-in-out_infinite] opacity-30"
+                                )} />
                             )}
                         </div>
                     </Marker>
