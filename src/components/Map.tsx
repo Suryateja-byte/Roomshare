@@ -27,6 +27,7 @@ import { MapMovedBanner } from './map/MapMovedBanner';
 import { MapGestureHint } from './map/MapGestureHint';
 import { PrivacyCircle } from './map/PrivacyCircle';
 import { BoundaryLayer } from './map/BoundaryLayer';
+import { UserMarker, useUserPin } from './map/UserMarker';
 import { cn } from '@/lib/utils';
 
 interface Listing {
@@ -738,6 +739,16 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
+    // User pin (drop-a-pin) state
+    const { isDropMode, toggleDropMode, pin: userPin, setPin: setUserPin, handleMapClick: handleUserPinClick } = useUserPin(token || '');
+
+    // Get hovered listing coords for distance display
+    const hoveredListingCoords = useMemo(() => {
+        if (!hoveredId) return null;
+        const listing = listings.find(l => l.id === hoveredId);
+        return listing ? { lat: listing.location.lat, lng: listing.location.lng } : null;
+    }, [hoveredId, listings]);
+
     if (!token) {
         return (
             <div className="w-full h-full rounded-xl overflow-hidden border shadow-lg relative bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
@@ -813,7 +824,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 }}
                 onMoveStart={() => setAreTilesLoading(true)}
                 onIdle={() => setAreTilesLoading(false)}
-                onClick={useClustering ? onClusterClick : undefined}
+                onClick={async (e: MapLayerMouseEvent) => {
+                    // User pin drop takes priority
+                    if (isDropMode && e.lngLat) {
+                        await handleUserPinClick(e.lngLat.lng, e.lngLat.lat);
+                        return;
+                    }
+                    // Otherwise handle cluster click
+                    if (useClustering) onClusterClick(e);
+                }}
                 interactiveLayerIds={useClustering ? (isDarkMode ? ['clusters-dark', 'cluster-count-dark'] : ['clusters', 'cluster-count']) : []}
                 onError={(e) => {
                     const error = (e as { error?: Error }).error;
@@ -1092,6 +1111,17 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         </div>
                     </Popup>
                 )}
+
+                {/* User-placed pin marker */}
+                <UserMarker
+                    isDropMode={isDropMode}
+                    onToggleDropMode={toggleDropMode}
+                    pin={userPin}
+                    onSetPin={setUserPin}
+                    mapboxToken={token}
+                    hoveredListingCoords={hoveredListingCoords}
+                    isDarkMode={isDarkMode}
+                />
             </Map>
 
             {/* Search as I move toggle - prominent pill button */}
