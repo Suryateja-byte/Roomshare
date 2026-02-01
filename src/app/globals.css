@@ -115,6 +115,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-family: var(--font-inter), 'Inter-fallback', ui-sans-serif, system-ui, sans-serif;
+    /* Fluid base font size: scales with viewport for dynamic type support.
+       Respects OS font-size preferences since rem is relative to root.
+       Range: 14px (320vw) → 16px (1280vw) */
+    font-size: clamp(0.875rem, 0.833rem + 0.208vw, 1rem);
     /* Prevent Radix UI scroll lock from shifting content */
     padding-right: 0 !important;
   }
