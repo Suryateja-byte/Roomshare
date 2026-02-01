@@ -17,7 +17,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Home, Loader2, MapPin, Maximize2, X } from 'lucide-react';
+import { Home, Loader2, MapPin, Maximize2, X, Map as MapIcon, Satellite, TrainFront } from 'lucide-react';
 import { Button } from './ui/button';
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from './SearchForm';
 import { useListingFocus } from '@/contexts/ListingFocusContext';
@@ -183,6 +183,13 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [isHighContrast, setIsHighContrast] = useState(false);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [currentZoom, setCurrentZoom] = useState(12);
+    const [mapStyleKey, setMapStyleKey] = useState<'standard' | 'satellite' | 'transit'>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = sessionStorage.getItem('roomshare-map-style');
+            if (saved === 'satellite' || saved === 'transit') return saved;
+        }
+        return 'standard';
+    });
     const [areTilesLoading, setAreTilesLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const { hoveredId, activeId, setHovered, setActive, requestScrollTo } = useListingFocus();
@@ -814,10 +821,18 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 mapboxAccessToken={token}
                 initialViewState={initialViewState}
                 style={{ width: '100%', height: '100%' }}
-                mapStyle={isHighContrast
-                    ? (isDarkMode ? "mapbox://styles/mapbox/navigation-night-v1" : "mapbox://styles/mapbox/navigation-day-v1")
-                    : (isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v11")
-                }
+                mapStyle={(() => {
+                    if (isHighContrast) {
+                        return isDarkMode ? "mapbox://styles/mapbox/navigation-night-v1" : "mapbox://styles/mapbox/navigation-day-v1";
+                    }
+                    if (mapStyleKey === 'satellite') {
+                        return "mapbox://styles/mapbox/satellite-streets-v12";
+                    }
+                    if (mapStyleKey === 'transit') {
+                        return isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/light-v11";
+                    }
+                    return isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v11";
+                })()}
                 onMoveEnd={handleMoveEnd}
                 onLoad={() => {
                     setIsMapLoaded(true);
@@ -1167,6 +1182,38 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 >
                     <Maximize2 className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
                 </button>
+            )}
+
+            {/* Map style toggle — Standard / Satellite / Transit */}
+            {isMapLoaded && (
+                <div className="absolute bottom-4 right-16 z-10 flex rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700 overflow-hidden" role="radiogroup" aria-label="Map style">
+                    {([
+                        { key: 'standard' as const, icon: <MapIcon className="w-3.5 h-3.5" />, label: 'Standard' },
+                        { key: 'satellite' as const, icon: <Satellite className="w-3.5 h-3.5" />, label: 'Satellite' },
+                        { key: 'transit' as const, icon: <TrainFront className="w-3.5 h-3.5" />, label: 'Transit' },
+                    ]).map(style => (
+                        <button
+                            key={style.key}
+                            role="radio"
+                            aria-checked={mapStyleKey === style.key}
+                            onClick={() => {
+                                setMapStyleKey(style.key);
+                                try { sessionStorage.setItem('roomshare-map-style', style.key); } catch { /* SSR safe */ }
+                            }}
+                            className={cn(
+                                "flex items-center gap-1 px-2.5 py-2 text-xs font-medium transition-colors",
+                                mapStyleKey === style.key
+                                    ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
+                                    : "bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                            )}
+                            aria-label={style.label}
+                            title={style.label}
+                        >
+                            {style.icon}
+                            <span className="hidden sm:inline">{style.label}</span>
+                        </button>
+                    ))}
+                </div>
             )}
 
             {/* MapMovedBanner - Shows when user panned with search-as-move OFF */}
