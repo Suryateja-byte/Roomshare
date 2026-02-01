@@ -79,7 +79,7 @@ export function FilterChip({
             "rounded-full",
             "bg-emerald-100 dark:bg-emerald-900/50",
             "text-emerald-700 dark:text-emerald-300",
-            "opacity-0 group-hover/chip:opacity-100",
+            impactDelta ? "opacity-100" : "opacity-0 group-hover/chip:opacity-100",
             "transition-opacity duration-150",
           )}
           aria-label={
@@ -110,7 +110,7 @@ export function FilterChip({
           "hover:text-zinc-700 dark:hover:text-zinc-200",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400",
           "transition-colors duration-150",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
+          "disabled:opacity-60 disabled:cursor-not-allowed",
           // WCAG: 44x44px minimum touch target via pseudo-element (16px + 14px*2 = 44px)
           "before:absolute before:inset-0 before:-m-[14px] before:content-['']",
         )}

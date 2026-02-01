@@ -63,24 +63,25 @@ export function AppliedFilterChips({
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
         {/* Filter chips */}
         <div className="flex items-center gap-2 flex-nowrap">
-          {chips.map((chip) => (
+          {chips.map((chip, i) => (
             <FilterChipWithImpact
               key={chip.id}
               chip={chip}
               onRemove={() => handleRemove(chip)}
               isRemoving={isPending}
               currentCount={currentCount}
+              index={i}
             />
           ))}
         </div>
 
         {/* Clear All button - only show when multiple filters */}
-        {chips.length > 1 && (
+        {chips.length >= 1 && (
           <button
             type="button"
             onClick={handleClearAll}
             disabled={isPending}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Clear all filters"
           >
             <X className="w-3.5 h-3.5" aria-hidden="true" />
