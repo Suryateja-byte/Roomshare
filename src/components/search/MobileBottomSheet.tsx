@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
+import PullToRefresh from "./PullToRefresh";
 
 /**
  * Snap points as fractions of viewport height (from bottom).
@@ -37,6 +38,8 @@ interface MobileBottomSheetProps {
   snapIndex?: number;
   /** Callback when snap index changes */
   onSnapChange?: (index: number) => void;
+  /** Called when pull-to-refresh gesture completes */
+  onRefresh?: () => Promise<void>;
 }
 
 /**
@@ -59,6 +62,7 @@ export default function MobileBottomSheet({
   headerText,
   snapIndex: controlledSnap,
   onSnapChange,
+  onRefresh,
 }: MobileBottomSheetProps) {
   const [internalSnap, setInternalSnap] = useState(1); // Start at half
   const snapIndex = controlledSnap ?? internalSnap;
@@ -320,7 +324,13 @@ export default function MobileBottomSheet({
             overflowY: isCollapsed ? "hidden" : "auto",
           }}
         >
-          {children}
+          {onRefresh ? (
+            <PullToRefresh onRefresh={onRefresh} enabled={!isCollapsed}>
+              {children}
+            </PullToRefresh>
+          ) : (
+            children
+          )}
         </div>
       </m.div>
     </LazyMotion>
