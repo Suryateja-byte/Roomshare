@@ -14,6 +14,7 @@ interface FavoriteButtonProps {
 export default function FavoriteButton({ listingId, initialIsSaved = false, className }: FavoriteButtonProps) {
     const [isSaved, setIsSaved] = useState(initialIsSaved);
     const [isLoading, setIsLoading] = useState(false);
+    const [animating, setAnimating] = useState(false);
     const router = useRouter();
 
     // P2-3: Memoize handler to improve INP by preventing function recreation on each render
@@ -24,9 +25,14 @@ export default function FavoriteButton({ listingId, initialIsSaved = false, clas
         if (isLoading) return;
 
         setIsLoading(true);
-        // Optimistic update
+        // Optimistic update with bounce animation on save
         const previousState = isSaved;
-        setIsSaved(!isSaved);
+        const willSave = !isSaved;
+        setIsSaved(willSave);
+        if (willSave) {
+            setAnimating(true);
+            setTimeout(() => setAnimating(false), 400);
+        }
 
         try {
             const response = await fetch('/api/favorites', {
@@ -74,7 +80,8 @@ export default function FavoriteButton({ listingId, initialIsSaved = false, clas
             <Heart
                 className={cn(
                     "w-4 h-4 transition-all duration-300",
-                    isSaved ? "fill-current scale-110" : "scale-100"
+                    isSaved ? "fill-current scale-110" : "scale-100",
+                    animating && "animate-heart-bounce"
                 )}
             />
         </button>
