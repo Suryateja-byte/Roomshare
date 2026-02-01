@@ -176,6 +176,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
     const [unclusteredListings, setUnclusteredListings] = useState<Listing[]>([]);
     const [isDarkMode, setIsDarkMode] = useState(false);
+    const [isHighContrast, setIsHighContrast] = useState(false);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [currentZoom, setCurrentZoom] = useState(12);
     const [areTilesLoading, setAreTilesLoading] = useState(false);
@@ -251,6 +252,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
         return () => observer.disconnect();
+    }, []);
+
+    // Detect high contrast preference
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-contrast: more)');
+        setIsHighContrast(mq.matches);
+        const handler = (e: MediaQueryListEvent) => setIsHighContrast(e.matches);
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
     }, []);
 
     // Always enable clustering — Mapbox handles any count gracefully.
@@ -790,7 +800,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 mapboxAccessToken={token}
                 initialViewState={initialViewState}
                 style={{ width: '100%', height: '100%' }}
-                mapStyle={isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v11"}
+                mapStyle={isHighContrast
+                    ? (isDarkMode ? "mapbox://styles/mapbox/navigation-night-v1" : "mapbox://styles/mapbox/navigation-day-v1")
+                    : (isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v11")
+                }
                 onMoveEnd={handleMoveEnd}
                 onLoad={() => {
                     setIsMapLoaded(true);
