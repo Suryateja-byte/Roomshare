@@ -33,6 +33,10 @@ interface MobileBottomSheetProps {
   children: ReactNode;
   /** Result count text shown in the sheet header */
   headerText?: string;
+  /** Controlled snap index (0=collapsed, 1=half, 2=expanded) */
+  snapIndex?: number;
+  /** Callback when snap index changes */
+  onSnapChange?: (index: number) => void;
 }
 
 /**
@@ -53,8 +57,22 @@ interface MobileBottomSheetProps {
 export default function MobileBottomSheet({
   children,
   headerText,
+  snapIndex: controlledSnap,
+  onSnapChange,
 }: MobileBottomSheetProps) {
-  const [snapIndex, setSnapIndex] = useState(1); // Start at half
+  const [internalSnap, setInternalSnap] = useState(1); // Start at half
+  const snapIndex = controlledSnap ?? internalSnap;
+  const setSnapIndex = useCallback(
+    (valOrFn: number | ((prev: number) => number)) => {
+      const newVal = typeof valOrFn === "function" ? valOrFn(snapIndex) : valOrFn;
+      if (onSnapChange) {
+        onSnapChange(newVal);
+      } else {
+        setInternalSnap(newVal);
+      }
+    },
+    [snapIndex, onSnapChange],
+  );
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
