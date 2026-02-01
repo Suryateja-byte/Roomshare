@@ -55,6 +55,47 @@ const MAP_COLORS = {
     zinc800: '#27272a',
 };
 
+// Price bucket colors for cluster rings (green = affordable, yellow = mid, red = expensive)
+const CLUSTER_RING_COLORS = {
+    green: '#22c55e',   // < $800/mo avg
+    yellow: '#eab308',  // $800-$1500/mo avg
+    red: '#ef4444',     // > $1500/mo avg
+};
+
+// Shared cluster radius expression
+const clusterRadiusExpr = [
+    'step',
+    ['get', 'point_count'],
+    20,      // 20px radius for < 10 points
+    10, 25,  // 25px radius for 10-49 points
+    50, 32,  // 32px radius for 50-99 points
+    100, 40  // 40px radius for 100+ points
+] as const;
+
+// Price-colored outer ring for clusters (rendered behind main cluster circle)
+const clusterRingLayer: LayerProps = {
+    id: 'cluster-ring',
+    type: 'circle',
+    filter: ['has', 'point_count'],
+    paint: {
+        'circle-color': 'transparent',
+        'circle-radius': [
+            'step',
+            ['get', 'point_count'],
+            24, 10, 29, 50, 36, 100, 44
+        ],
+        'circle-stroke-width': 3,
+        'circle-stroke-color': [
+            'step',
+            ['/', ['get', 'priceSum'], ['get', 'point_count']],
+            CLUSTER_RING_COLORS.green,
+            800, CLUSTER_RING_COLORS.yellow,
+            1500, CLUSTER_RING_COLORS.red,
+        ],
+        'circle-stroke-opacity': 0.7,
+    }
+};
+
 // Cluster layer - circles for grouped markers
 // Note: No 'source' property - Layer inherits from parent Source component
 const clusterLayer: LayerProps = {
@@ -62,15 +103,8 @@ const clusterLayer: LayerProps = {
     type: 'circle',
     filter: ['has', 'point_count'],
     paint: {
-        'circle-color': MAP_COLORS.zinc900, // zinc-900
-        'circle-radius': [
-            'step',
-            ['get', 'point_count'],
-            20,  // 20px radius for < 10 points
-            10, 25,  // 25px radius for 10-49 points
-            50, 32,  // 32px radius for 50-99 points
-            100, 40  // 40px radius for 100+ points
-        ],
+        'circle-color': MAP_COLORS.zinc900,
+        'circle-radius': clusterRadiusExpr as unknown as number,
         'circle-stroke-width': 3,
         'circle-stroke-color': MAP_COLORS.white
     }
@@ -83,27 +117,25 @@ const clusterLayerDark: LayerProps = {
     filter: ['has', 'point_count'],
     paint: {
         'circle-color': MAP_COLORS.white,
-        'circle-radius': [
-            'step',
-            ['get', 'point_count'],
-            20,
-            10, 25,
-            50, 32,
-            100, 40
-        ],
+        'circle-radius': clusterRadiusExpr as unknown as number,
         'circle-stroke-width': 3,
         'circle-stroke-color': MAP_COLORS.zinc900
     }
 };
 
-// Cluster count label layer
+// Cluster count label layer — shows "50+" for large clusters
 const clusterCountLayer: LayerProps = {
     id: 'cluster-count',
     type: 'symbol',
     filter: ['has', 'point_count'],
     layout: {
-        'text-field': '{point_count_abbreviated}',
-        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-field': [
+            'step',
+            ['get', 'point_count'],
+            ['to-string', ['get', 'point_count']],
+            50, ['concat', ['to-string', ['get', 'point_count_abbreviated']], '+'],
+        ] as unknown as string,
+        'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
         'text-size': 14
     },
     paint: {
@@ -117,8 +149,13 @@ const clusterCountLayerDark: LayerProps = {
     type: 'symbol',
     filter: ['has', 'point_count'],
     layout: {
-        'text-field': '{point_count_abbreviated}',
-        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-field': [
+            'step',
+            ['get', 'point_count'],
+            ['to-string', ['get', 'point_count']],
+            50, ['concat', ['to-string', ['get', 'point_count_abbreviated']], '+'],
+        ] as unknown as string,
+        'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
         'text-size': 14
     },
     paint: {

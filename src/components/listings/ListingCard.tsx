@@ -8,6 +8,7 @@ import { ImageCarousel } from './ImageCarousel';
 import { cn } from '@/lib/utils';
 import { getLanguageName } from '@/lib/languages';
 import { useListingFocus, useIsListingFocused } from '@/contexts/ListingFocusContext';
+import { TrustBadge } from '@/components/ui/TrustBadge';
 
 export interface Listing {
     id: string;
@@ -201,8 +202,8 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                         </div>
                     )}
 
-                    {/* Availability Badge - Inside image with glassmorphism */}
-                    <div className="absolute top-3 left-3 z-20">
+                    {/* Badges — top-left stack */}
+                    <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5">
                         <span className={cn(
                             "inline-flex items-center px-2.5 py-1 rounded-md text-2xs font-bold uppercase tracking-wide shadow-sm",
                             isAvailable
@@ -211,6 +212,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                         )}>
                             {isAvailable ? 'Available' : 'Filled'}
                         </span>
+                        <TrustBadge avgRating={listing.avgRating} reviewCount={listing.reviewCount} />
                     </div>
                 </div>
 
