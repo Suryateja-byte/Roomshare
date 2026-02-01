@@ -25,6 +25,7 @@ import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
 import { MapMovedBanner } from './map/MapMovedBanner';
 import { MapGestureHint } from './map/MapGestureHint';
+import { PrivacyCircle } from './map/PrivacyCircle';
 import { cn } from '@/lib/utils';
 
 interface Listing {
@@ -827,6 +828,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     console.error('Map Error:', message, error?.stack);
                 }}
             >
+                {/* Privacy circles — translucent ~200m radius around listings */}
+                <PrivacyCircle listings={listings} isDarkMode={isDarkMode} />
+
                 {/* Clustering Source and Layers - Layer nested inside Source inherits source automatically */}
                 {useClustering && (
                     <Source
