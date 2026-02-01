@@ -17,13 +17,14 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Home, Loader2, MapPin, X } from 'lucide-react';
+import { Home, Loader2, MapPin, Maximize2, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from './SearchForm';
 import { useListingFocus } from '@/contexts/ListingFocusContext';
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
 import { MapMovedBanner } from './map/MapMovedBanner';
+import { MapGestureHint } from './map/MapGestureHint';
 import { cn } from '@/lib/utils';
 
 interface Listing {
@@ -125,17 +126,24 @@ const clusterCountLayerDark: LayerProps = {
     }
 };
 
-// Threshold for when to use clustering vs individual markers
-const CLUSTER_THRESHOLD = 50;
+// Always use clustering — Mapbox handles any count gracefully.
+// With few listings, clusters simply won't form and individual markers show.
+// Previously used a threshold of 50, but this caused stale cluster layers
+// when the persistent map transitioned across the threshold boundary.
+
+// Zoom thresholds for two-tier pin display
+const ZOOM_DOTS_ONLY = 12;     // Below: all pins are gray dots (no price)
+const ZOOM_TOP_N_PINS = 14;    // 12-14: primary = price pins, mini = dots. 14+: all price pins
 
 export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
     const [unclusteredListings, setUnclusteredListings] = useState<Listing[]>([]);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
+    const [currentZoom, setCurrentZoom] = useState(12);
     const [areTilesLoading, setAreTilesLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
-    const { hoveredId, setActive, requestScrollTo } = useListingFocus();
+    const { hoveredId, activeId, setHovered, setActive, requestScrollTo } = useListingFocus();
     const router = useRouter();
     const searchParams = useSearchParams();
     const transitionContext = useSearchTransitionSafe();
@@ -154,7 +162,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     } = useMapBounds();
 
     // Banner visibility from context
-    const { showBanner, showLocationConflict, onSearch, onReset } = useMapMovedBanner();
+    const { showBanner, showLocationConflict, onSearch, onReset, areaCount, isAreaCountLoading } = useMapMovedBanner();
 
     const mapRef = useRef<any>(null);
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -163,6 +171,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     // Track URL bounds for reset functionality
     const urlBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
+    // P0 Issue #25: Track mount state to prevent stale callbacks updating state after unmount
+    const isMountedRef = useRef(true);
+    // Track map-initiated activeId to avoid re-triggering popup from card "Show on Map"
+    const lastMapActiveRef = useRef<string | null>(null);
 
     // Minimum interval between map searches (prevents 429 rate limiting)
     const MIN_SEARCH_INTERVAL_MS = 2000;
@@ -204,8 +216,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         return () => observer.disconnect();
     }, []);
 
-    // Use clustering only when there are many listings
-    const useClustering = listings.length >= CLUSTER_THRESHOLD;
+    // Always enable clustering — Mapbox handles any count gracefully.
+    // With few listings clusters simply won't form and individual markers show.
+    const useClustering = true;
 
     // Convert listings to GeoJSON for Mapbox clustering
     const geojsonData = useMemo(() => ({
@@ -245,6 +258,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         try {
             mapboxSource.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
                 if (err || !feature.geometry || feature.geometry.type !== 'Point') return;
+                // P0 Issue #25: Guard against stale callback after unmount
+                if (!isMountedRef.current) return;
 
                 // Mark as programmatic move to prevent banner showing
                 setProgrammaticMove(true);
@@ -293,6 +308,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             return true;
         });
 
+        // P0 Issue #25: Guard against state update after unmount
+        if (!isMountedRef.current) return;
         setUnclusteredListings(unique);
     }, [useClustering]);
 
@@ -436,6 +453,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     // Clear searching state when listings update from SSR
     // Also update E2E marker count tracking
     useEffect(() => {
+        // P0 Issue #25: Guard against state update after unmount
+        if (!isMountedRef.current) return;
         setIsSearching(false);
 
         // E2E testing: expose marker count for test verification
@@ -446,9 +465,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         }
     }, [listings]);
 
-    // Cleanup timers on unmount
+    // Cleanup timers on unmount and mark component as unmounted
     useEffect(() => {
         return () => {
+            // P0 Issue #25: Mark unmounted to prevent stale state updates
+            isMountedRef.current = false;
             if (debounceTimer.current) {
                 clearTimeout(debounceTimer.current);
             }
@@ -579,7 +600,23 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         });
     }, [executeMapSearch, setSearchHandler, setResetHandler, setHasUserMoved, setBoundsDirty, setProgrammaticMove]);
 
+    // When a card's "Show on Map" button sets activeId, open popup and center map
+    useEffect(() => {
+        if (!activeId || activeId === lastMapActiveRef.current) return;
+        const listing = listings.find((l) => l.id === activeId);
+        if (!listing) return;
+        setSelectedListing(listing);
+        setProgrammaticMove(true);
+        mapRef.current?.easeTo({
+            center: [listing.location.lng, listing.location.lat],
+            offset: [0, -150],
+            duration: 400,
+        });
+    }, [activeId, listings, setProgrammaticMove]);
+
     const handleMoveEnd = (e: ViewStateChangeEvent) => {
+        // Track zoom for two-tier pin display
+        setCurrentZoom(e.viewState.zoom);
         // Update unclustered listings for rendering individual markers
         updateUnclusteredListings();
 
@@ -652,12 +689,17 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     }
 
     return (
-        <div className="w-full h-full rounded-xl overflow-hidden border shadow-lg relative group">
+        <div
+            className="w-full h-full rounded-xl overflow-hidden border shadow-lg relative group"
+            role="region"
+            aria-label="Interactive map showing listing locations"
+            aria-roledescription="map"
+        >
             {/* Initial loading skeleton */}
             {!isMapLoaded && (
-                <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center">
+                <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center" role="status" aria-label="Loading map">
                     <div className="flex flex-col items-center gap-3">
-                        <MapPin className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse" />
+                        <MapPin className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse" aria-hidden="true" />
                         <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading map...</span>
                     </div>
                 </div>
@@ -665,9 +707,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
             {/* Tile loading indicator */}
             {isMapLoaded && areTilesLoading && (
-                <div className="absolute inset-0 bg-zinc-100/30 dark:bg-zinc-900/30 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 bg-zinc-100/30 dark:bg-zinc-900/30 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none" role="status" aria-label="Loading map tiles">
                     <div className="flex items-center gap-2 bg-white/90 dark:bg-zinc-800/90 px-4 py-2 rounded-lg shadow-sm">
-                        <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" />
+                        <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" aria-hidden="true" />
                         <span className="text-sm text-zinc-600 dark:text-zinc-300">Loading tiles...</span>
                     </div>
                 </div>
@@ -675,11 +717,24 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
             {/* Search-as-move loading indicator */}
             {isSearching && isMapLoaded && !areTilesLoading && (
-                <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10 pointer-events-none">
-                    <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" />
+                <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10 pointer-events-none" role="status" aria-label="Searching area">
+                    <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" aria-hidden="true" />
                     <span className="text-sm text-zinc-600 dark:text-zinc-300">Searching area...</span>
                 </div>
             )}
+
+            {/* Issue #11: Screen reader announcement for marker selection */}
+            <div
+                className="sr-only"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+            >
+                {selectedListing
+                    ? `Selected listing: ${selectedListing.title}, $${selectedListing.price} per month, ${selectedListing.availableSlots > 0 ? `${selectedListing.availableSlots} spots available` : 'currently filled'}`
+                    : ''
+                }
+            </div>
 
             <Map
                 ref={mapRef}
@@ -695,7 +750,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 onMoveStart={() => setAreTilesLoading(true)}
                 onIdle={() => setAreTilesLoading(false)}
                 onClick={useClustering ? onClusterClick : undefined}
-                interactiveLayerIds={useClustering ? [isDarkMode ? 'clusters-dark' : 'clusters'] : []}
+                interactiveLayerIds={useClustering ? (isDarkMode ? ['clusters-dark', 'cluster-count-dark'] : ['clusters', 'cluster-count']) : []}
                 onError={(e) => {
                     const error = (e as { error?: Error }).error;
                     const message = error?.message || 'Unknown map error';
@@ -733,6 +788,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     const handleMarkerClick = () => {
                         setSelectedListing(position.listing);
                         // Set active listing for card highlight and scroll-to
+                        lastMapActiveRef.current = position.listing.id;
                         setActive(position.listing.id);
                         requestScrollTo(position.listing.id);
                         // Mark as programmatic move to prevent banner showing
@@ -758,51 +814,95 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     >
                         <div
                             className={cn(
-                                "relative cursor-pointer group/marker transition-all duration-200",
-                                hoveredId === position.listing.id && "scale-110 z-10"
+                                "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none",
+                                "transition-all duration-200 ease-out",
+                                hoveredId === position.listing.id && "scale-125 z-50",
+                                hoveredId && hoveredId !== position.listing.id && "opacity-60"
                             )}
                             data-listing-id={position.listing.id}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}`}
+                            onMouseEnter={() => {
+                                setHovered(position.listing.id, "map");
+                                requestScrollTo(position.listing.id);
+                            }}
+                            onMouseLeave={() => setHovered(null)}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleMarkerClick();
                             }}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleMarkerClick();
+                                }
+                            }}
                         >
-                            {/* Pin body with price - Differentiated by tier */}
-                            {/* Primary tier (or no tier): Full size price pill */}
-                            {/* Mini tier: Smaller, more compact marker */}
-                            <div className={cn(
-                                "shadow-lg font-semibold whitespace-nowrap relative transition-all duration-200",
-                                "group-hover/marker:scale-105",
-                                // Size differentiation based on tier
-                                position.listing.tier === "mini"
-                                    ? "px-2 py-1 rounded-lg text-xs"  // Mini: smaller
-                                    : "px-3 py-1.5 rounded-xl text-sm",  // Primary/default: normal
-                                // Color based on hover/active state
-                                hoveredId === position.listing.id
-                                    ? "bg-rose-500 text-white ring-2 ring-white dark:ring-zinc-900 scale-105"
-                                    : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
-                            )}>
-                                ${position.listing.price}
-                            </div>
-                            {/* Pin tail/pointer - Scaled based on tier */}
-                            <div className={cn(
-                                "absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-transparent border-r-transparent transition-colors",
-                                // Size differentiation based on tier
-                                position.listing.tier === "mini"
-                                    ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"  // Mini: smaller tail
-                                    : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",  // Primary/default: normal tail
-                                // Color based on hover/active state
-                                hoveredId === position.listing.id
-                                    ? "border-t-rose-500"
-                                    : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
-                            )}></div>
-                            {/* Shadow under the pin for depth - Scaled based on tier */}
-                            <div className={cn(
-                                "absolute left-1/2 -translate-x-1/2 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]",
-                                position.listing.tier === "mini"
-                                    ? "-bottom-[2px] w-2 h-0.5"  // Mini: smaller shadow
-                                    : "-bottom-1 w-3 h-1"  // Primary/default: normal shadow
-                            )}></div>
+                            {/* Zoom-based two-tier pin rendering:
+                                - Below zoom 12: all pins are gray dots (no price)
+                                - Zoom 12-14: primary = price pills, mini = gray dots
+                                - Above zoom 14: all pins show price pills */}
+                            {(() => {
+                                const isMini = position.listing.tier === "mini";
+                                const showAsDot = currentZoom < ZOOM_DOTS_ONLY || (currentZoom < ZOOM_TOP_N_PINS && isMini);
+                                const isHovered = hoveredId === position.listing.id;
+
+                                if (showAsDot && !isHovered) {
+                                    // Gray dot marker (no price)
+                                    return (
+                                        <>
+                                            <div className={cn(
+                                                "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
+                                                "bg-zinc-400 dark:bg-zinc-500 ring-2 ring-white dark:ring-zinc-900",
+                                                "group-hover/marker:scale-125"
+                                            )} />
+                                            {/* Small shadow under dot */}
+                                            <div className="absolute left-1/2 -translate-x-1/2 -bottom-[1px] w-2 h-0.5 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[1px]" />
+                                        </>
+                                    );
+                                }
+
+                                // Price pill marker (full or mini size)
+                                return (
+                                    <>
+                                        <div className={cn(
+                                            "shadow-lg font-semibold whitespace-nowrap relative transition-all duration-200",
+                                            "group-hover/marker:scale-105",
+                                            isMini && currentZoom >= ZOOM_TOP_N_PINS
+                                                ? "px-2 py-1 rounded-lg text-xs"
+                                                : "px-3 py-1.5 rounded-xl text-sm",
+                                            isHovered
+                                                ? "bg-rose-500 text-white ring-2 ring-white dark:ring-zinc-900 scale-105"
+                                                : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
+                                        )}>
+                                            ${position.listing.price}
+                                        </div>
+                                        {/* Pin tail/pointer */}
+                                        <div className={cn(
+                                            "absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-transparent border-r-transparent transition-colors",
+                                            isMini && currentZoom >= ZOOM_TOP_N_PINS
+                                                ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"
+                                                : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",
+                                            isHovered
+                                                ? "border-t-rose-500"
+                                                : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
+                                        )} />
+                                        {/* Shadow under pin */}
+                                        <div className={cn(
+                                            "absolute left-1/2 -translate-x-1/2 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]",
+                                            isMini && currentZoom >= ZOOM_TOP_N_PINS
+                                                ? "-bottom-[2px] w-2 h-0.5"
+                                                : "-bottom-1 w-3 h-1"
+                                        )} />
+                                    </>
+                                );
+                            })()}
+                            {/* Pulsing ring on hover for visibility on dense maps */}
+                            {hoveredId === position.listing.id && (
+                                <div className="absolute -inset-2 -top-2 rounded-full border-2 border-rose-400 animate-ping opacity-40 pointer-events-none motion-reduce:animate-none" />
+                            )}
                         </div>
                     </Marker>
                     );
@@ -847,7 +947,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => setSelectedListing(null)}
-                                        className="w-7 h-7 rounded-full bg-zinc-950/50 hover:bg-zinc-950/70 text-white hover:text-white border-none"
+                                        className="rounded-full bg-zinc-950/50 hover:bg-zinc-950/70 text-white hover:text-white border-none"
+                                        aria-label="Close listing preview"
                                     >
                                         <X className="w-4 h-4" />
                                     </Button>
@@ -907,19 +1008,46 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 )}
             </Map>
 
-            {/* Search as I move toggle - Consistent rounded-xl radius with soft shadow */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white dark:bg-zinc-900 px-4 py-2.5 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] border border-zinc-100 dark:border-zinc-800 flex items-center gap-2.5 z-10 transition-opacity duration-200">
-                <input
-                    type="checkbox"
-                    id="searchAsMove"
-                    checked={searchAsMove}
-                    onChange={(e) => setSearchAsMove(e.target.checked)}
-                    className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white bg-white dark:bg-zinc-800 focus:ring-zinc-900 dark:focus:ring-zinc-400 focus:ring-offset-0"
-                />
-                <label htmlFor="searchAsMove" className="text-xs-plus font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
-                    Search as I move the map
-                </label>
+            {/* Search as I move toggle - prominent pill button */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+                <button
+                    role="switch"
+                    aria-checked={searchAsMove}
+                    onClick={() => setSearchAsMove(!searchAsMove)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none ${
+                        searchAsMove
+                            ? "bg-zinc-900 text-white border-zinc-900 ring-2 ring-green-400/30 dark:bg-white dark:text-zinc-900 dark:border-white dark:ring-green-500/30"
+                            : "bg-white text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
+                    }`}
+                >
+                    <div className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-400" : "bg-zinc-300 dark:bg-zinc-600"}`} />
+                    Search as I move
+                </button>
             </div>
+
+            {/* Fit all results button - zoom to show all markers */}
+            {listings.length >= 1 && isMapLoaded && (
+                <button
+                    onClick={() => {
+                        if (!mapRef.current || listings.length === 0) return;
+                        const points = listings.map(l => ({ lng: l.location.lng, lat: l.location.lat }));
+                        const minLng = Math.min(...points.map(p => p.lng));
+                        const maxLng = Math.max(...points.map(p => p.lng));
+                        const minLat = Math.min(...points.map(p => p.lat));
+                        const maxLat = Math.max(...points.map(p => p.lat));
+                        setProgrammaticMove(true);
+                        mapRef.current.fitBounds(
+                            [[minLng, minLat], [maxLng, maxLat]],
+                            { padding: 50, duration: 1000 }
+                        );
+                    }}
+                    className="absolute bottom-4 right-4 z-10 w-11 h-11 flex items-center justify-center bg-white dark:bg-zinc-800 rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                    aria-label="Fit all results in view"
+                    title="Fit all results"
+                >
+                    <Maximize2 className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
+                </button>
+            )}
 
             {/* MapMovedBanner - Shows when user panned with search-as-move OFF */}
             {(showBanner || showLocationConflict) && (
@@ -927,7 +1055,38 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     variant="map"
                     onSearch={onSearch}
                     onReset={onReset}
+                    areaCount={areaCount}
+                    isAreaCountLoading={isAreaCountLoading}
                 />
+            )}
+
+            {/* Mobile gesture hint - shown once for first-time touch users */}
+            {isMapLoaded && <MapGestureHint />}
+
+            {/* Empty state overlay - when map is loaded but no listings in viewport */}
+            {isMapLoaded && !areTilesLoading && !isSearching && listings.length === 0 && (
+                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 px-5 py-4 max-w-[280px] text-center pointer-events-auto">
+                    <MapPin className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2" aria-hidden="true" />
+                    <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">No listings in this area</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Try zooming out or adjusting your filters</p>
+                    <div className="flex gap-2 justify-center">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs h-8"
+                            onClick={() => {
+                                if (!mapRef.current) return;
+                                const map = mapRef.current.getMap();
+                                if (!map) return;
+                                const currentZoom = map.getZoom();
+                                setProgrammaticMove(true);
+                                mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
+                            }}
+                        >
+                            Zoom out
+                        </Button>
+                    </div>
+                </div>
             )}
         </div>
     );
