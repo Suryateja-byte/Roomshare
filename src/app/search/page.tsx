@@ -1,11 +1,8 @@
 import { auth } from '@/auth';
 import { getListingsPaginated, getSavedListingIds, analyzeFilterImpact, PaginatedResult, PaginatedResultHybrid, ListingData } from '@/lib/data';
-import { Suspense } from 'react';
-import ListingCard from '@/components/listings/ListingCard';
-import Pagination from '@/components/Pagination';
 import SortSelect from '@/components/SortSelect';
 import SaveSearchButton from '@/components/SaveSearchButton';
-import ZeroResultsSuggestions from '@/components/ZeroResultsSuggestions';
+import { SearchResultsClient } from '@/components/search/SearchResultsClient';
 import Link from 'next/link';
 import { Search, Clock } from 'lucide-react';
 import { headers } from 'next/headers';
@@ -14,43 +11,35 @@ import { parseSearchParams, buildRawParamsFromSearchParams } from '@/lib/search-
 import { executeSearchV2 } from '@/lib/search/search-v2-service';
 import { V2MapDataSetter } from '@/components/search/V2MapDataSetter';
 import { V1PathResetSetter } from '@/components/search/V1PathResetSetter';
+import { SearchResultsLoadingWrapper } from '@/components/search/SearchResultsLoadingWrapper';
+import { AppliedFilterChips } from '@/components/filters/AppliedFilterChips';
+import { CategoryBar } from '@/components/search/CategoryBar';
 import type { V2MapData } from '@/contexts/SearchV2DataContext';
 import { features } from '@/lib/env';
-
-// Skeleton component for listing cards during loading
-function ListingSkeleton() {
-    return (
-        <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-[840px] mx-auto pb-24 md:pb-6">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-                <div>
-                    <div className="h-6 w-48 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse" />
-                    <div className="h-4 w-64 bg-zinc-100 dark:bg-zinc-800 rounded mt-2 animate-pulse" />
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="h-9 w-24 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
-                    <div className="h-9 w-32 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
-                </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
-                {[...Array(6)].map((_, i) => (
-                    <div key={i} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden animate-pulse">
-                        <div className="aspect-[4/3] bg-zinc-200 dark:bg-zinc-700" />
-                        <div className="p-4 space-y-3">
-                            <div className="h-5 bg-zinc-200 dark:bg-zinc-700 rounded w-3/4" />
-                            <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded w-1/2" />
-                            <div className="flex justify-between items-center pt-2">
-                                <div className="h-5 bg-zinc-200 dark:bg-zinc-700 rounded w-20" />
-                                <div className="h-8 w-8 bg-zinc-100 dark:bg-zinc-800 rounded-full" />
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
+import { preload } from 'react-dom';
 
 const ITEMS_PER_PAGE = 12;
+
+// P2-2: Server-side preload hints for LCP optimization
+// Must match ListingCard.tsx PLACEHOLDER_IMAGES for consistent fallback behavior
+const PLACEHOLDER_IMAGES = [
+    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1484154218962-a1c002085d2f?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1502005229766-528352261b79?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80"
+];
+
+// Helper to get first image URL for a listing (matches ListingCard logic)
+function getFirstImageUrl(listing: { id: string; images?: string[] }): string {
+    if (listing.images && listing.images.length > 0) {
+        return listing.images[0];
+    }
+    // Deterministic placeholder selection based on listing ID
+    const placeholderIndex = listing.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % PLACEHOLDER_IMAGES.length;
+    return PLACEHOLDER_IMAGES[placeholderIndex];
+}
 
 export default async function SearchPage({
     searchParams,
@@ -127,9 +116,9 @@ export default async function SearchPage({
                         <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
                             <Search className="w-8 h-8 text-amber-600 dark:text-amber-400" />
                         </div>
-                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
+                        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
                             Please select a location
-                        </h2>
+                        </h1>
                         <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6">
                             To search for &ldquo;{q}&rdquo;, please select a location from the dropdown suggestions.
                             This helps us find relevant listings in your area.
@@ -208,14 +197,10 @@ export default async function SearchPage({
         throw new Error('Failed to fetch search results');
     }
 
-    const { items: listings, total: rawTotal, totalPages: rawTotalPages, page: currentPage } = paginatedResult;
-    // Handle potential null values from PaginatedResultHybrid (v2 path)
+    const { items: listings, total: rawTotal } = paginatedResult;
     // IMPORTANT: Keep null distinct from 0 - null means "unknown count (>100 results)"
     // whereas 0 means "confirmed zero results"
-    const total = rawTotal; // Keep null for >100 results (hybrid count optimization)
-    // P3b Fix: Keep null totalPages - don't default to 1
-    // Pagination component handles null by showing "Page X" without "of Y"
-    const totalPages = rawTotalPages;
+    const total = rawTotal;
 
     // Only show zero-results UI when we have confirmed zero results (total === 0)
     // Not when total is null (unknown count, >100 results)
@@ -224,21 +209,40 @@ export default async function SearchPage({
     // Analyze filter impact only when there are confirmed zero results
     const filterSuggestions = hasConfirmedZeroResults ? await analyzeFilterImpact(filterParams) : [];
 
+    // P2-2: Preload first 4 listing images for LCP optimization
+    // This emits <link rel="preload" as="image"> in the server-rendered HTML
+    // Only preload when we have results to display
+    if (listings.length > 0) {
+        listings.slice(0, 4).forEach((listing) => {
+            const imageUrl = getFirstImageUrl(listing);
+            preload(imageUrl, { as: 'image' });
+        });
+    }
+
+    // Build search params string for client-side "Load more" fetches
+    // Include all filter/sort params but NOT cursor/page (those are managed client-side)
+    const apiParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(rawParams)) {
+        if (['cursor', 'cursorStack', 'pageNumber', 'page', 'v2'].includes(key)) continue;
+        if (Array.isArray(value)) {
+            value.forEach(v => apiParams.append(key, v));
+        } else if (value) {
+            apiParams.set(key, value);
+        }
+    }
+    const searchParamsString = apiParams.toString();
+
+    // Extract nextCursor from paginated result
+    const initialNextCursor = 'nextCursor' in paginatedResult ? (paginatedResult.nextCursor ?? null) : null;
+
     const listContent = (
-        <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-[840px] mx-auto pb-24 md:pb-6">
-            {/* Screen reader announcement for search results */}
-            <div aria-live="polite" aria-atomic="true" className="sr-only">
-                {hasConfirmedZeroResults
-                    ? `No listings found${q ? ` for "${q}"` : ''}`
-                    : total === null
-                        ? `Found more than 100 listings${q ? ` for "${q}"` : ''}`
-                        : `Found ${total} ${total === 1 ? 'listing' : 'listings'}${q ? ` for "${q}"` : ''}`
-                }
-            </div>
+        <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
+            <CategoryBar />
+            <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+            <AppliedFilterChips currentCount={total} />
 
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
                 <div>
-                    {/* tabIndex -1 allows programmatic focus for screen readers */}
                     <h1
                         id="search-results-heading"
                         tabIndex={-1}
@@ -262,59 +266,20 @@ export default async function SearchPage({
                 </div>
             </div>
 
-            {hasConfirmedZeroResults ? (
-                <div className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50">
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm mb-4">
-                        <Search className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-400" />
-                    </div>
-                    <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-white mb-2">No matches found</h3>
-                    <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-xs text-center px-4">
-                        We couldn't find any listings {q ? `for "${q}"` : ''}.
-                    </p>
-
-                    {/* Smart filter suggestions */}
-                    {filterSuggestions.length > 0 ? (
-                        <div className="w-full max-w-sm px-4 mt-4">
-                            <Suspense fallback={null}>
-                                <ZeroResultsSuggestions suggestions={filterSuggestions} query={q} />
-                            </Suspense>
-                        </div>
-                    ) : (
-                        <Link
-                            href="/search"
-                            className="mt-6 px-4 py-2.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white text-sm font-medium transition-colors touch-target"
-                        >
-                            Clear all filters
-                        </Link>
-                    )}
-                </div>
-            ) : (
-                <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
-                        {listings.map(listing => (
-                            <ListingCard
-                                key={listing.id}
-                                listing={listing}
-                                isSaved={savedListingIds.includes(listing.id)}
-                            />
-                        ))}
-                    </div>
-
-                    {/* Pagination */}
-                    <Suspense fallback={null}>
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            totalItems={total}
-                            itemsPerPage={ITEMS_PER_PAGE}
-                            nextCursor={'nextCursor' in paginatedResult ? paginatedResult.nextCursor : undefined}
-                            prevCursor={'prevCursor' in paginatedResult ? paginatedResult.prevCursor : undefined}
-                            hasNextPage={'hasNextPage' in paginatedResult ? paginatedResult.hasNextPage : undefined}
-                            hasPrevPage={'hasPrevPage' in paginatedResult ? paginatedResult.hasPrevPage : undefined}
-                        />
-                    </Suspense>
-                </>
-            )}
+            <SearchResultsClient
+                key={searchParamsString}
+                initialListings={listings}
+                initialNextCursor={initialNextCursor}
+                initialTotal={total}
+                savedListingIds={savedListingIds}
+                searchParamsString={searchParamsString}
+                query={q ?? ""}
+                browseMode={browseMode}
+                hasConfirmedZeroResults={hasConfirmedZeroResults}
+                filterSuggestions={filterSuggestions}
+                sortOption={sortOption}
+            />
+            </div>
         </div>
     );
 
@@ -328,7 +293,10 @@ export default async function SearchPage({
             ) : (
                 <V1PathResetSetter />
             )}
-            {listContent}
+            {/* Wrap results with loading indicator for filter transitions */}
+            <SearchResultsLoadingWrapper>
+                {listContent}
+            </SearchResultsLoadingWrapper>
         </>
     );
 }
