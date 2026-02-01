@@ -19,14 +19,38 @@ export interface SplitStayPair {
  * data not yet in the schema.
  */
 export function findSplitStays(
-  _listings: ListingData[],
-  _stayDays?: number,
+  listings: ListingData[],
+  stayMonths?: number,
 ): SplitStayPair[] {
-  // TODO: Implement when date-range availability is added to schema
-  // Algorithm:
-  // 1. Filter listings available for partial date ranges
-  // 2. Find pairs where first.endDate ≈ second.startDate
-  // 3. Score by combined price, proximity, rating
-  // 4. Return top-N pairs
-  return [];
+  // Only suggest split stays for 6+ month durations with enough listings
+  if (!stayMonths || stayMonths < 6 || listings.length < 2) return [];
+
+  const halfMonths = Math.floor(stayMonths / 2);
+  const remainderMonths = stayMonths - halfMonths;
+  const splitLabel = `${halfMonths} mo + ${remainderMonths} mo`;
+
+  // Sort by price to pair budget-friendly with premium options
+  const sorted = [...listings]
+    .filter((l) => l.price > 0)
+    .sort((a, b) => a.price - b.price);
+
+  if (sorted.length < 2) return [];
+
+  const pairs: SplitStayPair[] = [];
+  const maxPairs = Math.min(2, Math.floor(sorted.length / 2));
+
+  for (let i = 0; i < maxPairs; i++) {
+    const first = sorted[i];
+    const second = sorted[sorted.length - 1 - i];
+    if (first.id === second.id) continue;
+
+    pairs.push({
+      first,
+      second,
+      combinedPrice: first.price * halfMonths + second.price * remainderMonths,
+      splitLabel,
+    });
+  }
+
+  return pairs;
 }

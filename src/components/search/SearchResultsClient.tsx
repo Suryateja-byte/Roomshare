@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -9,6 +9,8 @@ import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
 import SuggestedSearches from "@/components/search/SuggestedSearches";
 import { fetchMoreListings } from "@/app/search/actions";
 import { TotalPriceToggle } from "@/components/search/TotalPriceToggle";
+import { SplitStayCard } from "@/components/search/SplitStayCard";
+import { findSplitStays } from "@/lib/search/split-stay";
 import type { ListingData, FilterSuggestion } from "@/lib/data";
 
 /**
@@ -63,6 +65,22 @@ export function SearchResultsClient({
 
   const allListings = [...initialListings, ...extraListings];
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
+
+  // Derive estimatedMonths from leaseDuration search param
+  const estimatedMonths = useMemo(() => {
+    const sp = new URLSearchParams(searchParamsString);
+    const ld = sp.get('leaseDuration');
+    if (!ld) return 1;
+    const match = ld.match(/^(\d+)\s+months?$/i);
+    return match ? parseInt(match[1], 10) : 1;
+  }, [searchParamsString]);
+
+  // Compute split stay pairs for long durations (6+ months)
+  const splitStayPairs = useMemo(
+    () => findSplitStays(allListings, estimatedMonths),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allListings.length, estimatedMonths],
+  );
 
   // Parse searchParamsString into raw params for the server action (once)
   const rawParamsRef = useRef<Record<string, string | string[] | undefined> | null>(null);
@@ -180,9 +198,24 @@ export function SearchResultsClient({
                 isSaved={savedListingIds.includes(listing.id)}
                 priority={index < 4}
                 showTotalPrice={showTotalPrice}
+                estimatedMonths={estimatedMonths}
               />
             ))}
           </div>
+
+          {/* Split stay suggestions for long durations */}
+          {splitStayPairs.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+                Split your stay
+              </h3>
+              <div className="grid grid-cols-1 gap-4">
+                {splitStayPairs.map((pair) => (
+                  <SplitStayCard key={`${pair.first.id}-${pair.second.id}`} pair={pair} />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Load more section with progress indicator */}
           {nextCursor && !reachedCap && (
