@@ -3,11 +3,18 @@
 import { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { flushSync } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, Clock, Loader2, SlidersHorizontal, Home, Users, Building2, LayoutGrid } from 'lucide-react';
+import { Search, Clock, Loader2, SlidersHorizontal, Home, Users, Building2, LayoutGrid, LocateFixed } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
 import { SUPPORTED_LANGUAGES, getLanguageName, normalizeLanguages, type LanguageCode } from '@/lib/languages';
-import FilterModal from '@/components/search/FilterModal';
+import dynamic from 'next/dynamic';
+
+const FilterModal = dynamic(() => import('@/components/search/FilterModal'), {
+    ssr: false,
+    loading: () => null,
+});
+import { parseNaturalLanguageQuery, nlQueryToSearchParams } from '@/lib/search/natural-language-parser';
 // Import canonical allowlists and aliases from shared parsing module
 // This ensures client-side parsing matches server-side validation
 import {
@@ -23,6 +30,8 @@ import {
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { useRecentSearches, type RecentSearch, type RecentSearchFilters } from '@/hooks/useRecentSearches';
 import { useDebouncedFilterCount } from '@/hooks/useDebouncedFilterCount';
+import { useFacets } from '@/hooks/useFacets';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -156,6 +165,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const [showFilters, setShowFilters] = useState(false);
 
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(parseCoords);
+    const [geoLoading, setGeoLoading] = useState(false);
 
     // New filters state - don't validate in initial state to avoid hydration mismatch
     // Validation happens in useEffect after mount
@@ -260,12 +270,72 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         window.dispatchEvent(event);
     };
 
+    const handleUseMyLocation = useCallback(() => {
+        if (geoLoading) return;
+        if (!navigator.geolocation) {
+            toast.error('Geolocation is not supported by your browser');
+            return;
+        }
+        setGeoLoading(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude: lat, longitude: lng } = position.coords;
+                flushSync(() => {
+                    setLocation('');
+                    setSelectedCoords({ lat, lng });
+                });
+                window.dispatchEvent(new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
+                    detail: { lat, lng, zoom: 13 }
+                }));
+                setGeoLoading(false);
+                // Submit the form to trigger search with new coords
+                formRef.current?.requestSubmit();
+            },
+            (error) => {
+                setGeoLoading(false);
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        toast.error('Location permission denied. Enable it in browser settings.');
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        toast.error('Unable to determine your location.');
+                        break;
+                    case error.TIMEOUT:
+                        toast.error('Location request timed out. Try again.');
+                        break;
+                }
+            },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+        );
+    }, []);
+
     const handleSearch = useCallback((e: React.FormEvent) => {
         e.preventDefault();
 
+        // Try natural language parsing: if the input contains structured filters
+        // (price, room type, amenities, etc.), parse and redirect with those params
+        const trimmedLocation = location.trim();
+        const nlParsed = trimmedLocation ? parseNaturalLanguageQuery(trimmedLocation) : null;
+        if (nlParsed && !selectedCoords) {
+            // NL query detected — build URL from parsed filters
+            const nlParams = nlQueryToSearchParams(nlParsed);
+            // Preserve map bounds and sort from current URL
+            const current = new URLSearchParams(searchParams.toString());
+            for (const key of ['minLat', 'maxLat', 'minLng', 'maxLng', 'sort']) {
+                const val = current.get(key);
+                if (val) nlParams.set(key, val);
+            }
+            setIsSearching(true);
+            setShowFilters(false);
+            const searchUrl = `/search?${nlParams.toString()}`;
+            startTransition(() => {
+                router.push(searchUrl);
+            });
+            return;
+        }
+
         // Prevent unbounded searches: if user typed location but didn't select from dropdown,
         // don't submit (this prevents full-table scans on the server)
-        const trimmedLocation = location.trim();
         if (trimmedLocation.length > 2 && !selectedCoords) {
             // User needs to select a location from dropdown
             // Scroll the warning into view and briefly shake it for emphasis
@@ -348,7 +418,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
         // Include coordinates if a location was selected from suggestions
         // Only include if location text is not empty (prevents stale coords)
-        if (selectedCoords && trimmedLocation) {
+        if (selectedCoords) {
             params.set('lat', selectedCoords.lat.toString());
             params.set('lng', selectedCoords.lng.toString());
         }
@@ -578,6 +648,40 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         isDrawerOpen: showFilters,
     });
 
+    // Facets data (histogram + facet counts) for FilterModal
+    const { facets } = useFacets({
+        pending: {
+            minPrice,
+            maxPrice,
+            roomType,
+            leaseDuration,
+            moveInDate,
+            amenities,
+            houseRules,
+            languages,
+            genderPreference,
+            householdGender,
+        },
+        isDrawerOpen: showFilters,
+    });
+
+    // Derive price slider bounds from facets with fallback
+    const priceAbsoluteMin = facets?.priceRanges?.min ?? 0;
+    const priceAbsoluteMax = facets?.priceRanges?.max ?? 10000;
+
+    // Convert string price state to numbers for slider
+    const numericMinPrice = minPrice ? parseFloat(minPrice) : undefined;
+    const numericMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
+
+    // Handle price slider changes
+    const handlePriceChange = useCallback((min: number, max: number) => {
+        startTransition(() => {
+            // Only set if different from absolute bounds (avoid unnecessary params)
+            setMinPrice(min <= priceAbsoluteMin ? '' : String(min));
+            setMaxPrice(max >= priceAbsoluteMax ? '' : String(max));
+        });
+    }, [priceAbsoluteMin, priceAbsoluteMax]);
+
     // Handler for removing individual filters from FilterBar pills
     // INP optimization: Wrap state updates in startTransition for responsiveness
     const handleRemoveFilter = useCallback((type: string, value?: string) => {
@@ -611,16 +715,15 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;
 
-    // Handle Escape key to close filter drawer
-    useEffect(() => {
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && showFilters) {
-                setShowFilters(false);
-            }
-        };
-        document.addEventListener('keydown', handleEscape);
-        return () => document.removeEventListener('keydown', handleEscape);
-    }, [showFilters]);
+    // Handle Escape key to close filter drawer (via shared hook for consistency)
+    useKeyboardShortcuts([
+        {
+            key: 'Escape',
+            action: () => setShowFilters(false),
+            disabled: !showFilters,
+            description: 'Close filter drawer',
+        },
+    ]);
 
     // Prevent body scroll when drawer is open
     useEffect(() => {
@@ -655,30 +758,42 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             Where
                         </label>
                     )}
-                    <LocationSearchInput
-                        id="search-location"
-                        value={location}
-                        onChange={(value) => {
-                            setLocation(value);
-                            if (selectedCoords) setSelectedCoords(null);
-                            setShowRecentSearches(false);
-                        }}
-                        onLocationSelect={(data) => {
-                            handleLocationSelect(data);
-                            setShowRecentSearches(false);
-                        }}
-                        onFocus={() => {
-                            if (recentSearches.length > 0 && !location) {
-                                setShowRecentSearches(true);
-                            }
-                        }}
-                        onBlur={() => {
-                            // Delay hiding to allow click on recent search
-                            setTimeout(() => setShowRecentSearches(false), 200);
-                        }}
-                        placeholder="Search destinations"
-                        className={isCompact ? "text-sm" : "text-sm"}
-                    />
+                    <div className="flex items-center gap-1">
+                        <LocationSearchInput
+                            id="search-location"
+                            value={location}
+                            onChange={(value) => {
+                                setLocation(value);
+                                if (selectedCoords) setSelectedCoords(null);
+                                setShowRecentSearches(false);
+                            }}
+                            onLocationSelect={(data) => {
+                                handleLocationSelect(data);
+                                setShowRecentSearches(false);
+                            }}
+                            onFocus={() => {
+                                if (recentSearches.length > 0 && !location) {
+                                    setShowRecentSearches(true);
+                                }
+                            }}
+                            onBlur={() => {
+                                // Delay hiding to allow click on recent search
+                                setTimeout(() => setShowRecentSearches(false), 200);
+                            }}
+                            placeholder="Search destinations"
+                            className={isCompact ? "text-sm flex-1" : "text-sm flex-1"}
+                        />
+                        <button
+                            type="button"
+                            onClick={handleUseMyLocation}
+                            disabled={geoLoading}
+                            className="flex-shrink-0 p-1.5 rounded-full text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                            aria-label="Use my current location"
+                            title="Use my current location"
+                        >
+                            {geoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
+                        </button>
+                    </div>
 
                     {/* Recent Searches Dropdown */}
                     {showRecentSearches && recentSearches.length > 0 && (
@@ -908,6 +1023,19 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 minMoveInDate={minMoveInDate}
                 amenityOptions={AMENITY_OPTIONS}
                 houseRuleOptions={HOUSE_RULE_OPTIONS}
+                // Price range filter
+                minPrice={numericMinPrice}
+                maxPrice={numericMaxPrice}
+                priceAbsoluteMin={priceAbsoluteMin}
+                priceAbsoluteMax={priceAbsoluteMax}
+                priceHistogram={facets?.priceHistogram?.buckets}
+                onPriceChange={handlePriceChange}
+                // Facet counts
+                facetCounts={facets ? {
+                    amenities: facets.amenities,
+                    houseRules: facets.houseRules,
+                    roomTypes: facets.roomTypes,
+                } : undefined}
                 // P3-NEW-b: Dynamic count props from useDebouncedFilterCount
                 formattedCount={formattedCount}
                 isCountLoading={isCountLoading}
