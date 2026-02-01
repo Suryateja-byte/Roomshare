@@ -303,7 +303,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 mapRef.current?.flyTo({
                     center: feature.geometry.coordinates as [number, number],
                     zoom: zoom,
-                    duration: 500
+                    duration: 700,
+                    padding: { top: 50, bottom: 50, left: 50, right: 50 },
                 });
             });
         } catch (error) {
@@ -515,6 +516,17 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             }
         };
     }, []);
+
+    // Keyboard: Escape closes popup
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && selectedListing) {
+                setSelectedListing(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedListing]);
 
     // Sync URL bounds to context and track for reset functionality
     useEffect(() => {
@@ -811,7 +823,12 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         cluster={true}
                         clusterMaxZoom={14}
                         clusterRadius={50}
+                        clusterProperties={{
+                            priceSum: ['+', ['get', 'price']],
+                        }}
                     >
+                        {/* Price-colored outer ring (rendered first, behind main circle) */}
+                        <Layer {...clusterRingLayer} />
                         {isDarkMode && <Layer {...clusterLayerDark} />}
                         {isDarkMode && <Layer {...clusterCountLayerDark} />}
                         {!isDarkMode && <Layer {...clusterLayer} />}
