@@ -128,44 +128,41 @@ const clusterLayerDark: LayerProps = {
 };
 
 // Cluster count label layer — shows "50+" for large clusters
-const clusterCountLayer: LayerProps = {
-    id: 'cluster-count',
-    type: 'symbol',
-    filter: ['has', 'point_count'],
-    layout: {
-        'text-field': [
-            'step',
-            ['get', 'point_count'],
-            ['to-string', ['get', 'point_count']],
-            50, ['concat', ['to-string', ['get', 'point_count_abbreviated']], '+'],
-        ] as unknown as string,
-        'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-        'text-size': 14
-    },
-    paint: {
-        'text-color': MAP_COLORS.white
-    }
-};
+// text-size scales with OS/browser font-size settings via textScale factor
+const clusterCountTextField = [
+    'step',
+    ['get', 'point_count'],
+    ['to-string', ['get', 'point_count']],
+    50, ['concat', ['to-string', ['get', 'point_count_abbreviated']], '+'],
+] as unknown as string;
 
-// Dark mode cluster count
-const clusterCountLayerDark: LayerProps = {
-    id: 'cluster-count-dark',
-    type: 'symbol',
-    filter: ['has', 'point_count'],
-    layout: {
-        'text-field': [
-            'step',
-            ['get', 'point_count'],
-            ['to-string', ['get', 'point_count']],
-            50, ['concat', ['to-string', ['get', 'point_count_abbreviated']], '+'],
-        ] as unknown as string,
-        'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-        'text-size': 14
-    },
-    paint: {
-        'text-color': MAP_COLORS.zinc900
-    }
-};
+function getClusterCountLayer(textScale: number): LayerProps {
+    return {
+        id: 'cluster-count',
+        type: 'symbol',
+        filter: ['has', 'point_count'],
+        layout: {
+            'text-field': clusterCountTextField,
+            'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+            'text-size': Math.round(14 * textScale)
+        },
+        paint: { 'text-color': MAP_COLORS.white }
+    };
+}
+
+function getClusterCountLayerDark(textScale: number): LayerProps {
+    return {
+        id: 'cluster-count-dark',
+        type: 'symbol',
+        filter: ['has', 'point_count'],
+        layout: {
+            'text-field': clusterCountTextField,
+            'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+            'text-size': Math.round(14 * textScale)
+        },
+        paint: { 'text-color': MAP_COLORS.zinc900 }
+    };
+}
 
 // Always use clustering — Mapbox handles any count gracefully.
 // With few listings, clusters simply won't form and individual markers show.
@@ -181,6 +178,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [unclusteredListings, setUnclusteredListings] = useState<Listing[]>([]);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [isHighContrast, setIsHighContrast] = useState(false);
+    // Scale map label text with OS/browser font-size (Dynamic Type support)
+    const [textScale, setTextScale] = useState(1);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [currentZoom, setCurrentZoom] = useState(12);
     const [mapStyleKey, setMapStyleKey] = useState<'standard' | 'satellite' | 'transit'>(() => {
@@ -275,6 +274,20 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         mq.addEventListener('change', handler);
         return () => mq.removeEventListener('change', handler);
     }, []);
+
+    // Detect OS/browser font-size scale for map label Dynamic Type support
+    useEffect(() => {
+        const update = () => {
+            const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+            setTextScale(rootFontSize / 16);
+        };
+        update();
+        window.addEventListener('resize', update);
+        return () => window.removeEventListener('resize', update);
+    }, []);
+
+    const scaledClusterCountLayer = useMemo(() => getClusterCountLayer(textScale), [textScale]);
+    const scaledClusterCountLayerDark = useMemo(() => getClusterCountLayerDark(textScale), [textScale]);
 
     // Always enable clustering — Mapbox handles any count gracefully.
     // With few listings clusters simply won't form and individual markers show.
@@ -897,9 +910,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         {/* Price-colored outer ring (rendered first, behind main circle) */}
                         <Layer {...clusterRingLayer} />
                         {isDarkMode && <Layer {...clusterLayerDark} />}
-                        {isDarkMode && <Layer {...clusterCountLayerDark} />}
+                        {isDarkMode && <Layer {...scaledClusterCountLayerDark} />}
                         {!isDarkMode && <Layer {...clusterLayer} />}
-                        {!isDarkMode && <Layer {...clusterCountLayer} />}
+                        {!isDarkMode && <Layer {...scaledClusterCountLayer} />}
                     </Source>
                 )}
 
