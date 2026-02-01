@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SearchHeaderWrapper - Manages collapsible header on mobile
+ * SearchHeaderWrapper - Manages collapsible header on mobile and desktop
  *
  * On mobile:
  * - Shows full SearchForm when at top or manually expanded
@@ -9,30 +9,53 @@
  * - Collapsed bar shows location summary and filter access
  *
  * On desktop:
- * - Always shows full SearchForm
+ * - Shows full SearchForm when at top or manually expanded
+ * - Shows compact search pill when scrolled down
  */
 
-import { Suspense } from "react";
+import { Suspense, lazy, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useScrollHeader } from "@/hooks/useScrollHeader";
+import {
+  useKeyboardShortcuts,
+  formatShortcut,
+} from "@/hooks/useKeyboardShortcuts";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import CollapsedMobileSearch from "@/components/CollapsedMobileSearch";
-import SearchForm from "@/components/SearchForm";
+import { CompactSearchPill } from "@/components/search/CompactSearchPill";
+
+// LCP optimization: Lazy-load SearchForm to defer its ~875-line bundle + heavy dependencies
+// This allows listing images (the LCP elements) to render before SearchForm JavaScript loads
+const SearchForm = lazy(() => import("@/components/SearchForm"));
 
 export default function SearchHeaderWrapper() {
   const { isCollapsed } = useScrollHeader({ threshold: 80 });
   const { isExpanded, expand, openFilters } = useMobileSearch();
 
-  // Show collapsed bar on mobile when scrolled and not manually expanded
+  useKeyboardShortcuts([
+    {
+      key: "k",
+      meta: true,
+      action: () => document.getElementById("search-location")?.focus(),
+      description: "Focus search input",
+    },
+  ]);
+
+  // Show collapsed bar when scrolled and not manually expanded
   const showCollapsed = isCollapsed && !isExpanded;
+
+  const handleExpandDesktop = useCallback(() => {
+    // Scroll to top to reveal the full form
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   return (
     <>
-      {/* Full search form - hidden on mobile when collapsed */}
+      {/* Full search form - hidden when collapsed */}
       <div
         className={`transition-all duration-300 ease-out ${
-          showCollapsed ? "md:block hidden" : "block"
+          showCollapsed ? "hidden" : "block"
         }`}
       >
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
@@ -53,14 +76,28 @@ export default function SearchHeaderWrapper() {
             </Link>
 
             {/* Search Form */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 relative">
               <Suspense
                 fallback={
-                  <div className="h-14 sm:h-16 w-full bg-zinc-100 dark:bg-zinc-800 animate-pulse rounded-full" />
+                  /*
+                   * CLS fix: Fallback dimensions must match actual SearchForm height
+                   * Mobile: p-1.5 (12px) + button h-11 (44px) = 56px ≈ h-14
+                   * Desktop: md:p-2 (16px) + button sm:h-12 (48px) = 64px ≈ sm:h-16
+                   * Use rounded-xl to match actual form, not rounded-full
+                   */
+                  <div className="h-14 sm:h-16 w-full bg-zinc-100 dark:bg-zinc-800 animate-pulse rounded-xl border border-zinc-200/80 dark:border-zinc-700/80" />
                 }
               >
                 <SearchForm />
               </Suspense>
+
+              {/* Keyboard shortcut hint — desktop only */}
+              <kbd
+                className="hidden md:inline-flex absolute right-3 top-1/2 -translate-y-1/2 items-center px-1.5 py-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded pointer-events-none"
+                aria-hidden="true"
+              >
+                {formatShortcut({ key: "k", meta: true })}
+              </kbd>
             </div>
           </div>
         </div>
@@ -73,6 +110,18 @@ export default function SearchHeaderWrapper() {
         }`}
       >
         <CollapsedMobileSearch onExpand={expand} onOpenFilters={openFilters} />
+      </div>
+
+      {/* Compact search pill - visible on desktop only when collapsed */}
+      <div
+        className={`transition-all duration-300 ease-out ${
+          showCollapsed ? "hidden md:block py-2 px-6" : "hidden"
+        }`}
+      >
+        <CompactSearchPill
+          onExpand={handleExpandDesktop}
+          onOpenFilters={openFilters}
+        />
       </div>
     </>
   );
