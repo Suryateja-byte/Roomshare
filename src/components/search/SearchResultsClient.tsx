@@ -181,9 +181,12 @@ export function SearchResultsClient({
             ))}
           </div>
 
-          {/* Load more button */}
+          {/* Load more section with progress indicator */}
           {nextCursor && !reachedCap && (
-            <div className="flex justify-center mt-8 mb-4">
+            <div className="flex flex-col items-center mt-8 mb-4 gap-2">
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                Showing {allListings.length} of {total !== null ? `~${total}` : '100+'} listings
+              </p>
               <button
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
@@ -229,6 +232,13 @@ export function SearchResultsClient({
           {!nextCursor && allListings.length > 0 && extraListings.length > 0 && (
             <p className="text-center text-sm text-zinc-400 dark:text-zinc-500 mt-8">
               You&apos;ve seen all {allListings.length} results
+            </p>
+          )}
+
+          {/* Contextual footer */}
+          {allListings.length > 0 && (
+            <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-6 pb-4">
+              {total !== null ? `${total}+` : '100+'} stays{query ? ` in ${query}` : ''}
             </p>
           )}
         </>
