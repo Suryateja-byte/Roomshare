@@ -85,9 +85,12 @@ export function SearchResultsClient({
 
     setIsLoadingMore(true);
     setLoadError(null);
+    performance.mark('load-more-start');
 
     try {
       const result = await fetchMoreListings(nextCursor, rawParamsRef.current!);
+      performance.mark('load-more-end');
+      performance.measure('load-more', 'load-more-start', 'load-more-end');
 
       // Deduplicate by ID
       const dedupedItems = result.items.filter((item) => {

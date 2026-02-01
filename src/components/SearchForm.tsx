@@ -440,6 +440,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
 
         // Debounce the navigation to prevent race conditions
+        performance.mark('search-submit');
         setIsSearching(true);
         lastSearchRef.current = searchUrl;
 
