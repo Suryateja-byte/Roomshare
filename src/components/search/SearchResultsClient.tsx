@@ -8,6 +8,7 @@ import ListingCard from "@/components/listings/ListingCard";
 import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
 import SuggestedSearches from "@/components/search/SuggestedSearches";
 import { fetchMoreListings } from "@/app/search/actions";
+import { TotalPriceToggle } from "@/components/search/TotalPriceToggle";
 import type { ListingData, FilterSuggestion } from "@/lib/data";
 
 /**
@@ -48,6 +49,13 @@ export function SearchResultsClient({
   );
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showTotalPrice, setShowTotalPrice] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('showTotalPrice') ?? 'false');
+    } catch {
+      return false;
+    }
+  });
   // Track all seen IDs for deduplication (initialized with SSR listings)
   const seenIdsRef = useRef<Set<string>>(
     new Set(initialListings.map((l) => l.id)),
@@ -102,7 +110,7 @@ export function SearchResultsClient({
   const total = initialTotal;
 
   return (
-    <>
+    <div id="search-results" tabIndex={-1}>
       {/* Screen reader announcement for search results */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {hasConfirmedZeroResults
@@ -149,6 +157,18 @@ export function SearchResultsClient({
           {/* Suggested searches when browsing without a query */}
           {browseMode && !query && <SuggestedSearches />}
 
+          {/* Price toggle + result count header */}
+          {allListings.length > 0 && (
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                {total !== null
+                  ? `${total} ${total === 1 ? 'place' : 'places'}${query ? ` in ${query}` : ''}`
+                  : `100+ places${query ? ` in ${query}` : ''}`}
+              </p>
+              <TotalPriceToggle showTotal={showTotalPrice} onToggle={setShowTotalPrice} />
+            </div>
+          )}
+
           <div role="feed" aria-label="Search results" className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
             {allListings.map((listing, index) => (
               <ListingCard
@@ -156,6 +176,7 @@ export function SearchResultsClient({
                 listing={listing}
                 isSaved={savedListingIds.includes(listing.id)}
                 priority={index < 4}
+                showTotalPrice={showTotalPrice}
               />
             ))}
           </div>
@@ -212,6 +233,6 @@ export function SearchResultsClient({
           )}
         </>
       )}
-    </>
+    </div>
   );
 }

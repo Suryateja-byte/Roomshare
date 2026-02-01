@@ -88,9 +88,13 @@ interface ListingCardProps {
     className?: string;
     /** Priority loading for LCP optimization - use for above-fold images */
     priority?: boolean;
+    /** When true, show total price (price × estimatedMonths) instead of per-month */
+    showTotalPrice?: boolean;
+    /** Number of months for total price calculation */
+    estimatedMonths?: number;
 }
 
-export default function ListingCard({ listing, isSaved, className, priority = false }: ListingCardProps) {
+export default function ListingCard({ listing, isSaved, className, priority = false, showTotalPrice = false, estimatedMonths = 1 }: ListingCardProps) {
     const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
     const [isDragging, setIsDragging] = useState(false);
     const { setHovered, setActive, focusSource } = useListingFocus();
@@ -262,11 +266,21 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                         </div>
                     )}
 
-                    {/* Price Row - Clean, no button */}
+                    {/* Price Row */}
                     <div className="mt-auto">
                         <div className="flex items-baseline">
-                            <span className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
-                            {listing.price > 0 && <span className="text-zinc-400 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
+                            {showTotalPrice && estimatedMonths > 1 ? (
+                                <>
+                                    <span className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price * estimatedMonths)}</span>
+                                    <span className="text-zinc-400 dark:text-zinc-500 text-sm ml-0.5">total</span>
+                                    <span className="text-zinc-400 dark:text-zinc-500 text-xs ml-1.5">({formatPrice(listing.price)}/mo × {estimatedMonths})</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
+                                    {listing.price > 0 && <span className="text-zinc-400 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
