@@ -2,6 +2,7 @@
 
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { Map, List } from "lucide-react";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface FloatingMapButtonProps {
   /** Whether the bottom sheet is showing list content (half or expanded) */
@@ -32,7 +33,7 @@ export default function FloatingMapButton({
       <AnimatePresence mode="wait">
         <m.button
           key={isListMode ? "map" : "list"}
-          onClick={onToggle}
+          onClick={() => { triggerHaptic(); onToggle(); }}
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
