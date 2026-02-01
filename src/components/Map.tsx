@@ -28,6 +28,7 @@ import { MapGestureHint } from './map/MapGestureHint';
 import { PrivacyCircle } from './map/PrivacyCircle';
 import { BoundaryLayer } from './map/BoundaryLayer';
 import { UserMarker, useUserPin } from './map/UserMarker';
+import { POILayer } from './map/POILayer';
 import { cn } from '@/lib/utils';
 
 interface Listing {
@@ -1140,6 +1141,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     Search as I move
                 </button>
             </div>
+
+            {/* POI & Neighborhood label toggles */}
+            <POILayer mapRef={mapRef} isMapLoaded={isMapLoaded} />
 
             {/* Fit all results button - zoom to show all markers */}
             {listings.length >= 1 && isMapLoaded && (
