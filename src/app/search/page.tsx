@@ -14,6 +14,7 @@ import { V1PathResetSetter } from '@/components/search/V1PathResetSetter';
 import { SearchResultsLoadingWrapper } from '@/components/search/SearchResultsLoadingWrapper';
 import { AppliedFilterChips } from '@/components/filters/AppliedFilterChips';
 import { CategoryBar } from '@/components/search/CategoryBar';
+import { RecommendedFilters } from '@/components/search/RecommendedFilters';
 import type { V2MapData } from '@/contexts/SearchV2DataContext';
 import { features } from '@/lib/env';
 import { preload } from 'react-dom';
@@ -239,6 +240,7 @@ export default async function SearchPage({
         <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
             <CategoryBar />
             <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+            <RecommendedFilters />
             <AppliedFilterChips currentCount={total} />
 
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
