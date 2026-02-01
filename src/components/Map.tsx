@@ -220,6 +220,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     // Track URL bounds for reset functionality
     const urlBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
+    // Request deduplication: skip search if bounds haven't changed
+    const lastSearchBoundsRef = useRef<string | null>(null);
     // P0 Issue #25: Track mount state to prevent stale callbacks updating state after unmount
     const isMountedRef = useRef(true);
     // Track map-initiated activeId to avoid re-triggering popup from card "Show on Map"
@@ -601,6 +603,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
     // Execute the actual search with the given bounds
     const executeMapSearch = useCallback((bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }) => {
+        // Request deduplication: skip if bounds haven't meaningfully changed (rounded to 4 decimal places ~11m precision)
+        const boundsKey = `${bounds.minLng.toFixed(4)},${bounds.maxLng.toFixed(4)},${bounds.minLat.toFixed(4)},${bounds.maxLat.toFixed(4)}`;
+        if (boundsKey === lastSearchBoundsRef.current) return;
+        lastSearchBoundsRef.current = boundsKey;
+
         const params = new URLSearchParams(searchParams.toString());
 
         // Remove single point coordinates since we now have bounds
