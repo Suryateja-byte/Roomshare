@@ -11,6 +11,8 @@ interface ImageCarouselProps {
   priority?: boolean;
   className?: string;
   onImageError?: (index: number) => void;
+  /** Called when drag/swipe state changes — use to block parent click */
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
 /**
@@ -23,16 +25,22 @@ interface ImageCarouselProps {
  * - Lazy loading for non-visible images
  * - Keyboard accessible
  */
+/** Max dots to display — window shifts to keep selected dot visible */
+const MAX_DOTS = 5;
+
 export function ImageCarousel({
   images,
   alt,
   priority = false,
   className = '',
   onImageError,
+  onDragStateChange,
 }: ImageCarouselProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showControls, setShowControls] = useState(false);
+  const fallbackImage =
+    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80";
 
   const scrollPrev = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -66,6 +74,22 @@ export function ImageCarousel({
     };
   }, [emblaApi, onSelect]);
 
+  // Track drag state to prevent parent link click during swipe
+  useEffect(() => {
+    if (!emblaApi || !onDragStateChange) return;
+    const onPointerDown = () => onDragStateChange(true);
+    const onPointerUp = () => {
+      // Small delay so the click event on the parent link is still blocked
+      setTimeout(() => onDragStateChange(false), 10);
+    };
+    emblaApi.on('pointerDown', onPointerDown);
+    emblaApi.on('pointerUp', onPointerUp);
+    return () => {
+      emblaApi.off('pointerDown', onPointerDown);
+      emblaApi.off('pointerUp', onPointerUp);
+    };
+  }, [emblaApi, onDragStateChange]);
+
   // Handle keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'ArrowLeft') {
@@ -82,7 +106,7 @@ export function ImageCarousel({
     return (
       <div className={`relative overflow-hidden ${className}`}>
         <Image
-          src={images[0] || '/placeholder-listing.jpg'}
+          src={images[0] || fallbackImage}
           alt={alt}
           fill
           className="object-cover"
@@ -99,6 +123,12 @@ export function ImageCarousel({
       className={`relative overflow-hidden group ${className}`}
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
+      onFocus={() => setShowControls(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setShowControls(false);
+        }
+      }}
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="region"
@@ -135,16 +165,18 @@ export function ImageCarousel({
       <button
         onClick={scrollPrev}
         className={`
-          absolute left-2 top-1/2 -translate-y-1/2 z-10
-          w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90
+          absolute left-1 top-1/2 -translate-y-1/2 z-10
+          min-w-[44px] min-h-[44px] rounded-full bg-white/90 dark:bg-zinc-800/90
           flex items-center justify-center
           shadow-md backdrop-blur-sm
           transition-all duration-200
           hover:bg-white dark:hover:bg-zinc-700
           focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white
-          ${showControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}
+          ${showControls ? 'opacity-100 translate-x-0 pointer-events-auto' : 'opacity-0 -translate-x-2 pointer-events-none'}
         `}
         aria-label="Previous image"
+        aria-hidden={!showControls}
+        tabIndex={showControls ? 0 : -1}
       >
         <ChevronLeft className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
       </button>
@@ -152,43 +184,76 @@ export function ImageCarousel({
       <button
         onClick={scrollNext}
         className={`
-          absolute right-2 top-1/2 -translate-y-1/2 z-10
-          w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90
+          absolute right-1 top-1/2 -translate-y-1/2 z-10
+          min-w-[44px] min-h-[44px] rounded-full bg-white/90 dark:bg-zinc-800/90
           flex items-center justify-center
           shadow-md backdrop-blur-sm
           transition-all duration-200
           hover:bg-white dark:hover:bg-zinc-700
           focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white
-          ${showControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'}
+          ${showControls ? 'opacity-100 translate-x-0 pointer-events-auto' : 'opacity-0 translate-x-2 pointer-events-none'}
         `}
         aria-label="Next image"
+        aria-hidden={!showControls}
+        tabIndex={showControls ? 0 : -1}
       >
         <ChevronRight className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
       </button>
 
-      {/* Navigation Dots */}
+      {/* Navigation Dots — max 5 visible, window shifts with selection */}
       <div
         className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5"
         role="tablist"
         aria-label="Image navigation"
       >
-        {images.map((_, index) => (
-          <button
-            key={index}
-            onClick={(e) => scrollTo(e, index)}
-            className={`
-              w-1.5 h-1.5 rounded-full transition-all duration-200
-              focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1
-              ${index === selectedIndex
-                ? 'bg-white w-2.5'
-                : 'bg-white/60 hover:bg-white/80'
-              }
-            `}
-            role="tab"
-            aria-selected={index === selectedIndex}
-            aria-label={`Go to image ${index + 1}`}
-          />
-        ))}
+        {(() => {
+          const count = images.length;
+          if (count <= MAX_DOTS) {
+            // Show all dots
+            return images.map((_, index) => (
+              <button
+                key={index}
+                onClick={(e) => scrollTo(e, index)}
+                className="relative p-2.5 -m-2 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1"
+                role="tab"
+                aria-selected={index === selectedIndex}
+                aria-label={`Go to image ${index + 1}`}
+              >
+                <span
+                  className={`block rounded-full transition-all duration-200 ${
+                    index === selectedIndex
+                      ? 'bg-white w-2.5 h-1.5'
+                      : 'bg-white/60 w-1.5 h-1.5'
+                  }`}
+                />
+              </button>
+            ));
+          }
+          // Windowed dots: keep selected dot centered when possible
+          let start = Math.max(0, selectedIndex - Math.floor(MAX_DOTS / 2));
+          if (start + MAX_DOTS > count) start = count - MAX_DOTS;
+          const visibleIndices = Array.from({ length: MAX_DOTS }, (_, i) => start + i);
+          return visibleIndices.map((index) => (
+            <button
+              key={index}
+              onClick={(e) => scrollTo(e, index)}
+              className="relative p-2.5 -m-2 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1"
+              role="tab"
+              aria-selected={index === selectedIndex}
+              aria-label={`Go to image ${index + 1}`}
+            >
+              <span
+                className={`block rounded-full transition-all duration-200 ${
+                  index === selectedIndex
+                    ? 'bg-white w-2.5 h-1.5'
+                    : (index === visibleIndices[0] || index === visibleIndices[MAX_DOTS - 1])
+                      ? 'bg-white/40 w-1 h-1'
+                      : 'bg-white/60 w-1.5 h-1.5'
+                }`}
+              />
+            </button>
+          ));
+        })()}
       </div>
     </div>
   );
