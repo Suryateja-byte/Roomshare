@@ -901,7 +901,7 @@ export default function NeighborhoodChat({ latitude, longitude, listingId }: Nei
                   onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
                   placeholder="Ask anything..."
                   disabled={isLoading}
-                  className="w-full relative bg-transparent border-0 px-6 py-4 text-[15px] placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:ring-0 focus:outline-none text-zinc-900 dark:text-zinc-100 pr-12 rounded-[28px]"
+                  className="w-full relative bg-transparent border-0 px-6 py-4 text-[15px] placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:ring-0 focus:outline-none text-zinc-900 dark:text-zinc-100 pr-12 rounded-[28px]"
                 />
                 <button
                   type="submit"

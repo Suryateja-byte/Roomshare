@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
+import { useSearchParams } from "next/navigation";
 
 interface SearchResultsLoadingWrapperProps {
   children: React.ReactNode;
@@ -26,12 +28,42 @@ export function SearchResultsLoadingWrapper({
   const isPending = transitionContext?.isPending ?? false;
   const isSlowTransition = transitionContext?.isSlowTransition ?? false;
 
+  // Focus #search-results-heading when search params change (skip initial mount)
+  const searchParams = useSearchParams();
+  const paramsKey = searchParams.toString();
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    document.getElementById("search-results-heading")?.focus();
+  }, [paramsKey]);
+
+  // Announce result count to screen readers when transition completes
+  const prevPendingRef = useRef(false);
+  const [srAnnouncement, setSrAnnouncement] = useState("");
+
+  useEffect(() => {
+    if (prevPendingRef.current && !isPending) {
+      const heading = document.getElementById("search-results-heading");
+      if (heading?.textContent) {
+        setSrAnnouncement(heading.textContent);
+      }
+    }
+    prevPendingRef.current = isPending;
+  }, [isPending]);
+
   return (
     <div
       className="relative"
       aria-busy={isPending}
-      aria-live="polite"
     >
+      {/* Explicit SR announcement for result count changes */}
+      <span className="sr-only" aria-live="polite" role="status">
+        {srAnnouncement}
+      </span>
       {/* Loading overlay - shows during transitions */}
       {isPending && (
         <div

@@ -32,7 +32,7 @@ export function FilterPill({ label, value, onRemove, variant = 'active' }: Filte
       `}
       aria-label={`Remove ${displayText} filter`}
     >
-      <span className="truncate max-w-[150px]">{displayText}</span>
+      <span className="truncate max-w-[120px] sm:max-w-[150px] lg:max-w-[180px]">{displayText}</span>
       <X className="w-3.5 h-3.5 flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
     </button>
   );

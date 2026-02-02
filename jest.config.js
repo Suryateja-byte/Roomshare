@@ -38,7 +38,7 @@ const customJestConfig = {
     },
   },
   forceExit: true,
-  workerIdleMemoryLimit: "1GB",
+  workerIdleMemoryLimit: "512MB",
   moduleDirectories: ["node_modules", "<rootDir>/"],
   testMatch: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)"],
   transformIgnorePatterns: [

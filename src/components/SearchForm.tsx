@@ -7,7 +7,7 @@ import { Search, Clock, Loader2, SlidersHorizontal, Home, Users, Building2, Layo
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
-import { SUPPORTED_LANGUAGES, getLanguageName, normalizeLanguages, type LanguageCode } from '@/lib/languages';
+import { SUPPORTED_LANGUAGES, getLanguageName, type LanguageCode } from '@/lib/languages';
 import dynamic from 'next/dynamic';
 
 const FilterModal = dynamic(() => import('@/components/search/FilterModal'), {
@@ -15,35 +15,24 @@ const FilterModal = dynamic(() => import('@/components/search/FilterModal'), {
     loading: () => null,
 });
 import { parseNaturalLanguageQuery, nlQueryToSearchParams } from '@/lib/search/natural-language-parser';
-// Import canonical allowlists and aliases from shared parsing module
-// This ensures client-side parsing matches server-side validation
+// Import canonical allowlists from shared parsing module
 import {
     VALID_AMENITIES,
     VALID_HOUSE_RULES,
-    VALID_LEASE_DURATIONS,
-    VALID_ROOM_TYPES,
-    VALID_GENDER_PREFERENCES,
-    VALID_HOUSEHOLD_GENDERS,
-    LEASE_DURATION_ALIASES,
-    ROOM_TYPE_ALIASES,
 } from '@/lib/search-params';
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { useRecentSearches, type RecentSearch, type RecentSearchFilters } from '@/hooks/useRecentSearches';
 import { useDebouncedFilterCount } from '@/hooks/useDebouncedFilterCount';
 import { useFacets } from '@/hooks/useFacets';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useBatchedFilters } from '@/hooks/useBatchedFilters';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
 
-// Re-export canonical allowlists with legacy names for backwards compatibility within this component
-// This allows gradual migration without breaking existing code
+// Alias for FilterModal props
 const AMENITY_OPTIONS = VALID_AMENITIES;
 const HOUSE_RULE_OPTIONS = VALID_HOUSE_RULES;
-const GENDER_PREFERENCE_OPTIONS = VALID_GENDER_PREFERENCES;
-const HOUSEHOLD_GENDER_OPTIONS = VALID_HOUSEHOLD_GENDERS;
-const LEASE_DURATION_OPTIONS = VALID_LEASE_DURATIONS;
-const ROOM_TYPE_OPTIONS = VALID_ROOM_TYPES;
 
 // Room type options for inline filter tabs
 const ROOM_TYPE_TABS = [
@@ -99,55 +88,9 @@ export interface MapFlyToEventDetail {
     zoom?: number;
 }
 
-/** Clamp a price URL param to non-negative, returning '' for invalid values. */
-function clampPriceParam(raw: string | null): string {
-    if (!raw) return '';
-    const n = parseFloat(raw);
-    if (!Number.isFinite(n)) return '';
-    if (n < 0) return '0';
-    return raw;
-}
-
 export default function SearchForm({ variant = 'default' }: { variant?: 'default' | 'compact' }) {
     const searchParams = useSearchParams();
     const formRef = useRef<HTMLFormElement | null>(null);
-    const parseParamList = (key: string): string[] => {
-        const values = searchParams.getAll(key);
-        if (values.length === 0) return [];
-        return values
-            .flatMap(value => value.split(','))
-            .map(value => value.trim())
-            .filter(Boolean);
-    };
-    const normalizeByAllowlist = (values: string[], allowlist: readonly string[]) => {
-        const allowMap = new Map(allowlist.map(item => [item.toLowerCase(), item]));
-        const normalized = values
-            .map(value => allowMap.get(value.toLowerCase()))
-            .filter((value): value is string => Boolean(value));
-        return Array.from(new Set(normalized));
-    };
-    const parseEnumParam = (key: string, allowlist: readonly string[], aliases?: Record<string, string>) => {
-        const value = searchParams.get(key);
-        if (!value) return '';
-        const trimmed = value.trim();
-        // Check direct match first
-        if (allowlist.includes(trimmed)) return trimmed;
-        // Check case-insensitive match
-        const lowerValue = trimmed.toLowerCase();
-        const caseMatch = allowlist.find(item => item.toLowerCase() === lowerValue);
-        if (caseMatch) return caseMatch;
-        // Check aliases if provided
-        if (aliases) {
-            const aliasMatch = aliases[lowerValue];
-            if (aliasMatch && allowlist.includes(aliasMatch)) return aliasMatch;
-        }
-        // Invalid value - return empty string
-        return '';
-    };
-    const parseLanguages = () => {
-        const normalized = normalizeLanguages(parseParamList('languages'));
-        return Array.from(new Set(normalized));
-    };
     const parseCoords = () => {
         const lat = searchParams.get('lat');
         const lng = searchParams.get('lng');
@@ -160,24 +103,17 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         return { lat: parsedLat, lng: parsedLng };
     };
     const [location, setLocation] = useState(searchParams.get('q') || '');
-    const [minPrice, setMinPrice] = useState(() => clampPriceParam(searchParams.get('minPrice')));
-    const [maxPrice, setMaxPrice] = useState(() => clampPriceParam(searchParams.get('maxPrice')));
+    // Batched filter state — single hook manages pending vs committed
+    const { pending, isDirty: filtersDirty, setPending, reset: resetFilters, commit: commitFilters, committed } = useBatchedFilters();
+    // Destructure for convenient access (read-only aliases)
+    const { minPrice, maxPrice, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender } = pending;
+
     const [showFilters, setShowFilters] = useState(false);
 
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(parseCoords);
     const [geoLoading, setGeoLoading] = useState(false);
 
-    // New filters state - don't validate in initial state to avoid hydration mismatch
-    // Validation happens in useEffect after mount
-    const [moveInDate, setMoveInDate] = useState(searchParams.get('moveInDate') || '');
     const [hasMounted, setHasMounted] = useState(false);
-    const [leaseDuration, setLeaseDuration] = useState(parseEnumParam('leaseDuration', LEASE_DURATION_OPTIONS, LEASE_DURATION_ALIASES));
-    const [roomType, setRoomType] = useState(parseEnumParam('roomType', ROOM_TYPE_OPTIONS, ROOM_TYPE_ALIASES));
-    const [amenities, setAmenities] = useState<string[]>(normalizeByAllowlist(parseParamList('amenities'), AMENITY_OPTIONS));
-    const [houseRules, setHouseRules] = useState<string[]>(normalizeByAllowlist(parseParamList('houseRules'), HOUSE_RULE_OPTIONS));
-    const [languages, setLanguages] = useState<string[]>(parseLanguages());
-    const [genderPreference, setGenderPreference] = useState(parseEnumParam('genderPreference', GENDER_PREFERENCE_OPTIONS));
-    const [householdGender, setHouseholdGender] = useState(parseEnumParam('householdGender', HOUSEHOLD_GENDER_OPTIONS));
 
     // Language search filter state
     const [languageSearch, setLanguageSearch] = useState('');
@@ -223,28 +159,19 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setHasMounted(true);
         // Validate moveInDate on mount to clear invalid past dates
         const validated = validateMoveInDate(searchParams.get('moveInDate'));
-        setMoveInDate(validated);
+        if (validated !== moveInDate) {
+            setPending({ moveInDate: validated });
+        }
     }, []);
 
-    // Sync state with URL params when they change (e.g., after navigation)
+    // Sync non-filter state (location, coords) with URL when it changes
+    // Filter state sync is handled by useBatchedFilters internally
     useEffect(() => {
         const coords = parseCoords();
         if (coords) {
             setSelectedCoords(coords);
         }
-        // Sync other form fields from URL
         setLocation(searchParams.get('q') || '');
-        setMinPrice(clampPriceParam(searchParams.get('minPrice')));
-        setMaxPrice(clampPriceParam(searchParams.get('maxPrice')));
-        // Validate moveInDate to match server-side logic (reject past dates)
-        setMoveInDate(validateMoveInDate(searchParams.get('moveInDate')));
-        setLeaseDuration(parseEnumParam('leaseDuration', LEASE_DURATION_OPTIONS, LEASE_DURATION_ALIASES));
-        setRoomType(parseEnumParam('roomType', ROOM_TYPE_OPTIONS, ROOM_TYPE_ALIASES));
-        setAmenities(normalizeByAllowlist(parseParamList('amenities'), AMENITY_OPTIONS));
-        setHouseRules(normalizeByAllowlist(parseParamList('houseRules'), HOUSE_RULE_OPTIONS));
-        setLanguages(parseLanguages());
-        setGenderPreference(parseEnumParam('genderPreference', GENDER_PREFERENCE_OPTIONS));
-        setHouseholdGender(parseEnumParam('householdGender', HOUSEHOLD_GENDER_OPTIONS));
     }, [searchParams]);
 
     const router = useRouter();
@@ -502,61 +429,49 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // visual feedback (button press) over state computation
     const toggleAmenity = useCallback((amenity: string) => {
         startTransition(() => {
-            setAmenities(prev =>
-                prev.includes(amenity) ? prev.filter(a => a !== amenity) : [...prev, amenity]
-            );
+            const next = amenities.includes(amenity) ? amenities.filter(a => a !== amenity) : [...amenities, amenity];
+            setPending({ amenities: next });
         });
-    }, []);
+    }, [amenities, setPending]);
 
     const toggleHouseRule = useCallback((rule: string) => {
         startTransition(() => {
-            setHouseRules(prev =>
-                prev.includes(rule) ? prev.filter(r => r !== rule) : [...prev, rule]
-            );
+            const next = houseRules.includes(rule) ? houseRules.filter(r => r !== rule) : [...houseRules, rule];
+            setPending({ houseRules: next });
         });
-    }, []);
+    }, [houseRules, setPending]);
 
     const toggleLanguage = useCallback((lang: string) => {
         startTransition(() => {
-            setLanguages(prev =>
-                prev.includes(lang) ? prev.filter(l => l !== lang) : [...prev, lang]
-            );
+            const next = languages.includes(lang) ? languages.filter(l => l !== lang) : [...languages, lang];
+            setPending({ languages: next });
         });
-    }, []);
+    }, [languages, setPending]);
 
     // Room type selection — updates state and triggers search immediately
     const handleRoomTypeSelect = useCallback((value: string) => {
-        flushSync(() => {
-            setRoomType(value === 'any' ? '' : value);
-        });
-        formRef.current?.requestSubmit();
-    }, []);
+        setPending({ roomType: value === 'any' ? '' : value });
+        // Use queueMicrotask to let React process the state update before submitting
+        queueMicrotask(() => formRef.current?.requestSubmit());
+    }, [setPending]);
 
     // Room type selection from FilterBar CategoryTabs — sets state AND triggers search
     const handleFilterBarRoomTypeChange = useCallback((value: string) => {
-        // flushSync ensures the state update is applied before requestSubmit reads it
-        flushSync(() => {
-            setRoomType(value === 'any' ? '' : value);
-        });
-        formRef.current?.requestSubmit();
-    }, []);
+        setPending({ roomType: value === 'any' ? '' : value });
+        queueMicrotask(() => formRef.current?.requestSubmit());
+    }, [setPending]);
 
     // Clear all filters and reset to defaults
     // INP optimization: Batch state updates in startTransition
     const handleClearAllFilters = useCallback(() => {
         startTransition(() => {
             setLocation('');
-            setMinPrice('');
-            setMaxPrice('');
             setSelectedCoords(null);
-            setMoveInDate('');
-            setLeaseDuration('');
-            setRoomType('');
-            setAmenities([]);
-            setHouseRules([]);
-            setLanguages([]);
-            setGenderPreference('');
-            setHouseholdGender('');
+            setPending({
+                minPrice: '', maxPrice: '', moveInDate: '', leaseDuration: '',
+                roomType: '', amenities: [], houseRules: [], languages: [],
+                genderPreference: '', householdGender: '',
+            });
         });
         // Navigate to clean search page (outside transition - navigation is user-facing)
         if (transitionContext) {
@@ -564,7 +479,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         } else {
             router.push('/search');
         }
-    }, [transitionContext, router]);
+    }, [transitionContext, router, setPending]);
 
     // Count active filters for badge - split into two parts to avoid hydration mismatch
     // Base count excludes moveInDate (no Date() calls, safe for SSR)
@@ -597,72 +512,21 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         moveInDateCount > 0
     );
 
-    // P3c: Compute actual isDirty by comparing pending state to committed URL params
-    const filtersDirty = useMemo(() => {
-        // Get URL values (committed state)
-        const urlMinPrice = searchParams.get('minPrice') || '';
-        const urlMaxPrice = searchParams.get('maxPrice') || '';
-        const urlRoomType = searchParams.get('roomType') || '';
-        const urlLeaseDuration = searchParams.get('leaseDuration') || '';
-        const urlMoveInDate = searchParams.get('moveInDate') || '';
-        const urlAmenities = searchParams.getAll('amenities').sort();
-        const urlHouseRules = searchParams.getAll('houseRules').sort();
-        const urlLanguages = searchParams.getAll('languages').sort();
-        const urlGenderPreference = searchParams.get('genderPreference') || '';
-        const urlHouseholdGender = searchParams.get('householdGender') || '';
-
-        // Compare pending (local state) vs committed (URL)
-        return (
-            minPrice !== urlMinPrice ||
-            maxPrice !== urlMaxPrice ||
-            roomType !== urlRoomType ||
-            leaseDuration !== urlLeaseDuration ||
-            moveInDate !== urlMoveInDate ||
-            [...amenities].sort().join(',') !== urlAmenities.join(',') ||
-            [...houseRules].sort().join(',') !== urlHouseRules.join(',') ||
-            [...languages].sort().join(',') !== urlLanguages.join(',') ||
-            genderPreference !== urlGenderPreference ||
-            householdGender !== urlHouseholdGender
-        );
-    }, [searchParams, minPrice, maxPrice, roomType, leaseDuration, moveInDate, amenities, houseRules, languages, genderPreference, householdGender]);
-
     // P3-NEW-b: Get dynamic count for FilterModal button
+    // filtersDirty is now computed by useBatchedFilters
     const {
         formattedCount,
         isLoading: isCountLoading,
         boundsRequired,
     } = useDebouncedFilterCount({
-        pending: {
-            minPrice,
-            maxPrice,
-            roomType,
-            leaseDuration,
-            moveInDate,
-            amenities,
-            houseRules,
-            languages,
-            genderPreference,
-            householdGender,
-        },
-        // P3c: Use computed dirty state instead of just drawer open state
+        pending,
         isDirty: filtersDirty,
         isDrawerOpen: showFilters,
     });
 
     // Facets data (histogram + facet counts) for FilterModal
     const { facets } = useFacets({
-        pending: {
-            minPrice,
-            maxPrice,
-            roomType,
-            leaseDuration,
-            moveInDate,
-            amenities,
-            houseRules,
-            languages,
-            genderPreference,
-            householdGender,
-        },
+        pending,
         isDrawerOpen: showFilters,
     });
 
@@ -677,11 +541,12 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // Handle price slider changes
     const handlePriceChange = useCallback((min: number, max: number) => {
         startTransition(() => {
-            // Only set if different from absolute bounds (avoid unnecessary params)
-            setMinPrice(min <= priceAbsoluteMin ? '' : String(min));
-            setMaxPrice(max >= priceAbsoluteMax ? '' : String(max));
+            setPending({
+                minPrice: min <= priceAbsoluteMin ? '' : String(min),
+                maxPrice: max >= priceAbsoluteMax ? '' : String(max),
+            });
         });
-    }, [priceAbsoluteMin, priceAbsoluteMax]);
+    }, [priceAbsoluteMin, priceAbsoluteMax, setPending]);
 
     // Handler for removing individual filters from FilterBar pills
     // INP optimization: Wrap state updates in startTransition for responsiveness
@@ -689,29 +554,29 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         startTransition(() => {
             switch (type) {
                 case 'leaseDuration':
-                    setLeaseDuration('');
+                    setPending({ leaseDuration: '' });
                     break;
                 case 'moveInDate':
-                    setMoveInDate('');
+                    setPending({ moveInDate: '' });
                     break;
                 case 'amenity':
-                    if (value) setAmenities(prev => prev.filter(a => a !== value));
+                    if (value) setPending({ amenities: amenities.filter(a => a !== value) });
                     break;
                 case 'houseRule':
-                    if (value) setHouseRules(prev => prev.filter(r => r !== value));
+                    if (value) setPending({ houseRules: houseRules.filter(r => r !== value) });
                     break;
                 case 'language':
-                    if (value) setLanguages(prev => prev.filter(l => l !== value));
+                    if (value) setPending({ languages: languages.filter(l => l !== value) });
                     break;
                 case 'genderPreference':
-                    setGenderPreference('');
+                    setPending({ genderPreference: '' });
                     break;
                 case 'householdGender':
-                    setHouseholdGender('');
+                    setPending({ householdGender: '' });
                     break;
             }
         });
-    }, []);
+    }, [amenities, houseRules, languages, setPending]);
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;
@@ -859,7 +724,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             inputMode="numeric"
                             pattern="[0-9]*"
                             value={minPrice}
-                            onChange={(e) => setMinPrice(e.target.value)}
+                            onChange={(e) => setPending({ minPrice: e.target.value })}
                             placeholder="Min"
                             className={`w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
                             min="0"
@@ -873,7 +738,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             inputMode="numeric"
                             pattern="[0-9]*"
                             value={maxPrice}
-                            onChange={(e) => setMaxPrice(e.target.value)}
+                            onChange={(e) => setPending({ maxPrice: e.target.value })}
                             placeholder="Max"
                             className={`w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:ring-0 focus:outline-none outline-none ring-0 cursor-text appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] ${isCompact ? 'text-sm' : 'text-sm'}`}
                             min="0"
@@ -993,11 +858,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 onClose={() => setShowFilters(false)}
                 onApply={() => {
                     setShowFilters(false);
-                    // Trigger search with current filters via requestSubmit
-                    // (dispatchEvent with new Event won't trigger React's onSubmit handler)
-                    queueMicrotask(() => {
-                        formRef.current?.requestSubmit();
-                    });
+                    commitFilters();
                 }}
                 onClearAll={handleClearAllFilters}
                 hasActiveFilters={hasActiveFilters}
@@ -1010,14 +871,14 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 languages={languages}
                 genderPreference={genderPreference}
                 householdGender={householdGender}
-                onMoveInDateChange={setMoveInDate}
-                onLeaseDurationChange={setLeaseDuration}
-                onRoomTypeChange={handleFilterBarRoomTypeChange}
+                onMoveInDateChange={(v: string) => setPending({ moveInDate: v })}
+                onLeaseDurationChange={(v: string) => setPending({ leaseDuration: v })}
+                onRoomTypeChange={(v: string) => setPending({ roomType: v === 'any' ? '' : v })}
                 onToggleAmenity={toggleAmenity}
                 onToggleHouseRule={toggleHouseRule}
                 onToggleLanguage={toggleLanguage}
-                onGenderPreferenceChange={setGenderPreference}
-                onHouseholdGenderChange={setHouseholdGender}
+                onGenderPreferenceChange={(v: string) => setPending({ genderPreference: v })}
+                onHouseholdGenderChange={(v: string) => setPending({ householdGender: v })}
                 languageSearch={languageSearch}
                 onLanguageSearchChange={setLanguageSearch}
                 filteredLanguages={filteredLanguages}

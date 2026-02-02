@@ -110,6 +110,8 @@ export default function VerificationForm() {
                         onChange={handleDocumentUpload}
                         className="hidden"
                         id="document-upload"
+                        aria-describedby={error ? "verification-form-error" : undefined}
+                        aria-invalid={!!error}
                     />
                     <label
                         htmlFor="document-upload"
@@ -178,7 +180,7 @@ export default function VerificationForm() {
 
             {/* Error Message */}
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl p-4">
+                <div id="verification-form-error" role="alert" className="bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl p-4">
                     <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                 </div>
             )}
@@ -195,7 +197,7 @@ export default function VerificationForm() {
             <button
                 type="submit"
                 disabled={isSubmitting || !documentUrl}
-                className="w-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 py-3 px-6 rounded-xl font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                className="w-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 py-3 px-6 rounded-xl font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
                 {isSubmitting ? (
                     <>

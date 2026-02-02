@@ -26,6 +26,8 @@ import {
   useRef,
   useEffect,
 } from "react";
+import { useSearchParams } from "next/navigation";
+import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
 
 /** Coordinates for map bounds */
 export interface MapBoundsCoords {
@@ -62,7 +64,14 @@ interface MapBoundsState {
   resetToUrlBounds: () => void;
 }
 
-interface MapBoundsContextValue extends MapBoundsState {
+interface MapAreaCount {
+  /** Count of listings in current map area (null = 100+) */
+  areaCount: number | null;
+  /** Whether area count is loading */
+  isAreaCountLoading: boolean;
+}
+
+interface MapBoundsContextValue extends MapBoundsState, MapAreaCount {
   /** Update hasUserMoved (called by Map) */
   setHasUserMoved: (value: boolean) => void;
   /** Update boundsDirty (called by Map) */
@@ -79,6 +88,8 @@ interface MapBoundsContextValue extends MapBoundsState {
   setSearchHandler: (handler: () => void) => void;
   /** Register reset handler (called by Map) */
   setResetHandler: (handler: () => void) => void;
+  /** Ref for synchronous programmatic move check (used in Mapbox event handlers) */
+  isProgrammaticMoveRef: React.RefObject<boolean>;
 }
 
 const MapBoundsContext = createContext<MapBoundsContextValue | null>(null);
@@ -96,12 +107,17 @@ function isPointInBounds(point: PointCoords, bounds: MapBoundsCoords): boolean {
 }
 
 /** Auto-clear timeout for programmatic move flag (ms) */
-const PROGRAMMATIC_MOVE_TIMEOUT = 1500;
+const PROGRAMMATIC_MOVE_TIMEOUT = 2500;
+
 
 export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   const [hasUserMoved, setHasUserMovedState] = useState(false);
   const [boundsDirty, setBoundsDirty] = useState(false);
-  const [searchAsMove, setSearchAsMove] = useState(false);
+  const [searchAsMove, setSearchAsMoveState] = useState(true);
+
+  const setSearchAsMove = useCallback((value: boolean) => {
+    setSearchAsMoveState(value);
+  }, []);
   const [isProgrammaticMove, setIsProgrammaticMoveState] = useState(false);
   const [searchLocationName, setSearchLocationName] = useState<string | null>(
     null,
@@ -121,6 +137,47 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   const isProgrammaticMoveRef = useRef(false);
   // Ref to track timeout for cleanup
   const programmaticMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to track previous search params for route change detection
+  const prevSearchParamsRef = useRef<string | null>(null);
+
+  // Get search params for route change detection
+  const searchParams = useSearchParams();
+
+  // Reset map state when route changes to prevent stale state
+  // (e.g., showing "map moved" banner from NYC when user navigates to LA)
+  // Only reset on non-bounds param changes — bounds changes from map panning
+  // should NOT reset handlers or the search-as-move cycle breaks.
+  useEffect(() => {
+    const currentParams = searchParams.toString();
+    if (
+      prevSearchParamsRef.current !== null &&
+      prevSearchParamsRef.current !== currentParams
+    ) {
+      // Compare non-bounds params to detect true route changes
+      const BOUNDS_KEYS = ['minLat', 'maxLat', 'minLng', 'maxLng'];
+      const stripBounds = (raw: string) => {
+        const sp = new URLSearchParams(raw);
+        BOUNDS_KEYS.forEach((k) => sp.delete(k));
+        sp.sort();
+        return sp.toString();
+      };
+      const prevNonBounds = stripBounds(prevSearchParamsRef.current);
+      const currNonBounds = stripBounds(currentParams);
+
+      if (prevNonBounds !== currNonBounds) {
+        // True route change (filters, query, etc.) — reset everything
+        setHasUserMovedState(false);
+        setBoundsDirty(false);
+        setSearchHandlerState(null);
+        setResetHandlerState(null);
+      } else {
+        // Bounds-only change from map panning — reset dirty state but keep handlers
+        setHasUserMovedState(false);
+        setBoundsDirty(false);
+      }
+    }
+    prevSearchParamsRef.current = currentParams;
+  }, [searchParams]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -209,6 +266,111 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
     return !isPointInBounds(searchLocationCenter, currentMapBounds);
   }, [searchLocationCenter, currentMapBounds, hasUserMoved]);
 
+  // --- Area count: fetch listing count for current map bounds when banner is showing ---
+  const AREA_COUNT_DEBOUNCE_MS = 600;
+  const AREA_COUNT_CACHE_TTL_MS = 30_000;
+
+  const [areaCount, setAreaCount] = useState<number | null>(null);
+  const [isAreaCountLoading, setIsAreaCountLoading] = useState(false);
+  const areaCountAbortRef = useRef<AbortController | null>(null);
+  const areaCountDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const areaCountCacheRef = useRef<Map<string, { count: number | null; expiresAt: number }>>(new Map());
+
+  // Area count is enabled only when banner would show (toggle OFF + bounds dirty)
+  const areaCountEnabled = hasUserMoved && boundsDirty && !searchAsMove;
+
+  useEffect(() => {
+    // Cleanup debounce/abort
+    if (areaCountDebounceRef.current) {
+      clearTimeout(areaCountDebounceRef.current);
+      areaCountDebounceRef.current = null;
+    }
+
+    if (!areaCountEnabled || !currentMapBounds) {
+      // Abort in-flight, reset state
+      if (areaCountAbortRef.current) {
+        areaCountAbortRef.current.abort();
+        areaCountAbortRef.current = null;
+      }
+      setAreaCount(null);
+      setIsAreaCountLoading(false);
+      return;
+    }
+
+    // Build cache key from current map bounds + URL filter params
+    const boundsKey = `${currentMapBounds.minLat},${currentMapBounds.maxLat},${currentMapBounds.minLng},${currentMapBounds.maxLng}`;
+    const filterKey = searchParams.toString();
+    const cacheKey = `${boundsKey}|${filterKey}`;
+
+    // Check cache
+    const cached = areaCountCacheRef.current.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      setAreaCount(cached.count);
+      setIsAreaCountLoading(false);
+      return;
+    }
+
+    setIsAreaCountLoading(true);
+
+    areaCountDebounceRef.current = setTimeout(() => {
+      // Abort previous request
+      if (areaCountAbortRef.current) {
+        areaCountAbortRef.current.abort();
+      }
+      const controller = new AbortController();
+      areaCountAbortRef.current = controller;
+
+      // Build URL from current URL params, overriding bounds with map bounds
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("minLat", String(currentMapBounds.minLat));
+      params.set("maxLat", String(currentMapBounds.maxLat));
+      params.set("minLng", String(currentMapBounds.minLng));
+      params.set("maxLng", String(currentMapBounds.maxLng));
+      // Remove pagination params
+      params.delete("page");
+      params.delete("cursor");
+
+      rateLimitedFetch(`/api/search-count?${params.toString()}`, {
+        signal: controller.signal,
+        cache: "no-store",
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`${res.status}`);
+          return res.json();
+        })
+        .then((data) => {
+          if (!controller.signal.aborted) {
+            const count = (data.count as number | null);
+            setAreaCount(count);
+            setIsAreaCountLoading(false);
+            areaCountCacheRef.current.set(cacheKey, {
+              count,
+              expiresAt: Date.now() + AREA_COUNT_CACHE_TTL_MS,
+            });
+          }
+        })
+        .catch((err) => {
+          if (err instanceof Error && err.name === "AbortError") return;
+          if (err instanceof RateLimitError) {
+            if (!controller.signal.aborted) setIsAreaCountLoading(false);
+            return;
+          }
+          if (!controller.signal.aborted) {
+            setIsAreaCountLoading(false);
+          }
+        });
+    }, AREA_COUNT_DEBOUNCE_MS);
+
+    return () => {
+      if (areaCountDebounceRef.current) {
+        clearTimeout(areaCountDebounceRef.current);
+      }
+      if (areaCountAbortRef.current) {
+        areaCountAbortRef.current.abort();
+      }
+    };
+  }, [areaCountEnabled, currentMapBounds, searchParams]);
+
   // Memoize context value to prevent unnecessary re-renders
   // Without this, every state change creates a new object reference,
   // causing all consumers to re-render even if their specific values haven't changed
@@ -221,6 +383,8 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       searchLocationName,
       searchLocationCenter,
       locationConflict,
+      areaCount,
+      isAreaCountLoading,
       searchCurrentArea,
       resetToUrlBounds,
       setHasUserMoved,
@@ -231,6 +395,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       setCurrentMapBounds,
       setSearchHandler,
       setResetHandler,
+      isProgrammaticMoveRef,
     }),
     [
       hasUserMoved,
@@ -240,13 +405,18 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       searchLocationName,
       searchLocationCenter,
       locationConflict,
+      areaCount,
+      isAreaCountLoading,
       searchCurrentArea,
       resetToUrlBounds,
       setHasUserMoved,
       setProgrammaticMove,
       setSearchLocation,
       setCurrentMapBounds,
-      // Note: setSearchHandler/setResetHandler have empty deps, so they're stable
+      setSearchAsMove,
+      setSearchHandler,
+      setResetHandler,
+      isProgrammaticMoveRef,
     ],
   );
 
@@ -269,6 +439,8 @@ export function useMapBounds() {
       searchLocationName: null,
       searchLocationCenter: null,
       locationConflict: false,
+      areaCount: null,
+      isAreaCountLoading: false,
       searchCurrentArea: () => {},
       resetToUrlBounds: () => {},
       setHasUserMoved: () => {},
@@ -279,6 +451,7 @@ export function useMapBounds() {
       setCurrentMapBounds: () => {},
       setSearchHandler: () => {},
       setResetHandler: () => {},
+      isProgrammaticMoveRef: { current: false },
     };
   }
   return context;
@@ -297,6 +470,8 @@ export function useMapMovedBanner() {
     searchLocationName,
     searchCurrentArea,
     resetToUrlBounds,
+    areaCount,
+    isAreaCountLoading,
   } = useMapBounds();
 
   // Show "results not updated" banner when bounds differ but location is still visible
@@ -312,5 +487,7 @@ export function useMapMovedBanner() {
     locationName: searchLocationName,
     onSearch: searchCurrentArea,
     onReset: resetToUrlBounds,
+    areaCount,
+    isAreaCountLoading,
   };
 }

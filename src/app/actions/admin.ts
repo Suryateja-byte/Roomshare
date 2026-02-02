@@ -6,6 +6,8 @@ import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { ListingStatus, ReportStatus } from '@prisma/client';
 import { logAdminAction } from '@/lib/audit';
+import { logger } from '@/lib/logger';
+import { markListingDirty } from '@/lib/search/search-doc-dirty';
 
 // Helper to check admin status
 async function requireAdmin() {
@@ -97,7 +99,12 @@ export async function getUsers(options?: {
 
         return { users, total, page, limit };
     } catch (error) {
-        console.error('Error fetching users:', error);
+        logger.sync.error('Failed to fetch users (admin)', {
+            action: 'getUsers',
+            adminId: adminCheck.userId,
+            options,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to fetch users', users: [], total: 0 };
     }
 }
@@ -145,7 +152,12 @@ export async function toggleUserAdmin(userId: string) {
         revalidatePath('/admin/users');
         return { success: true, isAdmin: !user.isAdmin };
     } catch (error) {
-        console.error('Error toggling admin status:', error);
+        logger.sync.error('Failed to toggle admin status', {
+            action: 'toggleUserAdmin',
+            adminId: adminCheck.userId,
+            userId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to update admin status' };
     }
 }
@@ -193,7 +205,13 @@ export async function suspendUser(userId: string, suspend: boolean) {
         revalidatePath('/admin/users');
         return { success: true };
     } catch (error) {
-        console.error('Error suspending user:', error);
+        logger.sync.error('Failed to update user suspension', {
+            action: 'suspendUser',
+            adminId: adminCheck.userId,
+            userId,
+            suspend,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to update user status' };
     }
 }
@@ -275,7 +293,12 @@ export async function getListingsForAdmin(options?: {
 
         return { listings, total, page, limit };
     } catch (error) {
-        console.error('Error fetching listings:', error);
+        logger.sync.error('Failed to fetch listings (admin)', {
+            action: 'getListingsForAdmin',
+            adminId: adminCheck.userId,
+            options,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to fetch listings', listings: [], total: 0 };
     }
 }
@@ -301,6 +324,9 @@ export async function updateListingStatus(listingId: string, status: ListingStat
             data: { status }
         });
 
+        // Fire-and-forget: mark listing dirty for search doc refresh
+        markListingDirty(listingId, 'status_changed').catch(() => {});
+
         // Audit log
         await logAdminAction({
             adminId: adminCheck.userId!,
@@ -318,7 +344,13 @@ export async function updateListingStatus(listingId: string, status: ListingStat
         revalidatePath('/admin/listings');
         return { success: true };
     } catch (error) {
-        console.error('Error updating listing status:', error);
+        logger.sync.error('Failed to update listing status (admin)', {
+            action: 'updateListingStatus',
+            adminId: adminCheck.userId,
+            listingId,
+            status,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to update listing status' };
     }
 }
@@ -407,7 +439,12 @@ export async function deleteListing(listingId: string) {
         revalidatePath('/admin/listings');
         return { success: true, notifiedTenants: pendingBookings.length };
     } catch (error) {
-        console.error('Error deleting listing:', error);
+        logger.sync.error('Failed to delete listing (admin)', {
+            action: 'deleteListing',
+            adminId: adminCheck.userId,
+            listingId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to delete listing' };
     }
 }
@@ -477,7 +514,12 @@ export async function getReports(options?: {
 
         return { reports, total, page, limit };
     } catch (error) {
-        console.error('Error fetching reports:', error);
+        logger.sync.error('Failed to fetch reports (admin)', {
+            action: 'getReports',
+            adminId: adminCheck.userId,
+            options,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to fetch reports', reports: [], total: 0 };
     }
 }
@@ -531,7 +573,13 @@ export async function resolveReport(
         revalidatePath('/admin/reports');
         return { success: true };
     } catch (error) {
-        console.error('Error resolving report:', error);
+        logger.sync.error('Failed to resolve report', {
+            action: 'resolveReport',
+            adminId: adminCheck.userId,
+            reportId,
+            resolution: action,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to resolve report' };
     }
 }
@@ -645,7 +693,12 @@ export async function resolveReportAndRemoveListing(reportId: string, notes?: st
         revalidatePath('/admin/listings');
         return { success: true, affectedBookings: affectedBookings.length };
     } catch (error) {
-        console.error('Error resolving report with listing removal:', error);
+        logger.sync.error('Failed to resolve report with listing removal', {
+            action: 'resolveReportAndRemoveListing',
+            adminId: adminCheck.userId,
+            reportId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to resolve report' };
     }
 }
@@ -693,7 +746,11 @@ export async function getAdminStats() {
             totalMessages
         };
     } catch (error) {
-        console.error('Error fetching admin stats:', error);
+        logger.sync.error('Failed to fetch admin stats', {
+            action: 'getAdminStats',
+            adminId: adminCheck.userId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to fetch stats' };
     }
 }

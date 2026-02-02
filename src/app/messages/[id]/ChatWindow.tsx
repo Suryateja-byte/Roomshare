@@ -545,8 +545,8 @@ export default function ChatWindow({
                 {/* Block/Unblock Menu */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
-                            <MoreVertical className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
+                        <button className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors" aria-label="More options">
+                            <MoreVertical className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -666,7 +666,7 @@ export default function ChatWindow({
                                                     <button
                                                         onClick={() => handleRetry(msg)}
                                                         disabled={isSending || isOffline}
-                                                        className="flex items-center gap-1 text-xs text-white dark:text-red-900 hover:text-red-200 dark:hover:text-red-700 disabled:opacity-50 transition-colors"
+                                                        className="flex items-center gap-1 text-xs text-white dark:text-red-900 hover:text-red-200 dark:hover:text-red-700 disabled:opacity-60 transition-colors"
                                                     >
                                                         <RotateCw className="w-3 h-3" />
                                                         Retry
@@ -741,13 +741,13 @@ export default function ChatWindow({
                             onChange={handleInputChange}
                             placeholder={isOffline ? "You're offline..." : "Type a message..."}
                             maxLength={MESSAGE_MAX_LENGTH}
-                            className="flex-1 bg-zinc-100 dark:bg-zinc-800 border-0 rounded-full px-5 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 transition-all"
+                            className="flex-1 bg-zinc-100 dark:bg-zinc-800 border-0 rounded-full px-5 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 transition-all"
                             disabled={isSending}
                         />
                         <button
                             type="submit"
                             disabled={!input.trim() || isSending || isRateLimited || isOffline}
-                            className="w-11 h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                            className="w-11 h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95"
                         >
                             {isSending ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />

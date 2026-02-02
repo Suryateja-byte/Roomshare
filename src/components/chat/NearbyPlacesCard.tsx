@@ -328,8 +328,8 @@ export function NearbyPlacesCard({
             </div>
           ))}
           {/* Loading indicator */}
-          <div className="flex items-center justify-center gap-2 pt-2">
-            <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+          <div className="flex items-center justify-center gap-2 pt-2" role="status" aria-label="Searching nearby places">
+            <Loader2 className="w-4 h-4 animate-spin text-zinc-400" aria-hidden="true" />
             <span className="text-xs text-zinc-500 dark:text-zinc-400">Searching nearby...</span>
           </div>
         </div>

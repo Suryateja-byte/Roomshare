@@ -7,6 +7,7 @@
 
 import { executeSearchV2 } from "./search-v2-service";
 import { getListingsPaginated } from "@/lib/data";
+import { logger } from "@/lib/logger";
 import type { PaginatedResultHybrid, ListingData } from "@/lib/data";
 import type { V2MapData } from "@/contexts/SearchV2DataContext";
 import type { FilterParams } from "@/lib/search-params";
@@ -76,7 +77,10 @@ export async function orchestrateSearch(
         limit,
       });
     } catch (err) {
-      console.error("Search listings fetch failed:", err);
+      logger.sync.error("Search listings fetch failed", {
+        action: "getListingsPaginated",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
       fetchError =
         err instanceof Error
           ? err.message

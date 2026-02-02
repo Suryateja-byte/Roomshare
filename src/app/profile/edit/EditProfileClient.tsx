@@ -240,7 +240,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
                                         disabled={isUploading}
-                                        className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                                        className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
                                     >
                                         {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
                                         {isUploading ? 'Uploading...' : 'Upload New'}
@@ -250,7 +250,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                                             type="button"
                                             onClick={() => setImageUrl('')}
                                             disabled={isUploading}
-                                            className="px-4 py-2 bg-white dark:bg-transparent border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-full transition-colors disabled:opacity-50"
+                                            className="px-4 py-2 bg-white dark:bg-transparent border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-full transition-colors disabled:opacity-60"
                                         >
                                             Remove
                                         </button>
@@ -277,7 +277,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="Your full name"
                                     required
-                                    className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white/20 focus:bg-white dark:focus:bg-zinc-800 transition-all placeholder:text-zinc-400"
+                                    className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white/20 focus:bg-white dark:focus:bg-zinc-800 transition-all placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
                                 />
                             </div>
 
@@ -306,7 +306,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                                 placeholder="Tell others a bit about yourself..."
                                 rows={4}
                                 maxLength={500}
-                                className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white/20 focus:bg-white dark:focus:bg-zinc-800 transition-all placeholder:text-zinc-400 resize-none"
+                                className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white/20 focus:bg-white dark:focus:bg-zinc-800 transition-all placeholder:text-zinc-600 dark:placeholder:text-zinc-300 resize-none"
                             />
                             <div className="flex justify-end">
                                 <span className="text-xs text-zinc-400">{bio.length}/500 characters</span>
@@ -445,7 +445,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full sm:w-auto px-8 py-2.5 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium transition-all shadow-lg shadow-zinc-900/20 dark:shadow-white/10 active:scale-[0.98] text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full sm:w-auto px-8 py-2.5 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium transition-all shadow-lg shadow-zinc-900/20 dark:shadow-white/10 active:scale-[0.98] text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             <Save className="w-4 h-4" />
                             {isLoading ? 'Saving...' : 'Save Changes'}

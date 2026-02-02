@@ -8,6 +8,7 @@ import { createListingSchema } from '@/lib/schemas';
 import { triggerInstantAlerts } from '@/lib/search-alerts';
 import { checkSuspension, checkEmailVerified } from './suspension';
 import { logger } from '@/lib/logger';
+import { markListingDirty } from '@/lib/search/search-doc-dirty';
 
 // P1-15 FIX: Define proper type for listing data returned to client
 export type CreateListingData = {
@@ -157,6 +158,9 @@ export async function createListing(prevState: CreateListingState, formData: For
             city,
             state,
         });
+
+        // Fire-and-forget: mark listing dirty for search doc refresh
+        markListingDirty(listing.id, 'listing_created').catch(() => {});
 
         // ASYNC: Trigger instant alerts in background - non-blocking for better UX and scalability
         // This follows best practices: sync risks cascading failures, async improves resilience

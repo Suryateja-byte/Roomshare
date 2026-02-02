@@ -69,11 +69,13 @@ export default function ReviewResponseForm({
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Write a thoughtful response..."
                 rows={3}
-                className="w-full px-4 py-3 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 resize-none text-sm bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+                className="w-full px-4 py-3 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 resize-none text-sm bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
+                aria-describedby={error ? "review-response-error" : undefined}
+                aria-invalid={!!error}
             />
 
             {error && (
-                <p className="text-sm text-red-600 dark:text-red-400 mt-2">{error}</p>
+                <p id="review-response-error" role="alert" className="text-sm text-red-600 dark:text-red-400 mt-2">{error}</p>
             )}
 
             <div className="flex items-center justify-end gap-2 mt-3">
@@ -89,11 +91,12 @@ export default function ReviewResponseForm({
                 <button
                     type="submit"
                     disabled={isSubmitting || !content.trim()}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    aria-busy={isSubmitting}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 >
                     {isSubmitting ? (
                         <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                             {isEditing ? 'Saving...' : 'Posting...'}
                         </>
                     ) : (

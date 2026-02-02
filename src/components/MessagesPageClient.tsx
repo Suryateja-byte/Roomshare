@@ -474,8 +474,8 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                         </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-full">
-                                    <MoreVertical className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />
+                                <button className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-full" aria-label="More options">
+                                    <MoreVertical className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -485,9 +485,9 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                     className="cursor-pointer"
                                 >
                                     {isMarkingAllRead ? (
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                                     ) : (
-                                        <CheckCheck className="w-4 h-4 mr-2" />
+                                        <CheckCheck className="w-4 h-4 mr-2" aria-hidden="true" />
                                     )}
                                     Mark all as read
                                 </DropdownMenuItem>
@@ -500,7 +500,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search conversations..."
-                            className="w-full bg-zinc-50 dark:bg-zinc-900 h-10 pl-10 rounded-xl text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:bg-zinc-100 dark:focus:bg-zinc-800 transition-colors"
+                            className="w-full bg-zinc-50 dark:bg-zinc-900 h-10 pl-10 rounded-xl text-sm text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 outline-none focus:bg-zinc-100 dark:focus:bg-zinc-800 transition-colors"
                         />
                     </div>
                 </div>
@@ -589,8 +589,8 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                             {/* Block/Unblock Menu */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
-                                        <MoreVertical className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />
+                                    <button className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors" aria-label="More options">
+                                        <MoreVertical className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
@@ -637,6 +637,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                     <AlertDialogAction
                                         onClick={handleBlock}
                                         disabled={isBlocking}
+                                        aria-busy={isBlocking}
                                         className="bg-red-600 hover:bg-red-700 text-white"
                                     >
                                         {isBlocking ? 'Blocking...' : 'Block'}
@@ -659,6 +660,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                     <AlertDialogAction
                                         onClick={handleDeleteConversation}
                                         disabled={isDeletingConversation}
+                                        aria-busy={isDeletingConversation}
                                         className="bg-red-600 hover:bg-red-700 text-white"
                                     >
                                         {isDeletingConversation ? 'Deleting...' : 'Delete'}
@@ -678,7 +680,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                             }}
                         >
                             {loadingMessages ? (
-                                <div className="flex justify-center p-4"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-zinc-900 dark:border-white"></div></div>
+                                <div className="flex justify-center p-4" role="status" aria-label="Loading messages"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-zinc-900 dark:border-white" aria-hidden="true"></div></div>
                             ) : (
                                 msgs.map(m => (
                                     <div key={m.id} className={`flex ${m.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}>
@@ -770,8 +772,8 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                     <button
                                         type="button"
                                         onClick={() => toast.info('Attachments coming soon!', { description: 'File sharing feature is currently in development.' })}
-                                        className="p-2 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
-                                        title="Attachments coming soon"
+                                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
+                                        aria-label="Attachments coming soon"
                                     >
                                         <Paperclip className="w-5 h-5" />
                                     </button>
@@ -780,9 +782,9 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                         onChange={e => handleInputChange(e.target.value)}
                                         placeholder={isOffline ? "You're offline..." : "Type a message..."}
                                         maxLength={MESSAGE_MAX_LENGTH}
-                                        className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+                                        className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
                                     />
-                                    <button type="submit" disabled={!input.trim() || isOffline} className="w-10 h-10 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-all"><Send className="w-4 h-4 ml-0.5" /></button>
+                                    <button type="submit" disabled={!input.trim() || isOffline} className="min-w-[44px] min-h-[44px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-60 transition-all" aria-label="Send message"><Send className="w-4 h-4 ml-0.5" /></button>
                                 </form>
                                 {/* Character counter - show when user is typing */}
                                 {input.length > 0 && (

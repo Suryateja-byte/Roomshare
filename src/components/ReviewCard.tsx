@@ -111,8 +111,8 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => setIsEditingResponse(true)}
-                                    className="h-7 w-7 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
-                                    title="Edit response"
+                                    className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
+                                    aria-label="Edit response"
                                 >
                                     <Edit2 className="w-4 h-4" />
                                 </Button>
@@ -121,8 +121,8 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
                                     size="icon"
                                     onClick={handleDeleteResponse}
                                     disabled={isDeleting}
-                                    className="h-7 w-7 text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                    title="Delete response"
+                                    className="text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                    aria-label="Delete response"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </Button>

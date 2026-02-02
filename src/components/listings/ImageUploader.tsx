@@ -254,8 +254,8 @@ export default function ImageUploader({
 
                             {/* Error Overlay with Retry */}
                             {image.error && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/90 text-white p-2">
-                                    <AlertCircle className="w-5 h-5 mb-1" />
+                                <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/90 text-white p-2">
+                                    <AlertCircle className="w-5 h-5 mb-1" aria-hidden="true" />
                                     <p className="text-2xs text-center mb-2 line-clamp-2">{image.error}</p>
                                     {image.file && (
                                         <button
@@ -289,8 +289,8 @@ export default function ImageUploader({
                                             e.stopPropagation();
                                             removeImage(image.id);
                                         }}
-                                        className="bg-white/90 hover:bg-red-500 hover:text-white text-zinc-600 rounded-full p-1.5 shadow-sm transition-all opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
-                                        title="Remove image"
+                                        className="bg-white/90 hover:bg-red-500 hover:text-white text-zinc-600 rounded-full p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm transition-all opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
+                                        aria-label="Remove image"
                                     >
                                         <X size={14} />
                                     </button>
@@ -327,7 +327,7 @@ export default function ImageUploader({
                                 variant="outline"
                                 size="sm"
                                 onClick={retryAllFailed}
-                                className="text-xs h-7"
+                                className="text-xs"
                             >
                                 <RotateCcw className="w-3 h-3 mr-1" />
                                 Retry All Failed ({failedImages.length})

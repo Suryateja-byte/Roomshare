@@ -437,23 +437,25 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
   });
 
   describe("Viewport Validation", () => {
-    it("shows error for oversized viewport (P1-5 client-side check)", () => {
+    it("clamps oversized viewport and still fetches (P1-5 client-side check)", async () => {
       // Set oversized bounds (> MAX_LAT_SPAN/MAX_LNG_SPAN of 5)
       mockSearchParams.set("minLng", "-130.0");
       mockSearchParams.set("maxLng", "-120.0"); // 10 degree span
       mockSearchParams.set("minLat", "30.0");
       mockSearchParams.set("maxLat", "42.0"); // 12 degree span
 
-      const { getByRole } = render(
+      const { queryByRole } = render(
         <PersistentMapWrapper shouldRenderMap={true} />
       );
 
-      // Error banner should be visible
-      const errorAlert = getByRole("alert");
-      expect(errorAlert.textContent).toContain("Zoom in");
+      // No error banner - oversized bounds are now clamped instead of rejected
+      expect(queryByRole("alert")).not.toBeInTheDocument();
 
-      // No API call made
-      expect(mockFetch).not.toHaveBeenCalled();
+      // Fetch should proceed with clamped bounds
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+      expect(mockFetch).toHaveBeenCalled();
     });
 
     it("does not show error for valid viewport bounds", async () => {

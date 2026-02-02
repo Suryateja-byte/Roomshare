@@ -18,20 +18,20 @@ interface V2MapDataSetterProps {
  * page.tsx → V2MapDataSetter → context → PersistentMapWrapper
  */
 export function V2MapDataSetter({ data }: V2MapDataSetterProps) {
-  const { setV2MapData, setIsV2Enabled } = useSearchV2Data();
+  const { setV2MapData, setIsV2Enabled, dataVersion } = useSearchV2Data();
 
   useEffect(() => {
     // Mark v2 as enabled so PersistentMapWrapper knows to wait/skip fetch
     setIsV2Enabled(true);
     // Set the map data for PersistentMapWrapper to consume
-    setV2MapData(data);
+    setV2MapData(data, dataVersion);
 
     // NOTE: Cleanup intentionally removed to prevent race condition.
     // When URL changes (e.g., "search as I move"), React's effect cleanup
     // would set v2MapData to null BEFORE new data arrives, causing markers
     // to briefly disappear. Let new data overwrite old data instead.
     // Cleanup for leaving /search entirely is handled by layout unmount.
-  }, [data, setV2MapData, setIsV2Enabled]);
+  }, [data, dataVersion, setV2MapData, setIsV2Enabled]);
 
   // Renders nothing - just sets context
   return null;

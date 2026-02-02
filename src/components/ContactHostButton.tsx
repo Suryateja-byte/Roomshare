@@ -39,7 +39,8 @@ export default function ContactHostButton({ listingId }: { listingId: string }) 
         <Button
             onClick={handleContact}
             disabled={isLoading}
-            className="w-full h-12 text-base font-semibold"
+            size="lg"
+            className="w-full"
         >
             {isLoading ? 'Starting Chat...' : 'Contact Host'}
         </Button>

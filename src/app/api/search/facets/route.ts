@@ -44,6 +44,15 @@ const CACHE_TTL = 30;
 const MAX_FACET_RESULTS = 100;
 
 /**
+ * A single histogram bucket for price distribution
+ */
+export interface PriceHistogramBucket {
+  min: number;
+  max: number;
+  count: number;
+}
+
+/**
  * Response shape for facets endpoint
  */
 export interface FacetsResponse {
@@ -55,6 +64,10 @@ export interface FacetsResponse {
     max: number | null;
     median: number | null;
   };
+  priceHistogram: {
+    bucketWidth: number;
+    buckets: PriceHistogramBucket[];
+  } | null;
 }
 
 /**
@@ -366,6 +379,64 @@ async function getPriceRanges(
 }
 
 /**
+ * Compute adaptive bucket width based on price range.
+ * Targets 10-30 buckets for good visual density.
+ */
+function computeBucketWidth(min: number, max: number): number {
+  const range = max - min;
+  if (range <= 1000) return 50;
+  if (range <= 5000) return 250;
+  if (range <= 10000) return 500;
+  return 1000;
+}
+
+/**
+ * Get price histogram with adaptive bucket sizing.
+ * Uses sticky faceting (excludes price filter) so the histogram
+ * shows the full distribution regardless of slider position.
+ */
+async function getPriceHistogram(
+  filterParams: Parameters<typeof buildFacetWhereConditions>[0],
+  priceMin: number | null,
+  priceMax: number | null,
+): Promise<FacetsResponse["priceHistogram"]> {
+  if (priceMin === null || priceMax === null || priceMin >= priceMax) {
+    return null;
+  }
+
+  const bucketWidth = computeBucketWidth(priceMin, priceMax);
+
+  const { conditions, params, paramIndex } = buildFacetWhereConditions(
+    filterParams,
+    "price",
+  );
+  const whereClause = conditions.join(" AND ");
+
+  const query = `
+    SELECT
+      floor(d.price / $${paramIndex}) * $${paramIndex} AS bucket_min,
+      COUNT(*) AS count
+    FROM listing_search_docs d
+    WHERE ${whereClause}
+      AND d.price IS NOT NULL
+    GROUP BY bucket_min
+    ORDER BY bucket_min
+  `;
+
+  const results = await prisma.$queryRawUnsafe<
+    { bucket_min: number; count: bigint }[]
+  >(query, ...params, bucketWidth);
+
+  const buckets: PriceHistogramBucket[] = results.map((row) => ({
+    min: Number(row.bucket_min),
+    max: Number(row.bucket_min) + bucketWidth,
+    count: Number(row.count),
+  }));
+
+  return { bucketWidth, buckets };
+}
+
+/**
  * Generate cache key for facets request
  */
 function generateFacetsCacheKey(
@@ -402,11 +473,19 @@ async function getFacetsInternal(
     getPriceRanges(filterParams),
   ]);
 
+  // Histogram depends on priceRanges (needs min/max for bucket sizing)
+  const priceHistogram = await getPriceHistogram(
+    filterParams,
+    priceRanges.min,
+    priceRanges.max,
+  );
+
   return {
     amenities,
     houseRules,
     roomTypes,
     priceRanges,
+    priceHistogram,
   };
 }
 

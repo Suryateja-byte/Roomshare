@@ -239,7 +239,7 @@ export default function VerificationList({ initialRequests }: VerificationListPr
                                                 <button
                                                     onClick={() => handleReject(request.id)}
                                                     disabled={processingId === request.id}
-                                                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                                                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-60"
                                                 >
                                                     {processingId === request.id ? (
                                                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -262,7 +262,7 @@ export default function VerificationList({ initialRequests }: VerificationListPr
                                                 <button
                                                     onClick={() => handleApprove(request.id)}
                                                     disabled={processingId === request.id}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-60"
                                                 >
                                                     {processingId === request.id ? (
                                                         <Loader2 className="w-4 h-4 animate-spin" />

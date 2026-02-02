@@ -22,12 +22,15 @@ export default function ProfileError({
                 <User className="w-10 h-10 text-red-600 dark:text-red-400" />
             </div>
             <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-                Unable to load profile
+                Unable to load your profile
             </h2>
-            <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
-                {error.message || 'We encountered an error while loading your profile. Please try again.'}
+            <p className="text-zinc-600 dark:text-zinc-400 mb-2 max-w-md">
+                We&apos;re having trouble loading your profile right now. This is usually temporary.
             </p>
-            <div className="flex gap-3">
+            <p className="text-sm text-zinc-500 dark:text-zinc-500 mb-6 max-w-md">
+                Your profile information is safe — try refreshing the page in a moment.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
                 <Button onClick={() => reset()} size="lg" className="gap-2">
                     <RefreshCw className="w-4 h-4" />
                     Try again

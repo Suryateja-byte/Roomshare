@@ -283,7 +283,7 @@ export default function ReportList({ initialReports, totalReports }: ReportListP
                                                                 handleAction(report.id);
                                                             }}
                                                             disabled={processingId === report.id}
-                                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-60"
                                                         >
                                                             {processingId === report.id && selectedAction === 'resolve' ? (
                                                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -298,7 +298,7 @@ export default function ReportList({ initialReports, totalReports }: ReportListP
                                                                 handleAction(report.id);
                                                             }}
                                                             disabled={processingId === report.id}
-                                                            className="flex items-center gap-2 px-4 py-2 bg-zinc-600 text-white rounded-lg text-sm font-medium hover:bg-zinc-700 disabled:opacity-50"
+                                                            className="flex items-center gap-2 px-4 py-2 bg-zinc-600 text-white rounded-lg text-sm font-medium hover:bg-zinc-700 disabled:opacity-60"
                                                         >
                                                             {processingId === report.id && selectedAction === 'dismiss' ? (
                                                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -313,7 +313,7 @@ export default function ReportList({ initialReports, totalReports }: ReportListP
                                                                 handleAction(report.id);
                                                             }}
                                                             disabled={processingId === report.id}
-                                                            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                                                            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-60"
                                                         >
                                                             {processingId === report.id && selectedAction === 'remove' ? (
                                                                 <Loader2 className="w-4 h-4 animate-spin" />

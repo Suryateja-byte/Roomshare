@@ -65,6 +65,7 @@ const MAP_RELEVANT_KEYS = [
   "roomType",
   "genderPreference",
   "householdGender",
+  "nearMatches",
 ] as const;
 
 function getMapRelevantParams(searchParams: URLSearchParams): string {
@@ -186,6 +187,28 @@ function MapTransitionOverlay() {
   );
 }
 
+// Thin loading bar at top of map when fetching new marker data
+function MapDataLoadingBar() {
+  return (
+    <div
+      className="absolute top-0 left-0 right-0 z-20 h-1 overflow-hidden pointer-events-none"
+      role="status"
+      aria-label="Loading map data"
+    >
+      <div className="h-full bg-zinc-900/80 dark:bg-white/80 animate-[shimmer_1.5s_ease-in-out_infinite] origin-left" />
+      <style jsx>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          div { animation: none; opacity: 0.7; transform: none; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 /**
  * Convert v2 GeoJSON features to MapListingData format.
  * Maps GeoJSON properties to fields used by Map.tsx:
@@ -242,30 +265,29 @@ export default function PersistentMapWrapper({
 
   // Check for v2 data from context (injected by page.tsx via V2MapDataSetter)
   const { v2MapData, isV2Enabled } = useSearchV2Data();
+  const lastV2DataRef = useRef<V2MapData | null>(null);
 
   // Coordinate with list transitions - show overlay when list is loading
   const transitionContext = useSearchTransitionSafe();
   const isListTransitioning = transitionContext?.isPending ?? false;
   const hasV2Data = v2MapData !== null;
+  const hasAnyV2Data = hasV2Data || lastV2DataRef.current !== null;
+
+  useEffect(() => {
+    if (v2MapData) {
+      lastV2DataRef.current = v2MapData;
+    }
+  }, [v2MapData]);
 
   // Compute effective listings based on data source (v2 context or v1 fetch)
   // Memoized for stable reference to prevent unnecessary Map re-renders
   const effectiveListings = useMemo(() => {
-    // Safe: check both flags before accessing v2MapData
-    if (hasV2Data && v2MapData) {
-      return v2MapDataToListings(v2MapData);
-    }
-    // Defensive: if v2 signaled but data missing, log and fallback
-    if (hasV2Data && !v2MapData) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn(
-          "[PersistentMapWrapper] hasV2Data=true but v2MapData is null",
-        );
-      }
-      return [];
+    const activeV2Data = v2MapData ?? lastV2DataRef.current;
+    if (activeV2Data) {
+      return v2MapDataToListings(activeV2Data);
     }
     return listings;
-  }, [hasV2Data, v2MapData, listings]);
+  }, [v2MapData, listings]);
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
@@ -348,15 +370,37 @@ export default function PersistentMapWrapper({
       searchParams.has("minLat") &&
       searchParams.has("maxLat");
 
+    // Track whether we need to clamp bounds for the fetch
+    // Use URLSearchParams (writable) so we can modify if clamping is needed
+    let clampedSearchParams: URLSearchParams = new URLSearchParams(searchParams.toString());
+
     if (hasBounds) {
       // Client-side bounds validation - applies to both v1 and v2 paths
       const validation = isValidViewport(searchParams);
       if (!validation.valid) {
-        setError(validation.error || "Invalid viewport");
-        setIsFetchingMapData(false);
-        return;
+        // For NaN/Infinity, reject entirely
+        const minLat = parseFloat(searchParams.get("minLat") || "");
+        if (!Number.isFinite(minLat)) {
+          setError(validation.error || "Invalid viewport");
+          setIsFetchingMapData(false);
+          return;
+        }
+        // For "too wide" viewports, clamp to max span centered on viewport center
+        // instead of rejecting — keeps listings visible when zoomed out
+        const parsedMinLat = parseFloat(searchParams.get("minLat")!);
+        const parsedMaxLat = parseFloat(searchParams.get("maxLat")!);
+        const parsedMinLng = parseFloat(searchParams.get("minLng")!);
+        const parsedMaxLng = parseFloat(searchParams.get("maxLng")!);
+        const centerLat = (parsedMinLat + parsedMaxLat) / 2;
+        const centerLng = (parsedMinLng + parsedMaxLng) / 2;
+        const clamped = new URLSearchParams(searchParams.toString());
+        clamped.set("minLat", (centerLat - MAX_LAT_SPAN / 2).toString());
+        clamped.set("maxLat", (centerLat + MAX_LAT_SPAN / 2).toString());
+        clamped.set("minLng", (centerLng - MAX_LNG_SPAN / 2).toString());
+        clamped.set("maxLng", (centerLng + MAX_LNG_SPAN / 2).toString());
+        clampedSearchParams = clamped;
       }
-      // Clear error if viewport is now valid
+      // Clear error — we'll fetch with clamped or original bounds
       setError(null);
     }
 
@@ -379,7 +423,7 @@ export default function PersistentMapWrapper({
 
     // P3a Fix: Use only map-relevant params for deduplication
     // This prevents re-fetching when page/sort changes (which don't affect markers)
-    const paramsString = getMapRelevantParams(searchParams);
+    const paramsString = getMapRelevantParams(clampedSearchParams);
 
     // Skip if we've already fetched for these exact params
     if (paramsString === lastFetchedParamsRef.current) {
@@ -430,6 +474,9 @@ export default function PersistentMapWrapper({
     fetchListings(getMapRelevantParams(searchParams));
   }, [searchParams, fetchListings]);
 
+  const showInitialV2Placeholder = isV2Enabled && !hasAnyV2Data;
+  const showV2LoadingOverlay = isV2Enabled && !hasV2Data && hasAnyV2Data;
+
   // CRITICAL: Don't render map component if shouldRenderMap is false
   // This prevents Mapbox GL JS from loading (saves ~944KB and Mapbox billing)
   if (!shouldRenderMap) {
@@ -441,7 +488,7 @@ export default function PersistentMapWrapper({
   // IMPORTANT: If there's an error (e.g., viewport too large), show error banner instead
   // NOTE: min-h-[300px] ensures error banner is visible even when parent chain has
   // zero height (h-full chain issue) combined with overflow-hidden clipping
-  if (isV2Enabled && !hasV2Data) {
+  if (showInitialV2Placeholder) {
     return (
       <div className="relative w-full h-full min-h-[300px]">
         {error ? (
@@ -456,6 +503,18 @@ export default function PersistentMapWrapper({
   return (
     <div className="relative w-full h-full min-h-[300px]">
       {error && <MapErrorBanner message={error} onRetry={handleRetry} />}
+      {/* Data loading bar - shows when fetching map markers after pan/zoom/filter */}
+      {(isFetchingMapData || isListTransitioning || showV2LoadingOverlay) && (
+        <MapDataLoadingBar />
+      )}
+      {/* Marker loading shimmer - subtle overlay when map data is being fetched */}
+      {(isFetchingMapData || showV2LoadingOverlay) && !isListTransitioning && (
+        <div
+          className="absolute inset-0 z-10 pointer-events-none bg-white/10 dark:bg-zinc-950/10"
+          role="status"
+          aria-label="Loading listings"
+        />
+      )}
       {/* Coordinated loading overlay - shows when list is transitioning (filter change) */}
       {isListTransitioning && <MapTransitionOverlay />}
       <Suspense fallback={<MapLoadingPlaceholder />}>

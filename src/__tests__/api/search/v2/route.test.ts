@@ -565,7 +565,7 @@ describe("Search API v2 route", () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(503);
+      expect(response.status).toBe(500);
       expect(data.error).toBe("Failed to fetch search results");
     });
   });

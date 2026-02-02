@@ -128,6 +128,8 @@ export default function ImageUpload({
                         multiple={multiple}
                         onChange={(e) => handleUpload(e.target.files)}
                         className="hidden"
+                        aria-describedby={error ? "image-upload-error" : undefined}
+                        aria-invalid={!!error}
                     />
 
                     {isUploading ? (
@@ -170,7 +172,7 @@ export default function ImageUpload({
 
             {/* Error Message */}
             {error && (
-                <p className="text-sm text-red-500 mt-2">{error}</p>
+                <p id="image-upload-error" role="alert" className="text-sm text-red-500 mt-2">{error}</p>
             )}
 
             {/* Image Preview */}
@@ -190,7 +192,8 @@ export default function ImageUpload({
                                 <button
                                     type="button"
                                     onClick={() => handleRemove(url)}
-                                    className="p-2 bg-white rounded-full shadow-lg hover:bg-red-50 transition-colors"
+                                    className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white rounded-full shadow-lg hover:bg-red-50 transition-colors"
+                                    aria-label="Remove image"
                                 >
                                     <X className="w-4 h-4 text-red-500" />
                                 </button>

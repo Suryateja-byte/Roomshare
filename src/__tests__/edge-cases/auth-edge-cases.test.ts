@@ -12,6 +12,11 @@
  * @see Edge Cases Category A (20 tests)
  */
 
+// Mock next-auth/jwt to avoid ESM transformation issues
+jest.mock('next-auth/jwt', () => ({
+  getToken: jest.fn(),
+}));
+
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: {

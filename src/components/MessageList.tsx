@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import UserAvatar from '@/components/UserAvatar';
 
 interface Conversation {
@@ -43,10 +42,11 @@ export default function MessageList({ onSelectConversation, selectedConversation
     return (
         <div className="flex flex-col h-full overflow-y-auto">
             {conversations.map((conv) => (
-                <div
+                <button
+                    type="button"
                     key={conv.id}
                     onClick={() => onSelectConversation(conv.id)}
-                    className={`p-4 border-b cursor-pointer hover:bg-muted/50 transition-colors ${selectedConversationId === conv.id ? 'bg-muted' : ''}`}
+                    className={`p-4 border-b text-left cursor-pointer hover:bg-muted/50 transition-colors ${selectedConversationId === conv.id ? 'bg-muted' : ''}`}
                 >
                     <div className="flex items-center gap-3">
                         <UserAvatar image={conv.user.image} name={conv.user.name} size="md" />
@@ -60,7 +60,7 @@ export default function MessageList({ onSelectConversation, selectedConversation
                             <p className="text-sm text-muted-foreground truncate">{conv.lastMessage.content}</p>
                         </div>
                     </div>
-                </div>
+                </button>
             ))}
         </div>
     );

@@ -422,9 +422,17 @@ describe('normalizeFilters - bounds', () => {
     expect(result.bounds?.maxLng).toBe(180);
   });
 
-  it('swaps inverted lat', () => {
+  it('throws on inverted lat', () => {
+    expect(() =>
+      normalizeFilters({
+        bounds: { minLat: 40, maxLat: 30, minLng: 0, maxLng: 10 },
+      })
+    ).toThrow('minLat cannot exceed maxLat');
+  });
+
+  it('passes normal lat bounds through unchanged', () => {
     const result = normalizeFilters({
-      bounds: { minLat: 40, maxLat: 30, minLng: 0, maxLng: 10 },
+      bounds: { minLat: 30, maxLat: 40, minLng: 0, maxLng: 10 },
     });
     expect(result.bounds?.minLat).toBe(30);
     expect(result.bounds?.maxLat).toBe(40);

@@ -14,6 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PriceRangeFilter } from '@/components/search/PriceRangeFilter';
+import type { PriceHistogramBucket } from '@/app/api/search/facets/route';
 
 interface FilterModalProps {
   isOpen: boolean;
@@ -52,6 +54,21 @@ interface FilterModalProps {
   minMoveInDate: string;
   amenityOptions: readonly string[];
   houseRuleOptions: readonly string[];
+
+  // Price range filter
+  minPrice?: number;
+  maxPrice?: number;
+  priceAbsoluteMin?: number;
+  priceAbsoluteMax?: number;
+  priceHistogram?: PriceHistogramBucket[] | null;
+  onPriceChange?: (min: number, max: number) => void;
+
+  // Facet counts for filter options
+  facetCounts?: {
+    amenities: Record<string, number>;
+    houseRules: Record<string, number>;
+    roomTypes: Record<string, number>;
+  };
 
   // P3-NEW-b: Dynamic count display from useDebouncedFilterCount
   formattedCount?: string;
@@ -94,6 +111,15 @@ export function FilterModal({
   minMoveInDate,
   amenityOptions,
   houseRuleOptions,
+  // Price range
+  minPrice: minPriceProp,
+  maxPrice: maxPriceProp,
+  priceAbsoluteMin = 0,
+  priceAbsoluteMax = 10000,
+  priceHistogram,
+  onPriceChange,
+  // Facet counts
+  facetCounts,
   // P3-NEW-b: Dynamic count props
   formattedCount,
   isCountLoading,
@@ -146,6 +172,18 @@ export function FilterModal({
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+            {/* Price Range */}
+            {onPriceChange && (
+              <PriceRangeFilter
+                minPrice={minPriceProp ?? priceAbsoluteMin}
+                maxPrice={maxPriceProp ?? priceAbsoluteMax}
+                absoluteMin={priceAbsoluteMin}
+                absoluteMax={priceAbsoluteMax}
+                histogram={priceHistogram ?? null}
+                onChange={onPriceChange}
+              />
+            )}
+
             {/* Move-in Date */}
             <div className="space-y-2">
               <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">
@@ -191,9 +229,22 @@ export function FilterModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Any</SelectItem>
-                  <SelectItem value="Private Room">Private Room</SelectItem>
-                  <SelectItem value="Shared Room">Shared Room</SelectItem>
-                  <SelectItem value="Entire Place">Entire Place</SelectItem>
+                  {(['Private Room', 'Shared Room', 'Entire Place'] as const).map(type => {
+                    const count = facetCounts?.roomTypes[type];
+                    const isZero = count === 0;
+                    return (
+                      <SelectItem
+                        key={type}
+                        value={type}
+                        disabled={isZero && roomType !== type}
+                      >
+                        {type}
+                        {count !== undefined && (
+                          <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">({count})</span>
+                        )}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -202,24 +253,34 @@ export function FilterModal({
             <fieldset className="space-y-3">
               <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
               <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
-                {amenityOptions.map(amenity => (
-                  <Button
-                    key={amenity}
-                    type="button"
-                    variant="filter"
-                    onClick={() => onToggleAmenity(amenity)}
-                    data-active={amenities.includes(amenity)}
-                    aria-pressed={amenities.includes(amenity)}
-                    className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${
-                      amenities.includes(amenity) ? 'scale-[1.02]' : 'hover:scale-[1.02]'
-                    }`}
-                  >
-                    {amenity}
-                    {amenities.includes(amenity) && (
-                      <X className="w-3.5 h-3.5 ml-1.5" />
-                    )}
-                  </Button>
-                ))}
+                {amenityOptions.map(amenity => {
+                  const count = facetCounts?.amenities[amenity];
+                  const isZero = count === 0;
+                  const isActive = amenities.includes(amenity);
+                  return (
+                    <Button
+                      key={amenity}
+                      type="button"
+                      variant="filter"
+                      onClick={() => !isZero && onToggleAmenity(amenity)}
+                      data-active={isActive}
+                      aria-pressed={isActive}
+                      aria-disabled={isZero}
+                      disabled={isZero && !isActive}
+                      className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${
+                        isActive ? 'scale-[1.02]' : 'hover:scale-[1.02]'
+                      } ${isZero && !isActive ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      {amenity}
+                      {count !== undefined && !isActive && (
+                        <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">({count})</span>
+                      )}
+                      {isActive && (
+                        <X className="w-3.5 h-3.5 ml-1.5" />
+                      )}
+                    </Button>
+                  );
+                })}
               </div>
             </fieldset>
 
@@ -227,24 +288,34 @@ export function FilterModal({
             <fieldset className="space-y-3">
               <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
               <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
-                {houseRuleOptions.map(rule => (
-                  <Button
-                    key={rule}
-                    type="button"
-                    variant="filter"
-                    onClick={() => onToggleHouseRule(rule)}
-                    data-active={houseRules.includes(rule)}
-                    aria-pressed={houseRules.includes(rule)}
-                    className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${
-                      houseRules.includes(rule) ? 'scale-[1.02]' : 'hover:scale-[1.02]'
-                    }`}
-                  >
-                    {rule}
-                    {houseRules.includes(rule) && (
-                      <X className="w-3.5 h-3.5 ml-1.5" />
-                    )}
-                  </Button>
-                ))}
+                {houseRuleOptions.map(rule => {
+                  const count = facetCounts?.houseRules[rule];
+                  const isZero = count === 0;
+                  const isActive = houseRules.includes(rule);
+                  return (
+                    <Button
+                      key={rule}
+                      type="button"
+                      variant="filter"
+                      onClick={() => !isZero && onToggleHouseRule(rule)}
+                      data-active={isActive}
+                      aria-pressed={isActive}
+                      aria-disabled={isZero}
+                      disabled={isZero && !isActive}
+                      className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${
+                        isActive ? 'scale-[1.02]' : 'hover:scale-[1.02]'
+                      } ${isZero && !isActive ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      {rule}
+                      {count !== undefined && !isActive && (
+                        <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">({count})</span>
+                      )}
+                      {isActive && (
+                        <X className="w-3.5 h-3.5 ml-1.5" />
+                      )}
+                    </Button>
+                  );
+                })}
               </div>
             </fieldset>
 
@@ -371,7 +442,7 @@ export function FilterModal({
               type="button"
               onClick={onApply}
               disabled={boundsRequired}
-              className="flex-1 rounded-xl h-12 bg-zinc-900 text-white hover:bg-zinc-800 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 rounded-xl h-12 bg-zinc-900 text-white hover:bg-zinc-800 shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
               data-testid="filter-modal-apply"
             >
               {isCountLoading ? (

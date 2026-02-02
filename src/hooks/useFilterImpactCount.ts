@@ -13,6 +13,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { FilterChipData } from "@/components/filters/filter-chip-utils";
 import { removeFilterFromUrl } from "@/components/filters/filter-chip-utils";
+import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
 
 // Cache entry with expiration
 interface CacheEntry {
@@ -130,7 +131,7 @@ export function useFilterImpactCount({
       const queryWithoutFilter = removeFilterFromUrl(searchParams, chip);
       const url = `/api/search-count?${queryWithoutFilter}`;
 
-      const response = await fetch(url, {
+      const response = await rateLimitedFetch(url, {
         signal: abortController.signal,
         cache: "no-store",
       });
@@ -152,12 +153,17 @@ export function useFilterImpactCount({
         setHasFetched(true);
       }
     } catch (error) {
-      // Ignore abort errors
       if (error instanceof Error && error.name === "AbortError") {
         return;
       }
+      if (error instanceof RateLimitError) {
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+          setHasFetched(true);
+        }
+        return;
+      }
 
-      // Log other errors but don't crash
       console.error("[useFilterImpactCount] Error fetching count:", error);
 
       if (!abortController.signal.aborted) {

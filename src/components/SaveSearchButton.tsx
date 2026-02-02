@@ -134,7 +134,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
         <>
             <button
                 onClick={handleOpen}
-                className={`inline-flex items-center gap-2 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap ${className}`}
+                className={`inline-flex items-center gap-2 h-11 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap ${className}`}
             >
                 <Bookmark className="w-4 h-4" />
                 <span className="hidden sm:inline">Save Search</span>
@@ -172,6 +172,8 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="e.g., Downtown apartments under $1500"
                                     className="w-full px-4 py-2.5 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                                    aria-describedby={error ? "save-search-error" : undefined}
+                                    aria-invalid={!!error}
                                 />
                             </div>
 
@@ -237,7 +239,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
 
                             {/* Error */}
                             {error && (
-                                <p className="text-sm text-red-600">{error}</p>
+                                <p id="save-search-error" role="alert" className="text-sm text-red-600">{error}</p>
                             )}
 
                             {/* Actions */}
@@ -251,7 +253,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                                 <button
                                     onClick={handleSave}
                                     disabled={isLoading}
-                                    className="flex-1 px-4 py-2.5 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                                    className="flex-1 px-4 py-2.5 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
                                 >
                                     {isLoading ? (
                                         <>

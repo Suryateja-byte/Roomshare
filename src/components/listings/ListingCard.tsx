@@ -179,13 +179,13 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                 href={`/listings/${listing.id}`}
                 onClick={isDragging ? (e) => e.preventDefault() : undefined}
                 className={cn(
-                    "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 rounded-xl",
+                    "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 rounded-none sm:rounded-xl",
                     isDragging && "pointer-events-none"
                 )}
             >
-                <div className="relative bg-white dark:bg-zinc-900 flex flex-col rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden transition-all duration-normal hover:-translate-y-0.5 hover:shadow-lg hover:border-zinc-300 dark:hover:border-zinc-700">
+                <div className="relative bg-white dark:bg-zinc-900 flex flex-col rounded-none sm:rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden transition-all duration-normal hover:-translate-y-0.5 hover:shadow-lg hover:border-zinc-300 dark:hover:border-zinc-700">
                 {/* Image Area */}
-                <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
                     {/* Image Carousel or single image */}
                     <ImageCarousel
                         images={displayImages}

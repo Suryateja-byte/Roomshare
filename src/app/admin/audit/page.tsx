@@ -199,7 +199,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                                                         {log.admin.image ? (
                                                             <Image
                                                                 src={log.admin.image}
-                                                                alt=""
+                                                                alt={log.admin.name || 'Admin user'}
                                                                 width={24}
                                                                 height={24}
                                                                 className="rounded-full"

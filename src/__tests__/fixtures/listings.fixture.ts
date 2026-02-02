@@ -509,7 +509,7 @@ export function applyFilters(
   if (filters.amenities?.length) {
     result = result.filter((l) =>
       filters.amenities!.every((a) =>
-        l.amenities.some((la) => la.toLowerCase().includes(a.toLowerCase()))
+        l.amenities.some((la) => la.toLowerCase() === a.toLowerCase())
       )
     );
   }

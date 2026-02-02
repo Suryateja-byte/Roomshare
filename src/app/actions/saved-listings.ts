@@ -4,6 +4,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { checkSuspension } from './suspension';
+import { logger } from '@/lib/logger';
 
 export async function toggleSaveListing(listingId: string) {
     const session = await auth();
@@ -49,7 +50,11 @@ export async function toggleSaveListing(listingId: string) {
             return { saved: true };
         }
     } catch (error) {
-        console.error('Error toggling saved listing:', error);
+        logger.sync.error('Failed to toggle saved listing', {
+            action: 'toggleSaveListing',
+            listingId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to save listing', saved: false };
     }
 }
@@ -122,7 +127,11 @@ export async function getSavedListings() {
             savedAt: s.createdAt
         }));
     } catch (error) {
-        console.error('Error getting saved listings:', error);
+        logger.sync.error('Failed to get saved listings', {
+            action: 'getSavedListings',
+            userId: session.user.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return [];
     }
 }

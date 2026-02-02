@@ -386,7 +386,7 @@ export default function NearbyPlacesMap({
         <button
           onClick={handleZoomIn}
           className="
-            w-9 h-9 bg-white dark:bg-zinc-800
+            min-w-[44px] min-h-[44px] bg-white dark:bg-zinc-800
             rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700
             flex items-center justify-center
             text-zinc-700 dark:text-zinc-200
@@ -401,7 +401,7 @@ export default function NearbyPlacesMap({
         <button
           onClick={handleZoomOut}
           className="
-            w-9 h-9 bg-white dark:bg-zinc-800
+            min-w-[44px] min-h-[44px] bg-white dark:bg-zinc-800
             rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700
             flex items-center justify-center
             text-zinc-700 dark:text-zinc-200
@@ -416,7 +416,7 @@ export default function NearbyPlacesMap({
         <button
           onClick={handleResetView}
           className="
-            w-9 h-9 bg-zinc-900 dark:bg-white
+            min-w-[44px] min-h-[44px] bg-zinc-900 dark:bg-white
             rounded-lg shadow-md
             flex items-center justify-center
             text-white dark:text-zinc-900

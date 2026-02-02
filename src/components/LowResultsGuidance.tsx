@@ -120,7 +120,7 @@ export function LowResultsGuidance({
                   key={suggestion.type}
                   onClick={() => handleSuggestionClick(suggestion)}
                   disabled={isPending}
-                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-800/50"
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-60 dark:border-amber-700 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-800/50"
                 >
                   {suggestion.label}
                   <ChevronRight className="h-3 w-3" />

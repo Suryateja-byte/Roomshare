@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { checkSuspension } from './suspension';
+import { logger } from '@/lib/logger';
+import { markListingDirty } from '@/lib/search/search-doc-dirty';
 
 export type ListingStatus = 'ACTIVE' | 'PAUSED' | 'RENTED';
 
@@ -38,13 +40,21 @@ export async function updateListingStatus(listingId: string, status: ListingStat
             data: { status }
         });
 
+        // Fire-and-forget: mark listing dirty for search doc refresh
+        markListingDirty(listingId, 'status_changed').catch(() => {});
+
         revalidatePath(`/listings/${listingId}`);
         revalidatePath('/profile');
         revalidatePath('/search');
 
         return { success: true };
     } catch (error) {
-        console.error('Error updating listing status:', error);
+        logger.sync.error('Failed to update listing status', {
+            action: 'updateListingStatus',
+            listingId,
+            status,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to update listing status' };
     }
 }
@@ -55,9 +65,15 @@ export async function incrementViewCount(listingId: string) {
             where: { id: listingId },
             data: { viewCount: { increment: 1 } }
         });
+        // Fire-and-forget: mark listing dirty for search doc refresh
+        markListingDirty(listingId, 'view_count').catch(() => {});
         return { success: true };
     } catch (error) {
-        console.error('Error incrementing view count:', error);
+        logger.sync.error('Failed to increment view count', {
+            action: 'incrementViewCount',
+            listingId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to increment view count' };
     }
 }
@@ -118,7 +134,12 @@ export async function trackRecentlyViewed(listingId: string) {
 
         return { success: true };
     } catch (error) {
-        console.error('Error tracking recently viewed:', error);
+        logger.sync.error('Failed to track recently viewed', {
+            action: 'trackRecentlyViewed',
+            listingId,
+            userId: session.user.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to track recently viewed' };
     }
 }
@@ -171,7 +192,12 @@ export async function getRecentlyViewed(limit: number = 10) {
                 viewedAt: rv.viewedAt
             }));
     } catch (error) {
-        console.error('Error fetching recently viewed:', error);
+        logger.sync.error('Failed to fetch recently viewed', {
+            action: 'getRecentlyViewed',
+            userId: session.user.id,
+            limit,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return [];
     }
 }

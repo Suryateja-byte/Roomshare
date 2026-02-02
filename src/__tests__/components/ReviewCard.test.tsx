@@ -163,24 +163,24 @@ describe('ReviewCard', () => {
 
     it('shows edit button for owner', () => {
       render(<ReviewCard review={reviewWithResponse} isOwner={true} />)
-      expect(screen.getByTitle('Edit response')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Edit response' })).toBeInTheDocument()
     })
 
     it('shows delete button for owner', () => {
       render(<ReviewCard review={reviewWithResponse} isOwner={true} />)
-      expect(screen.getByTitle('Delete response')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Delete response' })).toBeInTheDocument()
     })
 
     it('does not show edit/delete for non-owner', () => {
       render(<ReviewCard review={reviewWithResponse} isOwner={false} />)
-      expect(screen.queryByTitle('Edit response')).not.toBeInTheDocument()
-      expect(screen.queryByTitle('Delete response')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Edit response' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Delete response' })).not.toBeInTheDocument()
     })
 
     it('shows edit form when edit button clicked', async () => {
       render(<ReviewCard review={reviewWithResponse} isOwner={true} />)
 
-      await userEvent.click(screen.getByTitle('Edit response'))
+      await userEvent.click(screen.getByRole('button', { name: 'Edit response' }))
 
       expect(screen.getByTestId('review-response-form')).toBeInTheDocument()
     })
@@ -188,7 +188,7 @@ describe('ReviewCard', () => {
     it('hides response when editing', async () => {
       render(<ReviewCard review={reviewWithResponse} isOwner={true} />)
 
-      await userEvent.click(screen.getByTitle('Edit response'))
+      await userEvent.click(screen.getByRole('button', { name: 'Edit response' }))
 
       expect(screen.queryByText('Host Response')).not.toBeInTheDocument()
     })
@@ -215,7 +215,7 @@ describe('ReviewCard', () => {
 
       render(<ReviewCard review={reviewWithResponse} isOwner={true} />)
 
-      await userEvent.click(screen.getByTitle('Delete response'))
+      await userEvent.click(screen.getByRole('button', { name: 'Delete response' }))
 
       expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to delete your response?')
     })
@@ -226,7 +226,7 @@ describe('ReviewCard', () => {
 
       render(<ReviewCard review={reviewWithResponse} isOwner={true} />)
 
-      await userEvent.click(screen.getByTitle('Delete response'))
+      await userEvent.click(screen.getByRole('button', { name: 'Delete response' }))
 
       expect(deleteReviewResponse).not.toHaveBeenCalled()
     })
@@ -237,7 +237,7 @@ describe('ReviewCard', () => {
 
       render(<ReviewCard review={reviewWithResponse} isOwner={true} />)
 
-      await userEvent.click(screen.getByTitle('Delete response'))
+      await userEvent.click(screen.getByRole('button', { name: 'Delete response' }))
 
       await waitFor(() => {
         expect(deleteReviewResponse).toHaveBeenCalledWith('response-123')
@@ -250,7 +250,7 @@ describe('ReviewCard', () => {
 
       render(<ReviewCard review={reviewWithResponse} isOwner={true} />)
 
-      await userEvent.click(screen.getByTitle('Delete response'))
+      await userEvent.click(screen.getByRole('button', { name: 'Delete response' }))
 
       await waitFor(() => {
         expect(mockRefresh).toHaveBeenCalled()
@@ -264,7 +264,7 @@ describe('ReviewCard', () => {
 
       render(<ReviewCard review={reviewWithResponse} isOwner={true} />)
 
-      await userEvent.click(screen.getByTitle('Delete response'))
+      await userEvent.click(screen.getByRole('button', { name: 'Delete response' }))
 
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalled()

@@ -261,7 +261,7 @@ export default function ListingList({ initialListings, totalListings }: ListingL
                                                                 <button
                                                                     onClick={() => handleStatusChange(listing.id, 'ACTIVE')}
                                                                     disabled={processingId === listing.id}
-                                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-50"
+                                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-60"
                                                                 >
                                                                     {processingId === listing.id ? (
                                                                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -275,7 +275,7 @@ export default function ListingList({ initialListings, totalListings }: ListingL
                                                                 <button
                                                                     onClick={() => handleStatusChange(listing.id, 'PAUSED')}
                                                                     disabled={processingId === listing.id}
-                                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-50"
+                                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-60"
                                                                 >
                                                                     {processingId === listing.id ? (
                                                                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -289,7 +289,7 @@ export default function ListingList({ initialListings, totalListings }: ListingL
                                                                 <button
                                                                     onClick={() => handleStatusChange(listing.id, 'RENTED')}
                                                                     disabled={processingId === listing.id}
-                                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-50"
+                                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-60"
                                                                 >
                                                                     {processingId === listing.id ? (
                                                                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -328,7 +328,7 @@ export default function ListingList({ initialListings, totalListings }: ListingL
                                             <button
                                                 onClick={() => handleDelete(listing.id)}
                                                 disabled={processingId === listing.id}
-                                                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                                                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-60 flex items-center gap-2"
                                             >
                                                 {processingId === listing.id && (
                                                     <Loader2 className="w-4 h-4 animate-spin" />

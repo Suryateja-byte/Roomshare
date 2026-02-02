@@ -1,9 +1,9 @@
 "use client";
 
-import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 export function OfflineIndicator() {
-  const isOnline = useOnlineStatus();
+  const { isOnline } = useNetworkStatus();
 
   if (isOnline) {
     return null;

@@ -20,6 +20,7 @@ import {
   useCallback,
   useState,
   useEffect,
+  useRef,
   type ReactNode,
   type TransitionStartFunction,
 } from "react";
@@ -39,6 +40,8 @@ interface SearchTransitionContextValue {
   replaceWithTransition: (url: string, options?: { scroll?: boolean }) => void;
   /** Raw startTransition for custom transition logic */
   startTransition: TransitionStartFunction;
+  /** Replay the last navigation (available only during slow transitions) */
+  retryLastNavigation: (() => void) | null;
 }
 
 const SearchTransitionContext =
@@ -52,6 +55,9 @@ export function SearchTransitionProvider({
   const [isPending, startTransition] = useTransition();
   const [isSlowTransition, setIsSlowTransition] = useState(false);
   const router = useRouter();
+
+  // Store last navigation for retry
+  const lastNavRef = useRef<{ url: string; method: "push" | "replace"; scroll: boolean } | null>(null);
 
   // Track slow transitions (>6s)
   useEffect(() => {
@@ -71,9 +77,10 @@ export function SearchTransitionProvider({
 
   const navigateWithTransition = useCallback(
     (url: string, options?: { scroll?: boolean }) => {
+      const scroll = options?.scroll ?? false;
+      lastNavRef.current = { url, method: "push", scroll };
       startTransition(() => {
-        // Default scroll: false to preserve scroll position
-        router.push(url, { scroll: options?.scroll ?? false });
+        router.push(url, { scroll });
       });
     },
     [router, startTransition],
@@ -81,13 +88,27 @@ export function SearchTransitionProvider({
 
   const replaceWithTransition = useCallback(
     (url: string, options?: { scroll?: boolean }) => {
+      const scroll = options?.scroll ?? false;
+      lastNavRef.current = { url, method: "replace", scroll };
       startTransition(() => {
-        // Use replace to avoid history pollution (e.g., map panning)
-        router.replace(url, { scroll: options?.scroll ?? false });
+        router.replace(url, { scroll });
       });
     },
     [router, startTransition],
   );
+
+  // Retry callback — only meaningful during slow transitions
+  const retryLastNavigation = useCallback(() => {
+    const last = lastNavRef.current;
+    if (!last) return;
+    startTransition(() => {
+      if (last.method === "replace") {
+        router.replace(last.url, { scroll: last.scroll });
+      } else {
+        router.push(last.url, { scroll: last.scroll });
+      }
+    });
+  }, [router, startTransition]);
 
   return (
     <SearchTransitionContext.Provider
@@ -97,6 +118,7 @@ export function SearchTransitionProvider({
         navigateWithTransition,
         replaceWithTransition,
         startTransition,
+        retryLastNavigation: isSlowTransition ? retryLastNavigation : null,
       }}
     >
       {children}

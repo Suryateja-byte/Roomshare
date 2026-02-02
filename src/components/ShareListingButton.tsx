@@ -97,6 +97,7 @@ export default function ShareListingButton({ listingId, title }: ShareListingBut
                 size="icon"
                 className="rounded-full"
                 onClick={handleShare}
+                aria-label="Share listing"
             >
                 <Share2 className="w-4 h-4" />
             </Button>

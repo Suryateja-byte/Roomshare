@@ -45,8 +45,11 @@ export default function SearchLayout({
               <SearchHeaderWrapper />
             </header>
 
-            {/* Main content with top padding to account for fixed header */}
-            <div className="flex-1 flex flex-col pt-[72px] sm:pt-[88px] overflow-hidden">
+            {/* Main content with top padding to account for fixed header
+                CLS fix: Padding must match header height exactly:
+                - Mobile: py-3 (12px*2) + h-14 (56px) = 80px
+                - sm+: py-4 (16px*2) + sm:h-16 (64px) = 96px */}
+            <div className="flex-1 flex flex-col pt-[80px] sm:pt-[96px] overflow-hidden">
               {/* Split view: List (from page) + Map (managed by SearchLayoutView) */}
               <MapBoundsProvider>
                 <ListingFocusProvider>

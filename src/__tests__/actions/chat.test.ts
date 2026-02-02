@@ -328,12 +328,7 @@ describe('Chat Actions', () => {
     })
 
     it('returns count of unread messages', async () => {
-      const mockUnread = [
-        { id: 'msg-1', sender: { id: 'other-1', name: 'User 1' }, conversation: { id: 'conv-1' } },
-        { id: 'msg-2', sender: { id: 'other-2', name: 'User 2' }, conversation: { id: 'conv-2' } },
-        { id: 'msg-3', sender: { id: 'other-1', name: 'User 1' }, conversation: { id: 'conv-1' } },
-      ]
-      ;(prisma.message.findMany as jest.Mock).mockResolvedValue(mockUnread)
+      ;(prisma.message.count as jest.Mock).mockResolvedValue(3)
 
       const result = await getUnreadMessageCount()
 
@@ -341,11 +336,11 @@ describe('Chat Actions', () => {
     })
 
     it('queries for correct conditions', async () => {
-      ;(prisma.message.findMany as jest.Mock).mockResolvedValue([])
+      ;(prisma.message.count as jest.Mock).mockResolvedValue(0)
 
       await getUnreadMessageCount()
 
-      expect(prisma.message.findMany).toHaveBeenCalledWith(
+      expect(prisma.message.count).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             conversation: {

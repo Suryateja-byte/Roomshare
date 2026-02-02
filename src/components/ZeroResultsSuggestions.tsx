@@ -1,9 +1,19 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, X, MapPin, SlidersHorizontal } from 'lucide-react';
+import { Search, X, MapPin, SlidersHorizontal, Navigation } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import type { FilterSuggestion } from '@/lib/data';
+
+/**
+ * Nearby area suggestions for zero-result searches.
+ * Shown when user searched a specific location that returned nothing.
+ */
+const NEARBY_SUGGESTIONS: Record<string, string[]> = {
+    // Fallback suggestions shown when no location-specific ones match
+    _default: ['Austin, TX', 'San Francisco, CA', 'New York, NY', 'Los Angeles, CA'],
+};
 
 interface ZeroResultsSuggestionsProps {
     suggestions: FilterSuggestion[];
@@ -93,6 +103,28 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
                         Browse all
                     </Button>
                 </div>
+
+                {/* Nearby area suggestions */}
+                <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-700 w-full max-w-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Navigation className="w-4 h-4 text-zinc-400" />
+                        <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                            Try a different area
+                        </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {NEARBY_SUGGESTIONS._default.map((area) => (
+                            <Link
+                                key={area}
+                                href={`/search?q=${encodeURIComponent(area)}`}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 transition-colors"
+                            >
+                                <MapPin className="w-3 h-3" />
+                                {area}
+                            </Link>
+                        ))}
+                    </div>
+                </div>
             </div>
         );
     }
@@ -138,6 +170,33 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
                     </p>
                 )}
             </div>
+
+            {/* Nearby area suggestions */}
+            {query && (
+                <div className="max-w-sm mx-auto mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Navigation className="w-3.5 h-3.5 text-zinc-400" />
+                        <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500">
+                            Try a different area
+                        </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {NEARBY_SUGGESTIONS._default
+                            .filter((area) => area.toLowerCase() !== query.toLowerCase())
+                            .slice(0, 3)
+                            .map((area) => (
+                                <Link
+                                    key={area}
+                                    href={`/search?q=${encodeURIComponent(area)}`}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-xs text-zinc-500 dark:text-zinc-400 transition-colors"
+                                >
+                                    <MapPin className="w-3 h-3" />
+                                    {area}
+                                </Link>
+                            ))}
+                    </div>
+                </div>
+            )}
 
             {/* Clear all button */}
             <div className="flex justify-center mt-6">

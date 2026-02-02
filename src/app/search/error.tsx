@@ -18,18 +18,21 @@ export default function SearchError({
     }, [error]);
 
     return (
-        <div className="min-h-screen bg-white dark:bg-zinc-950 pt-20">
+        <div className="min-h-screen bg-white dark:bg-zinc-950 pt-[80px] sm:pt-[96px]">
             <div className="max-w-lg mx-auto px-4 py-16 text-center">
                 <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-6">
                     <AlertCircle className="w-8 h-8 text-red-500 dark:text-red-400" />
                 </div>
 
                 <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
-                    Something went wrong
+                    Unable to load search results
                 </h1>
 
-                <p className="text-zinc-600 dark:text-zinc-400 mb-8">
-                    We couldn&apos;t load the search results. This might be a temporary issue with our servers.
+                <p className="text-zinc-600 dark:text-zinc-400 mb-2">
+                    We&apos;re having trouble finding listings right now. This is usually temporary.
+                </p>
+                <p className="text-sm text-zinc-500 dark:text-zinc-500 mb-8">
+                    Try refreshing the page, or adjust your search filters and try again.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">

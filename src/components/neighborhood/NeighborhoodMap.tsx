@@ -316,9 +316,9 @@ export function NeighborhoodMap({
     >
       {/* Loading state */}
       {!isMapLoaded && (
-        <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center">
+        <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center" role="status" aria-label="Loading map">
           <div className="flex flex-col items-center gap-3">
-            <MapPin className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse" />
+            <MapPin className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse" aria-hidden="true" />
             <span className="text-sm text-zinc-500 dark:text-zinc-400">
               Loading map...
             </span>
@@ -392,6 +392,7 @@ export function NeighborhoodMap({
               className={`
                 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
                 transition-transform duration-150
+                focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
                 ${
                   hoveredPlaceId === poi.placeId || selectedPlaceId === poi.placeId
                     ? 'scale-125 z-10'
@@ -404,9 +405,18 @@ export function NeighborhoodMap({
                 }
               `}
               role="button"
+              tabIndex={0}
               aria-label={`${poi.name}${poi.distanceMiles ? `, ${formatDistance(poi.distanceMiles)}` : ''}`}
               onMouseEnter={() => onPoiHover?.(poi)}
               onMouseLeave={() => onPoiHover?.(null)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setPopupPoi(poi);
+                  onPoiClick?.(poi);
+                }
+              }}
             >
               <div className="w-2 h-2 rounded-full bg-white" />
             </div>
@@ -415,7 +425,7 @@ export function NeighborhoodMap({
 
         {/* Center listing marker */}
         <Marker longitude={center.lng} latitude={center.lat} anchor="bottom">
-          <div className="relative">
+          <div className="relative" role="img" aria-label="Listing location">
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-lg ring-4 ring-primary/30">
               <HomeIcon className="w-4 h-4 text-primary-foreground" />
             </div>

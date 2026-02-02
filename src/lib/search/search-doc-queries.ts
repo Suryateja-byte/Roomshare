@@ -36,6 +36,22 @@ import { features } from "@/lib/env";
 import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
 
+// Statement timeout for search queries (5 seconds)
+const SEARCH_QUERY_TIMEOUT_MS = 5000;
+
+/**
+ * Execute a raw query with a statement timeout to prevent runaway queries.
+ * Uses SET LOCAL inside a transaction so the timeout only applies to this query.
+ */
+async function queryWithTimeout<T>(query: string, params: unknown[]): Promise<T[]> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(
+      `SET LOCAL statement_timeout = '${SEARCH_QUERY_TIMEOUT_MS}'`
+    );
+    return tx.$queryRawUnsafe<T[]>(query, ...params);
+  });
+}
+
 // Maximum results to return for map markers
 const MAX_MAP_MARKERS = 200;
 
@@ -195,18 +211,29 @@ function buildKeysetWhereClause(
       const dateParam = nextParam();
       const idParam = nextParam();
 
-      params.push(
-        cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null,
-        cursor.k[1],
-        cursor.id,
-      );
+      const cursorPrice =
+        cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      params.push(cursorPrice, cursor.k[1], cursor.id);
 
-      // For ASC NULLS LAST: values after cursor are > cursor OR cursor is NOT NULL and value IS NULL
-      clause = `(
-        (d.price > ${priceParam}::numeric OR (d.price IS NULL AND ${priceParam}::numeric IS NOT NULL))
-        OR (d.price = ${priceParam}::numeric AND d.listing_created_at < ${dateParam}::timestamptz)
-        OR (d.price = ${priceParam}::numeric AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
-      )`;
+      // Handle NULL cursor price separately to avoid SQL comparison issues (d.price = NULL always false)
+      if (cursorPrice === null) {
+        // Cursor is at NULL prices (end of non-NULL values)
+        // Only compare tie-breaker columns within the NULL group
+        clause = `(
+          d.price IS NULL AND (
+            d.listing_created_at < ${dateParam}::timestamptz
+            OR (d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
+          )
+        )`;
+      } else {
+        // For ASC NULLS LAST: values after cursor are > cursor OR cursor is NOT NULL and value IS NULL
+        clause = `(
+          (d.price > ${priceParam}::numeric)
+          OR (d.price IS NULL)
+          OR (d.price = ${priceParam}::numeric AND d.listing_created_at < ${dateParam}::timestamptz)
+          OR (d.price = ${priceParam}::numeric AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
+        )`;
+      }
       break;
     }
 
@@ -217,19 +244,29 @@ function buildKeysetWhereClause(
       const dateParam = nextParam();
       const idParam = nextParam();
 
-      params.push(
-        cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null,
-        cursor.k[1],
-        cursor.id,
-      );
+      const cursorPrice =
+        cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      params.push(cursorPrice, cursor.k[1], cursor.id);
 
-      // For DESC NULLS LAST: values after cursor are < cursor OR cursor is NULL (at end)
-      clause = `(
-        (d.price < ${priceParam}::numeric)
-        OR (d.price = ${priceParam}::numeric AND d.listing_created_at < ${dateParam}::timestamptz)
-        OR (d.price = ${priceParam}::numeric AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
-        OR (${priceParam}::numeric IS NULL AND d.price IS NOT NULL)
-      )`;
+      // Handle NULL cursor price separately to avoid SQL comparison issues
+      if (cursorPrice === null) {
+        // Cursor is at NULL prices (end of results for DESC NULLS LAST)
+        // Only compare tie-breaker columns within the NULL group
+        clause = `(
+          d.price IS NULL AND (
+            d.listing_created_at < ${dateParam}::timestamptz
+            OR (d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
+          )
+        )`;
+      } else {
+        // For DESC NULLS LAST: values after cursor are < cursor, then NULLs come last
+        clause = `(
+          (d.price < ${priceParam}::numeric)
+          OR (d.price IS NULL)
+          OR (d.price = ${priceParam}::numeric AND d.listing_created_at < ${dateParam}::timestamptz)
+          OR (d.price = ${priceParam}::numeric AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
+        )`;
+      }
       break;
     }
 
@@ -241,20 +278,31 @@ function buildKeysetWhereClause(
       const dateParam = nextParam();
       const idParam = nextParam();
 
-      params.push(
-        cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null,
-        cursor.k[1] !== null ? parseInt(cursor.k[1], 10) : null,
-        cursor.k[2],
-        cursor.id,
-      );
+      const cursorRating =
+        cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      const cursorCount =
+        cursor.k[1] !== null ? parseInt(cursor.k[1], 10) : null;
+      params.push(cursorRating, cursorCount, cursor.k[2], cursor.id);
 
-      clause = `(
-        (d.avg_rating < ${ratingParam}::float8)
-        OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count < ${countParam}::int)
-        OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count = ${countParam}::int AND d.listing_created_at < ${dateParam}::timestamptz)
-        OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count = ${countParam}::int AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
-        OR (${ratingParam}::float8 IS NULL AND d.avg_rating IS NOT NULL)
-      )`;
+      // Handle NULL cursor rating separately to avoid SQL comparison issues
+      if (cursorRating === null) {
+        // Cursor is at NULL ratings (end of results for DESC NULLS LAST)
+        // Only compare tie-breaker columns within the NULL group
+        clause = `(
+          d.avg_rating IS NULL AND (
+            d.listing_created_at < ${dateParam}::timestamptz
+            OR (d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
+          )
+        )`;
+      } else {
+        clause = `(
+          (d.avg_rating < ${ratingParam}::float8)
+          OR (d.avg_rating IS NULL)
+          OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count < ${countParam}::int)
+          OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count = ${countParam}::int AND d.listing_created_at < ${dateParam}::timestamptz)
+          OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count = ${countParam}::int AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
+        )`;
+      }
       break;
     }
 
@@ -389,21 +437,14 @@ function buildSearchDocWhereConditions(
     }
   }
 
-  // Amenities filter (AND logic) - uses lowercase arrays with GIN index
-  // Uses partial match pattern - 'pool' matches 'pool access'
+  // Amenities filter (AND logic) - uses @> containment with GIN index
   if (amenities?.length) {
     const normalizedAmenities = amenities
       .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
-      // For each search term, ensure at least one amenity contains it
-      conditions.push(`NOT EXISTS (
-        SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term
-        WHERE NOT EXISTS (
-          SELECT 1 FROM unnest(d.amenities_lower) AS la
-          WHERE la LIKE '%' || search_term || '%'
-        )
-      )`);
+      // Exact match containment using @> operator (GIN-indexed)
+      conditions.push(`d.amenities_lower @> $${paramIndex++}::text[]`);
       params.push(normalizedAmenities);
     }
   }
@@ -504,9 +545,9 @@ async function getSearchDocLimitedCountInternal(
     ) subq
   `;
 
-  const result = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
+  const result = await queryWithTimeout<{ count: bigint }>(
     limitedCountQuery,
-    ...queryParams,
+    queryParams,
   );
 
   const count = Number(result[0]?.count || 0);
@@ -574,10 +615,9 @@ async function getSearchDocMapListingsInternal(
   `;
 
   try {
-    const listings = await prisma.$queryRawUnsafe<any[]>(
+    const listings = await queryWithTimeout<any>(
       sqlQuery,
-      ...queryParams,
-      MAX_MAP_MARKERS,
+      [...queryParams, MAX_MAP_MARKERS],
     );
 
     return listings.map((l) => ({
@@ -668,6 +708,14 @@ async function getSearchDocListingsPaginatedInternal(
     } else {
       safePage = Math.max(1, page);
     }
+
+    // For unbounded browse, cap offset to prevent expensive full-table scans
+    // This prevents DOS attacks via ?page=1000 which would trigger OFFSET 11988
+    if (isUnboundedBrowse) {
+      const maxUnboundedPages = Math.ceil(MAX_UNBOUNDED_RESULTS / effectiveLimit);
+      safePage = Math.min(safePage, maxUnboundedPages);
+    }
+
     const offset = (safePage - 1) * effectiveLimit;
 
     // Fetch limit+1 items to determine hasNextPage
@@ -707,9 +755,9 @@ async function getSearchDocListingsPaginatedInternal(
 
     const dataParams = [...queryParams, fetchLimit, offset];
 
-    const listings = await prisma.$queryRawUnsafe<any[]>(
+    const listings = await queryWithTimeout<any>(
       dataQuery,
-      ...dataParams,
+      dataParams,
     );
 
     // Map results to ListingData
@@ -959,9 +1007,9 @@ export async function getSearchDocListingsWithKeyset(
 
     const dataParams = [...allParams, fetchLimit];
 
-    const listings = await prisma.$queryRawUnsafe<any[]>(
+    const listings = await queryWithTimeout<any>(
       dataQuery,
-      ...dataParams,
+      dataParams,
     );
 
     // Map results to ListingData
@@ -1143,9 +1191,9 @@ export async function getSearchDocListingsFirstPage(
 
     const dataParams = [...queryParams, fetchLimit];
 
-    const listings = await prisma.$queryRawUnsafe<any[]>(
+    const listings = await queryWithTimeout<any>(
       dataQuery,
-      ...dataParams,
+      dataParams,
     );
 
     // Map results to ListingData

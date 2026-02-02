@@ -7,6 +7,7 @@ import { checkSuspension } from '@/app/actions/suspension';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { markListingDirty } from '@/lib/search/search-doc-dirty';
 import {
     parsePaginationParams,
     buildPaginationResponse,
@@ -126,6 +127,11 @@ export async function POST(request: Request) {
                 }
             }
         });
+
+        // Fire-and-forget: mark listing dirty for search doc refresh
+        if (listingId) {
+            markListingDirty(listingId, 'review_changed').catch(() => {});
+        }
 
         // P1-22 FIX: Send notification in background (non-blocking)
         // Return response immediately, fire-and-forget notifications
@@ -305,6 +311,11 @@ export async function PUT(request: Request) {
             }
         });
 
+        // Fire-and-forget: mark listing dirty for search doc refresh
+        if (existingReview.listingId) {
+            markListingDirty(existingReview.listingId, 'review_changed').catch(() => {});
+        }
+
         return NextResponse.json(updatedReview);
     } catch (error) {
         logger.sync.error('Error updating review', {
@@ -347,6 +358,11 @@ export async function DELETE(request: Request) {
         await prisma.review.delete({
             where: { id: reviewId }
         });
+
+        // Fire-and-forget: mark listing dirty for search doc refresh
+        if (existingReview.listingId) {
+            markListingDirty(existingReview.listingId, 'review_changed').catch(() => {});
+        }
 
         return NextResponse.json({ success: true, message: 'Review deleted successfully' });
     } catch (error) {

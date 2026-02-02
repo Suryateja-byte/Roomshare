@@ -267,8 +267,7 @@ export async function getUnreadMessageCount() {
     const session = await auth();
     if (!session?.user?.id) return 0;
 
-    // Get detailed info for debugging
-    const unreadMessages = await prisma.message.findMany({
+    const unreadCount = await prisma.message.count({
         where: {
             conversation: {
                 participants: {
@@ -280,22 +279,9 @@ export async function getUnreadMessageCount() {
             read: false,
             deletedAt: null, // Exclude soft-deleted messages
         },
-        include: {
-            conversation: {
-                select: {
-                    id: true,
-                },
-            },
-            sender: {
-                select: {
-                    id: true,
-                    name: true,
-                },
-            },
-        },
     });
 
-    return unreadMessages.length;
+    return unreadCount;
 }
 
 /**

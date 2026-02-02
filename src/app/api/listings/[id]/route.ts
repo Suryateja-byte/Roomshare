@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { householdLanguagesSchema } from '@/lib/schemas';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
+import { markListingDirty } from '@/lib/search/search-doc-dirty';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -15,6 +16,22 @@ function extractStoragePath(publicUrl: string): string | null {
     const match = publicUrl.match(/\/storage\/v1\/object\/public\/images\/(.+)$/);
     return match ? match[1] : null;
 }
+
+const normalizeStringList = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+        return value
+            .filter((item): item is string => typeof item === 'string')
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+    if (typeof value === 'string') {
+        return value
+            .split(',')
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+    return [];
+};
 
 export async function DELETE(
     request: Request,
@@ -197,6 +214,9 @@ export async function PATCH(
             }
         }
 
+        const normalizedAmenities = normalizeStringList(amenities);
+        const normalizedHouseRules = normalizeStringList(houseRules);
+
         // Update in transaction
         const result = await prisma.$transaction(async (tx) => {
             // Update listing
@@ -206,8 +226,8 @@ export async function PATCH(
                     title,
                     description,
                     price: priceNum,
-                    amenities: amenities ? amenities.split(',').map((s: string) => s.trim()) : [],
-                    houseRules: houseRules ? houseRules.split(',').map((s: string) => s.trim()) : [],
+                    amenities: normalizedAmenities,
+                    houseRules: normalizedHouseRules,
                     householdLanguages: Array.isArray(householdLanguages)
                         ? householdLanguages.map((l: string) => l.trim().toLowerCase()).filter(isValidLanguageCode)
                         : [],
@@ -244,6 +264,9 @@ export async function PATCH(
 
             return updatedListing;
         });
+
+        // Fire-and-forget: mark listing dirty for search doc refresh
+        markListingDirty(id, 'listing_updated').catch(() => {});
 
         return NextResponse.json(result, { status: 200 });
     } catch (error) {

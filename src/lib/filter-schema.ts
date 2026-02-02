@@ -238,14 +238,14 @@ const boundsSchema = z
   })
   .transform((bounds) => {
     // Clamp values
-    let minLat = Math.max(-90, Math.min(90, bounds.minLat));
-    let maxLat = Math.max(-90, Math.min(90, bounds.maxLat));
+    const minLat = Math.max(-90, Math.min(90, bounds.minLat));
+    const maxLat = Math.max(-90, Math.min(90, bounds.maxLat));
     const minLng = Math.max(-180, Math.min(180, bounds.minLng));
     const maxLng = Math.max(-180, Math.min(180, bounds.maxLng));
 
-    // Swap lat if inverted
+    // Throw on inverted lat (consistent with search-params.ts and price validation)
     if (minLat > maxLat) {
-      [minLat, maxLat] = [maxLat, minLat];
+      throw new Error('minLat cannot exceed maxLat');
     }
 
     // Note: lng NOT swapped to support antimeridian crossing
@@ -647,14 +647,14 @@ function normalizeBounds(
   }
 
   // Clamp values
-  let minLat = Math.max(-90, Math.min(90, minLatRaw));
-  let maxLat = Math.max(-90, Math.min(90, maxLatRaw));
+  const minLat = Math.max(-90, Math.min(90, minLatRaw));
+  const maxLat = Math.max(-90, Math.min(90, maxLatRaw));
   const minLng = Math.max(-180, Math.min(180, minLngRaw));
   const maxLng = Math.max(-180, Math.min(180, maxLngRaw));
 
-  // Swap lat if inverted
+  // Throw on inverted lat (consistent with search-params.ts and price validation)
   if (minLat > maxLat) {
-    [minLat, maxLat] = [maxLat, minLat];
+    throw new Error('minLat cannot exceed maxLat');
   }
 
   // Note: lng NOT swapped to support antimeridian crossing

@@ -277,23 +277,26 @@ export default function ReviewForm({
                                 onChange={(e) => setComment(e.target.value)}
                                 maxLength={COMMENT_MAX_LENGTH}
                                 rows={3}
-                                className="w-full px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white placeholder:text-zinc-400"
+                                className="w-full px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
                                 placeholder="Update your review..."
+                                aria-describedby={error ? "review-edit-error" : undefined}
+                                aria-invalid={!!error}
                             />
                             <CharacterCounter current={comment.length} max={COMMENT_MAX_LENGTH} />
                         </div>
 
-                        {error && <p className="text-red-500 text-sm">{error}</p>}
+                        {error && <p id="review-edit-error" role="alert" className="text-red-500 text-sm">{error}</p>}
 
                         <div className="flex gap-2">
                             <Button
                                 onClick={handleUpdate}
                                 disabled={isSubmitting}
+                                aria-busy={isSubmitting}
                                 className="flex-1"
                             >
                                 {isSubmitting ? (
                                     <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                                         Saving...
                                     </>
                                 ) : (
@@ -366,10 +369,11 @@ export default function ReviewForm({
                         size="sm"
                         onClick={() => setShowDeleteDialog(true)}
                         disabled={isDeleting}
+                        aria-busy={isDeleting}
                         className="flex-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
                     >
                         {isDeleting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                         ) : (
                             <>
                                 <Trash2 className="w-4 h-4 mr-2" />
@@ -484,13 +488,15 @@ export default function ReviewForm({
                     onChange={(e) => setComment(e.target.value)}
                     placeholder="Share your experience..."
                     maxLength={COMMENT_MAX_LENGTH}
-                    className="w-full min-h-[100px] p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white/20 resize-y bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+                    className="w-full min-h-[100px] p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white/20 resize-y bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
                     disabled={isSubmitting}
+                    aria-describedby={error ? "review-form-error" : undefined}
+                    aria-invalid={!!error}
                 />
                 <CharacterCounter current={comment.length} max={COMMENT_MAX_LENGTH} className="mt-1" />
             </div>
 
-            {error && <p className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
+            {error && <p id="review-form-error" role="alert" className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
 
             <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Submitting...' : 'Post Review'}

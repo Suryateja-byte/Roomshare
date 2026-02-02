@@ -206,27 +206,31 @@ export default function ListingCardCarousel({
           isInteracting ? "opacity-100" : "opacity-0",
         )}
       >
-        {/* Previous button */}
+        {/* Previous button - 44px touch target with visual 32px appearance */}
         {currentIndex > 0 && (
           <button
             type="button"
             onClick={goToPrev}
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md flex items-center justify-center pointer-events-auto hover:bg-white dark:hover:bg-zinc-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="absolute left-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             aria-label="Previous image"
           >
-            <ChevronLeft className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
+            <span className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md flex items-center justify-center hover:bg-white dark:hover:bg-zinc-700 transition-colors">
+              <ChevronLeft className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
+            </span>
           </button>
         )}
 
-        {/* Next button */}
+        {/* Next button - 44px touch target with visual 32px appearance */}
         {currentIndex < totalImages - 1 && (
           <button
             type="button"
             onClick={goToNext}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md flex items-center justify-center pointer-events-auto hover:bg-white dark:hover:bg-zinc-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="absolute right-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             aria-label="Next image"
           >
-            <ChevronRight className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
+            <span className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md flex items-center justify-center hover:bg-white dark:hover:bg-zinc-700 transition-colors">
+              <ChevronRight className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
+            </span>
           </button>
         )}
       </div>
@@ -246,16 +250,20 @@ export default function ListingCardCarousel({
               e.stopPropagation();
               scrollToIndex(index);
             }}
-            className={cn(
-              "w-1.5 h-1.5 rounded-full transition-all duration-200",
-              index === currentIndex
-                ? "bg-white w-3 shadow-sm"
-                : "bg-white/60 hover:bg-white/80",
-            )}
+            className="relative p-2.5 -m-2 flex items-center justify-center"
             role="tab"
             aria-selected={index === currentIndex}
             aria-label={`Go to image ${index + 1}`}
-          />
+          >
+            <span
+              className={cn(
+                "block w-1.5 h-1.5 rounded-full transition-all duration-200",
+                index === currentIndex
+                  ? "bg-white w-3 shadow-sm"
+                  : "bg-white/60 group-hover/dot:bg-white/80",
+              )}
+            />
+          </button>
         ))}
       </div>
 

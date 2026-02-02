@@ -5,6 +5,7 @@ import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { checkSuspension } from './suspension';
+import { logger } from '@/lib/logger';
 
 const updateProfileSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100, 'Name is too long'),
@@ -49,7 +50,11 @@ export async function updateProfile(data: UpdateProfileInput) {
         if (error instanceof z.ZodError) {
             return { error: error.issues[0].message };
         }
-        console.error('Error updating profile:', error);
+        logger.sync.error('Failed to update profile', {
+            action: 'updateProfile',
+            userId: session.user.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to update profile' };
     }
 }
@@ -78,7 +83,11 @@ export async function getProfile() {
 
         return { user, error: null };
     } catch (error) {
-        console.error('Error fetching profile:', error);
+        logger.sync.error('Failed to fetch profile', {
+            action: 'getProfile',
+            userId: session.user.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to fetch profile', user: null };
     }
 }

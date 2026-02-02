@@ -59,10 +59,17 @@ export default function ChatWindow({ conversationId, currentUserId }: { conversa
     }, [conversationId]);
 
     useEffect(() => {
+        setMessages([]);
+        setLoading(true);
+        setLoadError(false);
+    }, [conversationId]);
+
+    useEffect(() => {
         fetchMessages();
+        if (isOffline) return;
         const interval = setInterval(fetchMessages, 5000); // Poll every 5s
         return () => clearInterval(interval);
-    }, [fetchMessages]);
+    }, [fetchMessages, isOffline]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

@@ -127,7 +127,6 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
                         Dismiss
                     </Button>
                     <Button
-                        variant="primary"
                         size="sm"
                         className="flex-1"
                         asChild
@@ -193,10 +192,11 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
                         className="flex-1"
                         onClick={handleDeleteConfirmClick}
                         disabled={isDeleting}
+                        aria-busy={isDeleting}
                     >
                         {isDeleting ? (
                             <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                                 Deleting...
                             </>
                         ) : (
@@ -229,10 +229,11 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
                 className="w-full"
                 onClick={handleDeleteClick}
                 disabled={isChecking}
+                aria-busy={isChecking}
             >
                 {isChecking ? (
                     <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                         Checking...
                     </>
                 ) : (

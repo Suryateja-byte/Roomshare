@@ -8,24 +8,16 @@
 import * as fc from 'fast-check';
 import {
   normalizeFilters,
-  NormalizedFilters,
   VALID_AMENITIES,
   VALID_HOUSE_RULES,
   VALID_ROOM_TYPES,
-  VALID_LEASE_DURATIONS,
-  VALID_GENDER_PREFERENCES,
-  VALID_HOUSEHOLD_GENDERS,
   VALID_SORT_OPTIONS,
-  MAX_SAFE_PRICE,
-  MAX_SAFE_PAGE,
-  MAX_PAGE_SIZE,
   Amenity,
   HouseRule,
   RoomType,
   SortOption,
 } from '@/lib/filter-schema';
 import {
-  TEST_LISTINGS,
   ACTIVE_LISTINGS,
   applyFilters,
   sortListings,
@@ -89,15 +81,6 @@ const boundsArb = fc.record({
   maxLat: latArb,
   minLng: lngArb,
   maxLng: lngArb,
-});
-
-/**
- * Generate valid date string (YYYY-MM-DD format)
- */
-const futureDateArb = fc.integer({ min: 1, max: 365 }).map((daysFromNow) => {
-  const date = new Date();
-  date.setDate(date.getDate() + daysFromNow);
-  return date.toISOString().split('T')[0];
 });
 
 /**
@@ -605,7 +588,13 @@ describe('Invariant 10: Bounds Integrity', () => {
   it('all results fall within specified bounds', () => {
     fc.assert(
       fc.property(boundsArb, (bounds) => {
-        const normalized = normalizeFilters({ bounds });
+        let normalized;
+        try {
+          normalized = normalizeFilters({ bounds });
+        } catch {
+          // Inverted lat bounds now throw (P1-13 security fix) - skip
+          return;
+        }
         if (!normalized.bounds) return; // Invalid bounds normalized away
 
         const results = applyFilters(ACTIVE_LISTINGS, { bounds: normalized.bounds });
@@ -630,15 +619,26 @@ describe('Invariant 10: Bounds Integrity', () => {
     );
   });
 
-  it('normalizes inverted latitude bounds', () => {
+  it('throws on inverted latitude bounds (P1-13 security fix)', () => {
     fc.assert(
       fc.property(latArb, latArb, (lat1, lat2) => {
+        const minLat = Math.min(lat1, lat2);
+        const maxLat = Math.max(lat1, lat2);
+
+        // Valid bounds should not throw
         const normalized = normalizeFilters({
-          bounds: { minLat: lat1, maxLat: lat2, minLng: 0, maxLng: 10 },
+          bounds: { minLat, maxLat, minLng: 0, maxLng: 10 },
         });
 
         if (normalized.bounds) {
           expect(normalized.bounds.minLat).toBeLessThanOrEqual(normalized.bounds.maxLat);
+        }
+
+        // Inverted bounds should throw
+        if (lat1 > lat2) {
+          expect(() => normalizeFilters({
+            bounds: { minLat: lat1, maxLat: lat2, minLng: 0, maxLng: 10 },
+          })).toThrow('minLat cannot exceed maxLat');
         }
       }),
       { numRuns: 30 }
@@ -732,7 +732,7 @@ describe('Invariant 12: SQL Injection Resistance', () => {
 
   it('handles SQL injection in query field', () => {
     for (const payload of sqlInjectionPayloads) {
-      const normalized = normalizeFilters({ query: payload });
+      normalizeFilters({ query: payload });
       // Should not crash and should preserve (but parameterize in DB)
       expect(() => applyFilters(ACTIVE_LISTINGS, { query: payload })).not.toThrow();
     }

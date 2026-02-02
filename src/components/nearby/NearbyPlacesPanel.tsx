@@ -285,10 +285,10 @@ export default function NearbyPlacesPanel({
                 focus:border-zinc-300 dark:focus:border-zinc-700
                 rounded-xl
                 text-zinc-900 dark:text-white text-sm
-                placeholder:text-zinc-400 dark:placeholder:text-zinc-500
+                placeholder:text-zinc-600 dark:placeholder:text-zinc-300
                 focus:outline-none
                 transition-all duration-200
-                disabled:opacity-50 disabled:cursor-not-allowed
+                disabled:opacity-60 disabled:cursor-not-allowed
               "
             />
             {/* Search icon button - appears when 2+ chars typed */}
@@ -305,7 +305,7 @@ export default function NearbyPlacesPanel({
                   text-white dark:text-zinc-900
                   rounded-lg
                   hover:bg-zinc-800 dark:hover:bg-zinc-100
-                  disabled:opacity-50
+                  disabled:opacity-60
                   transition-colors
                 "
               >
@@ -341,7 +341,7 @@ export default function NearbyPlacesPanel({
                       ? 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-zinc-900'
                       : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600'
                     }
-                    disabled:opacity-50 disabled:cursor-not-allowed
+                    disabled:opacity-60 disabled:cursor-not-allowed
                   `}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -375,7 +375,7 @@ export default function NearbyPlacesPanel({
                     ? 'bg-white dark:bg-zinc-600 shadow-sm text-zinc-900 dark:text-white'
                     : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
                   }
-                  disabled:opacity-50 disabled:cursor-not-allowed
+                  disabled:opacity-60 disabled:cursor-not-allowed
                 `}
               >
                 {option.label}

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { sendNotificationEmail } from '@/lib/email';
+import { logger } from '@/lib/logger';
 
 export async function createReviewResponse(reviewId: string, content: string) {
     const session = await auth();
@@ -80,7 +81,11 @@ export async function createReviewResponse(reviewId: string, content: string) {
 
         return { success: true, responseId: response.id };
     } catch (error) {
-        console.error('Error creating review response:', error);
+        logger.sync.error('Failed to create review response', {
+            action: 'createReviewResponse',
+            reviewId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to create response' };
     }
 }
@@ -131,7 +136,11 @@ export async function updateReviewResponse(responseId: string, content: string) 
 
         return { success: true };
     } catch (error) {
-        console.error('Error updating review response:', error);
+        logger.sync.error('Failed to update review response', {
+            action: 'updateReviewResponse',
+            responseId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to update response' };
     }
 }
@@ -177,7 +186,11 @@ export async function deleteReviewResponse(responseId: string) {
 
         return { success: true };
     } catch (error) {
-        console.error('Error deleting review response:', error);
+        logger.sync.error('Failed to delete review response', {
+            action: 'deleteReviewResponse',
+            responseId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to delete response' };
     }
 }

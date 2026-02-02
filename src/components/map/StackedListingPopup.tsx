@@ -179,7 +179,7 @@ export function StackedListingPopup({
                 href={`/listings/${listing.id}`}
                 data-testid={`stacked-popup-open-${listing.id}`}
                 onClick={(e) => e.stopPropagation()}
-                className={`flex-shrink-0 self-center p-1.5 rounded-full transition-colors ${
+                className={`flex-shrink-0 self-center p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-colors ${
                   isDarkMode
                     ? "hover:bg-zinc-700 text-zinc-400 hover:text-white"
                     : "hover:bg-zinc-200 text-zinc-400 hover:text-zinc-900"

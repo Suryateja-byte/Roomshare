@@ -354,15 +354,17 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                                     e.stopPropagation();
                                     toggleZoom();
                                 }}
-                                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
                                 title={isZoomed ? 'Zoom out' : 'Zoom in'}
+                                aria-label={isZoomed ? 'Zoom out' : 'Zoom in'}
                             >
                                 <ZoomIn className={cn("w-5 h-5", isZoomed && "text-primary")} />
                             </button>
                             <button
                                 onClick={closeLightbox}
-                                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
                                 title="Close (Esc)"
+                                aria-label="Close gallery"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -381,8 +383,9 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                                     e.stopPropagation();
                                     goToPrevious();
                                 }}
-                                className="absolute left-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
+                                className="absolute left-4 p-3 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
                                 title="Previous (←)"
+                                aria-label="Previous image"
                             >
                                 <ChevronLeft className="w-6 h-6 text-white" />
                             </button>
@@ -413,8 +416,9 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                                     e.stopPropagation();
                                     goToNext();
                                 }}
-                                className="absolute right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
+                                className="absolute right-4 p-3 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
                                 title="Next (→)"
+                                aria-label="Next image"
                             >
                                 <ChevronRight className="w-6 h-6 text-white" />
                             </button>
@@ -439,6 +443,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                                                 ? "ring-2 ring-white ring-offset-2 ring-offset-black"
                                                 : "opacity-50 hover:opacity-100"
                                         )}
+                                        aria-label={`View image ${i + 1}${currentIndex === i ? ' (current)' : ''}`}
                                     >
                                         <ImageWithFallback
                                             src={img}

@@ -32,11 +32,11 @@ export function CategoryTabs({ selectedRoomType, onRoomTypeChange }: CategoryTab
             type="button"
             onClick={() => onRoomTypeChange(value === 'any' ? '' : value)}
             className={`
-              flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
+              flex items-center gap-1.5 px-3 sm:px-4 py-2 min-h-[44px] rounded-lg text-sm font-medium
               transition-all duration-200
               ${isSelected
                 ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-900/50'
+                : 'text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-900/50'
               }
             `}
             aria-pressed={isSelected}

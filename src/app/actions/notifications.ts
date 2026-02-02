@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
+import { logger } from '@/lib/logger';
 
 export type NotificationType =
     | 'BOOKING_REQUEST'
@@ -35,7 +36,12 @@ export async function createNotification(input: CreateNotificationInput) {
         });
         return { success: true };
     } catch (error) {
-        console.error('Error creating notification:', error);
+        logger.sync.error('Failed to create notification', {
+            action: 'createNotification',
+            userId: input.userId,
+            type: input.type,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to create notification' };
     }
 }
@@ -71,7 +77,12 @@ export async function getNotifications(limit = 20) {
             totalCount
         };
     } catch (error) {
-        console.error('Error fetching notifications:', error);
+        logger.sync.error('Failed to fetch notifications', {
+            action: 'getNotifications',
+            userId: session.user.id,
+            limit,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { notifications: [], unreadCount: 0, hasMore: false };
     }
 }
@@ -99,7 +110,13 @@ export async function getMoreNotifications(cursor: string, limit = 20) {
             hasMore
         };
     } catch (error) {
-        console.error('Error fetching more notifications:', error);
+        logger.sync.error('Failed to fetch more notifications', {
+            action: 'getMoreNotifications',
+            userId: session.user.id,
+            cursor,
+            limit,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { notifications: [], hasMore: false };
     }
 }
@@ -122,7 +139,12 @@ export async function markNotificationAsRead(notificationId: string) {
         revalidatePath('/notifications');
         return { success: true };
     } catch (error) {
-        console.error('Error marking notification as read:', error);
+        logger.sync.error('Failed to mark notification as read', {
+            action: 'markNotificationAsRead',
+            userId: session.user.id,
+            notificationId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to mark notification as read' };
     }
 }
@@ -142,7 +164,11 @@ export async function markAllNotificationsAsRead() {
         revalidatePath('/notifications');
         return { success: true };
     } catch (error) {
-        console.error('Error marking all notifications as read:', error);
+        logger.sync.error('Failed to mark all notifications as read', {
+            action: 'markAllNotificationsAsRead',
+            userId: session.user.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to mark all notifications as read' };
     }
 }
@@ -164,7 +190,12 @@ export async function deleteNotification(notificationId: string) {
         revalidatePath('/notifications');
         return { success: true };
     } catch (error) {
-        console.error('Error deleting notification:', error);
+        logger.sync.error('Failed to delete notification', {
+            action: 'deleteNotification',
+            userId: session.user.id,
+            notificationId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to delete notification' };
     }
 }
@@ -181,7 +212,11 @@ export async function getUnreadNotificationCount() {
         });
         return count;
     } catch (error) {
-        console.error('Error getting unread notification count:', error);
+        logger.sync.error('Failed to get unread notification count', {
+            action: 'getUnreadNotificationCount',
+            userId: session.user.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return 0;
     }
 }
@@ -200,7 +235,11 @@ export async function deleteAllNotifications() {
         revalidatePath('/notifications');
         return { success: true, count: result.count };
     } catch (error) {
-        console.error('Error deleting all notifications:', error);
+        logger.sync.error('Failed to delete all notifications', {
+            action: 'deleteAllNotifications',
+            userId: session.user.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return { error: 'Failed to delete notifications' };
     }
 }

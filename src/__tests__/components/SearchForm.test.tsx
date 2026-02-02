@@ -1,7 +1,7 @@
 /**
  * Comprehensive tests for SearchForm component
  */
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Mock useSearchParams and useRouter
@@ -63,7 +63,7 @@ jest.mock('@/components/ui/date-picker', () => ({
 
 // Mock Select components
 jest.mock('@/components/ui/select', () => ({
-  Select: ({ children, value, onValueChange }: { children: React.ReactNode; value?: string; onValueChange?: (value: string) => void }) => (
+  Select: ({ children, value }: { children: React.ReactNode; value?: string; onValueChange?: (value: string) => void }) => (
     <div data-testid="select-root" data-value={value}>
       {children}
     </div>
@@ -78,6 +78,12 @@ jest.mock('@/components/ui/select', () => ({
     <div data-testid={`select-item-${value}`} data-value={value}>{children}</div>
   ),
   SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
+}))
+
+// Mock sonner toast
+const mockToastError = jest.fn()
+jest.mock('sonner', () => ({
+  toast: { error: (...args: unknown[]) => mockToastError(...args), success: jest.fn(), info: jest.fn() },
 }))
 
 import SearchForm from '@/components/SearchForm'
@@ -660,7 +666,6 @@ describe('SearchForm', () => {
 
   describe('debouncing', () => {
     it('debounces rapid submissions', async () => {
-      jest.useRealTimers() // Use real timers for this test
       render(<SearchForm />)
 
       const form = screen.getByRole('search')
@@ -668,8 +673,8 @@ describe('SearchForm', () => {
       // Submit form once
       fireEvent.submit(form)
 
-      // Wait for debounce to complete
-      await new Promise(resolve => setTimeout(resolve, 400))
+      // Advance past the 300ms debounce
+      jest.advanceTimersByTime(400)
 
       // Should have called push after debounce
       expect(mockPush).toHaveBeenCalled()
@@ -779,6 +784,86 @@ describe('SearchForm', () => {
 
         const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
         expect(pushCall).not.toContain('InvalidAmenity')
+      })
+    })
+
+    describe('Use My Location', () => {
+      const mockGetCurrentPosition = jest.fn()
+
+      beforeEach(() => {
+        mockToastError.mockClear()
+        Object.defineProperty(navigator, 'geolocation', {
+          value: { getCurrentPosition: mockGetCurrentPosition },
+          writable: true,
+          configurable: true,
+        })
+        mockGetCurrentPosition.mockReset()
+      })
+
+      it('sets lat/lng params on success without q param', async () => {
+        mockGetCurrentPosition.mockImplementation((success: PositionCallback) => {
+          success({ coords: { latitude: 40.7128, longitude: -74.006 } } as GeolocationPosition)
+        })
+        render(<SearchForm />)
+
+        const btn = screen.getByRole('button', { name: /use my current location/i })
+        fireEvent.click(btn)
+        jest.advanceTimersByTime(500)
+
+        await waitFor(() => {
+          expect(mockPush).toHaveBeenCalled()
+        })
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
+        expect(pushCall).toContain('lat=40.7128')
+        expect(pushCall).toContain('lng=-74.006')
+        expect(pushCall).not.toContain('q=')
+      })
+
+      it('shows toast on permission denied', () => {
+        mockGetCurrentPosition.mockImplementation((_s: PositionCallback, error: PositionErrorCallback) => {
+          error({ code: 1, message: 'denied', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as GeolocationPositionError)
+        })
+        render(<SearchForm />)
+
+        fireEvent.click(screen.getByRole('button', { name: /use my current location/i }))
+
+        expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('permission denied'))
+      })
+
+      it('shows toast on timeout', () => {
+        mockGetCurrentPosition.mockImplementation((_s: PositionCallback, error: PositionErrorCallback) => {
+          error({ code: 3, message: 'timeout', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as GeolocationPositionError)
+        })
+        render(<SearchForm />)
+
+        fireEvent.click(screen.getByRole('button', { name: /use my current location/i }))
+
+        expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('timed out'))
+      })
+
+      it('shows toast when geolocation not supported', () => {
+        Object.defineProperty(navigator, 'geolocation', {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        })
+        render(<SearchForm />)
+
+        fireEvent.click(screen.getByRole('button', { name: /use my current location/i }))
+
+        expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('not supported'))
+      })
+
+      it('ignores rapid double-tap', () => {
+        // First call never resolves (simulates pending geolocation)
+        mockGetCurrentPosition.mockImplementation(() => {})
+        render(<SearchForm />)
+
+        const btn = screen.getByRole('button', { name: /use my current location/i })
+        fireEvent.click(btn)
+        fireEvent.click(btn)
+
+        expect(mockGetCurrentPosition).toHaveBeenCalledTimes(1)
       })
     })
 

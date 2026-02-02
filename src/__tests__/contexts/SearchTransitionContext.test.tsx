@@ -172,4 +172,43 @@ describe("SearchTransitionContext", () => {
       expect(capturedContext!.isPending).toBe(false);
     });
   });
+
+  describe("retryLastNavigation", () => {
+    it("is null before any navigation", () => {
+      let capturedContext: ReturnType<typeof useSearchTransition> | null = null;
+
+      render(
+        <SearchTransitionProvider>
+          <TestConsumer
+            onRender={(ctx) => {
+              capturedContext = ctx;
+            }}
+          />
+        </SearchTransitionProvider>,
+      );
+
+      // No navigation yet + not slow → null
+      expect(capturedContext!.retryLastNavigation).toBeNull();
+    });
+
+    it("is null when transition is not slow (even after navigation)", async () => {
+      const user = userEvent.setup();
+      let capturedContext: ReturnType<typeof useSearchTransition> | null = null;
+
+      render(
+        <SearchTransitionProvider>
+          <TestConsumer
+            onRender={(ctx) => {
+              capturedContext = ctx;
+            }}
+          />
+        </SearchTransitionProvider>,
+      );
+
+      await user.click(screen.getByTestId("navigate-btn"));
+
+      // Not a slow transition, so retry should be null
+      expect(capturedContext!.retryLastNavigation).toBeNull();
+    });
+  });
 });

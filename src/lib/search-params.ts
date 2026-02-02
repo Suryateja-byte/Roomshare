@@ -456,9 +456,7 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     nearMatches,
   };
 
-  // Flag unbounded searches: text query without geographic bounds
-  // This would cause full-table scans and should be blocked
-  const boundsRequired = !!q && !bounds;
+  const boundsRequired = isBoundsRequired({ query: q, bounds });
 
   // Flag browse-all mode: no query and no bounds
   // Results will be capped but UI should inform user that more are available
@@ -655,4 +653,20 @@ export function validateSearchFilters(filters: unknown): FilterParams {
   }
 
   return validated;
+}
+
+/**
+ * Check whether a search request requires geographic bounds.
+ * A text query without bounds would cause a full-table scan.
+ *
+ * Endpoint behavior when bounds are required but missing:
+ * - /api/search/v2:      200 + { unboundedSearch: true }
+ * - /api/search/facets:  400 + { boundsRequired: true }
+ * - /api/search-count:   200 + { boundsRequired: true }
+ */
+export function isBoundsRequired(params: {
+  query?: string | null;
+  bounds?: unknown;
+}): boolean {
+  return !!params.query && !params.bounds;
 }

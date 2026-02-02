@@ -12,6 +12,8 @@ interface DatePickerProps {
     minDate?: string;
     className?: string;
     id?: string;
+    'aria-describedby'?: string;
+    'aria-invalid'?: boolean;
 }
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -26,7 +28,9 @@ export function DatePicker({
     placeholder = 'Select date',
     minDate,
     className,
-    id
+    id,
+    'aria-describedby': ariaDescribedBy,
+    'aria-invalid': ariaInvalid
 }: DatePickerProps) {
     const [mounted, setMounted] = React.useState(false);
     const [open, setOpen] = React.useState(false);
@@ -161,6 +165,8 @@ export function DatePicker({
             <button
                 type="button"
                 id={id}
+                aria-describedby={ariaDescribedBy}
+                aria-invalid={ariaInvalid}
                 className={cn(
                     'w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl',
                     'border border-zinc-200 dark:border-zinc-700',
@@ -191,6 +197,8 @@ export function DatePicker({
             <Popover.Trigger
                 type="button"
                 id={id}
+                aria-describedby={ariaDescribedBy}
+                aria-invalid={ariaInvalid}
                 className={cn(
                     'w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl',
                     'border border-zinc-200 dark:border-zinc-700',

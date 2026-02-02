@@ -66,9 +66,20 @@ export function SearchResultsClient({
   const allListings = [...initialListings, ...extraListings];
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
 
-  // Derive estimatedMonths from leaseDuration search param
+  // Derive estimatedMonths from moveInDate/moveOutDate, falling back to leaseDuration
   const estimatedMonths = useMemo(() => {
     const sp = new URLSearchParams(searchParamsString);
+    const moveIn = sp.get('moveInDate');
+    const moveOut = sp.get('moveOutDate');
+    if (moveIn && moveOut) {
+      const start = new Date(moveIn);
+      const end = new Date(moveOut);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start) {
+        const diffMs = end.getTime() - start.getTime();
+        const months = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.44)));
+        return months;
+      }
+    }
     const ld = sp.get('leaseDuration');
     if (!ld) return 1;
     const match = ld.match(/^(\d+)\s+months?$/i);

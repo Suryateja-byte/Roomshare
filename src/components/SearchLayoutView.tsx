@@ -5,8 +5,10 @@ import SearchViewToggle from "./SearchViewToggle";
 import PersistentMapWrapper from "./PersistentMapWrapper";
 import ListScrollBridge from "./listings/ListScrollBridge";
 import { useMapPreference } from "@/hooks/useMapPreference";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useMapMovedBanner } from "@/contexts/MapBoundsContext";
 import { MapMovedBanner } from "./map/MapMovedBanner";
+import { SearchMapUIProvider } from "@/contexts/SearchMapUIContext";
 
 interface SearchLayoutViewProps {
   children: ReactNode;
@@ -39,11 +41,25 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
     isLoading,
   } = useMapPreference();
 
+  useKeyboardShortcuts([
+    {
+      key: "m",
+      preventInInput: true,
+      action: toggleMap,
+      description: "Toggle map/list view",
+    },
+  ]);
+
   // Banner state for "search this area" / "reset" when user pans with search-as-move OFF
-  const { showBanner, showLocationConflict, onSearch, onReset } = useMapMovedBanner();
+  const { showBanner, showLocationConflict, onSearch, onReset, areaCount, isAreaCountLoading } = useMapMovedBanner();
+
+  // On mobile with bottom sheet, map stays visible — just trigger the search
+  const handleSearch = () => {
+    onSearch();
+  };
 
   return (
-    <>
+    <SearchMapUIProvider showMap={toggleMap} shouldShowMap={shouldShowMap}>
       {/* Bridge: Scrolls listing card into view when map marker is clicked */}
       <ListScrollBridge />
 
@@ -57,12 +73,14 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
         {(showBanner || showLocationConflict) && (
           <MapMovedBanner
             variant="list"
-            onSearch={onSearch}
+            onSearch={handleSearch}
             onReset={onReset}
+            areaCount={areaCount}
+            isAreaCountLoading={isAreaCountLoading}
           />
         )}
         {children}
       </SearchViewToggle>
-    </>
+    </SearchMapUIProvider>
   );
 }

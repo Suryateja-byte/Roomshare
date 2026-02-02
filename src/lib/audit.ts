@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 /**
  * Admin action types for audit logging
@@ -53,7 +54,14 @@ export async function logAdminAction(params: LogAdminActionParams): Promise<void
         });
     } catch (error) {
         // Log error but don't throw - audit logging should not break admin operations
-        console.error('[AUDIT] Failed to log admin action:', error, params);
+        logger.sync.error('Failed to log admin action', {
+            action: 'logAdminAction',
+            adminId: params.adminId,
+            targetType: params.targetType,
+            targetId: params.targetId,
+            auditAction: params.action,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
     }
 }
 

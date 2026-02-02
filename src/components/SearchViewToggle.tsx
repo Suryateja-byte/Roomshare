@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { Map, MapPinOff } from 'lucide-react';
 import MobileBottomSheet from './search/MobileBottomSheet';
 import FloatingMapButton from './search/FloatingMapButton';
+import { useListingFocus } from '@/contexts/ListingFocusContext';
 
 interface SearchViewToggleProps {
   children: React.ReactNode;
@@ -48,6 +49,14 @@ export default function SearchViewToggle({
   const mobileListRef = useRef<HTMLDivElement>(null);
   const isDesktop = useIsDesktop();
   const [mobileSnap, setMobileSnap] = useState(1); // 0=collapsed, 1=half, 2=expanded
+  const { activeId } = useListingFocus();
+
+  // When a map pin is tapped (activeId changes) on mobile, snap sheet to half
+  useEffect(() => {
+    if (activeId && isDesktop === false) {
+      setMobileSnap(1);
+    }
+  }, [activeId, isDesktop]);
 
   const handleFloatingToggle = useCallback(() => {
     // If sheet is showing list (half or expanded), collapse to show map

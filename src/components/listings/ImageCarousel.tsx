@@ -136,7 +136,7 @@ export function ImageCarousel({
       aria-roledescription="carousel"
     >
       {/* Embla viewport */}
-      <div ref={emblaRef} className="overflow-hidden h-full">
+      <div ref={emblaRef} className="overflow-hidden h-full aspect-[16/9] [touch-action:pan-y]">
         <div className="flex h-full">
           {images.map((src, index) => (
             <div

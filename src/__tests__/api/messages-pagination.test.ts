@@ -22,6 +22,7 @@ jest.mock('@/lib/prisma', () => ({
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      count: jest.fn(),
     },
   },
 }));
@@ -306,6 +307,7 @@ describe('Messages Pagination (P1-03)', () => {
   describe('GET /api/messages - Conversations Pagination', () => {
     it('returns default 20 conversations when no limit specified', async () => {
       const mockConversations = generateMockConversations(25);
+      (prisma.conversation.count as jest.Mock).mockResolvedValue(25);
       (prisma.conversation.findMany as jest.Mock).mockResolvedValue(mockConversations.slice(0, 21));
 
       const request = createMockRequest('http://localhost:3000/api/messages');
@@ -320,6 +322,7 @@ describe('Messages Pagination (P1-03)', () => {
 
     it('respects custom limit for conversations', async () => {
       const mockConversations = generateMockConversations(15);
+      (prisma.conversation.count as jest.Mock).mockResolvedValue(15);
       (prisma.conversation.findMany as jest.Mock).mockResolvedValue(mockConversations.slice(0, 11));
 
       const request = createMockRequest('http://localhost:3000/api/messages?limit=10');
@@ -332,6 +335,7 @@ describe('Messages Pagination (P1-03)', () => {
 
     it('returns cursor for next page of conversations', async () => {
       const mockConversations = generateMockConversations(25);
+      (prisma.conversation.count as jest.Mock).mockResolvedValue(25);
       (prisma.conversation.findMany as jest.Mock).mockResolvedValue(mockConversations.slice(0, 21));
 
       const request = createMockRequest('http://localhost:3000/api/messages?limit=20');
@@ -345,6 +349,7 @@ describe('Messages Pagination (P1-03)', () => {
 
     it('uses cursor to fetch next page of conversations', async () => {
       const mockConversations = generateMockConversations(10, 20);
+      (prisma.conversation.count as jest.Mock).mockResolvedValue(30);
       (prisma.conversation.findMany as jest.Mock).mockResolvedValue(mockConversations);
 
       const request = createMockRequest('http://localhost:3000/api/messages?cursor=conversation-19');

@@ -208,6 +208,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
 
         const map = mapRef.current.getMap();
         const bounds = map.getBounds();
+        if (!bounds) return;
 
         const ne = bounds.getNorthEast();
         const sw = bounds.getSouthWest();
@@ -297,9 +298,9 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
         <div className="w-full h-full rounded-xl overflow-hidden border shadow-lg relative">
             {/* Initial loading skeleton */}
             {!isMapLoaded && (
-                <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center">
+                <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center" role="status" aria-label="Loading map">
                     <div className="flex flex-col items-center gap-3">
-                        <MapPin className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse" />
+                        <MapPin className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse" aria-hidden="true" />
                         <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading map...</span>
                     </div>
                 </div>
@@ -307,9 +308,9 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
 
             {/* Tile loading indicator */}
             {isMapLoaded && areTilesLoading && (
-                <div className="absolute inset-0 bg-zinc-100/30 dark:bg-zinc-900/30 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 bg-zinc-100/30 dark:bg-zinc-900/30 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none" role="status" aria-label="Loading map tiles">
                     <div className="flex items-center gap-2 bg-white/90 dark:bg-zinc-800/90 px-4 py-2 rounded-lg shadow-sm">
-                        <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" />
+                        <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" aria-hidden="true" />
                         <span className="text-sm text-zinc-600 dark:text-zinc-300">Loading tiles...</span>
                     </div>
                 </div>
@@ -317,8 +318,8 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
 
             {/* Data loading indicator - shows when fetching listings after map movement */}
             {isFetchingListings && isMapLoaded && !areTilesLoading && (
-                <div className="absolute top-4 right-4 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10">
-                    <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" />
+                <div className="absolute top-4 right-4 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10" role="status" aria-label="Updating listings">
+                    <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" aria-hidden="true" />
                     <span className="text-sm text-zinc-600 dark:text-zinc-300">Updating listings...</span>
                 </div>
             )}
@@ -357,36 +358,52 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                 )}
 
                 {/* Individual price markers */}
-                {markerPositions.map((position) => (
-                    <Marker
-                        key={position.listing.id}
-                        longitude={position.lng}
-                        latitude={position.lat}
-                        anchor="bottom"
-                        onClick={(e: any) => {
-                            e.originalEvent.stopPropagation();
-                            setSelectedListing(position.listing);
+                {markerPositions.map((position) => {
+                    const handleMarkerSelect = () => {
+                        setSelectedListing(position.listing);
+                        // Smooth pan to center popup both horizontally and vertically
+                        mapRef.current?.easeTo({
+                            center: [position.lng, position.lat],
+                            offset: [0, -150], // NEGATIVE Y pushes marker UP, centering popup below it
+                            duration: 400
+                        });
+                    };
 
-                            // Smooth pan to center popup both horizontally and vertically
-                            mapRef.current?.easeTo({
-                                center: [position.lng, position.lat],
-                                offset: [0, -150], // NEGATIVE Y pushes marker UP, centering popup below it
-                                duration: 400
-                            });
-                        }}
-                    >
-                        <div className="relative cursor-pointer group/marker">
-                            {/* Pin body with price - Pill style matching card aesthetic */}
-                            <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-3 py-1.5 rounded-xl shadow-lg group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200 group-hover/marker:scale-105 transition-all duration-200 font-semibold text-sm whitespace-nowrap relative">
-                                ${position.listing.price}
+                    return (
+                        <Marker
+                            key={position.listing.id}
+                            longitude={position.lng}
+                            latitude={position.lat}
+                            anchor="bottom"
+                            onClick={(e: any) => {
+                                e.originalEvent.stopPropagation();
+                                handleMarkerSelect();
+                            }}
+                        >
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`$${position.listing.price} listing${position.listing.title ? `: ${position.listing.title}` : ''}`}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        handleMarkerSelect();
+                                    }
+                                }}
+                                className="relative cursor-pointer group/marker focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white rounded-xl"
+                            >
+                                {/* Pin body with price - Pill style matching card aesthetic */}
+                                <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-3 py-1.5 rounded-xl shadow-lg group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200 group-hover/marker:scale-105 transition-all duration-200 font-semibold text-sm whitespace-nowrap relative">
+                                    ${position.listing.price}
+                                </div>
+                                {/* Pin tail/pointer */}
+                                <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200 transition-colors" aria-hidden="true"></div>
+                                {/* Shadow under the pin for depth */}
+                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]" aria-hidden="true"></div>
                             </div>
-                            {/* Pin tail/pointer */}
-                            <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200 transition-colors"></div>
-                            {/* Shadow under the pin for depth */}
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]"></div>
-                        </div>
-                    </Marker>
-                ))}
+                        </Marker>
+                    );
+                })}
 
                 {selectedListing && (
                     <Popup
@@ -424,12 +441,13 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                                 {/* Close button */}
                                 <button
                                     onClick={() => setSelectedListing(null)}
+                                    aria-label="Close listing preview"
                                     className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${isDarkMode
                                             ? 'bg-zinc-900/80 hover:bg-zinc-900 text-white'
                                             : 'bg-white/80 hover:bg-white text-zinc-900'
                                         }`}
                                 >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-4 h-4" aria-hidden="true" />
                                 </button>
                                 {/* Availability badge */}
                                 <div className={`absolute bottom-2 left-2 px-2 py-1 rounded-md text-xs font-medium ${isDarkMode

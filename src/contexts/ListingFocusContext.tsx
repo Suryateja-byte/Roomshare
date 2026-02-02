@@ -20,6 +20,7 @@ import {
   useCallback,
   useMemo,
   useRef,
+  useEffect,
 } from "react";
 
 /** One-shot scroll request with nonce for deduplication */
@@ -28,6 +29,9 @@ export interface ScrollRequest {
   nonce: number;
 }
 
+/** Where the current focus originated — used to prevent hover→scroll→hover loops */
+export type FocusSource = "map" | "list" | null;
+
 interface ListingFocusState {
   /** ID of listing being hovered (null = none) */
   hoveredId: string | null;
@@ -35,11 +39,13 @@ interface ListingFocusState {
   activeId: string | null;
   /** One-shot scroll command - consumer should ack after handling */
   scrollRequest: ScrollRequest | null;
+  /** Where the current hover originated (auto-clears after 300ms) */
+  focusSource: FocusSource;
 }
 
 interface ListingFocusContextValue extends ListingFocusState {
-  /** Set hovered listing (from card or marker hover) */
-  setHovered: (id: string | null) => void;
+  /** Set hovered listing (from card or marker hover). Pass source to enable jank guard. */
+  setHovered: (id: string | null, source?: FocusSource) => void;
   /** Set active listing (persistent selection, no auto-clear) */
   setActive: (id: string | null) => void;
   /** Request scroll to a listing (fires one-shot command with nonce) */
@@ -63,6 +69,7 @@ const SSR_FALLBACK: ListingFocusContextValue = {
   hoveredId: null,
   activeId: null,
   scrollRequest: null,
+  focusSource: null,
   setHovered: () => {},
   setActive: () => {},
   requestScrollTo: () => {},
@@ -80,12 +87,29 @@ export function ListingFocusProvider({
   const [scrollRequest, setScrollRequest] = useState<ScrollRequest | null>(
     null,
   );
+  const [focusSource, setFocusSource] = useState<FocusSource>(null);
 
   // Nonce counter for scroll requests - allows triggering scroll to same listing twice
   const nonceRef = useRef(0);
+  const focusSourceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const setHovered = useCallback((id: string | null) => {
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
+    };
+  }, []);
+
+  const setHovered = useCallback((id: string | null, source?: FocusSource) => {
     setHoveredId(id);
+    if (id && source) {
+      setFocusSource(source);
+      if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
+      focusSourceTimeoutRef.current = setTimeout(() => setFocusSource(null), 300);
+    } else if (!id) {
+      setFocusSource(null);
+      if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
+    }
   }, []);
 
   const setActive = useCallback((id: string | null) => {
@@ -110,6 +134,8 @@ export function ListingFocusProvider({
     setHoveredId(null);
     setActiveId(null);
     setScrollRequest(null);
+    setFocusSource(null);
+    if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
   }, []);
 
   const contextValue = useMemo(
@@ -117,6 +143,7 @@ export function ListingFocusProvider({
       hoveredId,
       activeId,
       scrollRequest,
+      focusSource,
       setHovered,
       setActive,
       requestScrollTo,
@@ -127,6 +154,7 @@ export function ListingFocusProvider({
       hoveredId,
       activeId,
       scrollRequest,
+      focusSource,
       setHovered,
       setActive,
       requestScrollTo,

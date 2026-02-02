@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         if (conversationId) {
             // Fetch messages for a specific conversation
             const conversation = await prisma.conversation.findFirst({
-                where: { id: conversationId },
+                where: { id: conversationId, deletedAt: null },
                 include: { participants: { select: { id: true } } },
             });
 
@@ -45,9 +45,9 @@ export async function GET(request: Request) {
 
             // P1-03: Get total count and paginated messages in parallel
             const [total, messages] = await Promise.all([
-                prisma.message.count({ where: { conversationId } }),
+                prisma.message.count({ where: { conversationId, deletedAt: null } }),
                 prisma.message.findMany({
-                    where: { conversationId },
+                    where: { conversationId, deletedAt: null },
                     orderBy: { createdAt: 'desc' },
                     include: {
                         sender: { select: { id: true, name: true, image: true } },
@@ -68,30 +68,37 @@ export async function GET(request: Request) {
             return response;
         } else {
             // P1-03: Fetch all conversations for the user with pagination
-            const conversations = await prisma.conversation.findMany({
-                where: {
-                    participants: {
-                        some: { id: userId },
-                    },
+            const conversationWhere = {
+                deletedAt: null,
+                participants: {
+                    some: { id: userId },
                 },
-                include: {
-                    participants: {
-                        select: { id: true, name: true, image: true },
+            };
+
+            const [total, conversations] = await Promise.all([
+                prisma.conversation.count({ where: conversationWhere }),
+                prisma.conversation.findMany({
+                    where: conversationWhere,
+                    include: {
+                        participants: {
+                            select: { id: true, name: true, image: true },
+                        },
+                        messages: {
+                            where: { deletedAt: null },
+                            orderBy: { createdAt: 'desc' },
+                            take: 1,
+                        },
+                        listing: {
+                            select: { id: true, title: true, images: true },
+                        },
                     },
-                    messages: {
-                        orderBy: { createdAt: 'desc' },
-                        take: 1,
-                    },
-                    listing: {
-                        select: { id: true, title: true, images: true },
-                    },
-                },
-                orderBy: { updatedAt: 'desc' },
-                ...buildPrismaQueryOptions({ cursor, limit }),
-            });
+                    orderBy: { updatedAt: 'desc' },
+                    ...buildPrismaQueryOptions({ cursor, limit }),
+                }),
+            ]);
 
             // P1-03: Build paginated response for conversations
-            const paginatedResponse = buildPaginationResponse(conversations, limit, 0);
+            const paginatedResponse = buildPaginationResponse(conversations, limit, total);
 
             // P2-1: User-specific data must not be cached by CDN/browser
             const response = NextResponse.json({

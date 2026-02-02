@@ -69,7 +69,7 @@ export default function ListingStatusToggle({ listingId, currentStatus }: Listin
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={isUpdating}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${config.color} transition-all hover:shadow-md disabled:opacity-50`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${config.color} transition-all hover:shadow-md disabled:opacity-60`}
             >
                 <span className={`w-2 h-2 rounded-full ${config.dotColor}`} />
                 <span className="font-medium text-sm">{config.label}</span>

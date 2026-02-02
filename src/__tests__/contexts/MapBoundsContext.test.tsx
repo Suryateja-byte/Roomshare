@@ -7,7 +7,7 @@
  * - Banner logic should only trigger on user moves
  */
 
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import {
   MapBoundsProvider,
   useMapBounds,
@@ -73,9 +73,9 @@ describe("MapBoundsContext", () => {
 
       expect(result.current.isProgrammaticMove).toBe(true);
 
-      // Advance timers past the auto-clear timeout (1500ms)
+      // Advance timers past the auto-clear timeout (2500ms)
       act(() => {
-        jest.advanceTimersByTime(1600);
+        jest.advanceTimersByTime(2600);
       });
 
       expect(result.current.isProgrammaticMove).toBe(false);
@@ -129,9 +129,9 @@ describe("MapBoundsContext", () => {
       // Should still be true because timeout was reset
       expect(result.current.isProgrammaticMove).toBe(true);
 
-      // Wait another 600ms to exceed 1500ms from second call
+      // Wait another 1600ms to exceed 2500ms from second call
       act(() => {
-        jest.advanceTimersByTime(600);
+        jest.advanceTimersByTime(1600);
       });
 
       expect(result.current.isProgrammaticMove).toBe(false);
@@ -163,6 +163,11 @@ describe("MapBoundsContext", () => {
         banner: useMapMovedBanner(),
       });
       const { result } = renderHook(() => useCombined(), { wrapper });
+
+      // Disable searchAsMove (defaults to true) so banner can show
+      act(() => {
+        result.current.bounds.setSearchAsMove(false);
+      });
 
       // Simulate user move (no programmatic flag)
       act(() => {
@@ -264,6 +269,11 @@ describe("MapBoundsContext", () => {
       // Set a search location
       act(() => {
         result.current.bounds.setSearchLocation("San Francisco", { lat: 37.7749, lng: -122.4194 });
+      });
+
+      // Disable searchAsMove (defaults to true) so conflict can show
+      act(() => {
+        result.current.bounds.setSearchAsMove(false);
       });
 
       // Simulate user move to bounds that don't contain search location

@@ -52,17 +52,26 @@ jest.mock("next/server", () => ({
   },
 }));
 
+// Freeze listener count BEFORE importing route (Next.js 16 adds unhandledRejection listeners on import)
+const preImportListenerCount = process.listeners("unhandledRejection").length;
+
 import { GET } from "@/app/api/search/facets/route";
 import { prisma } from "@/lib/prisma";
 import type { NextRequest } from "next/server";
 
 // Clean up Next.js 16 unhandledRejection listeners that cause recursive setImmediate
 // stack overflow during Jest teardown (see: next/src/server/node-environment-extensions)
-const initialListeners = process.listeners("unhandledRejection").length;
+// Use preImport count since Next.js adds listeners during module initialization
+afterEach(() => {
+  const listeners = process.listeners("unhandledRejection");
+  if (listeners.length > preImportListenerCount) {
+    listeners.slice(preImportListenerCount).forEach((l) => process.removeListener("unhandledRejection", l));
+  }
+});
 afterAll(() => {
   const listeners = process.listeners("unhandledRejection");
-  if (listeners.length > initialListeners) {
-    listeners.slice(initialListeners).forEach((l) => process.removeListener("unhandledRejection", l));
+  if (listeners.length > preImportListenerCount) {
+    listeners.slice(preImportListenerCount).forEach((l) => process.removeListener("unhandledRejection", l));
   }
 });
 
@@ -103,7 +112,13 @@ describe("/api/search/facets", () => {
         { roomType: "Shared Room", count: BigInt(20) },
       ])
       // Price ranges query
-      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }])
+      // Price histogram query (5th call, triggered when min < max)
+      .mockResolvedValueOnce([
+        { bucket_min: 500, count: BigInt(10) },
+        { bucket_min: 1000, count: BigInt(20) },
+        { bucket_min: 1500, count: BigInt(15) },
+      ]);
   });
 
   describe("response structure", () => {
@@ -177,7 +192,7 @@ describe("/api/search/facets", () => {
       await GET(request);
 
       // Check that all queries included bounds
-      expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(4);
+      expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(5);
       // First call (amenities) should include bounds params
       const firstCallQuery = mockQueryRawUnsafe.mock.calls[0][0];
       expect(firstCallQuery).toContain("ST_MakeEnvelope");
@@ -328,7 +343,8 @@ describe("bounds validation (P1 - DoS prevention)", () => {
       .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
       .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
       .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
-      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }])
+      .mockResolvedValueOnce([{ bucket_min: 500, count: BigInt(10) }]);
 
     const request = createRequest({
       q: "austin",
@@ -350,7 +366,8 @@ describe("bounds validation (P1 - DoS prevention)", () => {
       .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
       .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
       .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
-      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }])
+      .mockResolvedValueOnce([{ bucket_min: 500, count: BigInt(10) }]);
 
     const request = createRequest({
       q: "austin",
@@ -388,7 +405,8 @@ describe("bounds validation (P1 - DoS prevention)", () => {
       .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
       .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
       .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
-      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }])
+      .mockResolvedValueOnce([{ bucket_min: 500, count: BigInt(10) }]);
 
     // No query param, no bounds - should be allowed (not a DoS vector without text search)
     const request = createRequest({});
@@ -406,7 +424,8 @@ describe("FTS text search (P2a - semantic alignment)", () => {
       .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
       .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
       .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
-      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }])
+      .mockResolvedValueOnce([{ bucket_min: 500, count: BigInt(10) }]);
   });
 
   it("uses plainto_tsquery for text search instead of LIKE", async () => {
@@ -467,7 +486,8 @@ describe("P2-NEW: lat/lng bounds derivation", () => {
       .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
       .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
       .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
-      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }]);
+      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }])
+      .mockResolvedValueOnce([{ bucket_min: 500, count: BigInt(10) }]);
   });
 
   it("accepts q+lat+lng without explicit bounds (normal SearchForm flow)", async () => {

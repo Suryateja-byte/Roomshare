@@ -18,6 +18,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import type { BatchedFilterValues } from "./useBatchedFilters";
+import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
 
 // Cache entry with expiration
 interface CacheEntry {
@@ -228,7 +229,7 @@ export function useDebouncedFilterCount({
 
     try {
       const url = buildCountUrl(pending, searchParams);
-      const response = await fetch(url, {
+      const response = await rateLimitedFetch(url, {
         signal: abortController.signal,
         cache: "no-store",
       });
@@ -252,17 +253,19 @@ export function useDebouncedFilterCount({
         setIsLoading(false);
       }
     } catch (error) {
-      // Ignore abort errors
       if (error instanceof Error && error.name === "AbortError") {
         return;
       }
+      // Silently back off on rate limit — shared state prevents further fetches
+      if (error instanceof RateLimitError) {
+        if (!abortController.signal.aborted) setIsLoading(false);
+        return;
+      }
 
-      // Log other errors but don't crash
       console.error("[useDebouncedFilterCount] Error fetching count:", error);
 
       if (!abortController.signal.aborted) {
         setIsLoading(false);
-        // Keep previous count on error, don't set to null
       }
     }
   }, [cacheKey, pending, searchParams]);

@@ -7,20 +7,8 @@
 
 import { TEST_LISTINGS, ACTIVE_LISTINGS, applyFilters, sortListings, paginateListings } from '../fixtures/listings.fixture';
 import type { TestListing } from '../fixtures/listings.fixture';
-import { normalizeFilters, type FilterParams } from '@/lib/filter-schema';
+import { normalizeFilters } from '@/lib/filter-schema';
 import {
-  filterByPrice,
-  filterByAmenities,
-  filterByHouseRules,
-  filterByLanguages,
-  filterByRoomType,
-  filterByLeaseDuration,
-  filterByMoveInDate,
-  filterByGenderPreference,
-  filterByHouseholdGender,
-  filterByBounds,
-  filterByQuery,
-  sortListings as realSortListings,
   sanitizeSearchQuery,
   isValidQuery,
   crossesAntimeridian,
@@ -572,18 +560,16 @@ describe('Edge Cases and Error Handling', () => {
     })).toThrow('minPrice cannot exceed maxPrice');
   });
 
-  it('handles inverted latitude bounds (normalizer swaps)', () => {
-    const filters = normalizeFilters({
+  it('handles inverted latitude bounds (throws validation error)', () => {
+    // P1-13: Inverted latitude now throws error instead of silently swapping
+    expect(() => normalizeFilters({
       bounds: {
         minLat: 40,
         maxLat: 30, // Inverted
         minLng: -122,
         maxLng: -120,
       },
-    });
-
-    // Latitude should be swapped
-    expect(filters.bounds?.minLat).toBeLessThanOrEqual(filters.bounds?.maxLat!);
+    })).toThrow('minLat cannot exceed maxLat');
   });
 
   it('clamps extreme values to safe ranges', () => {

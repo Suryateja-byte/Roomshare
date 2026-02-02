@@ -8,6 +8,23 @@ import { withRateLimit } from '@/lib/with-rate-limit';
 import { householdLanguagesSchema } from '@/lib/schemas';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
+import { markListingDirty } from '@/lib/search/search-doc-dirty';
+
+const normalizeStringList = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+        return value
+            .filter((item): item is string => typeof item === 'string')
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+    if (typeof value === 'string') {
+        return value
+            .split(',')
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+    return [];
+};
 
 export async function GET(request: Request) {
     // P2-3: Add rate limiting to prevent scraping
@@ -54,6 +71,17 @@ export async function POST(request: Request) {
 
     const startTime = Date.now();
     try {
+        // Get authenticated user before expensive operations (e.g., geocoding)
+        const session = await auth();
+        if (!session || !session.user || !session.user.id) {
+            await logger.warn('Unauthorized listing creation attempt', {
+                route: '/api/listings',
+                method: 'POST',
+            });
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const userId = session.user.id;
         const body = await request.json();
         // Log only non-sensitive metadata, NOT the full request body
         await logger.info('Create listing request received', {
@@ -62,6 +90,7 @@ export async function POST(request: Request) {
             hasTitle: !!body.title,
             hasAddress: !!body.address,
             imageCount: body.images?.length || 0,
+            userId: userId.slice(0, 8) + '...',
         });
 
         const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, images, householdLanguages, genderPreference, householdGender } = body;
@@ -125,17 +154,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Could not geocode address' }, { status: 400 });
         }
 
-        // Get authenticated user
-        const session = await auth();
-        if (!session || !session.user || !session.user.id) {
-            await logger.warn('Unauthorized listing creation attempt', {
-                route: '/api/listings',
-                method: 'POST',
-            });
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const userId = session.user.id;
+        const normalizedAmenities = normalizeStringList(amenities);
+        const normalizedHouseRules = normalizeStringList(houseRules);
 
         // Transaction to create listing and location, then update with PostGIS data
         const result = await prisma.$transaction(async (tx) => {
@@ -145,8 +165,8 @@ export async function POST(request: Request) {
                     description,
                     price: priceNum,
                     images: images || [],
-                    amenities: amenities ? amenities.split(',').map((s: string) => s.trim()) : [],
-                    houseRules: houseRules ? houseRules.split(',').map((s: string) => s.trim()) : [],
+                    amenities: normalizedAmenities,
+                    houseRules: normalizedHouseRules,
                     householdLanguages: Array.isArray(householdLanguages)
                         ? householdLanguages.map((l: string) => l.trim().toLowerCase()).filter(isValidLanguageCode)
                         : [],
@@ -189,6 +209,9 @@ export async function POST(request: Request) {
             userId: userId.slice(0, 8) + '...', // Truncate for privacy
             durationMs: Date.now() - startTime,
         });
+
+        // Fire-and-forget: mark listing dirty for search doc refresh
+        markListingDirty(result.id, 'listing_created').catch(() => {});
 
         // P2-1: Mutation responses must not be cached
         const response = NextResponse.json(result, { status: 201 });

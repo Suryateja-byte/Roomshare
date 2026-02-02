@@ -24,10 +24,13 @@ const SelectTrigger = React.forwardRef<
             "bg-white dark:bg-zinc-800",
             "px-3 py-2.5 sm:py-3 text-sm",
             "text-zinc-900 dark:text-white",
-            "placeholder:text-zinc-400 dark:placeholder:text-zinc-500",
+            // P2-8: Improved contrast for WCAG AA compliance
+            // Light: zinc-600 (7:1) vs zinc-400's failing 3.5:1
+            // Dark: zinc-300 (7.6:1) vs zinc-500's failing 2.8:1
+            "placeholder:text-zinc-600 dark:placeholder:text-zinc-300",
             "hover:border-zinc-300 dark:hover:border-zinc-600",
-            "focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-zinc-400/20",
-            "disabled:cursor-not-allowed disabled:opacity-50",
+            "focus:outline-none focus:ring-2 focus:ring-zinc-900/30 dark:focus:ring-zinc-400/40",
+            "disabled:cursor-not-allowed disabled:opacity-60",
             "transition-all duration-200",
             "[&>span]:line-clamp-1",
             className
@@ -36,7 +39,7 @@ const SelectTrigger = React.forwardRef<
     >
         {children}
         <SelectPrimitive.Icon asChild>
-            <ChevronDown className="h-4 w-4 text-zinc-400 dark:text-zinc-500 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+            <ChevronDown className="h-4 w-4 text-zinc-500 dark:text-zinc-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
 ))
@@ -145,7 +148,7 @@ const SelectItem = React.forwardRef<
             "focus:bg-zinc-100 dark:focus:bg-zinc-800",
             "data-[state=checked]:text-zinc-900 dark:data-[state=checked]:text-white",
             "data-[state=checked]:font-medium",
-            "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+            "data-[disabled]:pointer-events-none data-[disabled]:opacity-60",
             className
         )}
         {...props}

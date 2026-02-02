@@ -40,8 +40,18 @@ export function buildSearchUrl(filters: SearchFilters): string {
     if (filters.sort) params.set('sort', filters.sort);
     if (typeof filters.lat === 'number' && Number.isFinite(filters.lat)) params.set('lat', filters.lat.toString());
     if (typeof filters.lng === 'number' && Number.isFinite(filters.lng)) params.set('lng', filters.lng.toString());
-    if (typeof filters.minLat === 'number' && Number.isFinite(filters.minLat)) params.set('minLat', filters.minLat.toString());
-    if (typeof filters.maxLat === 'number' && Number.isFinite(filters.maxLat)) params.set('maxLat', filters.maxLat.toString());
+    // Normalize lat bounds client-side to prevent invalid URLs (server throws on inverted lat)
+    let normalizedMinLat = filters.minLat;
+    let normalizedMaxLat = filters.maxLat;
+    if (
+      typeof normalizedMinLat === 'number' && Number.isFinite(normalizedMinLat) &&
+      typeof normalizedMaxLat === 'number' && Number.isFinite(normalizedMaxLat) &&
+      normalizedMinLat > normalizedMaxLat
+    ) {
+      [normalizedMinLat, normalizedMaxLat] = [normalizedMaxLat, normalizedMinLat];
+    }
+    if (typeof normalizedMinLat === 'number' && Number.isFinite(normalizedMinLat)) params.set('minLat', normalizedMinLat.toString());
+    if (typeof normalizedMaxLat === 'number' && Number.isFinite(normalizedMaxLat)) params.set('maxLat', normalizedMaxLat.toString());
     if (typeof filters.minLng === 'number' && Number.isFinite(filters.minLng)) params.set('minLng', filters.minLng.toString());
     if (typeof filters.maxLng === 'number' && Number.isFinite(filters.maxLng)) params.set('maxLng', filters.maxLng.toString());
 

@@ -46,6 +46,7 @@ import {
   MAX_LAT_SPAN,
   MAX_LNG_SPAN,
 } from "@/lib/validation";
+import { logger } from "@/lib/logger";
 
 /**
  * Extract first value from a param that may be string, string[], or undefined.
@@ -165,39 +166,62 @@ export async function executeSearchV2(
       ...(params.limit && { limit: params.limit }),
     };
 
-    // Fetch list data based on keyset mode
-    let listResult: PaginatedResultHybrid<ListingData>;
-    let nextCursor: string | null;
-
-    if (useKeyset) {
-      // Keyset pagination path
-      if (keysetCursor) {
-        // Use keyset cursor for stable pagination
-        const keysetResult = await getSearchDocListingsWithKeyset(
-          filterParams,
-          keysetCursor,
-        );
-        listResult = keysetResult;
-        nextCursor = keysetResult.nextCursor;
+    // TTFB optimization: Execute list and map queries in parallel
+    // These are independent database queries that don't depend on each other
+    const listPromise = (async (): Promise<{
+      listResult: PaginatedResultHybrid<ListingData>;
+      nextCursor: string | null;
+    }> => {
+      if (useKeyset) {
+        // Keyset pagination path
+        if (keysetCursor) {
+          // Use keyset cursor for stable pagination
+          const keysetResult = await getSearchDocListingsWithKeyset(
+            filterParams,
+            keysetCursor,
+          );
+          return { listResult: keysetResult, nextCursor: keysetResult.nextCursor };
+        } else {
+          // First page or invalid cursor - get first page with keyset cursor
+          const firstPageResult =
+            await getSearchDocListingsFirstPage(filterParams);
+          return { listResult: firstPageResult, nextCursor: firstPageResult.nextCursor };
+        }
       } else {
-        // First page or invalid cursor - get first page with keyset cursor
-        const firstPageResult =
-          await getSearchDocListingsFirstPage(filterParams);
-        listResult = firstPageResult;
-        nextCursor = firstPageResult.nextCursor;
+        // Offset pagination path (legacy or SearchDoc disabled)
+        if (useSearchDoc) {
+          const result = await getSearchDocListingsPaginated(filterParams);
+          return {
+            listResult: result,
+            nextCursor: result.hasNextPage ? encodeCursor(page + 1) : null,
+          };
+        } else {
+          // Legacy path: PaginatedResult doesn't have hasNextPage, compute from totalPages
+          const result = await getListingsPaginated(filterParams);
+          const hasNext = result.page < result.totalPages;
+          return {
+            listResult: {
+              ...result,
+              totalPages: result.totalPages,
+              hasNextPage: hasNext,
+              hasPrevPage: result.page > 1,
+            },
+            nextCursor: hasNext ? encodeCursor(page + 1) : null,
+          };
+        }
       }
-    } else {
-      // Offset pagination path (legacy or SearchDoc disabled)
-      listResult = useSearchDoc
-        ? await getSearchDocListingsPaginated(filterParams)
-        : await getListingsPaginated(filterParams);
-      nextCursor = listResult.hasNextPage ? encodeCursor(page + 1) : null;
-    }
+    })();
 
-    // Fetch map data (independent of pagination mode)
-    const mapListings = useSearchDoc
-      ? await getSearchDocMapListings(filterParams)
-      : await getMapListings(filterParams);
+    // Map query runs in parallel with list query
+    const mapPromise = useSearchDoc
+      ? getSearchDocMapListings(filterParams)
+      : getMapListings(filterParams);
+
+    // Execute both queries concurrently
+    const [{ listResult, nextCursor }, mapListings] = await Promise.all([
+      listPromise,
+      mapPromise,
+    ]);
 
     // Determine mode based on mapListings count (not list total)
     const mode = determineMode(mapListings.length);
@@ -324,7 +348,8 @@ export async function executeSearchV2(
     return { response, paginatedResult: listResult };
   } catch (error) {
     // Log without PII (no user data, just error context)
-    console.error("SearchV2 service error:", {
+    logger.sync.error("SearchV2 service error", {
+      action: "executeSearchV2",
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return {

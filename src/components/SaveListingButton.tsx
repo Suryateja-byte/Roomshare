@@ -34,7 +34,7 @@ export default function SaveListingButton({ listingId }: SaveListingButtonProps)
 
     if (isLoading) {
         return (
-            <Button variant="outline" size="icon" className="rounded-full" disabled>
+            <Button variant="outline" size="icon" className="rounded-full" disabled aria-label="Loading saved status">
                 <Loader2 className="w-4 h-4 animate-spin" />
             </Button>
         );
@@ -47,6 +47,7 @@ export default function SaveListingButton({ listingId }: SaveListingButtonProps)
             className={`rounded-full transition-all ${isSaved ? 'bg-red-50 border-red-200 hover:bg-red-100' : ''}`}
             onClick={handleToggle}
             disabled={isToggling}
+            aria-label={isSaved ? 'Remove from saved listings' : 'Save listing'}
         >
             {isToggling ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

@@ -222,7 +222,7 @@ export default function UserList({ initialUsers, totalUsers, currentUserId }: Us
                                                 <button
                                                     onClick={() => handleToggleAdmin(user.id)}
                                                     disabled={processingId === user.id}
-                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-50"
+                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-60"
                                                 >
                                                     {processingId === user.id ? (
                                                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -237,7 +237,7 @@ export default function UserList({ initialUsers, totalUsers, currentUserId }: Us
                                                 <button
                                                     onClick={() => handleSuspend(user.id, !user.isSuspended)}
                                                     disabled={processingId === user.id}
-                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-50"
+                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-60"
                                                 >
                                                     {processingId === user.id ? (
                                                         <Loader2 className="w-4 h-4 animate-spin" />

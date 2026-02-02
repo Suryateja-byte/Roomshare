@@ -18,6 +18,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Home, Loader2, MapPin, Maximize2, X, Map as MapIcon, Satellite, TrainFront } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 import { Button } from './ui/button';
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from './SearchForm';
 import { useListingFocus } from '@/contexts/ListingFocusContext';
@@ -207,6 +208,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         setResetHandler,
         setSearchLocation,
         setProgrammaticMove,
+        isProgrammaticMoveRef,
     } = useMapBounds();
 
     // Banner visibility from context
@@ -225,6 +227,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const isMountedRef = useRef(true);
     // Track map-initiated activeId to avoid re-triggering popup from card "Show on Map"
     const lastMapActiveRef = useRef<string | null>(null);
+    // Skip the very first moveEnd (map settling at initialViewState) to prevent
+    // search-as-move from locking URL to SF defaults before auto-fly runs
+    const isInitialMoveRef = useRef(true);
 
     // Minimum interval between map searches (prevents 429 rate limiting)
     const MIN_SEARCH_INTERVAL_MS = 2000;
@@ -438,14 +443,55 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         return positions;
     }, [markersSource]);
 
-    // Default to San Francisco if no listings, or center on first listing
-    const initialViewState = listings.length > 0
-        ? { longitude: listings[0].location.lng, latitude: listings[0].location.lat, zoom: 12 }
-        : { longitude: -122.4194, latitude: 37.7749, zoom: 12 };
+    // Stabilize initial view state so it's only computed once on mount.
+    // Prevents SF default from being re-applied when listings temporarily become empty.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const initialViewState = useMemo(() =>
+        (() => {
+            const minLat = searchParams.get('minLat');
+            const maxLat = searchParams.get('maxLat');
+            const minLng = searchParams.get('minLng');
+            const maxLng = searchParams.get('maxLng');
+
+            if (minLat && maxLat && minLng && maxLng) {
+                const parsedMinLat = parseFloat(minLat);
+                const parsedMaxLat = parseFloat(maxLat);
+                const parsedMinLng = parseFloat(minLng);
+                const parsedMaxLng = parseFloat(maxLng);
+
+                if (
+                    Number.isFinite(parsedMinLat) &&
+                    Number.isFinite(parsedMaxLat) &&
+                    Number.isFinite(parsedMinLng) &&
+                    Number.isFinite(parsedMaxLng)
+                ) {
+                    const centerLat = (parsedMinLat + parsedMaxLat) / 2;
+                    let centerLng: number;
+
+                    if (parsedMinLng > parsedMaxLng) {
+                        const wrappedMaxLng = parsedMaxLng + 360;
+                        centerLng = (parsedMinLng + wrappedMaxLng) / 2;
+                        if (centerLng > 180) centerLng -= 360;
+                    } else {
+                        centerLng = (parsedMinLng + parsedMaxLng) / 2;
+                    }
+
+                    return { longitude: centerLng, latitude: centerLat, zoom: 12 };
+                }
+            }
+
+            return listings.length > 0
+                ? { longitude: listings[0].location.lng, latitude: listings[0].location.lat, zoom: 12 }
+                : { longitude: -122.4194, latitude: 37.7749, zoom: 12 };
+        })(),
+    []);
 
     // Auto-fly to listings on search (but not on map move)
     useEffect(() => {
         if (!mapRef.current || listings.length === 0) return;
+
+        // If "search as I move" is ON, the user controls the viewport — don't auto-fly
+        if (searchAsMove) return;
 
         // If we have map bounds in the URL, it means the user is panning/zooming manually
         // So we shouldn't auto-fly the map
@@ -480,7 +526,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 }
             );
         }
-    }, [listings, searchParams, setProgrammaticMove]);
+    }, [listings, searchParams, searchAsMove, setProgrammaticMove]);
 
     // Listen for fly-to events from location search
     useEffect(() => {
@@ -724,11 +770,30 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         // Always update current bounds in context for location conflict detection
         setCurrentMapBounds(bounds);
 
+        // Skip search/dirty logic during programmatic moves (auto-fly, card click, cluster expand)
+        if (isProgrammaticMoveRef.current) return;
+
+        // Skip the very first moveEnd (map settling at initialViewState)
+        // This prevents search-as-move from locking URL to SF defaults
+        // before the auto-fly effect has a chance to run
+        if (isInitialMoveRef.current) {
+            isInitialMoveRef.current = false;
+            return;
+        }
+
         // Mark that user has manually moved the map
         setHasUserMoved(true);
 
         // If search-as-move is ON, trigger search with throttle/debounce
         if (searchAsMove) {
+            // Don't trigger search when zoomed out too far — viewport exceeds server max span
+            const latSpan = bounds.maxLat - bounds.minLat;
+            const lngSpan = bounds.maxLng - bounds.minLng;
+            if (latSpan > 5 || lngSpan > 5) {
+                setBoundsDirty(true);
+                return;
+            }
+
             if (debounceTimer.current) {
                 clearTimeout(debounceTimer.current);
             }
@@ -794,6 +859,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             role="region"
             aria-label="Interactive map showing listing locations"
             aria-roledescription="map"
+            onWheel={(e) => e.stopPropagation()}
         >
             {/* Initial loading skeleton */}
             {!isMapLoaded && (
@@ -841,6 +907,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 mapboxAccessToken={token}
                 initialViewState={initialViewState}
                 style={{ width: '100%', height: '100%' }}
+                scrollZoom={true}
+                dragPan={true}
+                doubleClickZoom={true}
+                keyboard={true}
+                touchZoomRotate={true}
                 mapStyle={(() => {
                     if (isHighContrast) {
                         return isDarkMode ? "mapbox://styles/mapbox/navigation-night-v1" : "mapbox://styles/mapbox/navigation-day-v1";
@@ -857,6 +928,26 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 onLoad={() => {
                     setIsMapLoaded(true);
                     updateUnclusteredListings();
+
+                    // Restore exact viewport from URL bounds on (re)mount.
+                    // When the map remounts during "search as I move" navigation,
+                    // initialViewState only sets center + zoom 12 which doesn't
+                    // match the user's actual viewport. fitBounds restores it exactly.
+                    if (mapRef.current) {
+                        const sp = searchParams;
+                        const minLat = sp.get('minLat');
+                        const maxLat = sp.get('maxLat');
+                        const minLng = sp.get('minLng');
+                        const maxLng = sp.get('maxLng');
+                        if (minLat && maxLat && minLng && maxLng) {
+                            const bounds: [[number, number], [number, number]] = [
+                                [parseFloat(minLng), parseFloat(minLat)],
+                                [parseFloat(maxLng), parseFloat(maxLat)],
+                            ];
+                            setProgrammaticMove(true);
+                            mapRef.current.fitBounds(bounds, { duration: 0, padding: 0 });
+                        }
+                    }
                 }}
                 onMoveStart={() => setAreTilesLoading(true)}
                 onIdle={() => setAreTilesLoading(false)}
@@ -920,6 +1011,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 {markerPositions.map((position) => {
                     // Shared click handler for both Marker and inner content
                     const handleMarkerClick = () => {
+                        triggerHaptic();
                         setSelectedListing(position.listing);
                         // Set active listing for card highlight and scroll-to
                         lastMapActiveRef.current = position.listing.id;
@@ -948,7 +1040,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     >
                         <div
                             className={cn(
-                                "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none",
+                                "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center",
                                 // Spring easing for scale: cubic-bezier(0.34, 1.56, 0.64, 1)
                                 "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
                                 hoveredId === position.listing.id && "scale-[1.15] z-50",

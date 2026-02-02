@@ -117,7 +117,8 @@ export default function NotificationCenter() {
         <div className="relative" ref={menuRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="relative p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all"
+                className="relative p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all"
+                aria-label="Notifications"
             >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (

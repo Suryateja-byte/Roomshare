@@ -17,12 +17,21 @@ jest.mock("next/cache", () => ({
   unstable_cache: jest.fn((fn) => fn),
 }));
 
-// Mock prisma before imports
-jest.mock("@/lib/prisma", () => ({
-  prisma: {
-    $queryRawUnsafe: jest.fn(),
-  },
-}));
+// Mock prisma before imports — $transaction delegates to the same $queryRawUnsafe mock
+jest.mock("@/lib/prisma", () => {
+  const qru = jest.fn();
+  return {
+    prisma: {
+      $queryRawUnsafe: qru,
+      $transaction: jest.fn((fn: any) =>
+        fn({
+          $executeRawUnsafe: jest.fn(),
+          $queryRawUnsafe: qru,
+        })
+      ),
+    },
+  };
+});
 
 import { prisma } from "@/lib/prisma";
 import { getSearchDocLimitedCount } from "@/lib/search/search-doc-queries";

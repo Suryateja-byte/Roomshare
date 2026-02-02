@@ -226,7 +226,7 @@ export default function SavedListingsClient({ initialListings }: SavedListingsCl
                                         <button
                                             onClick={() => handleRemove(listing.id)}
                                             disabled={removingId === listing.id}
-                                            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                                            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-60"
                                             title="Remove from saved"
                                         >
                                             <Trash2 className="w-4 h-4" />

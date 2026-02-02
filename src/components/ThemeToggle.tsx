@@ -19,7 +19,10 @@ export default function ThemeToggle({ variant = 'button' }: ThemeToggleProps) {
 
     if (!mounted) {
         return variant === 'button' ? (
-            <button className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+            <button
+                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800"
+                aria-label="Toggle theme"
+            >
                 <Sun className="w-5 h-5 text-zinc-600" />
             </button>
         ) : null;
@@ -81,7 +84,7 @@ export default function ThemeToggle({ variant = 'button' }: ThemeToggleProps) {
     return (
         <button
             onClick={cycleTheme}
-            className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors"
+            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors"
             aria-label="Toggle theme"
         >
             {resolvedTheme === 'dark' ? (
