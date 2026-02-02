@@ -1,7 +1,8 @@
 {
   "env": {
     "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000",
-    "MAX_THINKING_TOKENS": "31999"
+    "MAX_THINKING_TOKENS": "31999",
+    "CLAUDE_CODE_TASK_LIST_ID": "roomshare-prodready"
   },
   "permissions": {
     "allow": [
@@ -113,15 +114,38 @@
       "Bash(pnpm prisma validate:*)",
       "Bash(NODE_OPTIONS=\"--experimental-vm-modules\" pnpm test:*)",
       "Bash(pnpm jest:*)",
-      "Bash(pnpm eslint:*)"
+      "Bash(pnpm eslint:*)",
+      "mcp__github__get_me",
+      "Bash(pnpm install)",
+      "Bash(pnpm exec playwright test:*)",
+      "Bash(pnpm test:e2e:*)",
+      "Bash(docker compose:*)",
+      "Bash(then echo \"Server ready after attempt $i\" break fi echo \"Waiting for server... attempt $i\" sleep 10 done curl -s http://localhost:3000/api/health/ready)",
+      "Bash(E2E_BASE_URL=http://localhost:3000 npx playwright test:*)",
+      "Bash(E2E_BASE_URL=http://localhost:3000 pnpm test:e2e:*)",
+      "Bash(pnpm run clean:next-locks:*)",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_run_code"
     ],
     "deny": [],
     "ask": []
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "context7",
-    "memory",
-    "github"
-  ]
+  "enabledMcpjsonServers": ["context7", "memory", "github"],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/my-analysis.sh",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
 }
