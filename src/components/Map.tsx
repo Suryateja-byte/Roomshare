@@ -771,7 +771,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         setCurrentMapBounds(bounds);
 
         // Skip search/dirty logic during programmatic moves (auto-fly, card click, cluster expand)
-        if (isProgrammaticMoveRef.current) return;
+        if (isProgrammaticMoveRef.current) {
+            setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
+            return;
+        }
 
         // Skip the very first moveEnd (map settling at initialViewState)
         // This prevents search-as-move from locking URL to SF defaults

@@ -28,6 +28,7 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
+import { PROGRAMMATIC_MOVE_TIMEOUT_MS, AREA_COUNT_DEBOUNCE_MS, AREA_COUNT_CACHE_TTL_MS } from "@/lib/constants";
 
 /** Coordinates for map bounds */
 export interface MapBoundsCoords {
@@ -106,8 +107,6 @@ function isPointInBounds(point: PointCoords, bounds: MapBoundsCoords): boolean {
   );
 }
 
-/** Auto-clear timeout for programmatic move flag (ms) */
-const PROGRAMMATIC_MOVE_TIMEOUT = 2500;
 
 
 export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
@@ -207,7 +206,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       programmaticMoveTimeoutRef.current = setTimeout(() => {
         setIsProgrammaticMoveState(false);
         isProgrammaticMoveRef.current = false;
-      }, PROGRAMMATIC_MOVE_TIMEOUT);
+      }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
     }
   }, []);
 
@@ -267,8 +266,6 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   }, [searchLocationCenter, currentMapBounds, hasUserMoved]);
 
   // --- Area count: fetch listing count for current map bounds when banner is showing ---
-  const AREA_COUNT_DEBOUNCE_MS = 600;
-  const AREA_COUNT_CACHE_TTL_MS = 30_000;
 
   const [areaCount, setAreaCount] = useState<number | null>(null);
   const [isAreaCountLoading, setIsAreaCountLoading] = useState(false);

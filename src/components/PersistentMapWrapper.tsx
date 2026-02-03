@@ -30,6 +30,7 @@ import {
 } from "react";
 import type { MapListingData } from "@/lib/data";
 import { useSearchV2Data, type V2MapData } from "@/contexts/SearchV2DataContext";
+import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 
 // CRITICAL: Lazy import - only loads when component renders
@@ -517,9 +518,11 @@ export default function PersistentMapWrapper({
       )}
       {/* Coordinated loading overlay - shows when list is transitioning (filter change) */}
       {isListTransitioning && <MapTransitionOverlay />}
-      <Suspense fallback={<MapLoadingPlaceholder />}>
-        <LazyDynamicMap listings={effectiveListings} />
-      </Suspense>
+      <MapErrorBoundary>
+        <Suspense fallback={<MapLoadingPlaceholder />}>
+          <LazyDynamicMap listings={effectiveListings} />
+        </Suspense>
+      </MapErrorBoundary>
     </div>
   );
 }

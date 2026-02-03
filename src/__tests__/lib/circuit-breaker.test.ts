@@ -413,5 +413,19 @@ describe('circuit-breaker', () => {
       expect(circuitBreakers.radar.getState()).toBe('CLOSED');
       expect(circuitBreakers.email.getState()).toBe('CLOSED');
     });
+
+    describe('mapboxGeocode breaker', () => {
+      it('should exist and start closed', () => {
+        expect(circuitBreakers.mapboxGeocode).toBeDefined();
+        expect(circuitBreakers.mapboxGeocode.getState()).toBe('CLOSED');
+      });
+    });
+
+    describe('postgis breaker', () => {
+      it('should exist and start closed', () => {
+        expect(circuitBreakers.postgis).toBeDefined();
+        expect(circuitBreakers.postgis.getState()).toBe('CLOSED');
+      });
+    });
   });
 });

@@ -77,3 +77,25 @@ export const LNG_MIN = -180;
 
 /** Maximum longitude */
 export const LNG_MAX = 180;
+
+// ============================================
+// Timing & Thresholds
+// ============================================
+
+/** Auto-clear timeout for programmatic map move flag (ms) */
+export const PROGRAMMATIC_MOVE_TIMEOUT_MS = 2500;
+
+/** Debounce delay for area count requests on map move (ms) */
+export const AREA_COUNT_DEBOUNCE_MS = 600;
+
+/** Client-side cache TTL for area count responses (ms) */
+export const AREA_COUNT_CACHE_TTL_MS = 30000;
+
+/** Threshold for "slow" search transition warning (ms) */
+export const SLOW_TRANSITION_THRESHOLD_MS = 6000;
+
+/** Result count threshold: >= this uses 'geojson' clustering, < uses 'pins' */
+export const CLUSTER_THRESHOLD = 50;
+
+/** Bounds quantization for cache key normalization (~100m precision) */
+export const BOUNDS_EPSILON = 0.001;

@@ -8,14 +8,11 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 
 // ============================================================================
-// Constants
+// Constants (re-exported from canonical source for backward compatibility)
 // ============================================================================
 
-/** Threshold for determining mode: >= 50 = 'geojson', < 50 = 'pins' */
-export const CLUSTER_THRESHOLD = 50;
-
-/** Bounds quantization for cache key normalization (~100m precision) */
-export const BOUNDS_EPSILON = 0.001;
+// Re-export from constants for backward compatibility
+export { CLUSTER_THRESHOLD, BOUNDS_EPSILON } from "@/lib/constants";
 
 // ============================================================================
 // Response Types

@@ -207,11 +207,10 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
     } else {
       console.error("[RateLimit] Redis error:", error);
     }
-    // FAIL CLOSED in production - security over availability
-    if (process.env.NODE_ENV === "production") {
-      return { success: false, retryAfter: 60 };
-    }
-    // Allow in development for local testing without Redis
+    // FAIL OPEN - availability over blocking all users when Redis is down
+    console.warn("[RateLimit] Redis unavailable, failing open", {
+      error: error instanceof Error ? error.message : "Unknown",
+    });
     return { success: true };
   }
 }
@@ -278,10 +277,10 @@ export async function checkMetricsRateLimit(
     } else {
       console.error("[RateLimit] Redis error:", error);
     }
-    // FAIL CLOSED in production - even for metrics
-    if (process.env.NODE_ENV === "production") {
-      return { success: false, retryAfter: 60 };
-    }
+    // FAIL OPEN - availability over blocking all users when Redis is down
+    console.warn("[RateLimit] Redis unavailable, failing open", {
+      error: error instanceof Error ? error.message : "Unknown",
+    });
     return { success: true };
   }
 }
@@ -346,10 +345,10 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
     } else {
       console.error("[RateLimit] Redis error:", error);
     }
-    // FAIL CLOSED in production
-    if (process.env.NODE_ENV === "production") {
-      return { success: false, retryAfter: 60 };
-    }
+    // FAIL OPEN - availability over blocking all users when Redis is down
+    console.warn("[RateLimit] Redis unavailable, failing open", {
+      error: error instanceof Error ? error.message : "Unknown",
+    });
     return { success: true };
   }
 }
@@ -416,11 +415,10 @@ export async function checkSearchCountRateLimit(
     } else {
       console.error("[RateLimit] Redis error:", error);
     }
-    // FAIL CLOSED in production - security over availability
-    if (process.env.NODE_ENV === "production") {
-      return { success: false, retryAfter: 60 };
-    }
-    // Allow in development for local testing without Redis
+    // FAIL OPEN - availability over blocking all users when Redis is down
+    console.warn("[RateLimit] Redis unavailable, failing open", {
+      error: error instanceof Error ? error.message : "Unknown",
+    });
     return { success: true };
   }
 }

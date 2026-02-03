@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // Number of dirty listings to process per cron run
-const BATCH_SIZE = 100;
+const BATCH_SIZE = parseInt(process.env.SEARCH_DOC_BATCH_SIZE || "100", 10);
 
 interface ListingWithData {
   id: string;
@@ -316,6 +316,15 @@ export async function GET(request: NextRequest) {
     const orphanCount = await handleOrphanDirtyFlags(dirtyIds, foundIds);
 
     const durationMs = Date.now() - startTime;
+
+    console.log(JSON.stringify({
+      event: "search_doc_cron_complete",
+      processed: upsertedCount,
+      orphans: orphanCount,
+      errors: errors.length,
+      totalDirty: dirtyIds.length,
+      durationMs,
+    }));
 
     console.log(
       `[SearchDoc Cron] Processed: ${upsertedCount}, Orphans: ${orphanCount}, ` +

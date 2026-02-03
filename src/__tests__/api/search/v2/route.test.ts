@@ -553,20 +553,68 @@ describe("Search API v2 route", () => {
       mockFeatures.searchV2 = true;
     });
 
-    it("should return 503 when v2 service returns error", async () => {
-      // When the service catches an internal error, it returns a graceful error response
-      // The route converts this to 503 (Service Unavailable)
-      (getListingsPaginated as jest.Mock).mockRejectedValue(
-        new Error("Database error"),
+    it("should return list results when map query fails", async () => {
+      const mockListings = [createMockListingData("1")];
+      const mockListResult: PaginatedResultHybrid<ListingData> = {
+        items: mockListings,
+        hasNextPage: false,
+        hasPrevPage: false,
+        total: 1,
+        totalPages: 1,
+        page: 1,
+        limit: 20,
+      };
+
+      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
+      (getMapListings as jest.Mock).mockRejectedValue(
+        new Error("Map query timeout"),
       );
-      (getMapListings as jest.Mock).mockResolvedValue([]);
 
       const request = createRequest();
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe("Failed to fetch search results");
+      expect(response.status).toBe(200);
+      expect(data.list.items).toHaveLength(1);
+      expect(data.list.items[0].id).toBe("1");
+      expect(data.map.geojson.type).toBe("FeatureCollection");
+      expect(data.map.geojson.features).toHaveLength(0);
+    });
+
+    it("should return empty results when list query fails", async () => {
+      const mockMapListings = [createMockMapListingData("1")];
+
+      (getListingsPaginated as jest.Mock).mockRejectedValue(
+        new Error("Database error"),
+      );
+      (getMapListings as jest.Mock).mockResolvedValue(mockMapListings);
+
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.list.items).toHaveLength(0);
+      expect(data.list.total).toBe(0);
+      expect(data.list.nextCursor).toBeNull();
+      expect(data.map.geojson.features).toHaveLength(1);
+    });
+
+    it("should return fully empty response when both queries fail", async () => {
+      (getListingsPaginated as jest.Mock).mockRejectedValue(
+        new Error("Database error"),
+      );
+      (getMapListings as jest.Mock).mockRejectedValue(
+        new Error("Map query timeout"),
+      );
+
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.list.items).toHaveLength(0);
+      expect(data.map.geojson.features).toHaveLength(0);
     });
   });
 

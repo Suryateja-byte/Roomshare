@@ -227,4 +227,18 @@ export const circuitBreakers = {
     resetTimeout: 60000, // 1 minute
     successThreshold: 3,
   }),
+
+  mapboxGeocode: new CircuitBreaker({
+    name: 'mapbox-geocode',
+    failureThreshold: 5,
+    resetTimeout: 30000, // 30 seconds
+    successThreshold: 2,
+  }),
+
+  postgis: new CircuitBreaker({
+    name: 'postgis',
+    failureThreshold: 3,
+    resetTimeout: 15000, // 15 seconds
+    successThreshold: 2,
+  }),
 };

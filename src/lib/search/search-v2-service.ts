@@ -40,7 +40,7 @@ import {
   type RankableListing,
 } from "@/lib/search/ranking";
 import type { SearchV2Response } from "@/lib/search/types";
-import type { PaginatedResultHybrid, ListingData } from "@/lib/data";
+import type { PaginatedResultHybrid, ListingData, MapListingData } from "@/lib/data";
 import {
   clampBoundsToMaxSpan,
   MAX_LAT_SPAN,
@@ -98,6 +98,8 @@ export async function executeSearchV2(
   params: SearchV2Params,
 ): Promise<SearchV2Result> {
   try {
+    const searchStartTime = performance.now();
+
     // Parse and validate search params
     const parsed = parseSearchParams(params.rawParams);
 
@@ -217,11 +219,35 @@ export async function executeSearchV2(
       ? getSearchDocMapListings(filterParams)
       : getMapListings(filterParams);
 
-    // Execute both queries concurrently
-    const [{ listResult, nextCursor }, mapListings] = await Promise.all([
+    // Execute both queries concurrently with partial failure tolerance
+    const [listSettled, mapSettled] = await Promise.allSettled([
       listPromise,
       mapPromise,
     ]);
+
+    // Handle partial failures gracefully
+    let listResult: PaginatedResultHybrid<ListingData>;
+    let nextCursor: string | null;
+    let mapListings: MapListingData[];
+
+    if (listSettled.status === "fulfilled") {
+      ({ listResult, nextCursor } = listSettled.value);
+    } else {
+      console.error("[SearchV2] List query failed, returning empty results", {
+        error: listSettled.reason instanceof Error ? listSettled.reason.message : "Unknown",
+      });
+      listResult = { items: [], hasNextPage: false, hasPrevPage: false, total: 0, totalPages: 0, page: 1, limit: 20 };
+      nextCursor = null;
+    }
+
+    if (mapSettled.status === "fulfilled") {
+      mapListings = mapSettled.value;
+    } else {
+      console.error("[SearchV2] Map query failed, returning empty map data", {
+        error: mapSettled.reason instanceof Error ? mapSettled.reason.message : "Unknown",
+      });
+      mapListings = [];
+    }
 
     // Determine mode based on mapListings count (not list total)
     const mode = determineMode(mapListings.length);
@@ -344,6 +370,16 @@ export async function executeSearchV2(
       },
       map: mapResponse,
     };
+
+    const searchDurationMs = Math.round(performance.now() - searchStartTime);
+    console.log(JSON.stringify({
+      event: "search_latency",
+      durationMs: searchDurationMs,
+      listCount: listResult?.items?.length ?? 0,
+      mapCount: mapListings?.length ?? 0,
+      mode,
+      cached: false,
+    }));
 
     return { response, paginatedResult: listResult };
   } catch (error) {

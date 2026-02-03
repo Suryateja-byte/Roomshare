@@ -25,9 +25,7 @@ import {
   type TransitionStartFunction,
 } from "react";
 import { useRouter } from "next/navigation";
-
-// Threshold for "slow" transition warning (6 seconds)
-const SLOW_TRANSITION_THRESHOLD_MS = 6000;
+import { SLOW_TRANSITION_THRESHOLD_MS } from "@/lib/constants";
 
 interface SearchTransitionContextValue {
   /** Whether a transition is currently in progress */
