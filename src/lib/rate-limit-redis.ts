@@ -2,6 +2,9 @@
  * Redis-backed rate limiting using Upstash.
  *
  * P1-08 FIX: Added timeout and circuit breaker protection for Redis operations.
+ * P1-09 FIX: Added in-memory rate limit fallback when Redis is unavailable.
+ *            Instead of failing open (allowing all requests), the fallback uses
+ *            a simple Map-based sliding window to maintain rate limiting.
  *
  * Provides burst and sustained rate limiters for:
  * - Chat API: 5/min burst, 30/hour sustained
@@ -15,6 +18,128 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { withTimeout, DEFAULT_TIMEOUTS, isTimeoutError } from "./timeout-wrapper";
 import { circuitBreakers, isCircuitOpenError } from "./circuit-breaker";
+
+// ============ IN-MEMORY RATE LIMIT FALLBACK ============
+// P1-09 FIX: Provides rate limiting when Redis is unavailable
+// Uses a simple Map-based sliding window implementation
+
+interface InMemoryRateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+// Separate maps for different rate limit types (burst vs sustained)
+const inMemoryRateLimits = new Map<string, InMemoryRateLimitEntry>();
+
+// Clean up expired entries periodically to prevent memory leaks
+const CLEANUP_INTERVAL_MS = 60000; // 1 minute
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
+function startCleanupInterval() {
+  if (cleanupInterval) return;
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    // Use forEach instead of for...of to avoid downlevelIteration requirement
+    inMemoryRateLimits.forEach((entry, key) => {
+      if (now >= entry.resetAt) {
+        inMemoryRateLimits.delete(key);
+      }
+    });
+  }, CLEANUP_INTERVAL_MS);
+  // Don't block Node.js from exiting
+  if (cleanupInterval.unref) {
+    cleanupInterval.unref();
+  }
+}
+
+// Start cleanup on module load
+startCleanupInterval();
+
+/**
+ * Check rate limit using in-memory fallback.
+ * Uses a simple fixed window algorithm (sufficient for fallback purposes).
+ *
+ * @param key - Unique key combining type and IP
+ * @param limit - Maximum requests allowed in window
+ * @param windowMs - Window duration in milliseconds
+ * @returns Result with success status and optional retryAfter seconds
+ */
+function checkInMemoryRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): { success: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const entry = inMemoryRateLimits.get(key);
+
+  // No existing entry or window expired - start fresh
+  if (!entry || now >= entry.resetAt) {
+    inMemoryRateLimits.set(key, { count: 1, resetAt: now + windowMs });
+    return { success: true };
+  }
+
+  // Check if limit exceeded
+  if (entry.count >= limit) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+    return {
+      success: false,
+      retryAfter: Math.max(1, retryAfter), // At least 1 second
+    };
+  }
+
+  // Increment count
+  entry.count++;
+  return { success: true };
+}
+
+// Rate limit configurations matching Redis limiters
+const RATE_LIMITS = {
+  chat: {
+    burst: { limit: 5, windowMs: 60 * 1000 }, // 5/min
+    sustained: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30/hour
+  },
+  metrics: {
+    burst: { limit: 100, windowMs: 60 * 1000 }, // 100/min
+    sustained: { limit: 500, windowMs: 60 * 60 * 1000 }, // 500/hour
+  },
+  map: {
+    burst: { limit: 60, windowMs: 60 * 1000 }, // 60/min
+    sustained: { limit: 300, windowMs: 60 * 60 * 1000 }, // 300/hour
+  },
+  searchCount: {
+    burst: { limit: 30, windowMs: 60 * 1000 }, // 30/min
+    sustained: { limit: 200, windowMs: 60 * 60 * 1000 }, // 200/hour
+  },
+} as const;
+
+/**
+ * Check both burst and sustained limits using in-memory fallback.
+ * Returns the more restrictive result.
+ */
+function checkInMemoryRateLimits(
+  type: keyof typeof RATE_LIMITS,
+  ip: string
+): { success: boolean; retryAfter?: number } {
+  const config = RATE_LIMITS[type];
+
+  // Check burst limit first (more likely to be hit)
+  const burstResult = checkInMemoryRateLimit(
+    `${type}-burst:${ip}`,
+    config.burst.limit,
+    config.burst.windowMs
+  );
+  if (!burstResult.success) {
+    return burstResult;
+  }
+
+  // Check sustained limit
+  const sustainedResult = checkInMemoryRateLimit(
+    `${type}-sustained:${ip}`,
+    config.sustained.limit,
+    config.sustained.windowMs
+  );
+  return sustainedResult;
+}
 
 // Initialize Redis client
 // Falls back gracefully if env vars not set (for local dev without Redis)
@@ -207,11 +332,12 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
     } else {
       console.error("[RateLimit] Redis error:", error);
     }
-    // FAIL OPEN - availability over blocking all users when Redis is down
-    console.warn("[RateLimit] Redis unavailable, failing open", {
+    // P1-09 FIX: Use in-memory fallback instead of failing open
+    console.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
       error: error instanceof Error ? error.message : "Unknown",
+      ip: ip.substring(0, 8) + "...", // Partial IP for debugging (no full PII)
     });
-    return { success: true };
+    return checkInMemoryRateLimits("chat", ip);
   }
 }
 
@@ -277,11 +403,12 @@ export async function checkMetricsRateLimit(
     } else {
       console.error("[RateLimit] Redis error:", error);
     }
-    // FAIL OPEN - availability over blocking all users when Redis is down
-    console.warn("[RateLimit] Redis unavailable, failing open", {
+    // P1-09 FIX: Use in-memory fallback instead of failing open
+    console.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
       error: error instanceof Error ? error.message : "Unknown",
+      ip: ip.substring(0, 8) + "...", // Partial IP for debugging (no full PII)
     });
-    return { success: true };
+    return checkInMemoryRateLimits("metrics", ip);
   }
 }
 
@@ -345,11 +472,12 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
     } else {
       console.error("[RateLimit] Redis error:", error);
     }
-    // FAIL OPEN - availability over blocking all users when Redis is down
-    console.warn("[RateLimit] Redis unavailable, failing open", {
+    // P1-09 FIX: Use in-memory fallback instead of failing open
+    console.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
       error: error instanceof Error ? error.message : "Unknown",
+      ip: ip.substring(0, 8) + "...", // Partial IP for debugging (no full PII)
     });
-    return { success: true };
+    return checkInMemoryRateLimits("map", ip);
   }
 }
 
@@ -415,10 +543,11 @@ export async function checkSearchCountRateLimit(
     } else {
       console.error("[RateLimit] Redis error:", error);
     }
-    // FAIL OPEN - availability over blocking all users when Redis is down
-    console.warn("[RateLimit] Redis unavailable, failing open", {
+    // P1-09 FIX: Use in-memory fallback instead of failing open
+    console.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
       error: error instanceof Error ? error.message : "Unknown",
+      ip: ip.substring(0, 8) + "...", // Partial IP for debugging (no full PII)
     });
-    return { success: true };
+    return checkInMemoryRateLimits("searchCount", ip);
   }
 }

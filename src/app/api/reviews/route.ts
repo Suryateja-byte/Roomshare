@@ -130,7 +130,12 @@ export async function POST(request: Request) {
 
         // Fire-and-forget: mark listing dirty for search doc refresh
         if (listingId) {
-            markListingDirty(listingId, 'review_changed').catch(() => {});
+            markListingDirty(listingId, 'review_changed').catch((err) => {
+                console.warn("[API] Failed to mark listing dirty", {
+                    listingId: listingId,
+                    error: err instanceof Error ? err.message : String(err)
+                });
+            });
         }
 
         // P1-22 FIX: Send notification in background (non-blocking)
@@ -313,7 +318,12 @@ export async function PUT(request: Request) {
 
         // Fire-and-forget: mark listing dirty for search doc refresh
         if (existingReview.listingId) {
-            markListingDirty(existingReview.listingId, 'review_changed').catch(() => {});
+            markListingDirty(existingReview.listingId, 'review_changed').catch((err) => {
+                console.warn("[API] Failed to mark listing dirty", {
+                    listingId: existingReview.listingId,
+                    error: err instanceof Error ? err.message : String(err)
+                });
+            });
         }
 
         return NextResponse.json(updatedReview);
@@ -361,7 +371,12 @@ export async function DELETE(request: Request) {
 
         // Fire-and-forget: mark listing dirty for search doc refresh
         if (existingReview.listingId) {
-            markListingDirty(existingReview.listingId, 'review_changed').catch(() => {});
+            markListingDirty(existingReview.listingId, 'review_changed').catch((err) => {
+                console.warn("[API] Failed to mark listing dirty", {
+                    listingId: existingReview.listingId,
+                    error: err instanceof Error ? err.message : String(err)
+                });
+            });
         }
 
         return NextResponse.json({ success: true, message: 'Review deleted successfully' });

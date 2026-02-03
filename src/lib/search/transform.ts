@@ -210,28 +210,60 @@ export function transformToPins(
 // ============================================================================
 
 /**
+ * Options for transformToMapResponse
+ */
+export interface TransformMapOptions {
+  /** Optional score map for ranking-based pin tiering */
+  scoreMap?: Map<string, number>;
+  /** True when more listings exist than MAX_MAP_MARKERS allows */
+  truncated?: boolean;
+  /** Total count of matching listings before LIMIT (only set when truncated) */
+  totalCandidates?: number;
+}
+
+/**
  * Transform map listings to v2 map response shape.
  * Always includes geojson, conditionally includes pins based on count.
  *
  * @param listings - Array of map listing data
- * @param scoreMap - Optional score map for ranking-based pin tiering
- * @returns Object with geojson (always) and pins (when sparse)
+ * @param options - Transform options including scoreMap and truncation info
+ * @returns Object with geojson (always), pins (when sparse), and truncation info
  */
 export function transformToMapResponse(
   listings: MapListingData[],
-  scoreMap?: Map<string, number>,
+  options?: TransformMapOptions | Map<string, number>,
 ): {
   geojson: SearchV2GeoJSON;
   pins?: SearchV2Pin[];
+  truncated?: boolean;
+  totalCandidates?: number;
 } {
+  // Support legacy signature: transformToMapResponse(listings, scoreMap)
+  const opts: TransformMapOptions = options instanceof Map
+    ? { scoreMap: options }
+    : options ?? {};
+
+  const { scoreMap, truncated, totalCandidates } = opts;
   const geojson = transformToGeoJSON(listings);
 
+  const result: {
+    geojson: SearchV2GeoJSON;
+    pins?: SearchV2Pin[];
+    truncated?: boolean;
+    totalCandidates?: number;
+  } = { geojson };
+
   if (shouldIncludePins(listings.length)) {
-    return {
-      geojson,
-      pins: transformToPins(listings, scoreMap),
-    };
+    result.pins = transformToPins(listings, scoreMap);
   }
 
-  return { geojson };
+  // Add truncation info when present
+  if (truncated) {
+    result.truncated = truncated;
+    if (totalCandidates !== undefined) {
+      result.totalCandidates = totalCandidates;
+    }
+  }
+
+  return result;
 }

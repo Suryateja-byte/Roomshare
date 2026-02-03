@@ -86,6 +86,7 @@ export default function MobileBottomSheet({
   const dragStartSnap = useRef(0);
   const dragStartTime = useRef(0);
   const isScrollDrag = useRef(false);
+  const isDraggingRef = useRef(false);
 
   const currentSnap = SNAP_POINTS[snapIndex];
 
@@ -156,36 +157,36 @@ export default function MobileBottomSheet({
       dragStartSnap.current = SNAP_POINTS[snapIndex];
       dragStartTime.current = Date.now();
       isScrollDrag.current = false;
+      isDraggingRef.current = true;
       setIsDragging(true);
       setDragOffset(0);
     },
     [snapIndex],
   );
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      if (!isDragging) return;
-      const touch = e.touches[0];
-      const dy = touch.clientY - dragStartY.current;
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDraggingRef.current) return;
+    const touch = e.touches[0];
+    const dy = touch.clientY - dragStartY.current;
 
-      // If dragging from content area, only allow if scrolled to top and dragging down
-      if (isScrollDrag.current) {
-        const content = contentRef.current;
-        if (content && content.scrollTop > 0) {
-          setIsDragging(false);
-          setDragOffset(0);
-          return;
-        }
-        if (dy < 0) return; // Only allow downward drag from content
+    // If dragging from content area, only allow if scrolled to top and dragging down
+    if (isScrollDrag.current) {
+      const content = contentRef.current;
+      if (content && content.scrollTop > 0) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        setDragOffset(0);
+        return;
       }
+      if (dy < 0) return; // Only allow downward drag from content
+    }
 
-      setDragOffset(dy);
-    },
-    [isDragging],
-  );
+    setDragOffset(dy);
+  }, []);
 
   const handleTouchEnd = useCallback(() => {
-    if (!isDragging) return;
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
     setIsDragging(false);
 
     const elapsed = Date.now() - dragStartTime.current;
@@ -203,13 +204,27 @@ export default function MobileBottomSheet({
 
     setSnapIndex(newIndex);
     setDragOffset(0);
-  }, [isDragging, dragOffset, findNearestSnap]);
+  }, [dragOffset, findNearestSnap, setSnapIndex]);
+
+  // Reset drag state on system interruption (incoming call, notification, gesture conflict)
+  const handleTouchCancel = useCallback(() => {
+    isDraggingRef.current = false;
+    setIsDragging(false);
+    setDragOffset(0);
+  }, []);
 
   // Content area touch start — track that drag originated from content
   const handleContentTouchStart = useCallback(
     (e: React.TouchEvent) => {
-      // Only allow sheet collapse from content when expanded and scrolled to top
-      if (snapIndex !== 2) return;
+      // Only allow sheet collapse from content when not already collapsed
+      if (snapIndex === 0) return;
+
+      // P1-5 FIX: Don't intercept touches on interactive elements
+      // This prevents buttons, links, and inputs from being blocked by drag gestures
+      const target = e.target as HTMLElement;
+      const isInteractive = target.closest('button, a, input, [role="button"], [data-interactive]');
+      if (isInteractive) return;
+
       const content = contentRef.current;
       if (content && content.scrollTop <= 0) {
         isScrollDrag.current = true;
@@ -219,16 +234,17 @@ export default function MobileBottomSheet({
     [snapIndex, handleTouchStart],
   );
 
-  // Escape key collapses to half
+  // Escape key collapses to half (only when sheet is visible and no higher-priority handlers)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && snapIndex !== 0) {
+        // Only handle if sheet is not collapsed (map popup has priority via stopImmediatePropagation)
         setSnapIndex(1);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [snapIndex, setSnapIndex]);
 
   // Prevent body scroll when sheet is expanded
   useEffect(() => {
@@ -282,9 +298,21 @@ export default function MobileBottomSheet({
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchCancel}
         >
-          {/* Visual handle bar */}
-          <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600 mx-auto mb-2" />
+          {/* P2-9 FIX: Keyboard-accessible drag handle */}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={`Drag handle. Press Enter to ${snapIndex === 2 ? 'collapse' : 'expand'} results`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setSnapIndex(snapIndex === 2 ? 1 : 2);
+              }
+            }}
+            className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600 mx-auto mb-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          />
 
           {/* Header content */}
           <div className="flex items-center justify-between">
@@ -319,6 +347,7 @@ export default function MobileBottomSheet({
           onTouchStart={handleContentTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchCancel}
           style={{
             // Prevent scroll when collapsed
             overflowY: isCollapsed ? "hidden" : "auto",

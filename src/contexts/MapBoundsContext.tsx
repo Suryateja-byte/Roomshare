@@ -111,8 +111,13 @@ function isPointInBounds(point: PointCoords, bounds: MapBoundsCoords): boolean {
 
 export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   const [hasUserMoved, setHasUserMovedState] = useState(false);
-  const [boundsDirty, setBoundsDirty] = useState(false);
+  const [boundsDirty, setBoundsDirtyState] = useState(false);
   const [searchAsMove, setSearchAsMoveState] = useState(true);
+
+  // P2-4 FIX: Wrap setters in useCallback with empty deps to prevent unnecessary re-renders
+  const setBoundsDirty = useCallback((value: boolean) => {
+    setBoundsDirtyState(value);
+  }, []);
 
   const setSearchAsMove = useCallback((value: boolean) => {
     setSearchAsMoveState(value);
@@ -166,13 +171,13 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       if (prevNonBounds !== currNonBounds) {
         // True route change (filters, query, etc.) — reset everything
         setHasUserMovedState(false);
-        setBoundsDirty(false);
+        setBoundsDirtyState(false);
         setSearchHandlerState(null);
         setResetHandlerState(null);
       } else {
         // Bounds-only change from map panning — reset dirty state but keep handlers
         setHasUserMovedState(false);
-        setBoundsDirty(false);
+        setBoundsDirtyState(false);
       }
     }
     prevSearchParamsRef.current = currentParams;
@@ -296,7 +301,14 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
 
     // Build cache key from current map bounds + URL filter params
     const boundsKey = `${currentMapBounds.minLat},${currentMapBounds.maxLat},${currentMapBounds.minLng},${currentMapBounds.maxLng}`;
-    const filterKey = searchParams.toString();
+    // Filter cache key to only include map-relevant params (exclude sort/page/cursor)
+    const filteredParams = new URLSearchParams(searchParams.toString());
+    filteredParams.delete('sort');
+    filteredParams.delete('page');
+    filteredParams.delete('cursor');
+    filteredParams.delete('cursorStack');
+    filteredParams.delete('pageNumber');
+    const filterKey = filteredParams.toString();
     const cacheKey = `${boundsKey}|${filterKey}`;
 
     // Check cache
@@ -307,15 +319,17 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setIsAreaCountLoading(true);
-
     areaCountDebounceRef.current = setTimeout(() => {
-      // Abort previous request
+      // P1-4 FIX: Abort previous request and clear reference
       if (areaCountAbortRef.current) {
         areaCountAbortRef.current.abort();
+        areaCountAbortRef.current = null;
       }
       const controller = new AbortController();
       areaCountAbortRef.current = controller;
+
+      // P1-4 FIX: Set loading AFTER abort is complete to prevent state flicker
+      setIsAreaCountLoading(true);
 
       // Build URL from current URL params, overriding bounds with map bounds
       const params = new URLSearchParams(searchParams.toString());

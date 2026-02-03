@@ -14,6 +14,7 @@ import {
   getSearchDocMapListings,
   getSearchDocListingsWithKeyset,
   getSearchDocListingsFirstPage,
+  type MapListingsResult,
 } from "@/lib/search/search-doc-queries";
 import {
   generateQueryHash,
@@ -47,6 +48,7 @@ import {
   MAX_LNG_SPAN,
 } from "@/lib/validation";
 import { logger } from "@/lib/logger";
+import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 
 /**
  * Extract first value from a param that may be string, string[], or undefined.
@@ -215,20 +217,24 @@ export async function executeSearchV2(
     })();
 
     // Map query runs in parallel with list query
-    const mapPromise = useSearchDoc
+    // SearchDoc returns { listings, truncated, totalCandidates }, legacy returns plain array
+    const mapPromise: Promise<MapListingsResult | MapListingData[]> = useSearchDoc
       ? getSearchDocMapListings(filterParams)
       : getMapListings(filterParams);
 
     // Execute both queries concurrently with partial failure tolerance
+    // P1-7 FIX: Wrap each promise with independent timeout to prevent indefinite hangs
     const [listSettled, mapSettled] = await Promise.allSettled([
-      listPromise,
-      mapPromise,
+      withTimeout(listPromise, DEFAULT_TIMEOUTS.DATABASE, "search-list-query"),
+      withTimeout(mapPromise, DEFAULT_TIMEOUTS.DATABASE, "search-map-query"),
     ]);
 
     // Handle partial failures gracefully
     let listResult: PaginatedResultHybrid<ListingData>;
     let nextCursor: string | null;
     let mapListings: MapListingData[];
+    let mapTruncated: boolean | undefined;
+    let mapTotalCandidates: number | undefined;
 
     if (listSettled.status === "fulfilled") {
       ({ listResult, nextCursor } = listSettled.value);
@@ -241,7 +247,17 @@ export async function executeSearchV2(
     }
 
     if (mapSettled.status === "fulfilled") {
-      mapListings = mapSettled.value;
+      const mapResult = mapSettled.value;
+      // Handle both SearchDoc result shape and legacy plain array
+      if ("listings" in mapResult) {
+        // SearchDoc path: { listings, truncated, totalCandidates }
+        mapListings = mapResult.listings;
+        mapTruncated = mapResult.truncated;
+        mapTotalCandidates = mapResult.totalCandidates;
+      } else {
+        // Legacy path: plain MapListingData[]
+        mapListings = mapResult;
+      }
     } else {
       console.error("[SearchV2] Map query failed, returning empty map data", {
         error: mapSettled.reason instanceof Error ? mapSettled.reason.message : "Unknown",
@@ -346,7 +362,12 @@ export async function executeSearchV2(
 
     // Transform map data (geojson always, pins only when sparse)
     // Pass scoreMap for score-based pin tiering when ranking is enabled
-    const mapResponse = transformToMapResponse(mapListings, scoreMap);
+    // Include truncation info when map results exceed MAX_MAP_MARKERS
+    const mapResponse = transformToMapResponse(mapListings, {
+      scoreMap,
+      truncated: mapTruncated,
+      totalCandidates: mapTotalCandidates,
+    });
 
     // Build response
     const response: SearchV2Response = {

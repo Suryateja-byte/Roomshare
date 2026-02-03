@@ -34,6 +34,7 @@ export function MapGestureHint() {
     <div
       className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-zinc-900/90 dark:bg-white/90 text-white dark:text-zinc-900 rounded-xl px-4 py-3 shadow-lg max-w-[260px] text-center animate-[fadeIn_300ms_ease-out]"
       role="status"
+      aria-live="polite"
     >
       <button
         onClick={dismiss}

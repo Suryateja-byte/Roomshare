@@ -39,6 +39,12 @@ function getFilterRelevantParams(sp: URLSearchParams): string {
   return filtered.toString();
 }
 
+const BOUNDS_KEYS = ["minLat", "maxLat", "minLng", "maxLng"] as const;
+
+function getBoundsParams(sp: URLSearchParams): string {
+  return BOUNDS_KEYS.map((k) => sp.get(k) ?? "").join(",");
+}
+
 /**
  * V2 map data passed from page.tsx to PersistentMapWrapper via context.
  * This enables sibling component data sharing without prop drilling.
@@ -84,6 +90,7 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
   const [dataVersion, setDataVersion] = useState(0);
   const searchParams = useSearchParams();
   const prevFilterParamsRef = useRef<string | null>(null);
+  const prevBoundsRef = useRef<string | null>(null);
   const dataVersionRef = useRef(0);
 
   // Clear stale v2MapData when filter params change to prevent showing wrong markers
@@ -100,6 +107,23 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
       setDataVersion(newVersion);
     }
     prevFilterParamsRef.current = currentParams;
+  }, [searchParams]);
+
+  // Clear stale v2MapData when bounds change (map pan/zoom)
+  // Bounds are not in FILTER_RELEVANT_KEYS because they change frequently,
+  // but we still need to invalidate stale v2 data when the viewport moves.
+  useEffect(() => {
+    const currentBounds = getBoundsParams(searchParams);
+    if (
+      prevBoundsRef.current !== null &&
+      prevBoundsRef.current !== currentBounds
+    ) {
+      setV2MapDataInternal(null);
+      const newVersion = dataVersionRef.current + 1;
+      dataVersionRef.current = newVersion;
+      setDataVersion(newVersion);
+    }
+    prevBoundsRef.current = currentBounds;
   }, [searchParams]);
 
   // Versioned setter that rejects stale data from out-of-order responses

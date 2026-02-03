@@ -10,7 +10,7 @@
  */
 
 import '@/lib/mapbox-init'; // Must be first - initializes worker
-import Map, { Marker, Popup, Source, Layer, MapLayerMouseEvent, ViewStateChangeEvent } from 'react-map-gl';
+import Map, { Marker, Popup, Source, Layer, MapLayerMouseEvent, ViewStateChangeEvent, MapRef } from 'react-map-gl';
 import type { LayerProps, GeoJSONSource } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -30,6 +30,7 @@ import { PrivacyCircle } from './map/PrivacyCircle';
 import { BoundaryLayer } from './map/BoundaryLayer';
 import { UserMarker, useUserPin } from './map/UserMarker';
 import { POILayer } from './map/POILayer';
+import { PROGRAMMATIC_MOVE_TIMEOUT_MS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 interface Listing {
@@ -184,10 +185,12 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [currentZoom, setCurrentZoom] = useState(12);
     const [mapStyleKey, setMapStyleKey] = useState<'standard' | 'satellite' | 'transit'>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = sessionStorage.getItem('roomshare-map-style');
-            if (saved === 'satellite' || saved === 'transit') return saved;
-        }
+        try {
+            if (typeof window !== 'undefined') {
+                const saved = sessionStorage.getItem('roomshare-map-style');
+                if (saved === 'satellite' || saved === 'transit') return saved;
+            }
+        } catch { /* sessionStorage unavailable (private browsing) */ }
         return 'standard';
     });
     const [areTilesLoading, setAreTilesLoading] = useState(false);
@@ -214,11 +217,12 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     // Banner visibility from context
     const { showBanner, showLocationConflict, onSearch, onReset, areaCount, isAreaCountLoading } = useMapMovedBanner();
 
-    const mapRef = useRef<any>(null);
+    const mapRef = useRef<MapRef | null>(null);
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
     const lastSearchTimeRef = useRef<number>(0);
     const pendingBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
     const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const searchSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     // Track URL bounds for reset functionality
     const urlBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
     // Request deduplication: skip search if bounds haven't changed
@@ -230,6 +234,16 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     // Skip the very first moveEnd (map settling at initialViewState) to prevent
     // search-as-move from locking URL to SF defaults before auto-fly runs
     const isInitialMoveRef = useRef(true);
+    // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
+    const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // Ref for sourcedata handler cleanup
+    const sourcedataHandlerRef = useRef<((e: any) => void) | null>(null);
+    // Guard against rapid cluster clicks causing multiple simultaneous flyTo calls
+    const isClusterExpandingRef = useRef(false);
+    // Debounce timer for updateUnclusteredListings to batch rapid moveEnd events
+    const updateUnclusteredDebounceRef = useRef<NodeJS.Timeout | null>(null);
+    // Debounce timer for marker hover scroll (300ms delay to prevent jank)
+    const hoverScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Minimum interval between map searches (prevents 429 rate limiting)
     const MIN_SEARCH_INTERVAL_MS = 2000;
@@ -327,6 +341,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         const feature = event.features?.[0];
         if (!feature || !mapRef.current) return;
 
+        // Guard: skip if already expanding a cluster to prevent multiple simultaneous flyTo calls
+        if (isClusterExpandingRef.current) return;
+
         const clusterId = feature.properties?.cluster_id;
         if (!clusterId) return;
 
@@ -341,6 +358,14 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
                 // Mark as programmatic move to prevent banner showing
                 setProgrammaticMove(true);
+                isClusterExpandingRef.current = true;
+                // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
+                if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+                programmaticClearTimeoutRef.current = setTimeout(() => {
+                    if (isProgrammaticMoveRef.current) {
+                        setProgrammaticMove(false);
+                    }
+                }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
                 mapRef.current?.flyTo({
                     center: feature.geometry.coordinates as [number, number],
                     zoom: zoom,
@@ -351,7 +376,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         } catch (error) {
             console.warn('Cluster expansion failed', error);
         }
-    }, [setProgrammaticMove]);
+    }, [setProgrammaticMove, isProgrammaticMoveRef]);
 
     // Update unclustered listings when map moves (for rendering individual markers)
     const updateUnclusteredListings = useCallback(() => {
@@ -371,7 +396,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             price: f.properties.price,
             availableSlots: f.properties.availableSlots,
             ownerId: f.properties.ownerId,
-            images: JSON.parse(f.properties.images || '[]'),
+            images: (() => { try { return JSON.parse(f.properties.images || '[]'); } catch { return []; } })(),
             location: {
                 lat: f.properties.lat,
                 lng: f.properties.lng
@@ -572,10 +597,20 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
     // Clear searching state when listings update from SSR
     // Also update E2E marker count tracking
+    // Clear activeId if it references a listing that no longer exists
     useEffect(() => {
         // P0 Issue #25: Guard against state update after unmount
         if (!isMountedRef.current) return;
         setIsSearching(false);
+        if (searchSafetyTimeoutRef.current) {
+            clearTimeout(searchSafetyTimeoutRef.current);
+            searchSafetyTimeoutRef.current = null;
+        }
+
+        // Clear activeId if the listing no longer exists in new results
+        if (activeId && !listings.find(l => l.id === activeId)) {
+            setActive(null);
+        }
 
         // E2E testing: expose marker count for test verification
         if (process.env.NEXT_PUBLIC_E2E === 'true') {
@@ -583,7 +618,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             (window as unknown as Record<string, unknown>).__roomshare = roomshare;
             roomshare.markerCount = listings.length;
         }
-    }, [listings]);
+    }, [listings, activeId, setActive]);
 
     // Cleanup timers on unmount and mark component as unmounted
     useEffect(() => {
@@ -595,6 +630,25 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             }
             if (throttleTimeoutRef.current) {
                 clearTimeout(throttleTimeoutRef.current);
+                throttleTimeoutRef.current = null;
+            }
+            if (searchSafetyTimeoutRef.current) {
+                clearTimeout(searchSafetyTimeoutRef.current);
+            }
+            if (programmaticClearTimeoutRef.current) {
+                clearTimeout(programmaticClearTimeoutRef.current);
+            }
+            if (hoverScrollTimeoutRef.current) {
+                clearTimeout(hoverScrollTimeoutRef.current);
+            }
+            if (updateUnclusteredDebounceRef.current) {
+                clearTimeout(updateUnclusteredDebounceRef.current);
+            }
+            // Remove sourcedata listener
+            if (mapRef.current && sourcedataHandlerRef.current) {
+                try {
+                    mapRef.current.getMap().off('sourcedata', sourcedataHandlerRef.current);
+                } catch { /* map may already be destroyed */ }
             }
         };
     }, []);
@@ -603,6 +657,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && selectedListing) {
+                e.stopImmediatePropagation(); // Prevent other Escape handlers (e.g., bottom sheet)
                 setSelectedListing(null);
             }
         };
@@ -686,6 +741,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         lastSearchTimeRef.current = Date.now();
         pendingBoundsRef.current = null;
         setIsSearching(true);
+        // Safety timeout: clear searching state if listings don't update within 10s
+        if (searchSafetyTimeoutRef.current) clearTimeout(searchSafetyTimeoutRef.current);
+        searchSafetyTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) setIsSearching(false);
+        }, 10_000);
         // Use replace to update bounds without creating history entries
         // This prevents Back button from stepping through each map pan position
         const url = `/search?${params.toString()}`;
@@ -725,6 +785,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
             // Mark as programmatic move to prevent banner showing
             setProgrammaticMove(true);
+            // Safety: clear programmatic flag if moveEnd doesn't fire
+            if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+            programmaticClearTimeoutRef.current = setTimeout(() => {
+                if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+            }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
 
             const { minLng, maxLng, minLat, maxLat } = urlBoundsRef.current;
             mapRef.current.fitBounds(
@@ -743,6 +808,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         if (!listing) return;
         setSelectedListing(listing);
         setProgrammaticMove(true);
+        // Safety: clear programmatic flag if moveEnd doesn't fire
+        if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+        programmaticClearTimeoutRef.current = setTimeout(() => {
+            if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
         mapRef.current?.easeTo({
             center: [listing.location.lng, listing.location.lat],
             offset: [0, -150],
@@ -753,8 +823,13 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const handleMoveEnd = (e: ViewStateChangeEvent) => {
         // Track zoom for two-tier pin display
         setCurrentZoom(e.viewState.zoom);
-        // Update unclustered listings for rendering individual markers
-        updateUnclusteredListings();
+        // Debounce updateUnclusteredListings to batch rapid moveEnd events (100ms)
+        if (updateUnclusteredDebounceRef.current) {
+            clearTimeout(updateUnclusteredDebounceRef.current);
+        }
+        updateUnclusteredDebounceRef.current = setTimeout(() => {
+            updateUnclusteredListings();
+        }, 100);
 
         // Get current map bounds
         const mapBounds = e.target.getBounds();
@@ -773,6 +848,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         // Skip search/dirty logic during programmatic moves (auto-fly, card click, cluster expand)
         if (isProgrammaticMoveRef.current) {
             setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
+            isClusterExpandingRef.current = false; // Clear cluster expansion flag
             return;
         }
 
@@ -826,7 +902,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
                 // Execute immediately if outside throttle window
                 executeMapSearch(bounds);
-            }, 500); // 500ms debounce
+            }, 600); // 600ms debounce (matches project spec)
         } else {
             // Search-as-move is OFF - mark bounds as dirty so banner shows
             setBoundsDirty(true);
@@ -876,7 +952,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
             {/* Tile loading indicator */}
             {isMapLoaded && areTilesLoading && (
-                <div className="absolute inset-0 bg-zinc-100/30 dark:bg-zinc-900/30 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none" role="status" aria-label="Loading map tiles">
+                <div className="absolute inset-0 bg-zinc-100/30 dark:bg-zinc-900/30 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none" role="status" aria-label="Loading map tiles" aria-live="polite">
                     <div className="flex items-center gap-2 bg-white/90 dark:bg-zinc-800/90 px-4 py-2 rounded-lg shadow-sm">
                         <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" aria-hidden="true" />
                         <span className="text-sm text-zinc-600 dark:text-zinc-300">Loading tiles...</span>
@@ -886,7 +962,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
             {/* Search-as-move loading indicator */}
             {isSearching && isMapLoaded && !areTilesLoading && (
-                <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10 pointer-events-none" role="status" aria-label="Searching area">
+                <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10 pointer-events-none" role="status" aria-label="Searching area" aria-live="polite">
                     <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" aria-hidden="true" />
                     <span className="text-sm text-zinc-600 dark:text-zinc-300">Searching area...</span>
                 </div>
@@ -932,6 +1008,20 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     setIsMapLoaded(true);
                     updateUnclusteredListings();
 
+                    // Fix 1: Listen for sourcedata to retry unclustered query after tiles load.
+                    // querySourceFeatures only returns results for rendered tiles, so after
+                    // flyTo/zoom, tiles reload asynchronously and we need to re-query.
+                    if (mapRef.current) {
+                        const map = mapRef.current.getMap();
+                        const handler = (e: any) => {
+                            if (e.sourceId === 'listings' && e.isSourceLoaded && !e.tile) {
+                                updateUnclusteredListings();
+                            }
+                        };
+                        sourcedataHandlerRef.current = handler;
+                        map.on('sourcedata', handler);
+                    }
+
                     // Restore exact viewport from URL bounds on (re)mount.
                     // When the map remounts during "search as I move" navigation,
                     // initialViewState only sets center + zoom 12 which doesn't
@@ -948,12 +1038,22 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                 [parseFloat(maxLng), parseFloat(maxLat)],
                             ];
                             setProgrammaticMove(true);
+                            // Safety: clear programmatic flag if moveEnd doesn't fire
+                            if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+                            programmaticClearTimeoutRef.current = setTimeout(() => {
+                                if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+                            }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
                             mapRef.current.fitBounds(bounds, { duration: 0, padding: 0 });
                         }
                     }
                 }}
                 onMoveStart={() => setAreTilesLoading(true)}
-                onIdle={() => setAreTilesLoading(false)}
+                onIdle={() => {
+                    setAreTilesLoading(false);
+                    // Fix 2: Re-query unclustered features after all tiles rendered.
+                    // onIdle is the most reliable signal that tiles are fully loaded.
+                    updateUnclusteredListings();
+                }}
                 onClick={async (e: MapLayerMouseEvent) => {
                     // User pin drop takes priority
                     if (isDropMode && e.lngLat) {
@@ -1022,6 +1122,13 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         requestScrollTo(position.listing.id);
                         // Mark as programmatic move to prevent banner showing
                         setProgrammaticMove(true);
+                        // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
+                        if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+                        programmaticClearTimeoutRef.current = setTimeout(() => {
+                            if (isProgrammaticMoveRef.current) {
+                                setProgrammaticMove(false);
+                            }
+                        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
                         // Smooth pan to center popup both horizontally and vertically
                         mapRef.current?.easeTo({
                             center: [position.lng, position.lat],
@@ -1054,14 +1161,23 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                             role="button"
                             tabIndex={0}
                             aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}`}
-                            onMouseEnter={() => {
+                            onPointerEnter={() => {
                                 setHovered(position.listing.id, "map");
-                                requestScrollTo(position.listing.id);
+                                // Debounce scroll request to prevent list jumping as user scans markers
+                                if (hoverScrollTimeoutRef.current) {
+                                    clearTimeout(hoverScrollTimeoutRef.current);
+                                }
+                                hoverScrollTimeoutRef.current = setTimeout(() => {
+                                    requestScrollTo(position.listing.id);
+                                }, 300);
                             }}
-                            onMouseLeave={() => setHovered(null)}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleMarkerClick();
+                            onPointerLeave={() => {
+                                setHovered(null);
+                                // Clear pending scroll request when hover ends
+                                if (hoverScrollTimeoutRef.current) {
+                                    clearTimeout(hoverScrollTimeoutRef.current);
+                                    hoverScrollTimeoutRef.current = null;
+                                }
                             }}
                             onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {

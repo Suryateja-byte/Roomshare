@@ -237,7 +237,8 @@ export function SearchResultsClient({
               <button
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
-                aria-label={`Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ''} listings`}
+                aria-busy={isLoadingMore}
+                aria-label={isLoadingMore ? "Loading more results" : `Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ''} listings`}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white text-sm font-medium transition-colors disabled:opacity-50 touch-target"
               >
                 {isLoadingMore ? (
