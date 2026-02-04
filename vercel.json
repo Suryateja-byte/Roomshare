@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/refresh-search-docs",
-      "schedule": "0 */6 * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

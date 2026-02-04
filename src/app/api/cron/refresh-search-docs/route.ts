@@ -51,15 +51,46 @@ interface ListingWithData {
 }
 
 /**
- * Compute recommended score formula
- * Formula: avg_rating * 20 + view_count * 0.1 + review_count * 5
+ * Compute recommended score formula with time decay, freshness boost, and log scaling
+ *
+ * Components:
+ * - Rating score: avgRating * 20 (unchanged)
+ * - Review score: reviewCount * 5 (unchanged)
+ * - View score: log(1 + views) * 10 * decayFactor (prevents gaming, decays over time)
+ * - Freshness boost: +15 points for new listings, decays linearly over 7 days
+ *
+ * Time decay: Views from older listings contribute less (30-day half-life)
+ * Log scaling: Prevents view count gaming (1000 views ≈ 69 points, not 100)
  */
-function computeRecommendedScore(
+export function computeRecommendedScore(
   avgRating: number,
   viewCount: number,
   reviewCount: number,
+  createdAt: Date,
 ): number {
-  return avgRating * 20 + viewCount * 0.1 + reviewCount * 5;
+  // Base scores (unchanged weights for rating and reviews)
+  const ratingScore = avgRating * 20;
+  const reviewScore = reviewCount * 5;
+
+  // Calculate days since listing was created
+  const daysSinceCreation = Math.floor(
+    (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  // Time decay on views (30-day half-life)
+  // Views older than 30 days contribute less (minimum 10% contribution)
+  const decayFactor = Math.max(0.1, 1 - (daysSinceCreation / 30) * 0.5);
+
+  // Logarithmic scaling on views (prevents gaming via page refreshes)
+  // log(1 + views) grows slowly: 100 views ≈ 4.6, 1000 views ≈ 6.9
+  const viewScore = Math.log(1 + viewCount) * 10 * decayFactor;
+
+  // Freshness boost for new listings (first 7 days)
+  // Day 0: +15 points, Day 7: +0 points (linear decay)
+  const freshnessBoost =
+    daysSinceCreation <= 7 ? 15 * (1 - daysSinceCreation / 7) : 0;
+
+  return ratingScore + viewScore + reviewScore + freshnessBoost;
 }
 
 /**
@@ -131,6 +162,7 @@ async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
     listing.avgRating,
     listing.viewCount,
     listing.reviewCount,
+    listing.createdAt,
   );
 
   // Compute lowercase arrays for case-insensitive filtering

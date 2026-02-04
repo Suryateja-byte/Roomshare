@@ -605,7 +605,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
   describe("H9: Transaction Rollback Edge Cases", () => {
     it("should rollback on partial failure", async () => {
       let slotDecremented = false;
-      let bookingCreated = false;
+      const bookingCreated = false;
 
       const createBookingInTransaction = async (): Promise<{
         success: boolean;

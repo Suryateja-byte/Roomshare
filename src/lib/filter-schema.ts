@@ -404,8 +404,8 @@ export function normalizeFilters(input: unknown): NormalizedFilters {
   }
 
   // Normalize price range
-  let minPrice = normalizePrice(raw.minPrice);
-  let maxPrice = normalizePrice(raw.maxPrice);
+  const minPrice = normalizePrice(raw.minPrice);
+  const maxPrice = normalizePrice(raw.maxPrice);
 
   // P1-13 FIX: Throw validation error instead of silent swap
   if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) {

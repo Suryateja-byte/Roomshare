@@ -132,6 +132,47 @@ describe('clampBoundsToMaxSpan', () => {
 
       expect(resultLngSpan).toBeLessThanOrEqual(MAX_LNG_SPAN + 0.01);
     });
+
+    it('preserves antimeridian crossing property after clamping (Task #186)', () => {
+      // This test specifically verifies that when oversized bounds cross the
+      // antimeridian, the crossing property (minLng > maxLng) is preserved
+      const bounds: MapBounds = {
+        minLat: 40.0,
+        maxLat: 42.0,
+        minLng: 170.0,
+        maxLng: -170.0, // Crosses antimeridian (20° span)
+      };
+
+      const result = clampBoundsToMaxSpan(bounds);
+
+      // The crossing property MUST be preserved after clamping
+      expect(result.minLng).toBeGreaterThan(result.maxLng);
+
+      // Verify the center is still near the antimeridian (around 180/-180)
+      // For a crossing, center is calculated as: (minLng + (maxLng+360)) / 2
+      // For original: (170 + (-170+360)) / 2 = (170 + 190) / 2 = 180
+      // After clamping, result should still be centered at 180
+      const adjustedMaxLng = result.maxLng + 360;
+      const resultCenterLng = (result.minLng + adjustedMaxLng) / 2;
+      expect(resultCenterLng).toBeCloseTo(180, 0);
+    });
+
+    it('returns bounds within [-180, 180] range after antimeridian clamping', () => {
+      const bounds: MapBounds = {
+        minLat: 40.0,
+        maxLat: 42.0,
+        minLng: 170.0,
+        maxLng: -170.0, // Crosses antimeridian
+      };
+
+      const result = clampBoundsToMaxSpan(bounds);
+
+      // Both coordinates should be within valid range
+      expect(result.minLng).toBeGreaterThanOrEqual(-180);
+      expect(result.minLng).toBeLessThanOrEqual(180);
+      expect(result.maxLng).toBeGreaterThanOrEqual(-180);
+      expect(result.maxLng).toBeLessThanOrEqual(180);
+    });
   });
 
   describe('edge cases', () => {

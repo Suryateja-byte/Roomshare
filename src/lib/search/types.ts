@@ -108,6 +108,10 @@ export interface SearchV2Map {
   geojson: SearchV2GeoJSON;
   /** ONLY when mode='pins' (sparse, <50 mapListings) - tiered pins for true-marker rendering */
   pins?: SearchV2Pin[];
+  /** True when more listings exist than MAX_MAP_MARKERS (200) allows */
+  truncated?: boolean;
+  /** Total count of matching listings before LIMIT was applied (only set when truncated) */
+  totalCandidates?: number;
 }
 
 /** Complete v2 search response */

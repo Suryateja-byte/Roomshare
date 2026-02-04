@@ -24,6 +24,7 @@ import {
   getRequestId,
 } from "@/lib/request-context";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
+import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 
 /**
  * Check if v2 is enabled via feature flag or URL param.
@@ -68,7 +69,12 @@ export async function GET(request: NextRequest) {
       const rawParams = buildRawParamsFromSearchParams(searchParams);
 
       // Delegate to shared v2 service (handles searchDoc, keyset, ranking)
-      const result = await executeSearchV2({ rawParams });
+      // P1-6 FIX: Add timeout protection to prevent indefinite hangs
+      const result = await withTimeout(
+        executeSearchV2({ rawParams }),
+        DEFAULT_TIMEOUTS.DATABASE,
+        "executeSearchV2"
+      );
 
       // Handle unbounded search (text query without geographic bounds)
       // This is not an error - it's a signal to the client to prompt for location
@@ -111,11 +117,22 @@ export async function GET(request: NextRequest) {
         },
       });
     } catch (error) {
+      const isValidationError =
+        error instanceof Error &&
+        (error.message.includes("cannot exceed") ||
+          error.message.includes("Invalid") ||
+          error.message.includes("must be"));
+
       console.error("Search v2 API error:", { error, requestId });
+
       return NextResponse.json(
-        { error: "Failed to fetch search results" },
         {
-          status: 500,
+          error: isValidationError
+            ? (error as Error).message
+            : "Failed to fetch search results",
+        },
+        {
+          status: isValidationError ? 400 : 500,
           headers: { "x-request-id": requestId },
         },
       );

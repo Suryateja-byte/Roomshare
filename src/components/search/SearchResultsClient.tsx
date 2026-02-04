@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -51,13 +51,17 @@ export function SearchResultsClient({
   );
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showTotalPrice, setShowTotalPrice] = useState(() => {
+  const [showTotalPrice, setShowTotalPrice] = useState(false);
+
+  // Hydrate showTotalPrice from sessionStorage after mount to avoid hydration mismatch
+  useEffect(() => {
     try {
-      return JSON.parse(sessionStorage.getItem('showTotalPrice') ?? 'false');
+      const stored = sessionStorage.getItem('showTotalPrice');
+      if (stored) setShowTotalPrice(JSON.parse(stored));
     } catch {
-      return false;
+      // sessionStorage unavailable or invalid JSON
     }
-  });
+  }, []);
   // Track all seen IDs for deduplication (initialized with SSR listings)
   const seenIdsRef = useRef<Set<string>>(
     new Set(initialListings.map((l) => l.id)),
@@ -237,7 +241,8 @@ export function SearchResultsClient({
               <button
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
-                aria-label={`Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ''} listings`}
+                aria-busy={isLoadingMore}
+                aria-label={isLoadingMore ? "Loading more results" : `Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ''} listings`}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white text-sm font-medium transition-colors disabled:opacity-50 touch-target"
               >
                 {isLoadingMore ? (
@@ -285,7 +290,7 @@ export function SearchResultsClient({
           {/* Contextual footer */}
           {allListings.length > 0 && (
             <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-6 pb-4">
-              {total !== null ? `${total}+` : '100+'} stays{query ? ` in ${query}` : ''}
+              {total === null ? '100+' : total} stays{query ? ` in ${query}` : ''}
             </p>
           )}
         </>

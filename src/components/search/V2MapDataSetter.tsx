@@ -18,20 +18,24 @@ interface V2MapDataSetterProps {
  * page.tsx → V2MapDataSetter → context → PersistentMapWrapper
  */
 export function V2MapDataSetter({ data }: V2MapDataSetterProps) {
-  const { setV2MapData, setIsV2Enabled, dataVersion } = useSearchV2Data();
+  const { setV2MapData, setIsV2Enabled } = useSearchV2Data();
 
   useEffect(() => {
     // Mark v2 as enabled so PersistentMapWrapper knows to wait/skip fetch
     setIsV2Enabled(true);
-    // Set the map data for PersistentMapWrapper to consume
-    setV2MapData(data, dataVersion);
+    // P2-FIX (#135): Don't pass dataVersion - page.tsx data is always fresh for current URL.
+    // Passing dataVersion caused race condition: when URL changes, context's effect increments
+    // dataVersionRef immediately but state update is batched. This effect would then pass
+    // the OLD version (from state) which gets rejected because ref already has new version.
+    // Version checking is only needed for async responses, not synchronous page props.
+    setV2MapData(data);
 
     // NOTE: Cleanup intentionally removed to prevent race condition.
     // When URL changes (e.g., "search as I move"), React's effect cleanup
     // would set v2MapData to null BEFORE new data arrives, causing markers
     // to briefly disappear. Let new data overwrite old data instead.
     // Cleanup for leaving /search entirely is handled by layout unmount.
-  }, [data, dataVersion, setV2MapData, setIsV2Enabled]);
+  }, [data, setV2MapData, setIsV2Enabled]);
 
   // Renders nothing - just sets context
   return null;

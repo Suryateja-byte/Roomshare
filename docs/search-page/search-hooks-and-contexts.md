@@ -36,7 +36,7 @@ Comprehensive reference for all React hooks and context providers powering the R
 
 ### SearchV2DataContext
 
-**File**: `src/contexts/SearchV2DataContext.tsx`
+**File**: `/mnt/d/Documents/roomshare/src/contexts/SearchV2DataContext.tsx`
 
 **Purpose**: Shares V2 map data (GeoJSON/pins) between the page component (list side) and the `PersistentMapWrapper` (map side) without prop drilling. This enables sibling component data sharing across the search layout.
 
@@ -62,11 +62,13 @@ interface V2MapData {
 
 #### Internal Logic
 
-- **Stale data prevention**: The provider tracks a `dataVersion` ref. When filter-relevant URL params change, it clears `v2MapData` and increments the version. Callers pass the version when setting data; if the version does not match the current one, the write is silently rejected.
-- **Filter-relevant keys**: `q`, `minPrice`, `maxPrice`, `amenities`, `moveInDate`, `leaseDuration`, `houseRules`, `languages`, `roomType`, `genderPreference`, `householdGender`, `nearMatches`.
+- **Stale data prevention**: The provider tracks a `dataVersionRef` ref. When filter-relevant URL params change OR bounds change, it clears `v2MapData` and increments the version. Callers pass the version when setting data; if the version does not match the current one, the write is silently rejected.
+- **Filter-relevant keys** (lines 18-31): `q`, `minPrice`, `maxPrice`, `amenities`, `moveInDate`, `leaseDuration`, `houseRules`, `languages`, `roomType`, `genderPreference`, `householdGender`, `nearMatches`.
+- **Bounds keys** (line 42): `minLat`, `maxLat`, `minLng`, `maxLng`.
+- **Separate effects**: Two `useEffect` hooks (lines 97-110 and 115-127) track filter params and bounds separately, both clearing stale data and incrementing version on change.
 
 ```ts
-// Version-guarded setter
+// Version-guarded setter (lines 130-137)
 const setV2MapData = (data: V2MapData | null, version?: number) => {
   if (version !== undefined && version !== dataVersionRef.current) {
     return; // Reject stale data
@@ -77,7 +79,7 @@ const setV2MapData = (data: V2MapData | null, version?: number) => {
 
 #### Hooks
 
-- `useSearchV2Data()` -- returns the full context value.
+- `useSearchV2Data()` -- returns the full context value (lines 160-162).
 
 #### Consumers
 
@@ -88,7 +90,7 @@ const setV2MapData = (data: V2MapData | null, version?: number) => {
 
 ### FilterStateContext
 
-**File**: `src/contexts/FilterStateContext.tsx`
+**File**: `/mnt/d/Documents/roomshare/src/contexts/FilterStateContext.tsx`
 
 **Purpose**: Shares pending filter state (dirty flag, change count, drawer open/close) across the search layout so components outside the filter drawer can react to uncommitted changes (e.g., showing a "Pending changes" banner).
 
@@ -106,13 +108,13 @@ const setV2MapData = (data: V2MapData | null, version?: number) => {
 
 #### Internal Logic
 
-- Uses a **ref-based callback registration** pattern for `openDrawer` to avoid infinite re-render loops. `SearchForm` registers its open callback via `registerOpenDrawer`, and consumers call `openDrawer` which reads from the ref.
-- Context value is memoized with `useMemo` to prevent unnecessary consumer re-renders.
+- Uses a **ref-based callback registration** pattern for `openDrawer` to avoid infinite re-render loops. `SearchForm` registers its open callback via `registerOpenDrawer` (lines 62-64), and consumers call `openDrawer` which reads from the ref (lines 67-69).
+- Context value is memoized with `useMemo` (lines 72-91) to prevent unnecessary consumer re-renders.
 
 #### Hooks
 
-- `useFilterState()` -- throws if used outside provider.
-- `useFilterStateSafe()` -- returns `null` if outside provider.
+- `useFilterState()` -- throws if used outside provider (lines 112-118).
+- `useFilterStateSafe()` -- returns `null` if outside provider (lines 104-106).
 
 #### Consumers
 
@@ -123,7 +125,7 @@ const setV2MapData = (data: V2MapData | null, version?: number) => {
 
 ### SearchTransitionContext
 
-**File**: `src/contexts/SearchTransitionContext.tsx`
+**File**: `/mnt/d/Documents/roomshare/src/contexts/SearchTransitionContext.tsx`
 
 **Purpose**: Wraps React's `useTransition` to coordinate navigation transitions across search components. Keeps current results visible while new data loads instead of showing a blank page flash.
 
@@ -140,15 +142,15 @@ const setV2MapData = (data: V2MapData | null, version?: number) => {
 
 #### Internal Logic
 
-- **Slow transition detection**: A `setTimeout` fires after 6000ms. If `isPending` is still true, `isSlowTransition` is set to `true`. This resets when the transition completes.
-- **Scroll preservation**: Both `navigateWithTransition` and `replaceWithTransition` default `scroll: false` to maintain the user's scroll position during filter changes.
+- **Slow transition detection** (lines 61-74): A `setTimeout` fires after `SLOW_TRANSITION_THRESHOLD_MS` (6000ms from `@/lib/constants`). If `isPending` is still true, `isSlowTransition` is set to `true`. This resets when the transition completes.
+- **Scroll preservation**: Both `navigateWithTransition` (lines 76-85) and `replaceWithTransition` (lines 87-96) default `scroll: false` to maintain the user's scroll position during filter changes.
 - **History hygiene**: `replaceWithTransition` uses `router.replace` to avoid polluting browser history (used for map panning).
-- **Retry mechanism**: Stores last navigation details (URL, method, scroll) in a ref. When slow transition occurs, `retryLastNavigation` callback becomes available to replay the navigation.
+- **Retry mechanism** (lines 58, 99-109): Stores last navigation details (URL, method, scroll) in a ref. When slow transition occurs, `retryLastNavigation` callback becomes available to replay the navigation.
 
 #### Hooks
 
-- `useSearchTransition()` -- throws if outside provider.
-- `useSearchTransitionSafe()` -- returns `null` if outside provider.
+- `useSearchTransition()` -- throws if outside provider (lines 131-139).
+- `useSearchTransitionSafe()` -- returns `null` if outside provider (lines 145-147).
 
 #### Consumers
 
@@ -160,7 +162,7 @@ const setV2MapData = (data: V2MapData | null, version?: number) => {
 
 ### MapBoundsContext
 
-**File**: `src/contexts/MapBoundsContext.tsx`
+**File**: `/mnt/d/Documents/roomshare/src/contexts/MapBoundsContext.tsx`
 
 **Purpose**: The most complex context in the search system. Tracks map movement state, bounds dirty tracking, "search as I move" toggle, location conflict detection, and area count fetching. Enables the "Map moved -- results not updated" banner to appear both on the map overlay and above the list results.
 
@@ -171,7 +173,7 @@ const setV2MapData = (data: V2MapData | null, version?: number) => {
 | `hasUserMoved` | `boolean` | User manually panned/zoomed (not programmatic) |
 | `boundsDirty` | `boolean` | Map bounds differ from URL bounds |
 | `searchAsMove` | `boolean` | Auto-search toggle (default `true`) |
-| `isProgrammaticMove` | `boolean` | Current movement is from `flyTo`/`fitBounds` |
+| `isProgrammaticMove` | `boolean` | Current movement is from `flyTo`/`fitBounds`/`easeTo` |
 | `searchLocationName` | `string \| null` | Original search location from `q` param |
 | `searchLocationCenter` | `PointCoords \| null` | Geocoded center of search location |
 | `locationConflict` | `boolean` | Map viewport no longer contains search location |
@@ -179,18 +181,34 @@ const setV2MapData = (data: V2MapData | null, version?: number) => {
 | `isAreaCountLoading` | `boolean` | Whether area count is fetching |
 | `searchCurrentArea` | `() => void` | Trigger search with current map bounds |
 | `resetToUrlBounds` | `() => void` | Reset map to URL bounds |
-| `setProgrammaticMove` | `(value: boolean) => void` | Set with 2500ms auto-clear |
+| `setProgrammaticMove` | `(value: boolean) => void` | Set with auto-clear timeout |
 | `setHasUserMoved` | `(value: boolean) => void` | Guards against programmatic moves |
 | `setCurrentMapBounds` | `(bounds: MapBoundsCoords \| null) => void` | Update current map viewport |
 | `isProgrammaticMoveRef` | `RefObject<boolean>` | Synchronous ref for Mapbox event handlers |
 | ... | | Several other setters for search location, handlers, etc. |
 
+#### Type Definitions
+
+```ts
+interface MapBoundsCoords {
+  minLng: number;
+  maxLng: number;
+  minLat: number;
+  maxLat: number;
+}
+
+interface PointCoords {
+  lat: number;
+  lng: number;
+}
+```
+
 #### Internal Logic
 
-- **Programmatic move guard**: `setProgrammaticMove(true)` sets both state and a ref, then auto-clears after 2500ms. `setHasUserMoved(true)` checks the ref and rejects if programmatic. This prevents the "map moved" banner from appearing during `flyTo` animations.
-- **Route change detection**: On URL change, compares non-bounds params. If only bounds changed (from map panning), resets dirty state but keeps handlers. If other params changed (true navigation), resets everything.
-- **Area count fetching**: When `hasUserMoved && boundsDirty && !searchAsMove`, fetches `/api/search-count` with current map bounds. Uses 600ms debounce, `AbortController`, 30s cache, and rate-limited fetch from `rate-limit-client.ts`. Only one request in-flight at a time.
-- **Location conflict**: Computed via `useMemo` -- checks if `searchLocationCenter` is within `currentMapBounds` using `isPointInBounds()`.
+- **Programmatic move guard** (lines 194-211): `setProgrammaticMove(true)` sets both state and a ref, then auto-clears after `PROGRAMMATIC_MOVE_TIMEOUT_MS` (2500ms from `@/lib/constants`). `setHasUserMoved(true)` checks the ref (lines 217-227) and rejects if programmatic. This prevents the "map moved" banner from appearing during `flyTo` animations.
+- **Route change detection** (lines 149-179): On URL change, compares non-bounds params. If only bounds changed (from map panning), resets dirty state but keeps handlers. If other params changed (true navigation), resets everything.
+- **Area count fetching** (lines 279-376): When `hasUserMoved && boundsDirty && !searchAsMove` (line 277), fetches `/api/search-count` with current map bounds. Uses `AREA_COUNT_DEBOUNCE_MS` (600ms) debounce, `AbortController`, `AREA_COUNT_CACHE_TTL_MS` (30s) cache, and `rateLimitedFetch` from `rate-limit-client.ts`. Only one request in-flight at a time.
+- **Location conflict** (lines 259-266): Computed via `useMemo` -- checks if `searchLocationCenter` is within `currentMapBounds` using `isPointInBounds()`.
 
 ```ts
 const areaCountEnabled = hasUserMoved && boundsDirty && !searchAsMove;
@@ -198,10 +216,11 @@ const areaCountEnabled = hasUserMoved && boundsDirty && !searchAsMove;
 
 #### Hooks
 
-- `useMapBounds()` -- returns full context with safe SSR defaults.
-- `useMapMovedBanner()` -- derived hook for banner display logic:
+- `useMapBounds()` (lines 434-462) -- returns full context with safe SSR defaults.
+- `useMapMovedBanner()` (lines 468-497) -- derived hook for banner display logic:
   - `showBanner`: bounds dirty + user moved + search-as-move OFF + no location conflict.
   - `showLocationConflict`: location conflict + search-as-move OFF (takes priority).
+  - Also returns `areaCount` and `isAreaCountLoading`.
 
 #### Consumers
 
@@ -213,7 +232,7 @@ const areaCountEnabled = hasUserMoved && boundsDirty && !searchAsMove;
 
 ### SearchMapUIContext
 
-**File**: `src/contexts/SearchMapUIContext.tsx`
+**File**: `/mnt/d/Documents/roomshare/src/contexts/SearchMapUIContext.tsx`
 
 **Purpose**: Coordinates "View on map" actions from listing cards to the map component. When a user clicks "View on map" on a `ListingCard`, this context stores a pending focus request, opens the map if hidden, and the map consumes the request to fly to the marker and open a popup.
 
@@ -230,9 +249,10 @@ const areaCountEnabled = hasUserMoved && boundsDirty && !searchAsMove;
 
 #### Internal Logic
 
-- **Nonce deduplication**: Each `focusListingOnMap` call increments a nonce. Rapid clicks only honor the latest request. `acknowledgeFocus` only clears if the nonce matches.
-- **Auto-open map**: If `shouldShowMap` is false when focus is requested, calls `showMap()` (passed as a prop to the provider).
+- **Nonce deduplication** (lines 61-74): Each `focusListingOnMap` call increments a nonce. Rapid clicks only honor the latest request. `acknowledgeFocus` only clears if the nonce matches (lines 76-78).
+- **Auto-open map** (lines 69-71): If `shouldShowMap` is false when focus is requested, calls `showMap()` (passed as a prop to the provider).
 - **No timeout**: `pendingFocus` persists until the map acknowledges it or a new request replaces it.
+- **Dismiss handler** (lines 84-90): `registerDismiss` stores handler in ref; `dismiss` calls it before navigation.
 
 #### Provider Props
 
@@ -246,14 +266,14 @@ interface SearchMapUIProviderProps {
 
 #### Hooks
 
-- `useSearchMapUI()` -- returns no-op fallback if outside provider (safe for non-search pages).
-- `usePendingMapFocus()` -- convenience hook for Map.tsx (returns only `pendingFocus`, `acknowledgeFocus`, `clearPendingFocus`).
+- `useSearchMapUI()` (lines 121-135) -- returns no-op fallback if outside provider (safe for non-search pages).
+- `usePendingMapFocus()` (lines 140-144) -- convenience hook for Map.tsx (returns only `pendingFocus`, `acknowledgeFocus`, `clearPendingFocus`).
 
 ---
 
 ### ListingFocusContext
 
-**File**: `src/contexts/ListingFocusContext.tsx`
+**File**: `/mnt/d/Documents/roomshare/src/contexts/ListingFocusContext.tsx`
 
 **Purpose**: Enables two-way hover/selection sync between listing cards and map markers. Hovering a card highlights the map marker; clicking a map marker scrolls to and highlights the card.
 
@@ -271,16 +291,27 @@ interface SearchMapUIProviderProps {
 | `ackScrollTo` | `(nonce: number) => void` | Clear scroll request if nonce matches |
 | `clearFocus` | `() => void` | Clear all focus state |
 
+#### Type Definitions
+
+```ts
+export interface ScrollRequest {
+  id: string;
+  nonce: number;
+}
+
+export type FocusSource = "map" | "list" | null;
+```
+
 #### Internal Logic
 
-- **Focus source with auto-clear**: When `setHovered` is called with a source (`'map'` or `'list'`), a 300ms timeout automatically clears `focusSource`. This prevents hover-to-scroll-to-hover feedback loops.
-- **Nonce-based scroll requests**: `requestScrollTo` increments a nonce, enabling re-scrolling to the same listing. `ackScrollTo` only clears if the nonce matches, preventing stale acknowledgments.
-- **Stable SSR fallback**: A module-level `SSR_FALLBACK` object is used when outside the provider, preventing re-render cascades.
+- **Focus source with auto-clear** (lines 103-113): When `setHovered` is called with a source (`'map'` or `'list'`), a 300ms timeout automatically clears `focusSource`. This prevents hover-to-scroll-to-hover feedback loops.
+- **Nonce-based scroll requests** (lines 119-131): `requestScrollTo` increments a nonce, enabling re-scrolling to the same listing. `ackScrollTo` only clears if the nonce matches, preventing stale acknowledgments.
+- **Stable SSR fallback** (lines 68-78): A module-level `SSR_FALLBACK` object is used when outside the provider, preventing re-render cascades.
 
 #### Hooks
 
-- `useListingFocus()` -- returns fallback if outside provider.
-- `useIsListingFocused(listingId)` -- memoized per-listing hook returning `{ isHovered, isActive, isFocused }`.
+- `useListingFocus()` (lines 177-180) -- returns fallback if outside provider.
+- `useIsListingFocused(listingId)` (lines 186-196) -- memoized per-listing hook returning `{ isHovered, isActive, isFocused }`.
 
 #### Consumers
 
@@ -292,7 +323,7 @@ interface SearchMapUIProviderProps {
 
 ### MobileSearchContext
 
-**File**: `src/contexts/MobileSearchContext.tsx`
+**File**: `/mnt/d/Documents/roomshare/src/contexts/MobileSearchContext.tsx`
 
 **Purpose**: Coordinates the collapsed/expanded state of the mobile search bar and provides a way for the layout to open the filter drawer.
 
@@ -308,13 +339,13 @@ interface SearchMapUIProviderProps {
 
 #### Internal Logic
 
-- **Ref-based handler registration**: Same pattern as `FilterStateContext`. The filter drawer open handler is stored in a ref to avoid re-renders on registration.
-- **Stable module-level fallback**: `FALLBACK_CONTEXT` is defined at module scope (not inside a function) so `useMobileSearch()` always returns the same reference outside the provider, preventing infinite re-render loops.
-- **Scroll-to-top on expand**: `expand()` calls `window.scrollTo({ top: 0, behavior: 'smooth' })`.
+- **Ref-based handler registration** (lines 54-76): Same pattern as `FilterStateContext`. The filter drawer open handler is stored in a ref to avoid re-renders on registration.
+- **Stable module-level fallback** (lines 39-45): `FALLBACK_CONTEXT` is defined at module scope (not inside a function) so `useMobileSearch()` always returns the same reference outside the provider, preventing infinite re-render loops.
+- **Scroll-to-top on expand** (lines 58-62): `expand()` calls `window.scrollTo({ top: 0, behavior: 'smooth' })`.
 
 #### Hooks
 
-- `useMobileSearch()` -- returns stable fallback if outside provider.
+- `useMobileSearch()` (lines 96-101) -- returns stable fallback if outside provider.
 
 ---
 
@@ -322,7 +353,7 @@ interface SearchMapUIProviderProps {
 
 ### useBatchedFilters
 
-**File**: `src/hooks/useBatchedFilters.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useBatchedFilters.ts`
 
 **Purpose**: Manages pending filter state before it is committed to the URL. Provides read/write access to uncommitted filter values and dirty state tracking.
 
@@ -356,21 +387,22 @@ interface BatchedFilterValues {
 
 #### Internal Logic
 
-- **URL parsing**: Reads filter values from URL search params via `readFiltersFromURL()` which normalizes values using allowlists, handles aliases (e.g., "private" → "Private room"), and clamps price params.
-- **Dirty comparison**: Compares pending vs. committed state using deep equality for arrays and value equality for strings.
-- **Sync on URL change**: `useEffect` syncs pending state when URL changes (back/forward navigation, external filter changes).
-- **Commit navigation**: Uses `SearchTransitionContext` if available for smooth transitions, falls back to `router.push`. Deletes pagination params (page, cursor, cursorStack, pageNumber) and preserves non-filter params (bounds, sort, q, lat, lng, nearMatches).
+- **URL parsing** (lines 115-156): Reads filter values from URL search params via `readFiltersFromURL()` which normalizes values using allowlists, handles aliases (e.g., "private" -> "Private room"), and clamps price params.
+- **Dirty comparison** (lines 167-183): Compares pending vs. committed state using deep equality for arrays and value equality for strings.
+- **Sync on URL change** (lines 218-220): `useEffect` syncs pending state when URL changes (back/forward navigation, external filter changes).
+- **Commit navigation** (lines 238-295): Uses `SearchTransitionContext` if available for smooth transitions, falls back to `router.push`. Deletes pagination params (page, cursor, cursorStack, pageNumber) and preserves non-filter params (bounds, sort, q, lat, lng, nearMatches).
 
 #### Exports
 
-- `emptyFilterValues` -- default empty state, used as initial value throughout the filter system.
+- `emptyFilterValues` (lines 39-50) -- default empty state, used as initial value throughout the filter system.
 - `BatchedFilterValues` type -- imported by `useDebouncedFilterCount`, `useFacets`, and filter components.
+- `readFiltersFromURL` function (lines 115-156) -- exported for external use.
 
 ---
 
 ### useDebouncedFilterCount
 
-**File**: `src/hooks/useDebouncedFilterCount.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useDebouncedFilterCount.ts`
 
 **Purpose**: Fetches listing counts from `/api/search-count` for the filter drawer "Show X listings" button. Debounces requests, caches results, and handles abort/cleanup.
 
@@ -395,17 +427,18 @@ interface BatchedFilterValues {
 
 #### Internal Logic
 
-- **Guard**: Only fetches when drawer is open AND filters are dirty.
-- **Debounce**: 300ms delay before fetch.
-- **Cache**: Module-level `Map<string, CacheEntry>` with 30s TTL. Cache key combines all pending filter values + committed URL bounds/location params.
-- **Abort**: `AbortController` cancels in-flight requests when filters change.
-- **Rate limiting**: Uses `rateLimitedFetch` from `rate-limit-client.ts` which provides shared rate-limit backoff across all search endpoints.
-- **Baseline capture**: On first dirty state after drawer opens, captures current count as baseline for delta display.
-- **Bounds from URL**: Uses committed bounds from the URL, not pending map bounds.
-- **Reset on close**: Clears baseline, boundsRequired, and count when drawer closes.
+- **Guard** (line 292): Only fetches when drawer is open AND filters are dirty.
+- **Debounce** (lines 35, 328): 300ms delay before fetch (`DEBOUNCE_MS`).
+- **Cache** (lines 31, 170-179): Module-level `Map<string, CacheEntry>` with 30s TTL (`CACHE_TTL_MS`). Cache key combines all pending filter values + committed URL bounds/location params.
+- **Abort** (lines 219-226): `AbortController` cancels in-flight requests when filters change.
+- **Rate limiting** (line 232): Uses `rateLimitedFetch` from `rate-limit-client.ts` which provides shared rate-limit backoff across all search endpoints.
+- **Baseline capture** (lines 302-317): On first dirty state after drawer opens, captures current count as baseline for delta display.
+- **Bounds from URL** (lines 134-148): Uses committed bounds from the URL, not pending map bounds.
+- **Reset on close** (lines 274-281): Clears baseline, boundsRequired, and count when drawer closes.
+- **boundsRequired handling** (lines 244, 346-348): When API returns `boundsRequired: true`, displays "Select a location" instead of count.
 
 ```ts
-// Cache key generation combines filter state + URL bounds
+// Cache key generation combines filter state + URL bounds (lines 71-101)
 function generateCacheKey(pending: BatchedFilterValues, searchParams: URLSearchParams): string
 ```
 
@@ -413,7 +446,7 @@ function generateCacheKey(pending: BatchedFilterValues, searchParams: URLSearchP
 
 ### useFilterImpactCount
 
-**File**: `src/hooks/useFilterImpactCount.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useFilterImpactCount.ts`
 
 **Purpose**: Calculates how removing a specific filter would change the result count. Fetches lazily on hover to minimize API cost. Displays a "+22" badge on filter chips.
 
@@ -436,19 +469,19 @@ function generateCacheKey(pending: BatchedFilterValues, searchParams: URLSearchP
 
 #### Internal Logic
 
-- **Lazy fetch**: Only fetches when `isHovering && !hasFetched`.
-- **Debounce**: 200ms hover delay before fetch.
-- **Cache**: Module-level `Map` with 60s TTL (longer than filter count cache since removal impact changes less frequently).
-- **Rate limiting**: Uses `rateLimitedFetch` from `rate-limit-client.ts` for shared backoff coordination.
-- **Cache key**: URL params with the target filter removed (via `removeFilterFromUrl`).
-- **Delta calculation**: `countWithoutFilter - currentCount`. If removing the filter yields 100+ (`null`), shows `"+100"`.
-- **Reset on chip change**: `hasFetched` resets when `chip.id` changes.
+- **Lazy fetch** (line 185): Only fetches when `isHovering && !hasFetched`.
+- **Debounce** (lines 29, 198): 200ms hover delay before fetch (`DEBOUNCE_MS`).
+- **Cache** (lines 25, 81-86): Module-level `Map` with 60s TTL (longer than filter count cache since removal impact changes less frequently).
+- **Rate limiting** (line 134): Uses `rateLimitedFetch` from `rate-limit-client.ts` for shared backoff coordination.
+- **Cache key** (lines 54-61): URL params with the target filter removed (via `removeFilterFromUrl`).
+- **Delta calculation** (lines 220-237): `countWithoutFilter - currentCount`. If removing the filter yields 100+ (`null`), shows `"+100"`.
+- **Reset on chip change** (lines 214-217): `hasFetched` resets when `chip.id` changes.
 
 ---
 
 ### useFacets
 
-**File**: `src/hooks/useFacets.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useFacets.ts`
 
 **Purpose**: Fetches facet counts (e.g., how many listings have "WiFi") and price histogram data from `/api/search/facets`. Used to populate filter drawer option counts and the price slider distribution.
 
@@ -468,14 +501,14 @@ function generateCacheKey(pending: BatchedFilterValues, searchParams: URLSearchP
 
 #### Internal Logic
 
-- **Cache key excludes price**: Price slider changes do not trigger a refetch. The cache key includes all other filters + location bounds but deliberately omits `minPrice`/`maxPrice`. The API request still includes price params so that non-price facet counts reflect the price selection.
-- **Debounce**: 300ms.
-- **Cache**: Module-level `Map` with 30s TTL.
-- **Abort**: `AbortController` cancels in-flight requests.
-- **Rate limiting**: Uses `rateLimitedFetch` from `rate-limit-client.ts` for coordinated backoff.
+- **Cache key excludes price** (lines 42-66): Price slider changes do not trigger a refetch. The cache key includes all other filters + location bounds but deliberately omits `minPrice`/`maxPrice`. The API request still includes price params so that non-price facet counts reflect the price selection.
+- **Debounce** (lines 26, 195): 300ms (`DEBOUNCE_MS`).
+- **Cache** (lines 24, 153-156): Module-level `Map` with 30s TTL (`CACHE_TTL_MS`).
+- **Abort** (lines 132-136): `AbortController` cancels in-flight requests.
+- **Rate limiting** (line 142): Uses `rateLimitedFetch` from `rate-limit-client.ts` for coordinated backoff.
 
 ```ts
-// Cache key excludes price intentionally
+// Cache key excludes price intentionally (lines 42-66)
 function generateFacetsCacheKey(pending: BatchedFilterValues, searchParams: URLSearchParams): string {
   const parts = [
     // Exclude minPrice/maxPrice
@@ -489,7 +522,7 @@ function generateFacetsCacheKey(pending: BatchedFilterValues, searchParams: URLS
 
 ### useRecentSearches
 
-**File**: `src/hooks/useRecentSearches.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useRecentSearches.ts`
 
 **Purpose**: Manages recent search history in `localStorage`. Stores up to 5 entries with full filter state, deduplicates by location, and supports legacy format migration.
 
@@ -516,19 +549,34 @@ interface RecentSearch {
   filters: RecentSearchFilters;
   resultCount?: number;
 }
+
+interface RecentSearchFilters {
+  minPrice?: string;
+  maxPrice?: string;
+  roomType?: string;
+  amenities?: string[];
+  leaseDuration?: string;
+  houseRules?: string[];
+}
 ```
 
 #### Internal Logic
 
-- **Legacy migration**: On load, detects entries without `id` or `filters` fields and migrates them to the new format, persisting the updated data back.
-- **Deduplication**: `saveRecentSearch` removes existing entries with the same location (case-insensitive) before adding.
+- **Legacy migration** (lines 161-187): On load, detects entries without `id` or `filters` fields and migrates them to the new format, persisting the updated data back.
+- **Deduplication** (lines 216-223): `saveRecentSearch` removes existing entries with the same location (case-insensitive) before adding.
 - **Error handling**: All `localStorage` operations are wrapped in try/catch for private browsing / quota exceeded scenarios.
+- **Max entries** (line 18): `MAX_RECENT_SEARCHES = 5`.
+
+#### Exported Functions
+
+- `formatRecentSearch(search: RecentSearch): string` (lines 92-118) -- exported for external formatting.
+- `getFilterSummary(filters: RecentSearchFilters): string | null` (lines 123-149) -- exported for filter summary.
 
 ---
 
 ### useNearbySearchRateLimit
 
-**File**: `src/hooks/useNearbySearchRateLimit.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useNearbySearchRateLimit.ts`
 
 **Purpose**: Session-based rate limiting for nearby place searches on listing detail pages. Prevents excessive API calls to the places service.
 
@@ -544,7 +592,7 @@ interface RecentSearch {
 |-------|------|-------------|
 | `canSearch` | `boolean` | Whether a search is permitted |
 | `remainingSearches` | `number` | Searches left (out of 3) |
-| `isDebounceBusy` | `boolean` | In 10s debounce window |
+| `isDebounceBusy` | `boolean` | In debounce window |
 | `debounceRemainingMs` | `number` | Milliseconds remaining (for countdown UI) |
 | `startDebounce` | `() => void` | Start debounce timer |
 | `incrementCount` | `() => void` | Increment search count (after success) |
@@ -560,10 +608,10 @@ interface RecentSearch {
 
 #### Internal Logic
 
-- **sessionStorage persistence**: State is keyed by `nearby-search-limit-${listingId}`. Stale data (>30min) is auto-cleared on read.
-- **Separated debounce and count**: `startDebounce()` starts the 10s timer; `incrementCount()` is called separately after a successful search. This decoupling prevents issues when searches fail.
-- **Countdown interval**: Updates `debounceRemainingMs` every 100ms for smooth countdown UI.
-- **Functional state updates**: `incrementCount` uses `setState(prev => ...)` to avoid stale closure issues with rapid increments.
+- **sessionStorage persistence** (lines 45-96): State is keyed by `nearby-search-limit-${listingId}`. Stale data (>30min) is auto-cleared on read.
+- **Separated debounce and count** (lines 239-272): `startDebounce()` starts the 10s timer; `incrementCount()` is called separately after a successful search. This decoupling prevents issues when searches fail.
+- **Countdown interval** (lines 165-172, 203-226): Updates `debounceRemainingMs` every 100ms for smooth countdown UI.
+- **Functional state updates** (lines 259-272): `incrementCount` uses `setState(prev => ...)` to avoid stale closure issues with rapid increments.
 
 #### Exported Constants
 
@@ -579,7 +627,7 @@ export const RATE_LIMIT_CONFIG = {
 
 ### useMapPreference
 
-**File**: `src/hooks/useMapPreference.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useMapPreference.ts`
 
 **Purpose**: Manages map visibility preference with localStorage persistence. Key for **Mapbox billing optimization** -- defers map initialization until user opts in on mobile.
 
@@ -604,16 +652,28 @@ export const RATE_LIMIT_CONFIG = {
 
 #### Internal Logic
 
-- **Hydration gate**: `shouldRenderMap = isHydrated && shouldShowMap`. This prevents mobile devices from initializing the Mapbox `Map` object during SSR when `isMobile` incorrectly defaults to `false`.
-- **MediaQuery listener**: Watches `(max-width: 767px)` for responsive breakpoint changes.
-- **localStorage validation**: Validates stored preference shape before applying.
-- **Mobile override**: On mobile, `shouldShowMap` is always `true` because the bottom sheet overlays the map.
+- **Hydration gate** (line 111): `shouldRenderMap = isHydrated && shouldShowMap`. This prevents mobile devices from initializing the Mapbox `Map` object during SSR when `isMobile` incorrectly defaults to `false`.
+- **MediaQuery listener** (lines 88-98): Watches `(max-width: 767px)` for responsive breakpoint changes.
+- **localStorage validation** (lines 35-52): Validates stored preference shape before applying.
+- **Mobile override** (lines 103-105): On mobile, `shouldShowMap` is always `true` because the bottom sheet overlays the map.
+
+#### Type Definitions
+
+```ts
+type DesktopPreference = "split" | "list-only";
+type MobilePreference = "list" | "map";
+
+interface MapPreference {
+  desktop: DesktopPreference;
+  mobile: MobilePreference;
+}
+```
 
 ---
 
 ### useScrollHeader
 
-**File**: `src/hooks/useScrollHeader.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useScrollHeader.ts`
 
 **Purpose**: Tracks scroll state for collapsible header behavior (iOS Safari-style). Collapses header when scrolling down past threshold, expands when scrolling up.
 
@@ -633,9 +693,9 @@ export const RATE_LIMIT_CONFIG = {
 
 #### Internal Logic
 
-- **requestAnimationFrame**: Uses RAF-based throttling for smooth 60fps updates. A `ticking` ref prevents multiple RAF calls per frame.
-- **Momentum thresholds**: Requires >5px downward delta to collapse, >20px upward delta to expand. This prevents jitter from small scroll adjustments.
-- **Always expand near top**: Forces expansion when `scrollY <= threshold`.
+- **requestAnimationFrame** (lines 68-73): Uses RAF-based throttling for smooth 60fps updates. A `ticking` ref prevents multiple RAF calls per frame.
+- **Momentum thresholds** (lines 48-56): Requires >5px downward delta to collapse, >20px upward delta to expand. This prevents jitter from small scroll adjustments.
+- **Always expand near top** (lines 54-56): Forces expansion when `scrollY <= threshold`.
 
 #### Convenience Hook
 
@@ -643,13 +703,13 @@ export const RATE_LIMIT_CONFIG = {
 export function useHeaderCollapsed(threshold = 100): boolean
 ```
 
-Returns only the `isCollapsed` boolean.
+Returns only the `isCollapsed` boolean (lines 101-104).
 
 ---
 
 ### useKeyboardShortcuts
 
-**File**: `src/hooks/useKeyboardShortcuts.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useKeyboardShortcuts.ts`
 
 **Purpose**: Global keyboard shortcut management with meta key support, input awareness, and accessibility.
 
@@ -684,10 +744,10 @@ interface ShortcutConfig {
 
 #### Internal Logic
 
-- **Ref-based shortcut storage**: Shortcuts array is stored in a ref and updated via effect, preventing handler recreation on every render.
-- **Input awareness**: Checks `document.activeElement` against input/textarea/select/contenteditable elements when `preventInInput` is set.
-- **Platform-aware formatting**: `formatShortcut()` returns platform-appropriate strings (e.g., `"⌘K"` on Mac, `"Ctrl+K"` on Windows).
-- **First match wins**: Only the first matching shortcut executes.
+- **Ref-based shortcut storage** (lines 90-95): Shortcuts array is stored in a ref and updated via effect, preventing handler recreation on every render.
+- **Input awareness** (lines 53-67, 108-111): Checks `document.activeElement` against input/textarea/select/contenteditable elements when `preventInInput` is set.
+- **Platform-aware formatting** (lines 148-175): `formatShortcut()` returns platform-appropriate strings (e.g., `"⌘K"` on Mac, `"Ctrl+K"` on Windows).
+- **First match wins** (line 133): Only the first matching shortcut executes.
 
 #### Helper Exports
 
@@ -699,7 +759,7 @@ export function formatShortcut(config: Pick<ShortcutConfig, 'key' | 'meta' | 'sh
 
 ### useAbortableServerAction
 
-**File**: `src/hooks/useAbortableServerAction.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useAbortableServerAction.ts`
 
 **Purpose**: Wraps Next.js server actions with request sequencing to prevent race conditions. Since server actions do not support `AbortSignal`, this uses a request ID pattern to discard stale responses.
 
@@ -725,9 +785,9 @@ interface UseAbortableServerActionOptions<TParams, TResult> {
 
 #### Internal Logic
 
-- **Request ID sequencing**: Each `execute` call increments `requestIdRef`. When the promise resolves, it checks if the captured ID still matches the current ref. If not, the response is silently discarded.
-- **Mounted guard**: A `mountedRef` prevents state updates after unmount.
-- **Cancel**: `cancel()` increments the request ID (invalidating any in-flight response) and sets `isLoading` to false.
+- **Request ID sequencing** (lines 65, 77-90): Each `execute` call increments `requestIdRef`. When the promise resolves, it checks if the captured ID still matches the current ref. If not, the response is silently discarded.
+- **Mounted guard** (lines 67-75, 88): A `mountedRef` prevents state updates after unmount.
+- **Cancel** (lines 108-112): `cancel()` increments the request ID (invalidating any in-flight response) and sets `isLoading` to false.
 
 ```ts
 const execute = useCallback(async (params: TParams) => {
@@ -742,7 +802,7 @@ const execute = useCallback(async (params: TParams) => {
 
 ### useNetworkStatus
 
-**File**: `src/hooks/useNetworkStatus.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useNetworkStatus.ts`
 
 **Purpose**: Tracks browser online/offline status via the `online` and `offline` window events.
 
@@ -755,17 +815,15 @@ const execute = useCallback(async (params: TParams) => {
 
 #### Internal Logic
 
-- Initializes state from `navigator.onLine` on mount
-- Registers event listeners for `online` and `offline` events
-- Cleans up listeners on unmount
-
-**Note**: The previously documented `useOnlineStatus` hook has been consolidated into this hook. `useNetworkStatus` provides both `isOnline` and `isOffline` for convenience.
+- Initializes state from `navigator.onLine` on mount (line 14)
+- Registers event listeners for `online` and `offline` events (lines 19-20)
+- Cleans up listeners on unmount (lines 22-25)
 
 ---
 
 ### useRateLimitHandler
 
-**File**: `src/hooks/useRateLimitHandler.ts`
+**File**: `/mnt/d/Documents/roomshare/src/hooks/useRateLimitHandler.ts`
 
 **Purpose**: Handles HTTP 429 rate limit errors with countdown state. Detects rate limit responses and provides state for displaying countdown UI.
 
@@ -778,10 +836,19 @@ const execute = useCallback(async (params: TParams) => {
 | `handleError` | `(result: RateLimitResult) => boolean` | Returns `true` if error was rate-limit |
 | `reset` | `() => void` | Clear rate limit state |
 
+#### RateLimitResult Interface
+
+```ts
+interface RateLimitResult {
+  error?: string;
+  retryAfter?: number;
+}
+```
+
 #### Internal Logic
 
-- **Detection**: Checks `result.error` for "too many requests" or "rate limit" (case-insensitive), or the presence of `result.retryAfter`.
-- **Default retry**: 60 seconds if `retryAfter` is not provided.
+- **Detection** (lines 41-54): Checks `result.error` for "too many requests" or "rate limit" (case-insensitive), or the presence of `result.retryAfter`.
+- **Default retry** (line 50): 60 seconds if `retryAfter` is not provided.
 - **No auto-timer**: The hook sets state but does not auto-reset. The consuming component is responsible for calling `reset()` (typically via a `RateLimitCountdown` component's `onRetryReady` callback).
 
 ---
@@ -790,32 +857,33 @@ const execute = useCallback(async (params: TParams) => {
 
 ### rate-limit-client
 
-**File**: `src/lib/rate-limit-client.ts`
+**File**: `/mnt/d/Documents/roomshare/src/lib/rate-limit-client.ts`
 
 **Purpose**: Shared, module-level 429/rate-limit handling for client fetches. Provides coordinated backoff across all search-related endpoints.
 
 #### Key Features
 
-- **Shared backoff state**: When any endpoint returns 429, every consumer backs off for the duration specified by `Retry-After`.
+- **Shared backoff state** (line 11): When any endpoint returns 429, every consumer backs off for the duration specified by `Retry-After`.
 - **Drop-in fetch replacement**: `rateLimitedFetch()` is a drop-in replacement for `fetch()` with built-in rate limit handling.
-- **Automatic backoff**: Parses `Retry-After` header (supports both delta-seconds and HTTP-date formats).
-- **RateLimitError**: Throws a custom error when throttled, allowing hooks to handle backoff gracefully.
+- **Automatic backoff** (lines 60-64): Parses `Retry-After` header (supports both delta-seconds and HTTP-date formats).
+- **RateLimitError** (lines 32-40): Throws a custom error when throttled, allowing hooks to handle backoff gracefully.
+- **Default backoff** (line 71): 60 seconds (`DEFAULT_BACKOFF_MS`) if `Retry-After` is missing or unparseable.
 
 #### Public API
 
 ```ts
-// Main fetch wrapper
+// Main fetch wrapper (lines 50-67)
 export async function rateLimitedFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<Response>
 
 // Helper functions
-export function isThrottled(): boolean
-export function getRetryAfterMs(): number
-export function resetThrottle(): void
+export function isThrottled(): boolean          // lines 16-18
+export function getRetryAfterMs(): number       // lines 21-23
+export function resetThrottle(): void           // lines 26-28
 
-// Error class
+// Error class (lines 32-40)
 export class RateLimitError extends Error {
   retryAfterMs: number;
 }

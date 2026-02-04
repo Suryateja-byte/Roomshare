@@ -160,6 +160,22 @@ function MapErrorBanner({
   );
 }
 
+// P2-FIX (#151): Separate informational banner (no retry button) for non-error messages
+// Used for viewport clamping notification where map is still functional
+function MapInfoBanner({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="absolute top-4 left-4 right-4 z-50 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg p-3"
+    >
+      <span className="text-sm text-blue-700 dark:text-blue-300 block">
+        {message}
+      </span>
+    </div>
+  );
+}
+
 // Loading placeholder for lazy map component
 function MapLoadingPlaceholder() {
   return (
@@ -232,20 +248,26 @@ function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
     }
   }
 
-  return v2MapData.geojson.features.map((feature) => ({
-    id: feature.properties.id,
-    title: feature.properties.title ?? "",
-    price: feature.properties.price ?? 0,
-    availableSlots: feature.properties.availableSlots,
-    ownerId: feature.properties.ownerId,
-    images: feature.properties.image ? [feature.properties.image] : [],
-    location: {
-      lng: feature.geometry.coordinates[0],
-      lat: feature.geometry.coordinates[1],
-    },
-    // Add tier from pins lookup (defaults to undefined if not in pins mode)
-    tier: pinTierMap.get(feature.properties.id),
-  }));
+  // P2-3 FIX: Filter out malformed features before accessing coordinates
+  return v2MapData.geojson.features
+    .filter((feature) => {
+      const coordinates = feature.geometry?.coordinates;
+      return Array.isArray(coordinates) && coordinates.length >= 2;
+    })
+    .map((feature) => {
+      const [lng, lat] = feature.geometry.coordinates;
+      return {
+        id: feature.properties.id,
+        title: feature.properties.title ?? "",
+        price: feature.properties.price ?? 0,
+        availableSlots: feature.properties.availableSlots,
+        ownerId: feature.properties.ownerId,
+        images: feature.properties.image ? [feature.properties.image] : [],
+        location: { lng, lat },
+        // Add tier from pins lookup (defaults to undefined if not in pins mode)
+        tier: pinTierMap.get(feature.properties.id),
+      };
+    });
 }
 
 interface PersistentMapWrapperProps {
@@ -263,36 +285,63 @@ export default function PersistentMapWrapper({
   const [listings, setListings] = useState<MapListingData[]>([]);
   const [isFetchingMapData, setIsFetchingMapData] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // P2-FIX (#151): Separate info messages from errors - info is non-blocking (no retry needed)
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   // Check for v2 data from context (injected by page.tsx via V2MapDataSetter)
-  const { v2MapData, isV2Enabled } = useSearchV2Data();
-  const lastV2DataRef = useRef<V2MapData | null>(null);
+  const { v2MapData, isV2Enabled, setIsV2Enabled } = useSearchV2Data();
+  // P2-FIX (#124): Use state instead of ref for last V2 data to ensure memo dependencies are correct
+  // Using a ref in useMemo causes stale data because refs aren't tracked by React
+  const [lastV2Data, setLastV2Data] = useState<V2MapData | null>(null);
+  // P2-FIX (#115): Track if data path has been determined to prevent brief empty map.
+  // On initial mount, we don't know if v2 or v1 will provide data. Show loading until determined.
+  const [dataPathDetermined, setDataPathDetermined] = useState(false);
 
   // Coordinate with list transitions - show overlay when list is loading
   const transitionContext = useSearchTransitionSafe();
   const isListTransitioning = transitionContext?.isPending ?? false;
   const hasV2Data = v2MapData !== null;
-  const hasAnyV2Data = hasV2Data || lastV2DataRef.current !== null;
+  const hasAnyV2Data = hasV2Data || lastV2Data !== null;
+
+  // P2-FIX (#115): Mark data path as determined when we receive any signal
+  // Check if URL has bounds (indicates V1 path with known location)
+  const hasBoundsInUrl =
+    searchParams.has("minLng") &&
+    searchParams.has("maxLng") &&
+    searchParams.has("minLat") &&
+    searchParams.has("maxLat");
+
+  useEffect(() => {
+    // V2 mode signaled (either enabled or explicitly disabled after being enabled)
+    // OR we have v2 data OR we have v1 listings OR we have bounds in URL (V1 path)
+    if (isV2Enabled || hasAnyV2Data || listings.length > 0 || hasBoundsInUrl) {
+      setDataPathDetermined(true);
+    }
+  }, [isV2Enabled, hasAnyV2Data, listings.length, hasBoundsInUrl]);
 
   useEffect(() => {
     if (v2MapData) {
-      lastV2DataRef.current = v2MapData;
+      setLastV2Data(v2MapData);
     }
   }, [v2MapData]);
 
   // Compute effective listings based on data source (v2 context or v1 fetch)
   // Memoized for stable reference to prevent unnecessary Map re-renders
   const effectiveListings = useMemo(() => {
-    const activeV2Data = v2MapData ?? lastV2DataRef.current;
+    // P2-FIX (#124): Use lastV2Data state (not ref) so memo properly recalculates
+    const activeV2Data = v2MapData ?? lastV2Data;
     if (activeV2Data) {
       return v2MapDataToListings(activeV2Data);
     }
     return listings;
-  }, [v2MapData, listings]);
+  }, [v2MapData, lastV2Data, listings]);
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const retryCountRef = useRef<number>(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchListings = useCallback(
     async (paramsString: string, signal?: AbortSignal) => {
@@ -317,13 +366,39 @@ export default function PersistentMapWrapper({
             // JSON parsing failed, use status-based message
           }
 
+          // Handle 429 with automatic retry (max 1 retry)
+          if (response.status === 429 && retryCountRef.current < 1) {
+            retryCountRef.current += 1;
+
+            // Check for Retry-After header (in seconds)
+            const retryAfterHeader = response.headers.get("Retry-After");
+            const retryDelayMs = retryAfterHeader
+              ? parseInt(retryAfterHeader, 10) * 1000
+              : 2000; // Default 2s exponential backoff
+
+            // P2-7 FIX: Guard dev logging to avoid production console pollution
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('[PersistentMapWrapper] Rate limited (429), retrying after', retryDelayMs, 'ms');
+            }
+
+            // Schedule automatic retry
+            retryTimeoutRef.current = setTimeout(() => {
+              fetchListings(paramsString, signal);
+            }, retryDelayMs);
+
+            return; // Exit without throwing - retry will happen automatically
+          }
+
           // Log error for debugging (PII-safe - no raw params)
           // Use warn for 400 (expected validation failures) to avoid polluting error overlay
           if (response.status === 400) {
-            console.warn("Map viewport validation failed:", {
-              status: response.status,
-              error: serverMessage,
-            });
+            // P2-7 FIX: Guard dev logging
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('[PersistentMapWrapper] Map viewport validation failed:', {
+                status: response.status,
+                error: serverMessage,
+              });
+            }
           } else {
             console.error("Map listings fetch failed:", {
               status: response.status,
@@ -342,6 +417,9 @@ export default function PersistentMapWrapper({
 
         const data = await response.json();
         setListings(data.listings || []);
+
+        // Reset retry counter on successful fetch
+        retryCountRef.current = 0;
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           console.error("Failed to fetch map listings:", err);
@@ -362,6 +440,10 @@ export default function PersistentMapWrapper({
     if (!shouldRenderMap) {
       return;
     }
+
+    // P1-2 FIX: Reset retry counter when effect re-runs with new params
+    // This ensures fresh retry attempts for each new search
+    retryCountRef.current = 0;
 
     // VIEWPORT VALIDATION: Check bounds validity FIRST, before any v2 checks.
     // This ensures "Zoom in further" error shows regardless of data source (v1 or v2).
@@ -400,20 +482,42 @@ export default function PersistentMapWrapper({
         clamped.set("minLng", (centerLng - MAX_LNG_SPAN / 2).toString());
         clamped.set("maxLng", (centerLng + MAX_LNG_SPAN / 2).toString());
         clampedSearchParams = clamped;
+
+        // P2-7 FIX: Guard dev logging
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('[PersistentMapWrapper] Map viewport clamped to max span:', {
+            original: {
+              lat: [parsedMinLat, parsedMaxLat],
+              lng: [parsedMinLng, parsedMaxLng],
+            },
+            clamped: {
+              lat: [centerLat - MAX_LAT_SPAN / 2, centerLat + MAX_LAT_SPAN / 2],
+              lng: [centerLng - MAX_LNG_SPAN / 2, centerLng + MAX_LNG_SPAN / 2],
+            },
+            maxSpan: { lat: MAX_LAT_SPAN, lng: MAX_LNG_SPAN },
+          });
+        }
+
+        // P2-FIX (#151): Use info message instead of error - map is functional, just clamped
+        setInfoMessage("Zoomed in to show results");
+      } else {
+        // Clear info message when viewport is valid (no clamping occurred)
+        setInfoMessage(null);
       }
-      // Clear error — we'll fetch with clamped or original bounds
-      setError(null);
     }
 
     // RACE GUARD: If v2 mode is signaled but data hasn't arrived yet,
     // delay the v1 fetch to give the setter time to run.
     // This prevents double-fetch and flicker.
+    // P1-3 NOTE: Error state set during viewport validation above is preserved
+    // through this early return - the cleanup doesn't clear error state.
     if (isV2Enabled && !hasV2Data) {
       const raceGuardTimeout = setTimeout(() => {
-        // After delay, if still no v2 data, the component will re-render
-        // and this effect will run again. If v2 data still hasn't arrived,
-        // it means v2 failed and we should fall back to v1 (done on next effect run).
-      }, 100); // 100ms is enough for React to flush the setter
+        // V2 data didn't arrive in time — disable v2 to fall back to v1 fetch.
+        // This triggers a re-render, the effect re-runs, skips this guard,
+        // and proceeds to the v1 fetch below.
+        setIsV2Enabled(false);
+      }, 200); // 200ms — enough for React flush, with margin
       return () => clearTimeout(raceGuardTimeout);
     }
 
@@ -424,6 +528,8 @@ export default function PersistentMapWrapper({
 
     // P3a Fix: Use only map-relevant params for deduplication
     // This prevents re-fetching when page/sort changes (which don't affect markers)
+    // VERIFIED: URLSearchParams.sort() ensures consistent ordering and toString()
+    // produces consistent URL-encoded strings, making string comparison reliable
     const paramsString = getMapRelevantParams(clampedSearchParams);
 
     // Skip if we've already fetched for these exact params
@@ -444,8 +550,14 @@ export default function PersistentMapWrapper({
       clearTimeout(fetchTimeoutRef.current);
     }
 
+    // Abort any in-flight request from previous effect run
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
     // Create abort controller for this fetch
     const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     // Throttle to 2s to stay within 30 req/min rate limit
     fetchTimeoutRef.current = setTimeout(() => {
@@ -457,7 +569,12 @@ export default function PersistentMapWrapper({
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
-      abortController.abort();
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, [searchParams, fetchListings, shouldRenderMap, isV2Enabled, hasV2Data]);
 
@@ -469,13 +586,24 @@ export default function PersistentMapWrapper({
       return;
     }
 
+    // P1-1 FIX: Abort any existing request before starting retry
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for retry request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     // Force a refetch by clearing the last fetched ref
     lastFetchedParamsRef.current = null;
     setError(null);
-    fetchListings(getMapRelevantParams(searchParams));
+    fetchListings(getMapRelevantParams(searchParams), abortController.signal);
   }, [searchParams, fetchListings]);
 
-  const showInitialV2Placeholder = isV2Enabled && !hasAnyV2Data;
+  // P2-FIX (#115): Also show placeholder when data path hasn't been determined yet.
+  // This prevents the brief empty map flash between mount and v2 signal.
+  const showInitialPlaceholder = !dataPathDetermined || (isV2Enabled && !hasAnyV2Data);
   const showV2LoadingOverlay = isV2Enabled && !hasV2Data && hasAnyV2Data;
 
   // CRITICAL: Don't render map component if shouldRenderMap is false
@@ -484,12 +612,12 @@ export default function PersistentMapWrapper({
     return null;
   }
 
-  // Show loading placeholder while waiting for v2 data (race guard)
-  // This prevents showing an empty map before v2MapData arrives
+  // Show loading placeholder while waiting for data (race guard)
+  // P2-FIX (#115): Also show when data path hasn't been determined to prevent brief empty map.
   // IMPORTANT: If there's an error (e.g., viewport too large), show error banner instead
   // NOTE: min-h-[300px] ensures error banner is visible even when parent chain has
   // zero height (h-full chain issue) combined with overflow-hidden clipping
-  if (showInitialV2Placeholder) {
+  if (showInitialPlaceholder) {
     return (
       <div className="relative w-full h-full min-h-[300px]">
         {error ? (
@@ -503,7 +631,9 @@ export default function PersistentMapWrapper({
 
   return (
     <div className="relative w-full h-full min-h-[300px]">
+      {/* P2-FIX (#151): Show error banner for errors, info banner for non-error messages */}
       {error && <MapErrorBanner message={error} onRetry={handleRetry} />}
+      {!error && infoMessage && <MapInfoBanner message={infoMessage} />}
       {/* Data loading bar - shows when fetching map markers after pan/zoom/filter */}
       {(isFetchingMapData || isListTransitioning || showV2LoadingOverlay) && (
         <MapDataLoadingBar />

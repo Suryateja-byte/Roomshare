@@ -31,10 +31,16 @@ describe("MAP_RELEVANT_KEYS includes nearMatches", () => {
   });
 });
 
-// ── Issue B: V2MapDataSetter passes dataVersion ──
+// ── Issue B: V2MapDataSetter does NOT pass dataVersion (fix #135) ──
+//
+// P2-FIX (#135): Don't pass dataVersion - page.tsx data is always fresh for current URL.
+// Passing dataVersion caused race condition: when URL changes, context's effect increments
+// dataVersionRef immediately but state update is batched. This effect would then pass
+// the OLD version (from state) which gets rejected because ref already has new version.
+// Version checking is only needed for async responses, not synchronous page props.
 
-describe("V2MapDataSetter source passes dataVersion", () => {
-  it("should call setV2MapData with data and dataVersion", () => {
+describe("V2MapDataSetter source does NOT pass dataVersion", () => {
+  it("should call setV2MapData with data only (no dataVersion)", () => {
     const fs = require("fs");
     const path = require("path");
     const source = fs.readFileSync(
@@ -44,10 +50,10 @@ describe("V2MapDataSetter source passes dataVersion", () => {
       ),
       "utf-8",
     );
-    // Verify setV2MapData is called with dataVersion argument
-    expect(source).toMatch(/setV2MapData\(data,\s*dataVersion\)/);
-    // Verify dataVersion is destructured from useSearchV2Data
-    expect(source).toContain("dataVersion");
+    // Verify setV2MapData is called WITHOUT dataVersion argument
+    expect(source).toMatch(/setV2MapData\(data\)/);
+    // Should NOT have dataVersion in the setV2MapData call
+    expect(source).not.toMatch(/setV2MapData\(data,\s*dataVersion\)/);
     expect(source).toMatch(/useSearchV2Data\(\)/);
   });
 });

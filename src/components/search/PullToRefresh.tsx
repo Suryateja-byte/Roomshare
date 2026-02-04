@@ -13,6 +13,12 @@ interface PullToRefreshProps {
   onRefresh: () => Promise<void>;
   /** Whether pull-to-refresh is enabled (disable when not at scroll top) */
   enabled?: boolean;
+  /**
+   * P2-FIX (#162): Optional ref to the actual scrollable container.
+   * If provided, scrollTop is checked on this element instead of the wrapper div.
+   * This fixes the issue where the wrapper div is not scrollable (scrollTop always 0).
+   */
+  scrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -23,6 +29,7 @@ export default function PullToRefresh({
   children,
   onRefresh,
   enabled = true,
+  scrollContainerRef,
 }: PullToRefreshProps) {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -34,13 +41,16 @@ export default function PullToRefresh({
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       if (!enabled || isRefreshing) return;
-      const container = containerRef.current;
-      if (container && container.scrollTop <= 0) {
+      // P2-FIX (#162): Use scrollContainerRef if provided, otherwise fallback to containerRef.
+      // The containerRef wrapper div is not scrollable (scrollTop always 0).
+      // The actual scroll element is typically passed via scrollContainerRef.
+      const scrollElement = scrollContainerRef?.current ?? containerRef.current;
+      if (scrollElement && scrollElement.scrollTop <= 0) {
         startY.current = e.touches[0].clientY;
         setIsPulling(true);
       }
     },
-    [enabled, isRefreshing],
+    [enabled, isRefreshing, scrollContainerRef],
   );
 
   const handleTouchMove = useCallback(
@@ -76,6 +86,14 @@ export default function PullToRefresh({
     }
   }, [isPulling, pullDistance, isRefreshing, onRefresh]);
 
+  // P2-FIX (#178): Handle touchCancel to reset state when touch is interrupted
+  // (e.g., browser gesture, incoming call, alert). Without this, isPulling
+  // can stay true incorrectly.
+  const handleTouchCancel = useCallback(() => {
+    setIsPulling(false);
+    setPullDistance(0);
+  }, []);
+
   const progress = Math.min(1, pullDistance / PULL_THRESHOLD);
   const showIndicator = pullDistance > 10 || isRefreshing;
 
@@ -86,6 +104,7 @@ export default function PullToRefresh({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
         className="relative"
       >
         {/* Pull indicator */}

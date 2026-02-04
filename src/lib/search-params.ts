@@ -323,12 +323,12 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     1,
   );
 
-  let validMinPrice = safeParseFloat(
+  const validMinPrice = safeParseFloat(
     getFirstValue(raw.minPrice),
     0,
     MAX_SAFE_PRICE,
   );
-  let validMaxPrice = safeParseFloat(
+  const validMaxPrice = safeParseFloat(
     getFirstValue(raw.maxPrice),
     0,
     MAX_SAFE_PRICE,
@@ -346,8 +346,8 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
 
   const validLat = safeParseFloat(getFirstValue(raw.lat), -90, 90);
   const validLng = safeParseFloat(getFirstValue(raw.lng), -180, 180);
-  let validMinLat = safeParseFloat(getFirstValue(raw.minLat), -90, 90);
-  let validMaxLat = safeParseFloat(getFirstValue(raw.maxLat), -90, 90);
+  const validMinLat = safeParseFloat(getFirstValue(raw.minLat), -90, 90);
+  const validMaxLat = safeParseFloat(getFirstValue(raw.maxLat), -90, 90);
   const validMinLng = safeParseFloat(getFirstValue(raw.minLng), -180, 180);
   const validMaxLng = safeParseFloat(getFirstValue(raw.maxLng), -180, 180);
 

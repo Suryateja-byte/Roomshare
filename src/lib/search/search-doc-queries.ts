@@ -32,6 +32,7 @@ import {
   expandFiltersForNearMatches,
   isNearMatch,
 } from "@/lib/near-matches";
+import { BOUNDS_EPSILON } from "@/lib/constants";
 import { features } from "@/lib/env";
 import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
@@ -46,7 +47,8 @@ const SEARCH_QUERY_TIMEOUT_MS = 5000;
 async function queryWithTimeout<T>(query: string, params: unknown[]): Promise<T[]> {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(
-      `SET LOCAL statement_timeout = '${SEARCH_QUERY_TIMEOUT_MS}'`
+      'SET LOCAL statement_timeout = $1',
+      `${SEARCH_QUERY_TIMEOUT_MS}`
     );
     return tx.$queryRawUnsafe<T[]>(query, ...params);
   });
@@ -67,6 +69,14 @@ export const MAX_UNBOUNDED_RESULTS = 48;
 // Cache Key Generators
 // ============================================
 
+/**
+ * Quantize a coordinate value for cache key consistency.
+ * Uses BOUNDS_EPSILON (~100m precision) to match generateQueryHash in hash.ts.
+ */
+function quantizeBound(value: number): number {
+  return Math.round(value / BOUNDS_EPSILON) * BOUNDS_EPSILON;
+}
+
 function createSearchDocListCacheKey(params: FilterParams): string {
   const normalized = {
     q: params.query?.toLowerCase().trim() || "",
@@ -79,7 +89,7 @@ function createSearchDocListCacheKey(params: FilterParams): string {
     leaseDuration: params.leaseDuration?.toLowerCase() || "",
     moveInDate: params.moveInDate || "",
     bounds: params.bounds
-      ? `${params.bounds.minLng.toFixed(4)},${params.bounds.minLat.toFixed(4)},${params.bounds.maxLng.toFixed(4)},${params.bounds.maxLat.toFixed(4)}`
+      ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",
     page: params.page ?? 1,
     limit: params.limit ?? 12,
@@ -101,7 +111,7 @@ function createSearchDocMapCacheKey(params: FilterParams): string {
     leaseDuration: params.leaseDuration?.toLowerCase() || "",
     moveInDate: params.moveInDate || "",
     bounds: params.bounds
-      ? `${params.bounds.minLng.toFixed(4)},${params.bounds.minLat.toFixed(4)},${params.bounds.maxLng.toFixed(4)},${params.bounds.maxLat.toFixed(4)}`
+      ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",
   };
   return JSON.stringify(normalized);
@@ -121,7 +131,7 @@ function createSearchDocCountCacheKey(params: FilterParams): string {
     genderPreference: params.genderPreference || "",
     householdGender: params.householdGender || "",
     bounds: params.bounds
-      ? `${params.bounds.minLng.toFixed(4)},${params.bounds.minLat.toFixed(4)},${params.bounds.maxLng.toFixed(4)},${params.bounds.maxLat.toFixed(4)}`
+      ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",
     // NOTE: No page or limit - intentionally excluded for cross-page caching
   };
@@ -284,7 +294,7 @@ function buildKeysetWhereClause(
         cursor.k[1] !== null ? parseInt(cursor.k[1], 10) : null;
       params.push(cursorRating, cursorCount, cursor.k[2], cursor.id);
 
-      // Handle NULL cursor rating separately to avoid SQL comparison issues
+      // Handle NULL cursor values separately to avoid SQL comparison issues
       if (cursorRating === null) {
         // Cursor is at NULL ratings (end of results for DESC NULLS LAST)
         // Only compare tie-breaker columns within the NULL group
@@ -294,11 +304,21 @@ function buildKeysetWhereClause(
             OR (d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
           )
         )`;
+      } else if (cursorCount === null) {
+        // Cursor has rating but NULL review_count (within the same rating, NULLs come last)
+        // Only compare tie-breaker columns within the NULL review_count group
+        clause = `(
+          (d.avg_rating < ${ratingParam}::float8)
+          OR (d.avg_rating IS NULL)
+          OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count IS NULL AND d.listing_created_at < ${dateParam}::timestamptz)
+          OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count IS NULL AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
+        )`;
       } else {
         clause = `(
           (d.avg_rating < ${ratingParam}::float8)
           OR (d.avg_rating IS NULL)
           OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count < ${countParam}::int)
+          OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count IS NULL)
           OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count = ${countParam}::int AND d.listing_created_at < ${dateParam}::timestamptz)
           OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count = ${countParam}::int AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
         )`;
@@ -578,9 +598,21 @@ export async function getSearchDocLimitedCount(
 // Map Listings Query (SearchDoc)
 // ============================================
 
+/**
+ * Result shape for map listings query with truncation info.
+ * Used to inform users when more listings exist than can be shown on the map.
+ */
+export interface MapListingsResult {
+  listings: MapListingData[];
+  /** True when more listings exist than MAX_MAP_MARKERS allows */
+  truncated: boolean;
+  /** Total count of matching listings before LIMIT (only set when truncated) */
+  totalCandidates?: number;
+}
+
 async function getSearchDocMapListingsInternal(
   params: FilterParams,
-): Promise<MapListingData[]> {
+): Promise<MapListingsResult> {
   // Defense in depth: map listings ALWAYS require geographic bounds
   // This prevents full-table scans and ensures map has a defined viewport
   if (!params.bounds) {
@@ -598,6 +630,7 @@ async function getSearchDocMapListingsInternal(
 
   // Query with minimal fields for map markers
   // Uses precomputed lat/lng from SearchDoc (no ST_X/ST_Y needed)
+  // COUNT(*) OVER() gives us total matching rows before LIMIT is applied
   const sqlQuery = `
     SELECT
       d.id,
@@ -607,7 +640,8 @@ async function getSearchDocMapListingsInternal(
       d.owner_id as "ownerId",
       d.images[1] as "primaryImage",
       d.lat,
-      d.lng
+      d.lng,
+      COUNT(*) OVER() as "totalCount"
     FROM listing_search_docs d
     WHERE ${whereClause}
     ORDER BY d.listing_created_at DESC
@@ -620,7 +654,11 @@ async function getSearchDocMapListingsInternal(
       [...queryParams, MAX_MAP_MARKERS],
     );
 
-    return listings.map((l) => ({
+    // Extract total count from first row (same for all rows due to window function)
+    const totalCount = listings.length > 0 ? Number(listings[0].totalCount) : 0;
+    const truncated = totalCount > MAX_MAP_MARKERS;
+
+    const mappedListings = listings.map((l) => ({
       id: l.id,
       title: l.title,
       price: Number(l.price),
@@ -632,6 +670,13 @@ async function getSearchDocMapListingsInternal(
         lng: Number(l.lng) || 0,
       },
     }));
+
+    return {
+      listings: mappedListings,
+      truncated,
+      // Only include totalCandidates when truncated (to avoid confusion)
+      ...(truncated && { totalCandidates: totalCount }),
+    };
   } catch (error) {
     const dataError = wrapDatabaseError(error, "getSearchDocMapListings");
     dataError.log({
@@ -645,10 +690,11 @@ async function getSearchDocMapListingsInternal(
 /**
  * Get map listings from SearchDoc (denormalized table).
  * Cached with 60s TTL.
+ * Returns listings with truncation info when more than MAX_MAP_MARKERS exist.
  */
 export async function getSearchDocMapListings(
   params: FilterParams = {},
-): Promise<MapListingData[]> {
+): Promise<MapListingsResult> {
   const cacheKey = createSearchDocMapCacheKey(params);
 
   const cachedFn = unstable_cache(

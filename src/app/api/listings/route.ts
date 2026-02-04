@@ -32,6 +32,7 @@ export async function GET(request: Request) {
     if (rateLimitResponse) return rateLimitResponse;
 
     const startTime = Date.now();
+    const requestId = crypto.randomUUID();
     try {
         const { searchParams } = new URL(request.url);
         const q = searchParams.get('q') || undefined;
@@ -44,15 +45,20 @@ export async function GET(request: Request) {
             query: q,
             count: listings.length,
             durationMs: Date.now() - startTime,
+            requestId,
         });
 
-        // P2-7: Add Cache-Control headers for client-side caching
-        // Short TTL since listings can change frequently (new bookings, price updates)
-        const response = NextResponse.json(listings);
-        response.headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-        // P2-1: Vary header for proper CDN caching
-        response.headers.set('Vary', 'Accept-Encoding');
-        return response;
+        // P2-6: Add Cache-Control headers for CDN and client-side caching
+        // s-maxage=60: CDN caches for 60s
+        // max-age=30: Browser caches for 30s (shorter to get fresher data)
+        // stale-while-revalidate=120: Serve stale while revalidating in background
+        return NextResponse.json(listings, {
+            headers: {
+                "Cache-Control": "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+                "x-request-id": requestId,
+                "Vary": "Accept-Encoding",
+            },
+        });
     } catch (error) {
         logger.sync.error('Error fetching listings', {
             route: '/api/listings',
@@ -211,7 +217,12 @@ export async function POST(request: Request) {
         });
 
         // Fire-and-forget: mark listing dirty for search doc refresh
-        markListingDirty(result.id, 'listing_created').catch(() => {});
+        markListingDirty(result.id, 'listing_created').catch((err) => {
+            console.warn("[API] Failed to mark listing dirty", {
+                listingId: result.id,
+                error: err instanceof Error ? err.message : String(err)
+            });
+        });
 
         // P2-1: Mutation responses must not be cached
         const response = NextResponse.json(result, { status: 201 });

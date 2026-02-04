@@ -1,11 +1,54 @@
 /**
  * Tests for useBatchedFilters hook
+ *
+ * Coverage:
+ * - arraysEqual with same elements different order
+ * - isDirty when only array fields change
+ * - commit preserves non-filter URL params
+ * - reset after multiple setPending calls
  */
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
+  useBatchedFilters,
   readFiltersFromURL,
   emptyFilterValues,
   type BatchedFilterValues,
 } from "@/hooks/useBatchedFilters";
+
+// Mock next/navigation
+jest.mock("next/navigation", () => ({
+  useRouter: jest.fn(),
+  useSearchParams: jest.fn(),
+}));
+
+// Mock SearchTransitionContext
+jest.mock("@/contexts/SearchTransitionContext", () => ({
+  useSearchTransitionSafe: jest.fn(() => null),
+}));
+
+const mockRouter = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  forward: jest.fn(),
+  refresh: jest.fn(),
+  prefetch: jest.fn(),
+};
+
+const createMockSearchParams = (
+  params: Record<string, string | string[]> = {}
+) => {
+  const urlSearchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((v) => urlSearchParams.append(key, v));
+    } else {
+      urlSearchParams.set(key, value);
+    }
+  });
+  return urlSearchParams;
+};
 
 // --- Unit tests for readFiltersFromURL (pure function, no hooks needed) ---
 
@@ -287,5 +330,489 @@ describe("setPending merging", () => {
     state = { ...state, minPrice: "200" };
     state = { ...state, minPrice: "300" };
     expect(state.minPrice).toBe("300");
+  });
+});
+
+// --- Hook integration tests using renderHook ---
+
+describe("useBatchedFilters hook", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useRouter as jest.Mock).mockReturnValue(mockRouter);
+    (useSearchParams as jest.Mock).mockReturnValue(createMockSearchParams());
+  });
+
+  describe("initial state", () => {
+    it("initializes pending state from URL params", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          minPrice: "500",
+          maxPrice: "1500",
+          roomType: "Private Room",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      expect(result.current.pending.minPrice).toBe("500");
+      expect(result.current.pending.maxPrice).toBe("1500");
+      expect(result.current.pending.roomType).toBe("Private Room");
+    });
+
+    it("returns empty values when no URL params", () => {
+      const { result } = renderHook(() => useBatchedFilters());
+
+      expect(result.current.pending).toEqual(emptyFilterValues);
+      expect(result.current.isDirty).toBe(false);
+    });
+  });
+
+  describe("arraysEqual with same elements different order", () => {
+    it("considers arrays equal regardless of order", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          amenities: "Wifi,Parking,Washer",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      // Set same amenities in different order
+      act(() => {
+        result.current.setPending({ amenities: ["Washer", "Wifi", "Parking"] });
+      });
+
+      // Should NOT be dirty because arrays have same elements
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it("detects dirty state when array has different elements", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          amenities: "Wifi,Parking",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      // Set different amenities
+      act(() => {
+        result.current.setPending({ amenities: ["Wifi", "Washer"] });
+      });
+
+      // Should be dirty because arrays have different elements
+      expect(result.current.isDirty).toBe(true);
+    });
+
+    it("detects dirty state when array lengths differ", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          amenities: "Wifi,Parking",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      // Set fewer amenities
+      act(() => {
+        result.current.setPending({ amenities: ["Wifi"] });
+      });
+
+      expect(result.current.isDirty).toBe(true);
+    });
+
+    it("handles empty arrays correctly", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(createMockSearchParams());
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      // Initially empty, set to empty - should not be dirty
+      act(() => {
+        result.current.setPending({ amenities: [] });
+      });
+
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it("handles houseRules array order independence", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          houseRules: "Couples allowed,Pets allowed",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      // Same rules, different order
+      act(() => {
+        result.current.setPending({ houseRules: ["Pets allowed", "Couples allowed"] });
+      });
+
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it("handles languages array order independence", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          languages: "en,es",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      // Same languages, different order
+      act(() => {
+        result.current.setPending({ languages: ["es", "en"] });
+      });
+
+      expect(result.current.isDirty).toBe(false);
+    });
+  });
+
+  describe("isDirty when only array fields change", () => {
+    it("detects dirty when adding to amenities", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(createMockSearchParams());
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ amenities: ["Wifi"] });
+      });
+
+      expect(result.current.isDirty).toBe(true);
+    });
+
+    it("detects dirty when adding to houseRules", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(createMockSearchParams());
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ houseRules: ["Pets allowed"] });
+      });
+
+      expect(result.current.isDirty).toBe(true);
+    });
+
+    it("detects dirty when adding to languages", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(createMockSearchParams());
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ languages: ["en"] });
+      });
+
+      expect(result.current.isDirty).toBe(true);
+    });
+
+    it("not dirty when array is same as URL", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          amenities: "Wifi",
+          houseRules: "Pets allowed",
+          languages: "en",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      // Should not be dirty initially
+      expect(result.current.isDirty).toBe(false);
+
+      // Set to same values
+      act(() => {
+        result.current.setPending({
+          amenities: ["Wifi"],
+          houseRules: ["Pets allowed"],
+          languages: ["en"],
+        });
+      });
+
+      expect(result.current.isDirty).toBe(false);
+    });
+  });
+
+  describe("commit preserves non-filter URL params", () => {
+    it("preserves bounds param on commit", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          bounds: "37.0,-122.5,38.0,-121.5",
+          minPrice: "500",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ minPrice: "600" });
+      });
+
+      act(() => {
+        result.current.commit();
+      });
+
+      expect(mockRouter.push).toHaveBeenCalledTimes(1);
+      const calledUrl = mockRouter.push.mock.calls[0][0] as string;
+      expect(calledUrl).toContain("bounds=");
+      expect(calledUrl).toContain("minPrice=600");
+    });
+
+    it("preserves sort param on commit", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          sort: "price-asc",
+          roomType: "Private Room",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ roomType: "Entire place" });
+      });
+
+      act(() => {
+        result.current.commit();
+      });
+
+      const calledUrl = mockRouter.push.mock.calls[0][0] as string;
+      expect(calledUrl).toContain("sort=price-asc");
+    });
+
+    it("preserves q (query) param on commit", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          q: "San Francisco",
+          minPrice: "500",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ maxPrice: "2000" });
+      });
+
+      act(() => {
+        result.current.commit();
+      });
+
+      const calledUrl = mockRouter.push.mock.calls[0][0] as string;
+      expect(calledUrl).toContain("q=San");
+      expect(calledUrl).toContain("maxPrice=2000");
+    });
+
+    it("preserves lat/lng params on commit", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          lat: "37.7749",
+          lng: "-122.4194",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ amenities: ["Wifi"] });
+      });
+
+      act(() => {
+        result.current.commit();
+      });
+
+      const calledUrl = mockRouter.push.mock.calls[0][0] as string;
+      expect(calledUrl).toContain("lat=37.7749");
+      expect(calledUrl).toContain("lng=-122.4194");
+    });
+
+    it("removes pagination params on commit", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          page: "2",
+          cursor: "abc123",
+          cursorStack: "xyz",
+          pageNumber: "3",
+          minPrice: "500",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ minPrice: "600" });
+      });
+
+      act(() => {
+        result.current.commit();
+      });
+
+      const calledUrl = mockRouter.push.mock.calls[0][0] as string;
+      expect(calledUrl).not.toContain("page=");
+      expect(calledUrl).not.toContain("cursor=");
+      expect(calledUrl).not.toContain("cursorStack=");
+      expect(calledUrl).not.toContain("pageNumber=");
+      expect(calledUrl).toContain("minPrice=600");
+    });
+  });
+
+  describe("reset after multiple setPending calls", () => {
+    it("resets all pending changes to committed state", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          minPrice: "500",
+          maxPrice: "1500",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      // Make multiple changes
+      act(() => {
+        result.current.setPending({ minPrice: "600" });
+      });
+      act(() => {
+        result.current.setPending({ maxPrice: "2000" });
+      });
+      act(() => {
+        result.current.setPending({ roomType: "Private Room" });
+      });
+
+      expect(result.current.isDirty).toBe(true);
+      expect(result.current.pending.minPrice).toBe("600");
+      expect(result.current.pending.maxPrice).toBe("2000");
+      expect(result.current.pending.roomType).toBe("Private Room");
+
+      // Reset
+      act(() => {
+        result.current.reset();
+      });
+
+      // Should be back to committed state
+      expect(result.current.isDirty).toBe(false);
+      expect(result.current.pending.minPrice).toBe("500");
+      expect(result.current.pending.maxPrice).toBe("1500");
+      expect(result.current.pending.roomType).toBe("");
+    });
+
+    it("resets array fields correctly", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          amenities: "Wifi",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      // Add multiple amenities
+      act(() => {
+        result.current.setPending({ amenities: ["Wifi", "Parking", "Washer"] });
+      });
+
+      expect(result.current.pending.amenities).toEqual(["Wifi", "Parking", "Washer"]);
+
+      // Reset
+      act(() => {
+        result.current.reset();
+      });
+
+      expect(result.current.pending.amenities).toEqual(["Wifi"]);
+    });
+
+    it("reset is idempotent - calling multiple times has same effect", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          minPrice: "500",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ minPrice: "1000" });
+      });
+
+      // Reset multiple times
+      act(() => {
+        result.current.reset();
+      });
+      act(() => {
+        result.current.reset();
+      });
+      act(() => {
+        result.current.reset();
+      });
+
+      expect(result.current.pending.minPrice).toBe("500");
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it("syncs pending with URL when URL changes externally", async () => {
+      const mockSearchParams = createMockSearchParams({ minPrice: "500" });
+      (useSearchParams as jest.Mock).mockReturnValue(mockSearchParams);
+
+      const { result, rerender } = renderHook(() => useBatchedFilters());
+
+      expect(result.current.pending.minPrice).toBe("500");
+
+      // Make local change
+      act(() => {
+        result.current.setPending({ minPrice: "1000" });
+      });
+
+      expect(result.current.pending.minPrice).toBe("1000");
+      expect(result.current.isDirty).toBe(true);
+
+      // Simulate URL change (e.g., back navigation)
+      const newSearchParams = createMockSearchParams({ minPrice: "750" });
+      (useSearchParams as jest.Mock).mockReturnValue(newSearchParams);
+
+      rerender();
+
+      // Pending should sync to new URL value
+      await waitFor(() => {
+        expect(result.current.pending.minPrice).toBe("750");
+        expect(result.current.isDirty).toBe(false);
+      });
+    });
+  });
+
+  describe("setPending hook behavior", () => {
+    it("merges partial updates", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(createMockSearchParams());
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ minPrice: "500" });
+      });
+
+      act(() => {
+        result.current.setPending({ maxPrice: "1500" });
+      });
+
+      expect(result.current.pending.minPrice).toBe("500");
+      expect(result.current.pending.maxPrice).toBe("1500");
+    });
+
+    it("allows updating multiple fields at once", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(createMockSearchParams());
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({
+          minPrice: "500",
+          maxPrice: "1500",
+          roomType: "Private Room",
+          amenities: ["Wifi", "Parking"],
+        });
+      });
+
+      expect(result.current.pending.minPrice).toBe("500");
+      expect(result.current.pending.maxPrice).toBe("1500");
+      expect(result.current.pending.roomType).toBe("Private Room");
+      expect(result.current.pending.amenities).toEqual(["Wifi", "Parking"]);
+    });
   });
 });

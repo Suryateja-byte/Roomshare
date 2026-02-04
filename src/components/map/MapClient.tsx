@@ -4,7 +4,7 @@ import '@/lib/mapbox-init'; // Must be first - initializes worker
 import ReactMapGL, { Marker, Popup, Source, Layer, ViewStateChangeEvent, MapLayerMouseEvent } from 'react-map-gl';
 import type { LayerProps, GeoJSONSource } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -94,6 +94,10 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
         latitude: 37.7749,
         zoom: 12
     });
+
+    // Keyboard navigation state for arrow key navigation between markers
+    const [keyboardFocusedId, setKeyboardFocusedId] = useState<string | null>(null);
+    const markerRefs = useRef<globalThis.Map<string, HTMLDivElement>>(new globalThis.Map());
 
     // Debounce the view state to prevent excessive API calls
     const [debouncedViewState] = useDebounce(viewState, 500);
@@ -288,6 +292,85 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
         return positions;
     }, [markersSource]);
 
+    // Sorted marker positions for keyboard navigation (top-to-bottom, left-to-right)
+    const sortedMarkerPositions = useMemo(() => {
+        return [...markerPositions].sort((a, b) => {
+            const latDiff = b.lat - a.lat;
+            if (Math.abs(latDiff) > 0.001) return latDiff;
+            return a.lng - b.lng;
+        });
+    }, [markerPositions]);
+
+    // Keyboard navigation handler for arrow keys
+    const handleMarkerKeyboardNavigation = useCallback((e: ReactKeyboardEvent<HTMLDivElement>, currentListingId: string) => {
+        const currentIndex = sortedMarkerPositions.findIndex(p => p.listing.id === currentListingId);
+        if (currentIndex === -1 || sortedMarkerPositions.length === 0) return;
+
+        let nextIndex: number | null = null;
+        const currentPos = sortedMarkerPositions[currentIndex];
+
+        const findNearest = (filter: (pos: MarkerPosition) => boolean) => {
+            let bestIndex = -1;
+            let bestDistance = Infinity;
+            for (let i = 0; i < sortedMarkerPositions.length; i++) {
+                if (i === currentIndex) continue;
+                const pos = sortedMarkerPositions[i];
+                if (filter(pos)) {
+                    const distance = Math.sqrt(
+                        Math.pow(pos.lat - currentPos.lat, 2) +
+                        Math.pow(pos.lng - currentPos.lng, 2)
+                    );
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestIndex = i;
+                    }
+                }
+            }
+            return bestIndex;
+        };
+
+        switch (e.key) {
+            case 'ArrowUp':
+                nextIndex = findNearest(pos => pos.lat > currentPos.lat);
+                break;
+            case 'ArrowDown':
+                nextIndex = findNearest(pos => pos.lat < currentPos.lat);
+                break;
+            case 'ArrowLeft':
+                nextIndex = findNearest(pos => pos.lng < currentPos.lng);
+                break;
+            case 'ArrowRight':
+                nextIndex = findNearest(pos => pos.lng > currentPos.lng);
+                break;
+            case 'Home':
+                if (sortedMarkerPositions.length > 0) nextIndex = 0;
+                break;
+            case 'End':
+                if (sortedMarkerPositions.length > 0) nextIndex = sortedMarkerPositions.length - 1;
+                break;
+            default:
+                return;
+        }
+
+        if (nextIndex !== null && nextIndex !== -1 && nextIndex !== currentIndex) {
+            e.preventDefault();
+            e.stopPropagation();
+            const nextMarker = sortedMarkerPositions[nextIndex];
+            const nextId = nextMarker.listing.id;
+
+            setKeyboardFocusedId(nextId);
+            const markerEl = markerRefs.current.get(nextId);
+            if (markerEl) markerEl.focus();
+
+            if (mapRef.current) {
+                mapRef.current.easeTo({
+                    center: [nextMarker.lng, nextMarker.lat],
+                    duration: 300
+                });
+            }
+        }
+    }, [sortedMarkerPositions]);
+
     const onMove = useCallback((evt: ViewStateChangeEvent) => {
         setViewState(evt.viewState);
         // Update unclustered listings after move
@@ -381,16 +464,27 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                             }}
                         >
                             <div
+                                ref={(el) => {
+                                    if (el) {
+                                        markerRefs.current.set(position.listing.id, el);
+                                    } else {
+                                        markerRefs.current.delete(position.listing.id);
+                                    }
+                                }}
                                 role="button"
                                 tabIndex={0}
-                                aria-label={`$${position.listing.price} listing${position.listing.title ? `: ${position.listing.title}` : ''}`}
+                                aria-label={`$${position.listing.price} listing${position.listing.title ? `: ${position.listing.title}` : ''}. Use arrow keys to navigate between markers.`}
+                                onFocus={() => setKeyboardFocusedId(position.listing.id)}
+                                onBlur={() => setKeyboardFocusedId(current => current === position.listing.id ? null : current)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
                                         e.preventDefault();
                                         handleMarkerSelect();
+                                    } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+                                        handleMarkerKeyboardNavigation(e, position.listing.id);
                                     }
                                 }}
-                                className="relative cursor-pointer group/marker focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white rounded-xl"
+                                className={`relative cursor-pointer group/marker focus:outline-none rounded-xl ${keyboardFocusedId === position.listing.id ? 'z-50' : ''}`}
                             >
                                 {/* Pin body with price - Pill style matching card aesthetic */}
                                 <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-3 py-1.5 rounded-xl shadow-lg group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200 group-hover/marker:scale-105 transition-all duration-200 font-semibold text-sm whitespace-nowrap relative">
@@ -400,6 +494,10 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                                 <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[7px] border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200 transition-colors" aria-hidden="true"></div>
                                 {/* Shadow under the pin for depth */}
                                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]" aria-hidden="true"></div>
+                                {/* Keyboard focus ring */}
+                                {keyboardFocusedId === position.listing.id && (
+                                    <div className="absolute -inset-3 rounded-full border-[3px] border-blue-500 dark:border-blue-400 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]" aria-hidden="true" />
+                                )}
                             </div>
                         </Marker>
                     );
@@ -442,7 +540,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                                 <button
                                     onClick={() => setSelectedListing(null)}
                                     aria-label="Close listing preview"
-                                    className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${isDarkMode
+                                    className={`absolute top-1 right-1 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center transition-colors ${isDarkMode
                                             ? 'bg-zinc-900/80 hover:bg-zinc-900 text-white'
                                             : 'bg-white/80 hover:bg-white text-zinc-900'
                                         }`}

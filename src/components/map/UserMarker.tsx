@@ -93,7 +93,8 @@ export function UserMarker({
             <button
                 onClick={onToggleDropMode}
                 className={cn(
-                    "absolute bottom-4 left-4 z-10 flex items-center gap-2 px-3 py-2 rounded-lg shadow-md border text-sm font-medium transition-all",
+                    // P2-8 FIX: Ensure 44px minimum touch target for WCAG 2.5.5
+                    "absolute bottom-4 left-4 z-10 flex items-center justify-center gap-2 px-3 py-2 rounded-lg shadow-md border text-sm font-medium transition-all min-h-[44px]",
                     isDropMode
                         ? "bg-rose-500 text-white border-rose-500 ring-2 ring-rose-300"
                         : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
@@ -140,9 +141,11 @@ export function UserMarker({
                                 ) : (
                                     <span className="text-zinc-400">Custom pin</span>
                                 )}
+                                {/* P1-FIX (#97): Ensure 44px minimum touch target for WCAG 2.5.5.
+                                    The visual icon is small (12px) but touch area is 44x44 via negative margin. */}
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onSetPin(null); }}
-                                    className="ml-1 hover:text-rose-500 flex-shrink-0"
+                                    className="ml-1 hover:text-rose-500 flex-shrink-0 min-w-[44px] min-h-[44px] -m-3 p-3 flex items-center justify-center touch-manipulation"
                                     aria-label="Remove pin"
                                 >
                                     <X className="w-3 h-3" />
@@ -169,6 +172,7 @@ export function UserMarker({
 export function useUserPin(mapboxToken: string) {
     const [isDropMode, setIsDropMode] = useState(false);
     const [pin, setPin] = useState<UserPinState | null>(null);
+    const abortRef = useRef<AbortController | null>(null);
 
     const toggleDropMode = useCallback(() => {
         setIsDropMode(prev => !prev);
@@ -181,10 +185,15 @@ export function useUserPin(mapboxToken: string) {
         setPin({ lng, lat, address: null });
         setIsDropMode(false);
 
+        // Cancel any in-flight geocode request
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         try {
             const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&types=address,poi&limit=1`;
-            const res = await fetch(url);
-            if (res.ok) {
+            const res = await fetch(url, { signal: controller.signal });
+            if (res.ok && !controller.signal.aborted) {
                 const data = await res.json();
                 const address = data.features?.[0]?.place_name ?? null;
                 setPin(prev => prev ? { ...prev, address } : null);
@@ -195,6 +204,11 @@ export function useUserPin(mapboxToken: string) {
 
         return true; // Handled
     }, [isDropMode, mapboxToken]);
+
+    // Clean up on unmount
+    useEffect(() => {
+        return () => abortRef.current?.abort();
+    }, []);
 
     return { isDropMode, toggleDropMode, pin, setPin, handleMapClick };
 }

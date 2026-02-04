@@ -58,7 +58,7 @@ export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPill
     <div className="hidden md:flex items-center gap-2 w-full max-w-2xl mx-auto">
       <button
         onClick={onExpand}
-        className="flex-1 flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow"
+        className="flex-1 flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         aria-label="Expand search form"
       >
         <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
@@ -85,7 +85,7 @@ export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPill
       {onOpenFilters && (
         <button
           onClick={onOpenFilters}
-          className="relative flex items-center justify-center w-12 h-12 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow flex-shrink-0"
+          className="relative flex items-center justify-center w-12 h-12 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ''}`}
         >
           <SlidersHorizontal className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />

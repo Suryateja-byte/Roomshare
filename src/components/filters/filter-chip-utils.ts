@@ -57,6 +57,8 @@ const _FILTER_PARAMS = [
   "leaseDuration",
   "moveInDate",
   "nearMatches",
+  "genderPreference",
+  "householdGender",
 ] as const;
 
 type _FilterParamKey = (typeof _FILTER_PARAMS)[number];
@@ -195,6 +197,36 @@ export function urlToFilterChips(
       id: "nearMatches",
       label: "Near matches",
       paramKey: "nearMatches",
+    });
+  }
+
+  // Gender preference filter
+  const genderPreference = searchParams.get("genderPreference");
+  if (genderPreference && genderPreference !== "any") {
+    chips.push({
+      id: "genderPreference",
+      label:
+        genderPreference === "female"
+          ? "Female Only"
+          : genderPreference === "male"
+            ? "Male Only"
+            : genderPreference,
+      paramKey: "genderPreference",
+    });
+  }
+
+  // Household gender filter
+  const householdGender = searchParams.get("householdGender");
+  if (householdGender && householdGender !== "any") {
+    chips.push({
+      id: "householdGender",
+      label:
+        householdGender === "female"
+          ? "All Female"
+          : householdGender === "male"
+            ? "All Male"
+            : householdGender,
+      paramKey: "householdGender",
     });
   }
 

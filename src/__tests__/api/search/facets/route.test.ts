@@ -25,6 +25,7 @@ jest.mock("@/lib/request-context", () => ({
   createContextFromHeaders: jest.fn().mockReturnValue({}),
   runWithRequestContext: jest.fn((_, fn) => fn()),
   getRequestId: jest.fn().mockReturnValue("test-request-id"),
+  getRequestContext: jest.fn().mockReturnValue({ requestId: "test-request-id" }),
 }));
 
 // Mock unstable_cache to execute function immediately

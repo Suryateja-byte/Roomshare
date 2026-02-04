@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMapListings, MapListingData } from "@/lib/data";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
+import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { validateAndParseBounds } from "@/lib/validation";
 import {
   createContextFromHeaders,
@@ -108,7 +109,11 @@ export async function GET(request: NextRequest) {
       };
 
       // Fetch listings using existing data function
-      const listings: MapListingData[] = await getMapListings(filterParams);
+      const listings: MapListingData[] = await withTimeout(
+        getMapListings(filterParams),
+        DEFAULT_TIMEOUTS.DATABASE,
+        "getMapListings"
+      );
 
       return NextResponse.json(
         { listings },

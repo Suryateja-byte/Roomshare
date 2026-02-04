@@ -182,7 +182,7 @@ describe("Unbounded Browse Protection", () => {
     });
 
     it("executes query when bounds are provided", async () => {
-      // Arrange
+      // Arrange - include totalCount for COUNT(*) OVER() window function
       const mockMapListings = [
         {
           id: "listing-1",
@@ -193,6 +193,7 @@ describe("Unbounded Browse Protection", () => {
           primaryImage: "/image.jpg",
           lat: 37.7749,
           lng: -122.4194,
+          totalCount: BigInt(1),
         },
       ];
       (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockMapListings);
@@ -207,10 +208,11 @@ describe("Unbounded Browse Protection", () => {
         },
       });
 
-      // Assert: Should execute and return map listings
+      // Assert: Should execute and return map listings with truncation info
       expect(prisma.$queryRawUnsafe).toHaveBeenCalled();
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("listing-1");
+      expect(result.listings).toHaveLength(1);
+      expect(result.listings[0].id).toBe("listing-1");
+      expect(result.truncated).toBe(false);
     });
   });
 

@@ -41,6 +41,17 @@ interface SearchMapUIContextValue {
 
 const SearchMapUIContext = createContext<SearchMapUIContextValue | null>(null);
 
+// P2-FIX (#179): Stable no-op fallback for SSR/outside-provider usage
+// Prevents creating new object on every render
+const NOOP_CONTEXT_VALUE: SearchMapUIContextValue = {
+  pendingFocus: null,
+  focusListingOnMap: () => {},
+  acknowledgeFocus: () => {},
+  clearPendingFocus: () => {},
+  registerDismiss: () => {},
+  dismiss: () => {},
+};
+
 interface SearchMapUIProviderProps {
   children: React.ReactNode;
   showMap: () => void;
@@ -120,18 +131,8 @@ export function SearchMapUIProvider({
  */
 export function useSearchMapUI() {
   const context = useContext(SearchMapUIContext);
-  if (!context) {
-    // Return no-op when used outside provider (e.g., non-search pages)
-    return {
-      pendingFocus: null,
-      focusListingOnMap: () => {},
-      acknowledgeFocus: () => {},
-      clearPendingFocus: () => {},
-      registerDismiss: () => {},
-      dismiss: () => {},
-    };
-  }
-  return context;
+  // P2-FIX (#179): Return stable no-op fallback when outside provider
+  return context ?? NOOP_CONTEXT_VALUE;
 }
 
 /**
@@ -140,5 +141,9 @@ export function useSearchMapUI() {
 export function usePendingMapFocus() {
   const { pendingFocus, acknowledgeFocus, clearPendingFocus } =
     useSearchMapUI();
-  return { pendingFocus, acknowledgeFocus, clearPendingFocus };
+  // P2-FIX (#180): Memoize return value to prevent creating new object every render
+  return useMemo(
+    () => ({ pendingFocus, acknowledgeFocus, clearPendingFocus }),
+    [pendingFocus, acknowledgeFocus, clearPendingFocus]
+  );
 }
