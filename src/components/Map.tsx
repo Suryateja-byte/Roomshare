@@ -921,6 +921,22 @@ export default function MapComponent({
         }
     }, [listings, searchParams, searchAsMove, setProgrammaticMove]);
 
+    // Expose map ref and helpers for E2E testing
+    useEffect(() => {
+        if (!isMapLoaded || !mapRef.current) return;
+
+        const win = window as unknown as Record<string, unknown>;
+        win.__e2eMapRef = mapRef.current.getMap();
+        win.__e2eSetProgrammaticMove = setProgrammaticMove;
+        win.__e2eUpdateMarkers = updateUnclusteredListings;
+
+        return () => {
+            delete win.__e2eMapRef;
+            delete win.__e2eSetProgrammaticMove;
+            delete win.__e2eUpdateMarkers;
+        };
+    }, [isMapLoaded, setProgrammaticMove, updateUnclusteredListings]);
+
     // Listen for fly-to events from location search
     useEffect(() => {
         const handleFlyTo = (event: CustomEvent<MapFlyToEventDetail>) => {
@@ -1015,6 +1031,9 @@ export default function MapComponent({
 
     // Cleanup timers on unmount and mark component as unmounted
     useEffect(() => {
+        // Reset mounted flag on (re)mount — required for React Strict Mode
+        // which unmounts/remounts in development, leaving the ref as false
+        isMountedRef.current = true;
         return () => {
             // P0 Issue #25: Mark unmounted to prevent stale state updates
             isMountedRef.current = false;
@@ -1550,6 +1569,14 @@ export default function MapComponent({
 
                     setIsMapLoaded(true);
                     updateUnclusteredListings();
+
+                    // E2E testing hook: expose map ref and helpers for programmatic control
+                    if (mapRef.current) {
+                        const win = window as unknown as Record<string, unknown>;
+                        win.__e2eMapRef = mapRef.current.getMap();
+                        win.__e2eSetProgrammaticMove = setProgrammaticMove;
+                        win.__e2eUpdateMarkers = updateUnclusteredListings;
+                    }
 
                     // Fix 1: Listen for sourcedata to retry unclustered query after tiles load.
                     // querySourceFeatures only returns results for rendered tiles, so after

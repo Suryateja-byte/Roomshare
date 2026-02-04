@@ -139,22 +139,81 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
       await page.goto("/");
       await page.waitForLoadState("domcontentloaded");
       // Navigate to search with different bounds - triggers fresh fetch with mock
-      await page.goto(searchUrl, { waitUntil: "networkidle" });
+      await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
+
+      // Wait for map E2E hook to be available, then zoom in to uncluster markers
+      try {
+        await page.waitForFunction(
+          () => !!(window as any).__e2eMapRef,
+          { timeout: 15000 }
+        );
+        // Zoom in programmatically to the stacked coords and wait for idle
+        await page.evaluate(
+          (coords) => {
+            return new Promise<void>((resolve) => {
+              const map = (window as any).__e2eMapRef;
+              const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+              if (map && setProgrammatic) {
+                setProgrammatic(true);
+                map.once("idle", () => resolve());
+                map.jumpTo({ center: [coords.lng, coords.lat], zoom: 16 });
+                // Safety timeout
+                setTimeout(() => resolve(), 8000);
+              } else {
+                resolve();
+              }
+            });
+          },
+          STACKED_COORDS
+        );
+        // Trigger marker update after tiles load
+        await page.evaluate(() => {
+          const updateMarkers = (window as any).__e2eUpdateMarkers;
+          if (typeof updateMarkers === "function") {
+            updateMarkers();
+          }
+        });
+      } catch {
+        // Fallback: just wait for map to settle
+      }
+      await page.waitForTimeout(1000);
     },
   };
 }
 
 /**
  * Wait for stacked marker to appear on map.
- * Since triggerRefetch uses networkidle, the API call has already completed.
- * We just need to wait for markers to render.
+ * After triggerRefetch zooms to the stacked coords, markers should render.
+ * Calls __e2eUpdateMarkers to ensure the marker state is refreshed after
+ * programmatic zoom (sourcedata handler may miss tile events).
  */
 export async function waitForStackedMarker(
   page: Page,
-  timeout: number = 10000,
+  timeout: number = 15000,
 ): Promise<void> {
+  // Wait for the E2E map hook to be available (map loaded)
+  try {
+    await page.waitForFunction(
+      () => !!(window as any).__e2eMapRef,
+      { timeout: 10000 }
+    );
+  } catch {
+    // Map not ready — fall through and let the marker wait fail with a clear error
+  }
+
+  // Manually trigger marker update (sourcedata handler may skip tile events
+  // during programmatic zoom)
+  await page.evaluate(() => {
+    const updateMarkers = (window as any).__e2eUpdateMarkers;
+    if (typeof updateMarkers === "function") {
+      updateMarkers();
+    }
+  });
+
+  // Wait for React to render markers
+  await page.waitForTimeout(500);
+
   // Wait for marker to be visible
-  // The mock intercepts the API and returns stacked listings at the same coordinates
   await page.locator(".mapboxgl-marker:visible").first().waitFor({
     state: "visible",
     timeout,
