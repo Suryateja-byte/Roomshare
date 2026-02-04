@@ -117,11 +117,22 @@ export async function GET(request: NextRequest) {
         },
       });
     } catch (error) {
+      const isValidationError =
+        error instanceof Error &&
+        (error.message.includes("cannot exceed") ||
+          error.message.includes("Invalid") ||
+          error.message.includes("must be"));
+
       console.error("Search v2 API error:", { error, requestId });
+
       return NextResponse.json(
-        { error: "Failed to fetch search results" },
         {
-          status: 500,
+          error: isValidationError
+            ? (error as Error).message
+            : "Failed to fetch search results",
+        },
+        {
+          status: isValidationError ? 400 : 500,
           headers: { "x-request-id": requestId },
         },
       );

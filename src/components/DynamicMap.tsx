@@ -3,6 +3,14 @@
 import dynamic from 'next/dynamic';
 import { ComponentProps } from 'react';
 
+// Re-export controlled component types for consumers
+export type {
+    MapViewState,
+    MapBounds,
+    MapViewStateChangeEvent,
+    MapComponentProps,
+} from '@/components/Map';
+
 // Dynamic import for Map component - defers 944KB mapbox-gl bundle until needed
 const MapComponent = dynamic(() => import('@/components/Map'), {
     ssr: false,
@@ -15,6 +23,16 @@ const MapComponent = dynamic(() => import('@/components/Map'), {
 
 type DynamicMapProps = ComponentProps<typeof MapComponent>;
 
-export default function DynamicMap({ listings }: DynamicMapProps) {
-    return <MapComponent listings={listings} />;
+/**
+ * DynamicMap - Lazy-loaded wrapper for MapComponent.
+ *
+ * Passes through all MapComponent props including controlled mode props:
+ * - viewState / onViewStateChange for controlled viewport
+ * - selectedListingId / onSelectedListingChange for controlled selection
+ * - disableAutoFit to prevent automatic viewport changes
+ *
+ * @see MapComponent for full prop documentation
+ */
+export default function DynamicMap(props: DynamicMapProps) {
+    return <MapComponent {...props} />;
 }

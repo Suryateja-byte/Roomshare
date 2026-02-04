@@ -31,9 +31,15 @@ export default function SearchError({
                 <p className="text-zinc-600 dark:text-zinc-400 mb-2">
                     We&apos;re having trouble finding listings right now. This is usually temporary.
                 </p>
-                <p className="text-sm text-zinc-500 dark:text-zinc-500 mb-8">
+                <p className="text-sm text-zinc-500 dark:text-zinc-500 mb-4">
                     Try refreshing the page, or adjust your search filters and try again.
                 </p>
+
+                {error.digest && (
+                    <p className="mt-2 mb-8 text-sm text-zinc-500 dark:text-zinc-400">
+                        Reference ID: <code className="bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded font-mono text-xs">{error.digest}</code>
+                    </p>
+                )}
 
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button onClick={() => reset()} size="lg" className="gap-2">

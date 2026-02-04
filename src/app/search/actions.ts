@@ -68,18 +68,10 @@ export async function fetchMoreListings(
     }
   }
 
-  // V1 fallback - cursor-based pagination not supported, return empty
-  // The initial page already loaded via SSR; v1 doesn't support cursor continuation
-  const { filterParams, requestedPage } = parseSearchParams(rawParams);
-  const v1Result = await getListingsPaginated({
-    ...filterParams,
-    page: requestedPage,
-    limit: ITEMS_PER_PAGE,
-  });
-
-  return {
-    items: v1Result.items,
-    nextCursor: null,
-    hasNextPage: false,
-  };
+  // V1 fallback - cursor-based pagination not truly supported
+  // Return empty result to signal load more is unavailable via V1
+  // The initial page was already loaded via SSR; continuing with page-based
+  // pagination would return duplicate first-page results
+  console.warn("[fetchMoreListings] V1 fallback reached - cursor pagination not supported");
+  return { items: [], nextCursor: null, hasNextPage: false };
 }

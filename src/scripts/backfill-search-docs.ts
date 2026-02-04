@@ -154,15 +154,34 @@ async function countListingsWithoutLocation(): Promise<number> {
 }
 
 /**
- * Compute recommended score formula
- * Formula: avg_rating * 20 + view_count * 0.1 + review_count * 5
+ * Compute recommended score with time decay, log scaling, and freshness boost
+ * Same formula used in cron job for consistency
  */
 function computeRecommendedScore(
   avgRating: number,
   viewCount: number,
   reviewCount: number,
+  createdAt: Date,
 ): number {
-  return avgRating * 20 + viewCount * 0.1 + reviewCount * 5;
+  // Base scores
+  const ratingScore = avgRating * 20;
+  const reviewScore = reviewCount * 5;
+
+  // Time decay on views (30-day half-life)
+  const daysSinceCreation = Math.floor(
+    (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const decayFactor = Math.max(0.1, 1 - (daysSinceCreation / 30) * 0.5);
+
+  // Logarithmic scaling on views
+  const viewScore = Math.log(1 + viewCount) * 10 * decayFactor;
+
+  // Freshness boost for new listings (first 7 days)
+  const freshnessBoost = daysSinceCreation <= 7
+    ? 15 * (1 - daysSinceCreation / 7)
+    : 0;
+
+  return ratingScore + viewScore + reviewScore + freshnessBoost;
 }
 
 /**
@@ -184,6 +203,7 @@ async function upsertSearchDocsBatch(
       listing.avgRating,
       listing.viewCount,
       listing.reviewCount,
+      listing.createdAt,
     );
 
     // Compute lowercase arrays for case-insensitive filtering

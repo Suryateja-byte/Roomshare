@@ -160,6 +160,22 @@ function MapErrorBanner({
   );
 }
 
+// P2-FIX (#151): Separate informational banner (no retry button) for non-error messages
+// Used for viewport clamping notification where map is still functional
+function MapInfoBanner({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="absolute top-4 left-4 right-4 z-50 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg p-3"
+    >
+      <span className="text-sm text-blue-700 dark:text-blue-300 block">
+        {message}
+      </span>
+    </div>
+  );
+}
+
 // Loading placeholder for lazy map component
 function MapLoadingPlaceholder() {
   return (
@@ -269,32 +285,56 @@ export default function PersistentMapWrapper({
   const [listings, setListings] = useState<MapListingData[]>([]);
   const [isFetchingMapData, setIsFetchingMapData] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // P2-FIX (#151): Separate info messages from errors - info is non-blocking (no retry needed)
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   // Check for v2 data from context (injected by page.tsx via V2MapDataSetter)
   const { v2MapData, isV2Enabled, setIsV2Enabled } = useSearchV2Data();
-  const lastV2DataRef = useRef<V2MapData | null>(null);
+  // P2-FIX (#124): Use state instead of ref for last V2 data to ensure memo dependencies are correct
+  // Using a ref in useMemo causes stale data because refs aren't tracked by React
+  const [lastV2Data, setLastV2Data] = useState<V2MapData | null>(null);
+  // P2-FIX (#115): Track if data path has been determined to prevent brief empty map.
+  // On initial mount, we don't know if v2 or v1 will provide data. Show loading until determined.
+  const [dataPathDetermined, setDataPathDetermined] = useState(false);
 
   // Coordinate with list transitions - show overlay when list is loading
   const transitionContext = useSearchTransitionSafe();
   const isListTransitioning = transitionContext?.isPending ?? false;
   const hasV2Data = v2MapData !== null;
-  const hasAnyV2Data = hasV2Data || lastV2DataRef.current !== null;
+  const hasAnyV2Data = hasV2Data || lastV2Data !== null;
+
+  // P2-FIX (#115): Mark data path as determined when we receive any signal
+  // Check if URL has bounds (indicates V1 path with known location)
+  const hasBoundsInUrl =
+    searchParams.has("minLng") &&
+    searchParams.has("maxLng") &&
+    searchParams.has("minLat") &&
+    searchParams.has("maxLat");
+
+  useEffect(() => {
+    // V2 mode signaled (either enabled or explicitly disabled after being enabled)
+    // OR we have v2 data OR we have v1 listings OR we have bounds in URL (V1 path)
+    if (isV2Enabled || hasAnyV2Data || listings.length > 0 || hasBoundsInUrl) {
+      setDataPathDetermined(true);
+    }
+  }, [isV2Enabled, hasAnyV2Data, listings.length, hasBoundsInUrl]);
 
   useEffect(() => {
     if (v2MapData) {
-      lastV2DataRef.current = v2MapData;
+      setLastV2Data(v2MapData);
     }
   }, [v2MapData]);
 
   // Compute effective listings based on data source (v2 context or v1 fetch)
   // Memoized for stable reference to prevent unnecessary Map re-renders
   const effectiveListings = useMemo(() => {
-    const activeV2Data = v2MapData ?? lastV2DataRef.current;
+    // P2-FIX (#124): Use lastV2Data state (not ref) so memo properly recalculates
+    const activeV2Data = v2MapData ?? lastV2Data;
     if (activeV2Data) {
       return v2MapDataToListings(activeV2Data);
     }
     return listings;
-  }, [v2MapData, listings]);
+  }, [v2MapData, lastV2Data, listings]);
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
@@ -458,11 +498,11 @@ export default function PersistentMapWrapper({
           });
         }
 
-        // Set informational message for users (non-blocking)
-        setError("Zoomed in to show results");
+        // P2-FIX (#151): Use info message instead of error - map is functional, just clamped
+        setInfoMessage("Zoomed in to show results");
       } else {
-        // Clear error only if viewport is valid (no clamping occurred)
-        setError(null);
+        // Clear info message when viewport is valid (no clamping occurred)
+        setInfoMessage(null);
       }
     }
 
@@ -561,7 +601,9 @@ export default function PersistentMapWrapper({
     fetchListings(getMapRelevantParams(searchParams), abortController.signal);
   }, [searchParams, fetchListings]);
 
-  const showInitialV2Placeholder = isV2Enabled && !hasAnyV2Data;
+  // P2-FIX (#115): Also show placeholder when data path hasn't been determined yet.
+  // This prevents the brief empty map flash between mount and v2 signal.
+  const showInitialPlaceholder = !dataPathDetermined || (isV2Enabled && !hasAnyV2Data);
   const showV2LoadingOverlay = isV2Enabled && !hasV2Data && hasAnyV2Data;
 
   // CRITICAL: Don't render map component if shouldRenderMap is false
@@ -570,12 +612,12 @@ export default function PersistentMapWrapper({
     return null;
   }
 
-  // Show loading placeholder while waiting for v2 data (race guard)
-  // This prevents showing an empty map before v2MapData arrives
+  // Show loading placeholder while waiting for data (race guard)
+  // P2-FIX (#115): Also show when data path hasn't been determined to prevent brief empty map.
   // IMPORTANT: If there's an error (e.g., viewport too large), show error banner instead
   // NOTE: min-h-[300px] ensures error banner is visible even when parent chain has
   // zero height (h-full chain issue) combined with overflow-hidden clipping
-  if (showInitialV2Placeholder) {
+  if (showInitialPlaceholder) {
     return (
       <div className="relative w-full h-full min-h-[300px]">
         {error ? (
@@ -589,7 +631,9 @@ export default function PersistentMapWrapper({
 
   return (
     <div className="relative w-full h-full min-h-[300px]">
+      {/* P2-FIX (#151): Show error banner for errors, info banner for non-error messages */}
       {error && <MapErrorBanner message={error} onRetry={handleRetry} />}
+      {!error && infoMessage && <MapInfoBanner message={infoMessage} />}
       {/* Data loading bar - shows when fetching map markers after pan/zoom/filter */}
       {(isFetchingMapData || isListTransitioning || showV2LoadingOverlay) && (
         <MapDataLoadingBar />

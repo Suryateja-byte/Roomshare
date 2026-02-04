@@ -25,13 +25,16 @@ import { useSearchV2Data } from "@/contexts/SearchV2DataContext";
  * @see PersistentMapWrapper for the race guard that depends on this state
  */
 export function V1PathResetSetter() {
-  const { setV2MapData, setIsV2Enabled } = useSearchV2Data();
+  const { setV2MapData, setIsV2Enabled, dataVersion } = useSearchV2Data();
 
   useEffect(() => {
     // Reset v2 state to signal "v1 mode active"
     // This breaks the race guard loop in PersistentMapWrapper
     setIsV2Enabled(false);
-    setV2MapData(null);
+    // P1-FIX (#156): Pass current dataVersion to prevent race with V2MapDataSetter.
+    // If V2 search completes while V1 fallback is running, version mismatch
+    // prevents this from accidentally clearing valid V2 data.
+    setV2MapData(null, dataVersion);
 
     // NOTE: No cleanup function needed here.
     // Same reasoning as V2MapDataSetter:
@@ -39,7 +42,7 @@ export function V1PathResetSetter() {
     // - Cleanup would race with the next page's setter
     // - New page's setter will overwrite this state anyway
     // - Layout unmount handles full cleanup when leaving /search
-  }, [setV2MapData, setIsV2Enabled]);
+  }, [setV2MapData, setIsV2Enabled, dataVersion]);
 
   // Render nothing - this is a side-effect-only component
   return null;

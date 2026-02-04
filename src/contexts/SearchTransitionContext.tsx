@@ -21,6 +21,7 @@ import {
   useState,
   useEffect,
   useRef,
+  useMemo,
   type ReactNode,
   type TransitionStartFunction,
 } from "react";
@@ -108,17 +109,28 @@ export function SearchTransitionProvider({
     });
   }, [router, startTransition]);
 
+  // P2-FIX (#172): Memoize context value to prevent unnecessary consumer re-renders
+  const contextValue = useMemo(
+    () => ({
+      isPending,
+      isSlowTransition,
+      navigateWithTransition,
+      replaceWithTransition,
+      startTransition,
+      retryLastNavigation: isSlowTransition ? retryLastNavigation : null,
+    }),
+    [
+      isPending,
+      isSlowTransition,
+      navigateWithTransition,
+      replaceWithTransition,
+      startTransition,
+      retryLastNavigation,
+    ]
+  );
+
   return (
-    <SearchTransitionContext.Provider
-      value={{
-        isPending,
-        isSlowTransition,
-        navigateWithTransition,
-        replaceWithTransition,
-        startTransition,
-        retryLastNavigation: isSlowTransition ? retryLastNavigation : null,
-      }}
-    >
+    <SearchTransitionContext.Provider value={contextValue}>
       {children}
     </SearchTransitionContext.Provider>
   );

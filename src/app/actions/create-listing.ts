@@ -1,6 +1,5 @@
 'use server';
 
-import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
@@ -9,6 +8,7 @@ import { triggerInstantAlerts } from '@/lib/search-alerts';
 import { checkSuspension, checkEmailVerified } from './suspension';
 import { logger } from '@/lib/logger';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
+import { upsertSearchDocSync } from '@/lib/search/search-doc-sync';
 
 // P1-15 FIX: Define proper type for listing data returned to client
 export type CreateListingData = {
@@ -32,7 +32,7 @@ export type CreateListingState = {
     data?: CreateListingData;
 };
 
-export async function createListing(prevState: CreateListingState, formData: FormData): Promise<CreateListingState> {
+export async function createListing(_prevState: CreateListingState, formData: FormData): Promise<CreateListingState> {
     // 1. Validate input using Zod
     const rawData = {
         title: formData.get('title'),
@@ -159,7 +159,11 @@ export async function createListing(prevState: CreateListingState, formData: For
             state,
         });
 
-        // Fire-and-forget: mark listing dirty for search doc refresh
+        // Synchronously upsert search doc for immediate visibility (0-second delay vs 6-hour batch)
+        // This ensures new listings are searchable immediately after creation
+        await upsertSearchDocSync(listing.id);
+
+        // Also mark dirty as backup - if sync failed, cron will catch up
         markListingDirty(listing.id, 'listing_created').catch(() => {});
 
         // ASYNC: Trigger instant alerts in background - non-blocking for better UX and scalability

@@ -1,23 +1,23 @@
 # Search Ranking, Scoring & Filter Schema
 
-Technical documentation for the Roomshare search ranking algorithm, filter validation schema, URL parameter handling, and related utilities.
+Technical documentation for the Roomshare search ranking algorithm, filter validation schema, URL parameter handling, full-text search, and query execution.
 
 ---
 
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
+- [Data Model: listing_search_docs](#data-model-listing_search_docs)
+- [Full-Text Search (FTS)](#full-text-search-fts)
+- [Filter Schema](#filter-schema)
+- [URL Parameter Parsing](#url-parameter-parsing)
+- [Query Building & Execution](#query-building--execution)
 - [Ranking System](#ranking-system)
-  - [Types (`ranking/types.ts`)](#ranking-types)
-  - [Scoring (`ranking/score.ts`)](#ranking-scoring)
-  - [Ranking (`ranking/rank.ts`)](#ranking-functions)
-  - [Entry Point (`ranking/index.ts`)](#ranking-entry-point)
-- [Filter Schema (`filter-schema.ts`)](#filter-schema)
-- [URL Parameter Parsing (`search-params.ts`)](#url-parameter-parsing)
-- [Client Search Utilities (`search-utils.ts`)](#client-search-utilities)
-- [Filter Chip Utilities (`filter-chip-utils.ts`)](#filter-chip-utilities)
-- [Filter Regression Framework (`filter-regression.ts`)](#filter-regression-framework)
-- [Search Alerts (`search-alerts.ts`)](#search-alerts)
+- [Pagination](#pagination)
+- [Sort Options](#sort-options)
+- [Feature Flags](#feature-flags)
+- [Filter UI Components](#filter-ui-components)
+- [Client Utilities](#client-utilities)
 - [Constants Reference](#constants-reference)
 
 ---
@@ -34,239 +34,171 @@ search-params.ts          -- parse & validate raw URL params
 filter-schema.ts          -- Zod-based canonical validation + normalization
     |
     v
-ranking/score.ts          -- compute per-listing signal scores (0-1)
-ranking/rank.ts           -- build score map, sort, debug output
-ranking/index.ts          -- public API, feature flag gating
+search-v2-service.ts      -- orchestrate list + map queries in parallel
     |
     v
-search-utils.ts           -- build search URLs from filter objects (client)
-filter-chip-utils.ts      -- convert URL params to removable UI chips
-filter-regression.ts      -- golden-file regression testing framework
-search-alerts.ts          -- saved search alert processing (server)
+search-doc-queries.ts     -- build SQL, execute against listing_search_docs
+    |
+    v
+ranking/                  -- compute scores for map pin tiering
+    |
+    v
+transform.ts              -- convert to v2 response (GeoJSON, pins, list items)
+    |
+    v
+SearchV2Response          -- unified response to client
 ```
 
-Data flows from raw URL parameters through validation and normalization, then into ranking (for map pin tiering) and back to the client as filter chips and search URLs.
+### Key Components
+
+| File | Purpose |
+|------|---------|
+| `src/lib/search/search-v2-service.ts` | Main search entry point, orchestrates list + map queries |
+| `src/lib/search/search-doc-queries.ts` | SQL query builder, executes against denormalized table |
+| `src/lib/search-params.ts` | URL parameter parsing and validation |
+| `src/lib/filter-schema.ts` | Zod schemas for canonical filter validation |
+| `src/lib/search/ranking/` | Heuristic scoring for map pin tiering |
+| `src/lib/search/transform.ts` | Response transformation (GeoJSON, pins, list) |
+| `src/lib/search/cursor.ts` | Keyset cursor encoding/decoding |
+| `src/lib/search/hash.ts` | Query hash generation for caching |
 
 ---
 
-## Ranking System
+## Data Model: listing_search_docs
 
-### Ranking Types
+**File**: `prisma/migrations/20260110000000_search_doc/migration.sql`
 
-**File**: `src/lib/search/ranking/types.ts`
+A denormalized read model that replaces expensive JOINs (Listing + Location + Review) with single-table reads.
 
-**Purpose**: Type definitions for the heuristic ranking system. Designed for future ML extensibility.
+### Table Schema
 
-#### Interfaces
+```sql
+CREATE TABLE "listing_search_docs" (
+  -- Primary key (same as Listing.id)
+  "id" TEXT NOT NULL PRIMARY KEY,
 
-| Interface | Purpose |
-|-----------|---------|
-| `RankingContext` | Search context passed to scoring: sort option, map center, median price, debug flag |
-| `RankingWeights` | Per-signal weights (must sum to 1.0) |
-| `SignalValues` | Individual signal scores, all normalized 0-1 |
-| `DebugSignals` | Debug output per listing (id + signals + total). No PII. |
-| `RankableListing` | Minimum listing fields required for scoring |
-| `RankingConfig` | Version string + weights for A/B testing |
+  -- From Listing
+  "owner_id" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "description" TEXT NOT NULL,
+  "price" DOUBLE PRECISION NOT NULL,
+  "images" TEXT[] NOT NULL DEFAULT '{}',
+  "amenities" TEXT[] NOT NULL DEFAULT '{}',
+  "house_rules" TEXT[] NOT NULL DEFAULT '{}',
+  "household_languages" TEXT[] NOT NULL DEFAULT '{}',
+  "primary_home_language" TEXT,
+  "lease_duration" TEXT,
+  "room_type" TEXT,
+  "move_in_date" TIMESTAMPTZ,
+  "total_slots" INTEGER NOT NULL,
+  "available_slots" INTEGER NOT NULL,
+  "view_count" INTEGER NOT NULL DEFAULT 0,
+  "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+  "listing_created_at" TIMESTAMPTZ NOT NULL,
 
-#### RankableListing Fields
+  -- From Location (denormalized)
+  "address" TEXT NOT NULL,
+  "city" TEXT NOT NULL,
+  "state" TEXT NOT NULL,
+  "zip" TEXT NOT NULL,
+  "location_geog" geography(Point, 4326),  -- PostGIS geography
+  "lat" DOUBLE PRECISION,                   -- Precomputed for fast access
+  "lng" DOUBLE PRECISION,
 
-```typescript
-interface RankableListing {
-  id: string;
-  recommendedScore?: number | null;  // Pre-computed: avg_rating*20 + view_count*0.1 + review_count*5
-  avgRating?: number | null;         // 0-5
-  reviewCount?: number | null;
-  price?: number | null;
-  createdAt?: Date | string | null;
-  lat?: number | null;
-  lng?: number | null;
-}
+  -- From Review aggregation (precomputed)
+  "avg_rating" DOUBLE PRECISION NOT NULL DEFAULT 0,
+  "review_count" INTEGER NOT NULL DEFAULT 0,
+
+  -- Precomputed for sorting
+  -- Formula: avg_rating * 20 + view_count * 0.1 + review_count * 5
+  "recommended_score" DOUBLE PRECISION NOT NULL DEFAULT 0,
+
+  -- Case-insensitive filter columns (lowercase for GIN containment)
+  "amenities_lower" TEXT[] NOT NULL DEFAULT '{}',
+  "house_rules_lower" TEXT[] NOT NULL DEFAULT '{}',
+  "household_languages_lower" TEXT[] NOT NULL DEFAULT '{}',
+
+  -- Full-text search (added in 20260116000000_search_doc_fts)
+  "search_tsv" tsvector,
+
+  -- Freshness tracking
+  "doc_created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "doc_updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 ```
+
+### Indexes
+
+| Index | Type | Columns | Purpose |
+|-------|------|---------|---------|
+| `search_doc_location_geog_idx` | GIST | `location_geog` | Spatial bounding box queries |
+| `search_doc_status_idx` | B-tree | `status` (WHERE ACTIVE) | Filter active listings |
+| `search_doc_price_idx` | B-tree | `price` | Price range queries |
+| `search_doc_created_at_idx` | B-tree | `listing_created_at DESC` | Sort by newest |
+| `search_doc_recommended_score_idx` | B-tree | `recommended_score DESC` | Sort by recommended |
+| `search_doc_rating_idx` | B-tree | `avg_rating DESC, review_count DESC` | Sort by rating |
+| `search_doc_amenities_gin_idx` | GIN | `amenities_lower` | Array containment |
+| `search_doc_house_rules_gin_idx` | GIN | `house_rules_lower` | Array containment |
+| `search_doc_languages_gin_idx` | GIN | `household_languages_lower` | Array overlap |
+| `search_doc_tsv_gin_idx` | GIN | `search_tsv` | Full-text search |
+
+### Recommended Score Formula
+
+```
+recommended_score = avg_rating * 20 + view_count * 0.1 + review_count * 5
+```
+
+Precomputed during sync to avoid runtime calculation.
 
 ---
 
-### Ranking Scoring
+## Full-Text Search (FTS)
 
-**File**: `src/lib/search/ranking/score.ts`
+**File**: `prisma/migrations/20260116000000_search_doc_fts/migration.sql`
 
-**Purpose**: Computes normalized (0-1) scores for each ranking signal. All signals are interpretable and tunable.
+### tsvector Column
 
-#### Default Weights
+The `search_tsv` column stores weighted tsvectors for full-text search:
 
-```typescript
-const DEFAULT_WEIGHTS: RankingWeights = {
-  quality:  0.25,  // Pre-computed recommended_score
-  rating:   0.25,  // Rating with review confidence
-  price:    0.15,  // Price competitiveness
-  recency:  0.15,  // Listing freshness
-  geo:      0.20,  // Distance from map center
-};
-// Sum = 1.0
+```sql
+search_tsv =
+  setweight(to_tsvector('english', title), 'A') ||
+  setweight(to_tsvector('english', city), 'B') ||
+  setweight(to_tsvector('english', state), 'B') ||
+  setweight(to_tsvector('english', description), 'C')
 ```
 
-#### Scoring Formula
+**Weights**:
+- **A (highest)**: title
+- **B (medium)**: city, state
+- **C (lower)**: description
 
-The final score is a weighted sum of five normalized signals:
+### Query Execution
 
-```
-score = quality*0.25 + rating*0.25 + price*0.15 + recency*0.15 + geo*0.20
-```
+**File**: `src/lib/search/search-doc-queries.ts` (lines 392-404)
 
-Each signal is independently normalized to the 0-1 range.
-
-#### Signal Functions
-
-##### `normalizeRecommendedScore(score)`
-
-Sigmoid normalization for the pre-computed `recommended_score` field.
-
-- **Input range**: 0-200 (typical), where `score = avg_rating*20 + view_count*0.1 + review_count*5`
-- **Formula**: `1 / (1 + e^(-0.04 * (score - 50)))`
-- **Midpoint**: 50 (score=50 maps to 0.5)
-- **Missing data**: returns 0.3
-
-```
-score=0   -> ~0.12
-score=25  -> ~0.27
-score=50  -> 0.50
-score=100 -> ~0.88
-score=150 -> ~0.98
+```sql
+-- FTS condition
+d.search_tsv @@ plainto_tsquery('english', $N)
 ```
 
-##### `normalizeRating(rating, reviewCount)`
+Uses `plainto_tsquery` which handles multi-word queries as AND by default.
 
-Bayesian average to handle low review counts.
+### FTS Ranking in ORDER BY
 
-- **Prior**: 3.5 (neutral average)
-- **Minimum reviews for full confidence**: 5
-- **Formula**: `(3.5*5 + rating*count) / (5 + count) / 5`
-- **Missing rating**: returns 0.5
+**File**: `src/lib/search/search-doc-queries.ts` (lines 496-518)
 
-Example: a listing with rating=5.0 and 1 review gets an adjusted rating of `(17.5 + 5) / 6 = 3.75`, normalized to 0.75.
+When FTS is active, `ts_rank_cd` is added as a secondary sort factor:
 
-##### `normalizePriceCompetitiveness(price, medianPrice)`
-
-Gaussian decay from the local median price. Listings at the median score highest.
-
-- **Formula**: `exp(-ln(price/median)^2 / (2 * 0.5^2))`
-- **At median**: 1.0
-- **At 2x median**: ~0.38
-- **At 0.5x median**: ~0.38
-- **Missing data**: returns 0.5
-
-##### `normalizeRecency(createdAt)`
-
-Exponential decay with a 30-day half-life.
-
-- **Formula**: `0.5^(ageMs / halfLifeMs)`
-- **Half-life**: 30 days
-- **Brand new**: 1.0
-- **30 days old**: 0.5
-- **60 days old**: 0.25
-- **90 days old**: 0.125
-- **Missing data**: returns 0.5
-
-##### `normalizeDistance(lat, lng, center)`
-
-Exponential decay from the map center using Haversine distance.
-
-- **Formula**: `0.5^(distanceKm / 5)`
-- **Half-distance**: 5 km
-- **At center**: 1.0
-- **5 km away**: 0.5
-- **10 km away**: 0.25
-- **No center provided**: returns 0.5 (signal skipped)
-- **Missing coordinates**: returns 0.3
-
-#### Utility Functions
-
-| Function | Signature | Purpose |
-|----------|-----------|---------|
-| `computeScore` | `(listing, context, weights?) -> number` | Overall score (0-1) |
-| `computeSignals` | `(listing, context) -> SignalValues` | All individual signals |
-| `computeMedianPrice` | `(listings[]) -> number \| undefined` | Median price from listing array |
-| `getBoundsCenter` | `(bounds) -> {lat, lng}` | Center point from SW/NE bounds |
-
----
-
-### Ranking Functions
-
-**File**: `src/lib/search/ranking/rank.ts`
-
-**Purpose**: Converts scores to ranked lists and provides debug output.
-
-#### Exported Functions
-
-##### `buildScoreMap(listings, context, weights?)`
-
-```typescript
-function buildScoreMap<T extends RankableListing>(
-  listings: T[],
-  context: RankingContext,
-  weights?: RankingWeights,
-): Map<string, number>
+```sql
+ORDER BY
+  d.recommended_score DESC,
+  ts_rank_cd(d.search_tsv, plainto_tsquery('english', $N)) DESC,
+  d.listing_created_at DESC,
+  d.id ASC
 ```
 
-Returns a `Map<listingId, score>` for all listings.
-
-##### `rankListings(candidates, scoreMap)`
-
-```typescript
-function rankListings<T extends { id: string }>(
-  candidates: T[],
-  scoreMap: Map<string, number>,
-): T[]
-```
-
-Returns a **new** array sorted by score descending. Tie-breaking is deterministic by `id.localeCompare()`.
-
-##### `getDebugSignals(listings, scoreMap, context, limit?)`
-
-```typescript
-function getDebugSignals<T extends RankableListing>(
-  listings: T[],
-  scoreMap: Map<string, number>,
-  context: RankingContext,
-  limit?: number, // default 5
-): DebugSignals[]
-```
-
-Returns debug info for the top N listings. All values rounded to 2 decimal places. Contains only IDs and normalized signals -- no PII.
-
----
-
-### Ranking Entry Point
-
-**File**: `src/lib/search/ranking/index.ts`
-
-**Purpose**: Public API for the ranking module. Re-exports all types and functions; provides feature flag gating.
-
-#### Feature Flag
-
-```typescript
-const RANKING_VERSION = "v1-heuristic";
-
-function isRankingEnabled(urlRanker?: string | null): boolean
-```
-
-- Checks `features.searchRanking` env flag (default: `true`)
-- URL override via `?ranker=1|true|0|false` is only allowed when `features.searchDebugRanking` is enabled (non-production)
-
-#### Usage Pattern
-
-```typescript
-import { isRankingEnabled, buildScoreMap, computeMedianPrice, getBoundsCenter } from '@/lib/search/ranking';
-
-if (isRankingEnabled(params.ranker)) {
-  const context = {
-    sort: params.sort,
-    center: getBoundsCenter(bounds),
-    localMedianPrice: computeMedianPrice(mapListings),
-  };
-  const scoreMap = buildScoreMap(mapListings, context);
-  // Pass scoreMap to transformToPins for score-based tiering
-}
-```
+This leverages tsvector weights for relevance ranking within the primary sort.
 
 ---
 
@@ -274,7 +206,7 @@ if (isRankingEnabled(params.ranker)) {
 
 **File**: `src/lib/filter-schema.ts`
 
-**Purpose**: Canonical single source of truth for filter validation using Zod. Used by both URL parsing and server-side validation.
+Canonical single source of truth for filter validation using Zod.
 
 ### Valid Enum Values
 
@@ -290,64 +222,44 @@ if (isRankingEnabled(params.ranker)) {
 
 ### Alias Mappings
 
-URL-friendly aliases are resolved to canonical values:
-
 **Room Type Aliases**:
-`private` -> `Private Room`, `shared` -> `Shared Room`, `entire` / `whole` / `studio` -> `Entire Place`
+- `private` / `private_room` / `privateroom` → `Private Room`
+- `shared` / `shared_room` / `sharedroom` → `Shared Room`
+- `entire` / `entire_place` / `entireplace` / `whole` / `studio` → `Entire Place`
 
 **Lease Duration Aliases**:
-`mtm` -> `Month-to-month`, `3_months` -> `3 months`, `6_months` -> `6 months`, `12_months` / `1_year` -> `12 months`
+- `mtm` / `month-to-month` / `month_to_month` → `Month-to-month`
+- `3_months` / `3months` → `3 months`
+- `6_months` / `6months` → `6 months`
+- `12_months` / `12months` / `1_year` / `1year` → `12 months`
 
 ### Validation Rules
 
 | Field | Type | Rules |
 |-------|------|-------|
 | `query` | string | Trimmed, max 200 chars, empty becomes undefined |
-| `minPrice` / `maxPrice` | number | Clamped to [0, 1,000,000,000]. `minPrice > maxPrice` throws error |
+| `minPrice` / `maxPrice` | number | Clamped to [0, 1,000,000,000]. Throws error if `minPrice > maxPrice` |
 | `amenities` | string[] | Case-insensitive against allowlist, deduplicated, sorted, max 20 items |
 | `houseRules` | string[] | Same as amenities |
 | `languages` | string[] | Normalized via `normalizeLanguages()`, deduplicated, sorted, max 20 |
-| `roomType` | enum | Case-insensitive, `any` treated as undefined |
+| `roomType` | enum | Case-insensitive with aliases, `any` treated as undefined |
 | `leaseDuration` | enum | Case-insensitive with aliases, `any` treated as undefined |
 | `genderPreference` | enum | Case-insensitive, `any` treated as undefined |
 | `householdGender` | enum | Case-insensitive, `any` treated as undefined |
-| `moveInDate` | string | `YYYY-MM-DD` format, must be today to 2 years in future, validated against calendar |
-| `bounds` | object | `{minLat, maxLat, minLng, maxLng}`, clamped to [-90,90]/[-180,180]. **`minLat > maxLat` throws error**. lng NOT swapped (antimeridian support) |
+| `moveInDate` | string | `YYYY-MM-DD` format, must be today to 2 years in future |
+| `bounds` | object | `{minLat, maxLat, minLng, maxLng}`, clamped to [-90,90]/[-180,180]. Throws error if `minLat > maxLat`. Lng NOT validated for inversion (antimeridian support) |
 | `sort` | enum | Case-insensitive |
 | `page` | int | Clamped to [1, 100], default 1 |
 | `limit` | int | Clamped to [1, 100], default 12 |
 
 ### Exported Functions
 
-| Function | Signature | Purpose |
-|----------|-----------|---------|
-| `normalizeFilters` | `(input: unknown) -> NormalizedFilters` | Canonical normalization. Trims, validates, deduplicates, sorts, clamps. **Throws on inverted ranges (price, lat)**. |
-| `validateFilters` | `(input: unknown) -> Result` | Strict validation returning `{success, data}` or `{success: false, errors}` |
-| `isEmptyFilters` | `(filters: NormalizedFilters) -> boolean` | True if no active filters (ignoring page/limit) |
-| `filtersToSearchParams` | `(filters: NormalizedFilters) -> URLSearchParams` | Convert normalized filters back to URL params |
-
-### Zod Schemas
-
-```typescript
-export const filterSchema: z.ZodObject<...>;       // All filter fields
-export const paginationSchema: z.ZodObject<...>;    // page + limit
-export const searchParamsSchema: z.ZodObject<...>;  // filterSchema.merge(paginationSchema)
-```
-
-### Range Validation Behavior (P1-13, P1-3)
-
-**Consistent Error Handling**: All inverted ranges now throw validation errors instead of silent correction.
-
-- **Price ranges**: `minPrice > maxPrice` throws `"minPrice cannot exceed maxPrice"`
-- **Latitude ranges**: `minLat > maxLat` throws `"minLat cannot exceed maxLat"`
-- **Longitude ranges**: NOT validated for inversion (supports antimeridian crossing)
-
-This applies to:
-- `normalizeFilters()` function (line 411-413 for price, line 656-658 for lat)
-- `boundsSchema` transform (line 247-249)
-- Zod schema validation
-
-**Rationale**: Throwing errors provides better user feedback than silent swapping, which could mask client bugs or confuse users about their filter settings.
+| Function | Purpose |
+|----------|---------|
+| `normalizeFilters(input)` | Canonical normalization. Throws on inverted ranges. |
+| `validateFilters(input)` | Returns `{success, data}` or `{success: false, errors}` |
+| `isEmptyFilters(filters)` | True if no active filters (ignoring page/limit) |
+| `filtersToSearchParams(filters)` | Convert normalized filters to URLSearchParams |
 
 ---
 
@@ -355,266 +267,425 @@ This applies to:
 
 **File**: `src/lib/search-params.ts`
 
-**Purpose**: Parses raw URL search parameters into validated, typed filter objects. Serves as the primary entry point for server-side search parameter handling.
-
 ### Key Types
 
 ```typescript
-interface RawSearchParams {
-  q?: string | string[];
-  minPrice?: string | string[];
-  maxPrice?: string | string[];
-  amenities?: string | string[];
-  // ... all filter params as string | string[]
-  lat?: string | string[];     // Point-based location
-  lng?: string | string[];
-  nearMatches?: string | string[];
-}
-
 interface ParsedSearchParams {
   q?: string;
   requestedPage: number;
   sortOption: SortOption;
   filterParams: FilterParams;
-  boundsRequired: boolean;  // true when text query exists without geographic bounds
+  boundsRequired: boolean;  // true when text query exists without bounds
   browseMode: boolean;      // true when no query and no bounds
 }
 ```
 
-### Exported Functions
+### Parsing Behavior
 
-#### `parseSearchParams(raw: RawSearchParams): ParsedSearchParams`
+1. **Price ranges**: Throws error if `minPrice > maxPrice`
+2. **Latitude ranges**: Throws error if `minLat > maxLat`
+3. **Longitude ranges**: NOT validated (supports antimeridian crossing)
+4. **Point-to-bounds**: If `lat`/`lng` provided without bounds, auto-generates ~10km radius bounds
+5. **Default sort**: `recommended`
+6. **Unbounded text search**: Sets `boundsRequired: true` (prevents full-table scans)
 
-Main parser. Converts raw URL strings to validated filter params with these behaviors:
+### URL Parameter Reference
 
-- **Inverted price ranges** (`minPrice > maxPrice`) **throw an error** (P1-13 fix, line 339-345)
-- **Inverted latitude ranges** (`minLat > maxLat`) **throw an error** (P1-3 fix, line 355-361)
-- If `lat`/`lng` provided without bounds, auto-generates bounds using `LAT_OFFSET_DEGREES` (0.09 degrees, ~10km radius)
-- Default sort: `recommended`
-- Sets `boundsRequired: true` when a text query has no geographic bounds (prevents full-table scans)
-- Sets `browseMode: true` when no query and no bounds
-
-#### `buildRawParamsFromSearchParams(searchParams: URLSearchParams): Record<string, string | string[]>`
-
-Converts `URLSearchParams` to a raw params object, preserving duplicate keys as arrays.
-
-```typescript
-// ?amenities=Wifi&amenities=AC -> { amenities: ['Wifi', 'AC'] }
-```
-
-#### `getPriceParam(searchParams: URLSearchParams, type: 'min' | 'max'): number | undefined`
-
-Reads price from URL with budget alias support. Canonical `minPrice`/`maxPrice` takes precedence over `minBudget`/`maxBudget`.
-
-#### `validateSearchFilters(filters: unknown): FilterParams`
-
-Server-side validation for untrusted input (e.g., client submissions stored in the database). Same validation logic as `parseSearchParams` but for object input rather than URL strings.
-
-**Throws errors** on:
-- Inverted price ranges (line 535-541)
-- Inverted latitude ranges (line 648-650)
+| URL Parameter | Type | Format | Aliases |
+|--------------|------|--------|---------|
+| `q` | string | Text query | - |
+| `minPrice` | number | Price in dollars | `minBudget` |
+| `maxPrice` | number | Price in dollars | `maxBudget` |
+| `amenities` | string[] | Comma-separated or repeated | - |
+| `houseRules` | string[] | Comma-separated or repeated | - |
+| `languages` | string[] | Comma-separated or repeated | - |
+| `roomType` | string | Enum or alias | See aliases above |
+| `leaseDuration` | string | Enum or alias | See aliases above |
+| `genderPreference` | string | Enum value | - |
+| `householdGender` | string | Enum value | - |
+| `moveInDate` | string | `YYYY-MM-DD` | - |
+| `minLat`, `maxLat`, `minLng`, `maxLng` | number | Bounding box | - |
+| `lat`, `lng` | number | Center point (auto-generates bounds) | - |
+| `sort` | string | Sort option | - |
+| `page` | int | Page number | - |
+| `nearMatches` | boolean | `true`/`false` | - |
 
 ---
 
-## Client Search Utilities
+## Query Building & Execution
 
-**File**: `src/lib/search-utils.ts`
+**File**: `src/lib/search/search-doc-queries.ts`
 
-**Purpose**: Client-safe utility for building search URLs from filter objects.
+### Base WHERE Conditions
 
-### Types
+Every search query includes:
+
+```sql
+WHERE d.available_slots > 0
+  AND d.status = 'ACTIVE'
+  AND d.lat IS NOT NULL
+  AND d.lng IS NOT NULL
+```
+
+### Filter Conditions
+
+| Filter | SQL Condition | Notes |
+|--------|--------------|-------|
+| Geographic bounds | `d.location_geog && ST_MakeEnvelope(...)::geography` | PostGIS geography operator |
+| Price range | `d.price >= $N` / `d.price <= $N` | Inclusive |
+| Text search | `d.search_tsv @@ plainto_tsquery('english', $N)` | FTS with weights |
+| Room type | `LOWER(d.room_type) = LOWER($N)` | Case-insensitive |
+| Lease duration | `LOWER(d.lease_duration) = LOWER($N)` | Case-insensitive |
+| Move-in date | `d.move_in_date IS NULL OR d.move_in_date <= $N` | Available by target date |
+| Languages | `d.household_languages_lower && $N::text[]` | OR logic (any match) |
+| Amenities | `d.amenities_lower @> $N::text[]` | AND logic (all required) |
+| House rules | `d.house_rules_lower @> $N::text[]` | AND logic (all required) |
+| Gender preference | `d.gender_preference = $N` | Exact match |
+| Household gender | `d.household_gender = $N` | Exact match |
+
+### Antimeridian Handling
+
+**File**: `src/lib/search/search-doc-queries.ts` (lines 364-379)
+
+For bounding boxes that cross the antimeridian (minLng > maxLng):
+
+```sql
+(
+  d.location_geog && ST_MakeEnvelope(minLng, minLat, 180, maxLat, 4326)::geography
+  OR d.location_geog && ST_MakeEnvelope(-180, minLat, maxLng, maxLat, 4326)::geography
+)
+```
+
+### Statement Timeout
+
+**File**: `src/lib/search/search-doc-queries.ts` (lines 40-53)
+
+All queries execute with a 5-second statement timeout:
+
+```sql
+SET LOCAL statement_timeout = '5000'
+```
+
+### Query Limits
+
+| Query Type | Limit | Purpose |
+|------------|-------|---------|
+| Map markers | 200 | `MAX_MAP_MARKERS` |
+| Hybrid count threshold | 100 | `HYBRID_COUNT_THRESHOLD` - if count > 100, return null |
+| Unbounded browse | 48 | `MAX_UNBOUNDED_RESULTS` - cap for no-query, no-bounds |
+
+---
+
+## Ranking System
+
+**Directory**: `src/lib/search/ranking/`
+
+Heuristic scoring for map pin tiering when result count < 50.
+
+### Default Weights
+
+**File**: `src/lib/search/ranking/score.ts` (lines 19-25)
 
 ```typescript
-interface SearchFilters {
-  query?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  amenities?: string[];
-  moveInDate?: string;
-  leaseDuration?: string;
-  houseRules?: string[];
-  roomType?: string;
-  languages?: string[];
-  genderPreference?: string;
-  householdGender?: string;
-  lat?: number;
-  lng?: number;
-  minLat?: number; maxLat?: number;
-  minLng?: number; maxLng?: number;
-  sort?: string;
-  city?: string;
+const DEFAULT_WEIGHTS = {
+  quality: 0.25,  // Pre-computed recommended_score
+  rating: 0.25,   // Rating with review confidence
+  price: 0.15,    // Price competitiveness
+  recency: 0.15,  // Listing freshness
+  geo: 0.2,       // Distance from center
+};
+// Sum = 1.0
+```
+
+### Scoring Formula
+
+```
+final_score = quality*0.25 + rating*0.25 + price*0.15 + recency*0.15 + geo*0.20
+```
+
+All signals are normalized to 0-1 range.
+
+### Signal Functions
+
+#### `normalizeRecommendedScore(score)`
+
+Sigmoid normalization for the pre-computed `recommended_score` field.
+
+- **Formula**: `1 / (1 + e^(-0.04 * (score - 50)))`
+- **Midpoint**: 50 (score=50 maps to 0.5)
+- **Missing data**: returns 0.3
+
+| Score | Normalized |
+|-------|------------|
+| 0 | ~0.12 |
+| 25 | ~0.27 |
+| 50 | 0.50 |
+| 100 | ~0.88 |
+| 150 | ~0.98 |
+
+#### `normalizeRating(rating, reviewCount)`
+
+Bayesian average to handle low review counts.
+
+- **Prior**: 3.5 (neutral average)
+- **Minimum reviews for full confidence**: 5
+- **Formula**: `(3.5*5 + rating*count) / (5 + count) / 5`
+- **Missing rating**: returns 0.5
+
+#### `normalizePriceCompetitiveness(price, medianPrice)`
+
+Gaussian decay from the local median price.
+
+- **Formula**: `exp(-ln(price/median)^2 / (2 * 0.5^2))`
+- **At median**: 1.0
+- **At 2x median**: ~0.38
+- **At 0.5x median**: ~0.38
+- **Missing data**: returns 0.5
+
+#### `normalizeRecency(createdAt)`
+
+Exponential decay with 30-day half-life.
+
+- **Formula**: `0.5^(ageMs / halfLifeMs)`
+- **Half-life**: 30 days
+
+| Age | Normalized |
+|-----|------------|
+| Brand new | 1.0 |
+| 30 days | 0.5 |
+| 60 days | 0.25 |
+| 90 days | 0.125 |
+
+#### `normalizeDistance(lat, lng, center)`
+
+Exponential decay from map center using Haversine distance.
+
+- **Formula**: `0.5^(distanceKm / 5)`
+- **Half-distance**: 5 km
+- **Earth radius**: 6371 km
+
+| Distance | Normalized |
+|----------|------------|
+| At center | 1.0 |
+| 5 km | 0.5 |
+| 10 km | 0.25 |
+| 15 km | 0.125 |
+| No center provided | 0.5 |
+
+### Ranking Functions
+
+| Function | Purpose |
+|----------|---------|
+| `buildScoreMap(listings, context, weights?)` | Returns `Map<listingId, score>` |
+| `rankListings(candidates, scoreMap)` | Sort by score descending, tie-break by ID |
+| `getDebugSignals(listings, scoreMap, context, limit?)` | Debug info for top N listings (default 5) |
+
+### Feature Flag
+
+**File**: `src/lib/search/ranking/index.ts` (lines 62-75)
+
+```typescript
+const RANKING_VERSION = "v1-heuristic";
+
+function isRankingEnabled(urlRanker?: string | null): boolean
+```
+
+- Env flag: `features.searchRanking` (default: `true`)
+- URL override: `?ranker=1|true|0|false` (only when `features.searchDebugRanking` is enabled)
+
+---
+
+## Pagination
+
+### Offset-Based (Legacy)
+
+**File**: `src/lib/search/hash.ts` (lines 112-133)
+
+Simple base64url cursor encoding page number:
+
+```typescript
+encodeCursor(page: number): string  // { p: page } → base64url
+decodeCursor(cursor: string): number | null
+```
+
+### Keyset-Based (v2)
+
+**File**: `src/lib/search/cursor.ts`
+
+Stable cursor-based pagination that prevents result drift.
+
+#### Cursor Structure
+
+```typescript
+interface KeysetCursor {
+  v: 1;                    // Version for future compatibility
+  s: SortOption;           // Sort option to validate cursor matches query
+  k: (string | null)[];    // Key values in ORDER BY sequence
+  id: string;              // Tie-breaker listing ID
 }
 ```
 
-### Exported Functions
+#### Expected Key Counts per Sort
 
-#### `buildSearchUrl(filters: SearchFilters): string`
+| Sort Option | Keys | Columns |
+|-------------|------|---------|
+| `recommended` | 2 | recommended_score, listing_created_at |
+| `newest` | 1 | listing_created_at |
+| `price_asc` | 2 | price, listing_created_at |
+| `price_desc` | 2 | price, listing_created_at |
+| `rating` | 3 | avg_rating, review_count, listing_created_at |
 
-Builds a `/search?...` URL string. Array params (amenities, houseRules, languages) are appended as separate query params:
+#### Keyset WHERE Clause
 
+**File**: `src/lib/search/search-doc-queries.ts` (lines 156-318)
+
+Uses explicit OR-chains for mixed ASC/DESC sorts (NOT tuple comparison):
+
+```sql
+-- Example for recommended sort (DESC, DESC, ASC)
+(
+  (d.recommended_score < $1::float8)
+  OR (d.recommended_score = $1::float8 AND d.listing_created_at < $2::timestamptz)
+  OR (d.recommended_score = $1::float8 AND d.listing_created_at = $2::timestamptz AND d.id > $3)
+)
 ```
-/search?amenities=Wifi&amenities=AC&minPrice=500
-```
+
+#### Hybrid Pagination
+
+- **First page**: Uses offset-based, returns keyset cursor for next page
+- **Subsequent pages**: Uses keyset cursor for stable pagination
+- **Legacy compatibility**: `decodeCursorAny()` detects and handles both formats
 
 ---
 
-## Filter Chip Utilities
+## Sort Options
+
+**File**: `src/lib/search/search-doc-queries.ts` (lines 496-518)
+
+### ORDER BY Clauses
+
+| Sort Option | ORDER BY |
+|-------------|----------|
+| `recommended` | `recommended_score DESC, [ts_rank_cd DESC,] listing_created_at DESC, id ASC` |
+| `newest` | `listing_created_at DESC, [ts_rank_cd DESC,] id ASC` |
+| `price_asc` | `price ASC NULLS LAST, [ts_rank_cd DESC,] listing_created_at DESC, id ASC` |
+| `price_desc` | `price DESC NULLS LAST, [ts_rank_cd DESC,] listing_created_at DESC, id ASC` |
+| `rating` | `avg_rating DESC NULLS LAST, review_count DESC, [ts_rank_cd DESC,] listing_created_at DESC, id ASC` |
+
+**Note**: `ts_rank_cd` is only included when FTS is active (query parameter provided).
+
+---
+
+## Feature Flags
+
+### Search Doc (`ENABLE_SEARCH_DOC`)
+
+**File**: `src/lib/search/search-doc-queries.ts` (lines 1339-1351)
+
+- Env var: `ENABLE_SEARCH_DOC=true`
+- URL override: `?searchDoc=1` or `?searchDoc=0`
+- Default: `false` (controlled by env)
+
+When disabled, falls back to slow LIKE queries on joined tables.
+
+### Keyset Pagination (`ENABLE_SEARCH_KEYSET`)
+
+Controlled by `features.searchKeyset` env flag.
+
+### Ranking (`features.searchRanking`)
+
+Default: `true`. Applies heuristic scoring for map pin tiering.
+
+### Debug Ranking (`features.searchDebugRanking`)
+
+Allows URL override for ranking (`?ranker=1`) and debug signals (`?debugRank=1`).
+
+---
+
+## Filter UI Components
+
+### FilterModal
+
+**File**: `src/components/search/FilterModal.tsx`
+
+Slide-out drawer for detailed filters. Pure presentational component.
+
+**Filter Sections**:
+1. Price Range (PriceRangeFilter component)
+2. Move-in Date (DatePicker)
+3. Lease Duration (Select)
+4. Room Type (Select with facet counts)
+5. Amenities (Toggle chips with facet counts)
+6. House Rules (Toggle chips with facet counts)
+7. Languages (Searchable selection)
+8. Gender Preference (Select)
+9. Household Gender (Select)
+
+### PriceRangeFilter
+
+**File**: `src/components/search/PriceRangeFilter.tsx`
+
+Dual-thumb slider with histogram visualization.
+
+- Uses `@radix-ui/react-slider`
+- Dynamic step: 10 (≤$1000), 25 (≤$5000), 50 (>$5000)
+- Values ≥$10,000 shown as "Xk"
+
+### PriceHistogram
+
+**File**: `src/components/search/PriceHistogram.tsx`
+
+Visual histogram showing price distribution.
+
+- Default height: 80px
+- Minimum bar height: 2px
+- In-range bars: dark, out-of-range: light
+
+### RecommendedFilters
+
+**File**: `src/components/search/RecommendedFilters.tsx`
+
+Contextual filter suggestion pills above search results.
+
+**Default Suggestions** (max 5 shown):
+- Furnished, Pet Friendly, Wifi, Parking, Washer
+- Private Room, Entire Place
+- Month-to-month
+- Under $1000
+- Couples OK
+
+---
+
+## Client Utilities
+
+### Filter Chip Utilities
 
 **File**: `src/components/filters/filter-chip-utils.ts`
 
-**Purpose**: Converts URL search params into displayable, removable filter chips for the UI.
-
-### Types
-
-```typescript
-interface FilterChipData {
-  id: string;         // Unique key (e.g., "amenities:Wifi")
-  label: string;      // Display text
-  paramKey: string;   // URL param key
-  paramValue?: string; // For array params: value to remove
-}
-```
-
-### Preserved vs Filter Parameters
-
-**Preserved** (kept on clear all): `q`, `lat`, `lng`, `minLat`, `maxLat`, `minLng`, `maxLng`, `sort`
-
-**Filter params** (shown as chips): `minPrice`, `maxPrice`, `amenities`, `houseRules`, `languages`, `roomType`, `leaseDuration`, `moveInDate`, `nearMatches`
-
-### Exported Functions
-
 | Function | Purpose |
 |----------|---------|
-| `urlToFilterChips(searchParams)` | Convert URL params to chip array. Combines minPrice+maxPrice into a single "price-range" chip. Language codes are converted to display names. |
-| `removeFilterFromUrl(searchParams, chip)` | Remove one filter, return new query string. Handles array params (removes single value from comma list). Resets page to 1. |
-| `clearAllFilters(searchParams)` | Remove all filter params, preserve location + sort. |
-| `hasFilterChips(searchParams)` | Boolean check for any active filter chips. |
+| `urlToFilterChips(searchParams)` | Convert URL params to chip array |
+| `removeFilterFromUrl(searchParams, chip)` | Remove one filter, return new query string |
+| `clearAllFilters(searchParams)` | Remove all filter params, preserve location + sort |
+| `hasFilterChips(searchParams)` | Boolean check for any active filter chips |
 
-### Price Display
+**Preserved params** (kept on clear all): `q`, `lat`, `lng`, `minLat`, `maxLat`, `minLng`, `maxLng`, `sort`
 
-- Combined range: `$500 - $2,000`
-- Min only: `Min $500`
-- Max only: `Max $2,000`
+### Search URL Builder
 
-Budget aliases (`minBudget`/`maxBudget`) are handled transparently via `getPriceParam`.
-
----
-
-## Filter Regression Framework
-
-**File**: `src/lib/filter-regression.ts`
-
-**Purpose**: Captures real-world filter patterns from production and replays them in tests to detect behavioral regressions.
-
-### Core Concepts
-
-1. **Scenario Capture**: Call `captureFilterScenario()` on search requests to record raw input, normalized filters, result IDs, and a behavior hash.
-2. **Behavior Hash**: Deterministic hash of `{filters, resultCount, first10Ids, last10Ids}` for regression detection.
-3. **Regression Testing**: Replay scenarios against the current implementation; detect normalization changes, result count changes, and performance regressions.
-
-### Key Types
+**File**: `src/lib/search-utils.ts`
 
 ```typescript
-interface FilterScenario {
-  id: string;
-  timestamp: string;
-  rawInput: unknown;
-  normalizedFilters: NormalizedFilters;
-  resultCount: number;
-  resultIds: string[];
-  executionTimeMs: number;
-  behaviorHash: string;
-}
-
-interface RegressionReport {
-  scenarioId: string;
-  status: 'pass' | 'fail' | 'warning';
-  message: string;
-  expected: Partial<FilterScenario>;
-  actual: Partial<FilterScenario>;
-  diff?: Record<string, { expected: unknown; actual: unknown }>;
-}
+buildSearchUrl(filters: SearchFilters): string
 ```
 
-### Exported Functions
-
-| Function | Purpose |
-|----------|---------|
-| `captureFilterScenario(rawInput, resultIds, executionTimeMs)` | Create a scenario from a search request |
-| `createBehaviorHash(filters, resultIds)` | Deterministic hash for regression detection |
-| `storeScenario` / `getScenario` / `getAllScenarios` / `clearScenarios` | In-memory scenario store |
-| `exportScenarios()` / `importScenarios(json)` | JSON serialization for test fixtures |
-| `runScenario(scenario, executor)` | Test one scenario, returns `RegressionReport` |
-| `runRegressionSuite(executor)` | Test all stored scenarios, returns `RegressionSummary` |
-| `createGoldenScenario(name, description, input)` | Create a golden scenario for stable tests |
-| `validateGoldenScenario(golden)` | Check golden scenario against current normalization |
-| `validateCriticalScenarios()` | Run all pre-defined critical scenarios |
-
-### Regression Detection
-
-- **Fail**: Normalization output changed OR behavior hash changed
-- **Warning**: Result count changed (may be data-dependent) OR execution time > 2x baseline
-- **Pass**: All checks match
-
-### ScenarioSampler
-
-Bucket-based sampling to capture diverse filter patterns without storing every request:
-
-```typescript
-const sampler = new ScenarioSampler(maxPerBucket = 10, maxTotal = 1000);
-sampler.sample(scenario); // returns true if added
-sampler.getCoverageStats(); // { "q-price-room": 5, "geo": 8, ... }
-```
-
-Bucket keys are derived from active filter types (e.g., `amen-geo-price`).
-
-### Pre-defined Critical Scenarios
-
-The `CRITICAL_SCENARIOS` array includes golden tests for:
-- Empty filters
-- Basic price filter
-- Complex multi-filter combo
-- Geographic bounds
-- Antimeridian crossing (lng not swapped)
-- Case-insensitive enums
-- Array deduplication
-- Malformed input resilience
-- Extreme value clamping
-- Whitespace trimming
-- **Inverted price range** (expects error)
-- **Inverted lat range** (expects error)
-
----
-
-## Search Alerts
-
-**File**: `src/lib/search-alerts.ts`
-
-**Purpose**: Server-side processing of saved search alerts. Matches new listings against stored filter criteria and sends notifications.
-
-### Exported Functions
-
-#### `processSearchAlerts(): Promise<ProcessResult>`
-
-Batch alert processor for DAILY and WEEKLY frequencies. Finds saved searches due for alerts, queries new matching listings, sends email notifications, and creates in-app notifications.
-
-#### `triggerInstantAlerts(newListing: NewListingForAlert): Promise<{sent, errors}>`
-
-Triggered when a new listing is created. Runs filter matching in-process against all INSTANT subscriptions.
-
-### Filter Matching Logic (internal `matchesFilters`)
-
-- **Price**: min/max inclusive range
-- **City**: case-insensitive substring match
-- **Room type, Lease duration, Gender preference, Household gender**: exact match
-- **Move-in date**: listing available by target date (null = available anytime)
-- **Amenities, House rules**: ALL required items must be present (AND logic)
-- **Languages**: ANY listed language matches (OR logic)
-- **Query**: case-insensitive substring match against title, description, city, state
+Builds `/search?...` URL string. Array params appended as separate query params.
 
 ---
 
 ## Constants Reference
+
+**File**: `src/lib/constants.ts`
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
@@ -625,38 +696,62 @@ Triggered when a new listing is created. Runs filter matching in-process against
 | `MAX_PAGE_SIZE` | 100 | Max results per page |
 | `MIN_QUERY_LENGTH` | 2 | Minimum search query length |
 | `MAX_QUERY_LENGTH` | 200 | Maximum search query length |
-| `LAT_OFFSET_DEGREES` | 0.09 | ~10km radius for point-to-bounds expansion |
+| `LAT_OFFSET_DEGREES` | 0.09 | ~10km radius for point-to-bounds |
+| `MAX_LAT_SPAN` | 5 | Max latitude span (~550km) |
+| `MAX_LNG_SPAN` | 5 | Max longitude span (~550km at equator) |
+| `CLUSTER_THRESHOLD` | 50 | Use pins if < 50 results, else geojson clustering |
+| `BOUNDS_EPSILON` | 0.001 | Bounds quantization (~100m precision) |
+| `AREA_COUNT_DEBOUNCE_MS` | 600 | Debounce for area count on map move |
+| `AREA_COUNT_CACHE_TTL_MS` | 30000 | Client cache for area count |
+
+### Query Limits (search-doc-queries.ts)
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `MAX_MAP_MARKERS` | 200 | Max markers returned for map |
+| `HYBRID_COUNT_THRESHOLD` | 100 | Return null count if > 100 |
+| `MAX_UNBOUNDED_RESULTS` | 48 | Cap for unbounded browse (4 pages of 12) |
+| `SEARCH_QUERY_TIMEOUT_MS` | 5000 | Statement timeout (5 seconds) |
 
 ---
 
-## URL Parameter Encoding Reference
+## Query Hash
 
-### Encoding (filters to URL)
+**File**: `src/lib/search/hash.ts`
 
-| Filter | URL Parameter | Format | Example |
-|--------|--------------|--------|---------|
-| Text query | `q` | string | `q=downtown+studio` |
-| Min price | `minPrice` (alias: `minBudget`) | number | `minPrice=500` |
-| Max price | `maxPrice` (alias: `maxBudget`) | number | `maxPrice=2000` |
-| Amenities | `amenities` | comma-separated or repeated | `amenities=Wifi,AC` |
-| House rules | `houseRules` | comma-separated or repeated | `houseRules=Pets+allowed` |
-| Languages | `languages` | comma-separated or repeated | `languages=en,es` |
-| Room type | `roomType` | string (aliases accepted) | `roomType=private` |
-| Lease duration | `leaseDuration` | string (aliases accepted) | `leaseDuration=6_months` |
-| Gender preference | `genderPreference` | string | `genderPreference=FEMALE_ONLY` |
-| Household gender | `householdGender` | string | `householdGender=MIXED` |
-| Move-in date | `moveInDate` | YYYY-MM-DD | `moveInDate=2026-03-01` |
-| Bounds | `minLat`, `maxLat`, `minLng`, `maxLng` | number | `minLat=37.7&maxLat=37.85` |
-| Point location | `lat`, `lng` | number | `lat=37.77&lng=-122.42` |
-| Sort | `sort` | enum | `sort=price_asc` |
-| Page | `page` | integer | `page=2` |
-| Near matches | `nearMatches` | `true`/`false`/`1` | `nearMatches=true` |
+Generates 16-character SHA256 hash from filter parameters for caching.
 
-### Decoding Priority
+**Features**:
+- Bounds quantized with `BOUNDS_EPSILON` (0.001) for ~100m cache tolerance
+- Arrays sorted for order-independence
+- Strings lowercased for case-insensitivity
+- Excludes pagination params (page, limit, cursor)
 
-1. Canonical param names take precedence over aliases (`minPrice` over `minBudget`)
-2. First value used when duplicate keys exist (except arrays)
-3. All enum values are case-insensitive
-4. `any` is treated as "no filter" (returns undefined)
-5. **Invalid ranges throw errors**: `minPrice > maxPrice` and `minLat > maxLat` cause validation errors
-6. Longitude ranges NOT validated for inversion (supports antimeridian crossing)
+```typescript
+generateQueryHash(params: HashableFilterParams): string
+```
+
+---
+
+## Response Transform
+
+**File**: `src/lib/search/transform.ts`
+
+### Mode Determination
+
+- `mapListings.length >= 50` → `"geojson"` (Mapbox clustering)
+- `mapListings.length < 50` → `"pins"` (individual tiered pins)
+
+### GeoJSON Transform
+
+Always returned. FeatureCollection with Point features containing:
+- `id`, `title`, `price`, `image`, `availableSlots`, `ownerId`
+
+### Pin Transform
+
+Only when mode is `"pins"`. Includes:
+- `id`, `lat`, `lng`, `price`
+- `tier`: "primary" or "mini" (based on ranking)
+- `stackCount`: number of listings at same location (if > 1)
+
+Pin tiering uses `getPrimaryPinLimit()` (default 40, configurable via `NEXT_PUBLIC_PRIMARY_PINS` env var, clamped to 10-120).

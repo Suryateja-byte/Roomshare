@@ -1,0 +1,56 @@
+--- a/src/components/Map.tsx
++++ b/src/components/Map.tsx
+@@ -271,12 +271,26 @@
+     // Detect dark mode
+     useEffect(() => {
+         const checkDarkMode = () => {
+             setIsDarkMode(document.documentElement.classList.contains('dark'));
+         };
+         checkDarkMode();
+
+-        // Watch for theme changes
++        // Watch for theme changes via class attribute
+         const observer = new MutationObserver(checkDarkMode);
+         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+-        return () => observer.disconnect();
++        // Watch for system preference changes (prefers-color-scheme)
++        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
++        const handleMediaChange = () => {
++            // Only apply system preference if no explicit class is set
++            if (!document.documentElement.classList.contains('dark') && !document.documentElement.classList.contains('light')) {
++                setIsDarkMode(mediaQuery.matches);
++            }
++        };
++        mediaQuery.addEventListener('change', handleMediaChange);
++        // Check initial system preference
++        handleMediaChange();
++
++        return () => {
++            observer.disconnect();
++            mediaQuery.removeEventListener('change', handleMediaChange);
++        };
+     }, []);
+
+@@ -294,9 +308,17 @@
+     // Detect OS/browser font-size scale for map label Dynamic Type support
+     useEffect(() => {
+         const update = () => {
+             const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+             setTextScale(rootFontSize / 16);
+         };
+         update();
++
++        // Detect window resize (viewport changes)
+         window.addEventListener('resize', update);
+-        return () => window.removeEventListener('resize', update);
++
++        // Detect font-size changes via ResizeObserver (browser zoom, accessibility settings)
++        const resizeObserver = new ResizeObserver(update);
++        resizeObserver.observe(document.documentElement);
++
++        return () => {
++            window.removeEventListener('resize', update);
++            resizeObserver.disconnect();
++        };
+     }, []);

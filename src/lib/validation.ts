@@ -124,9 +124,44 @@ export function clampBoundsToMaxSpan(bounds: MapBounds): MapBounds {
   const halfLat = clampedLatSpan / 2;
   const halfLng = clampedLngSpan / 2;
 
+  // Calculate clamped latitude bounds (same for all cases)
+  const clampedMinLat = Math.max(LAT_MIN, centerLat - halfLat);
+  const clampedMaxLat = Math.min(LAT_MAX, centerLat + halfLat);
+
+  // Handle antimeridian crossing case separately to preserve the crossing property
+  if (crossesAntimeridian) {
+    // For antimeridian crossing, centerLng is near +/-180
+    // Calculate raw bounds that may need wrapping
+    let newMinLng = centerLng - halfLng;
+    let newMaxLng = centerLng + halfLng;
+
+    // Wrap minLng if it goes below -180 (should wrap to positive side)
+    if (newMinLng < LNG_MIN) {
+      newMinLng = newMinLng + 360;
+    }
+    // Wrap maxLng if it goes above 180 (should wrap to negative side)
+    if (newMaxLng > LNG_MAX) {
+      newMaxLng = newMaxLng - 360;
+    }
+
+    // Ensure we still have a valid crossing (minLng > maxLng)
+    // If wrapping didn't produce a crossing, the span was small enough
+    // to fit without crossing, so use normal clamping
+    if (newMinLng > newMaxLng) {
+      return {
+        minLat: clampedMinLat,
+        maxLat: clampedMaxLat,
+        minLng: newMinLng,
+        maxLng: newMaxLng,
+      };
+    }
+    // Fall through to normal clamping if crossing collapsed
+  }
+
+  // Normal case (no antimeridian crossing) - standard clamping
   return {
-    minLat: Math.max(LAT_MIN, centerLat - halfLat),
-    maxLat: Math.min(LAT_MAX, centerLat + halfLat),
+    minLat: clampedMinLat,
+    maxLat: clampedMaxLat,
     minLng: Math.max(LNG_MIN, centerLng - halfLng),
     maxLng: Math.min(LNG_MAX, centerLng + halfLng),
   };

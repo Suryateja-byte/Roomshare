@@ -24,6 +24,7 @@ import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import {
   createContextFromHeaders,
   runWithRequestContext,
+  getRequestId,
 } from "@/lib/request-context";
 import {
   sanitizeSearchQuery,
@@ -100,6 +101,8 @@ function buildFacetWhereConditions(
     houseRules?: string[];
     roomType?: string;
     languages?: string[];
+    genderPreference?: string;
+    householdGender?: string;
     bounds?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
   },
   excludeFilter?: "amenities" | "houseRules" | "roomType" | "price",
@@ -115,6 +118,7 @@ function buildFacetWhereConditions(
     roomType,
     languages,
     bounds,
+    // Note: genderPreference and householdGender accessed via filterParams below
   } = filterParams;
 
   // Base conditions
@@ -209,13 +213,8 @@ function buildFacetWhereConditions(
       .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
-      conditions.push(`NOT EXISTS (
-        SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term
-        WHERE NOT EXISTS (
-          SELECT 1 FROM unnest(d.amenities_lower) AS la
-          WHERE la LIKE '%' || search_term || '%'
-        )
-      )`);
+      // Use @> (array contains) operator - GIN indexed
+      conditions.push(`d.amenities_lower @> $${paramIndex++}::text[]`);
       params.push(normalizedAmenities);
     }
   }
@@ -229,6 +228,18 @@ function buildFacetWhereConditions(
       conditions.push(`d.house_rules_lower @> $${paramIndex++}::text[]`);
       params.push(normalizedRules);
     }
+  }
+
+  // Gender preference filter (e.g., "female", "male", "any")
+  if (filterParams.genderPreference && filterParams.genderPreference !== "any") {
+    conditions.push(`d.gender_preference = $${paramIndex++}`);
+    params.push(filterParams.genderPreference);
+  }
+
+  // Household gender filter (e.g., "female", "male", "mixed")
+  if (filterParams.householdGender && filterParams.householdGender !== "any") {
+    conditions.push(`d.household_gender = $${paramIndex++}`);
+    params.push(filterParams.householdGender);
   }
 
   return { conditions, params, paramIndex };
@@ -543,7 +554,10 @@ export async function GET(request: NextRequest) {
             },
             {
               status: 400,
-              headers: { "Cache-Control": "private, no-store" },
+              headers: {
+                "Cache-Control": "private, no-store",
+                "x-request-id": getRequestId(),
+              },
             },
           );
         }
@@ -568,7 +582,10 @@ export async function GET(request: NextRequest) {
             { error: "Invalid coordinate values" },
             {
               status: 400,
-              headers: { "Cache-Control": "private, no-store" },
+              headers: {
+                "Cache-Control": "private, no-store",
+                "x-request-id": getRequestId(),
+              },
             },
           );
         }
@@ -608,14 +625,22 @@ export async function GET(request: NextRequest) {
         headers: {
           "Cache-Control": "private, no-store",
           "X-Cache-TTL": String(CACHE_TTL),
+          "x-request-id": getRequestId(),
         },
       });
     } catch (error) {
-      console.error("[search/facets] Error fetching facets:", error);
+      const requestId = getRequestId();
+      logger.sync.error("[search/facets] Error fetching facets", {
+        error: error instanceof Error ? error.message : "Unknown",
+        requestId,
+      });
 
       return NextResponse.json(
         { error: "Failed to fetch facets" },
-        { status: 500 },
+        {
+          status: 500,
+          headers: { "x-request-id": requestId },
+        },
       );
     }
   });

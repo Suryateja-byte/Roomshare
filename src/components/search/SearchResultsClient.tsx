@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -51,13 +51,17 @@ export function SearchResultsClient({
   );
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showTotalPrice, setShowTotalPrice] = useState(() => {
+  const [showTotalPrice, setShowTotalPrice] = useState(false);
+
+  // Hydrate showTotalPrice from sessionStorage after mount to avoid hydration mismatch
+  useEffect(() => {
     try {
-      return JSON.parse(sessionStorage.getItem('showTotalPrice') ?? 'false');
+      const stored = sessionStorage.getItem('showTotalPrice');
+      if (stored) setShowTotalPrice(JSON.parse(stored));
     } catch {
-      return false;
+      // sessionStorage unavailable or invalid JSON
     }
-  });
+  }, []);
   // Track all seen IDs for deduplication (initialized with SSR listings)
   const seenIdsRef = useRef<Set<string>>(
     new Set(initialListings.map((l) => l.id)),
@@ -286,7 +290,7 @@ export function SearchResultsClient({
           {/* Contextual footer */}
           {allListings.length > 0 && (
             <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-6 pb-4">
-              {total !== null ? `${total}+` : '100+'} stays{query ? ` in ${query}` : ''}
+              {total === null ? '100+' : total} stays{query ? ` in ${query}` : ''}
             </p>
           )}
         </>

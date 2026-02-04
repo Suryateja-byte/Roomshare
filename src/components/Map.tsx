@@ -13,7 +13,7 @@ import '@/lib/mapbox-init'; // Must be first - initializes worker
 import Map, { Marker, Popup, Source, Layer, MapLayerMouseEvent, ViewStateChangeEvent, MapRef } from 'react-map-gl';
 import type { LayerProps, GeoJSONSource } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -52,6 +52,133 @@ interface MarkerPosition {
     listing: Listing;
     lat: number;
     lng: number;
+}
+
+/**
+ * Map view state for controlled component pattern.
+ * Contains center coordinates and zoom level.
+ */
+export interface MapViewState {
+    /** Longitude of map center */
+    longitude: number;
+    /** Latitude of map center */
+    latitude: number;
+    /** Zoom level (0-22) */
+    zoom: number;
+    /** Optional bearing (rotation) in degrees */
+    bearing?: number;
+    /** Optional pitch (tilt) in degrees */
+    pitch?: number;
+}
+
+/**
+ * Map bounds coordinates (bounding box).
+ * Used for search queries and viewport tracking.
+ */
+export interface MapBounds {
+    minLng: number;
+    maxLng: number;
+    minLat: number;
+    maxLat: number;
+}
+
+/**
+ * Payload for view state change callback.
+ * Includes both view state and computed bounds.
+ */
+export interface MapViewStateChangeEvent {
+    /** The new view state */
+    viewState: MapViewState;
+    /** The computed bounds of the new viewport */
+    bounds: MapBounds;
+    /** Whether this change was from a programmatic move (flyTo/fitBounds) */
+    isProgrammatic: boolean;
+}
+
+/**
+ * Props for the MapComponent.
+ * Supports both controlled and uncontrolled usage patterns.
+ *
+ * @example Uncontrolled usage (default):
+ * ```tsx
+ * <MapComponent listings={listings} />
+ * ```
+ *
+ * @example Controlled usage:
+ * ```tsx
+ * const [viewState, setViewState] = useState({ longitude: -122.4, latitude: 37.8, zoom: 12 });
+ * <MapComponent
+ *   listings={listings}
+ *   viewState={viewState}
+ *   onViewStateChange={({ viewState }) => setViewState(viewState)}
+ * />
+ * ```
+ *
+ * @example With selected listing control:
+ * ```tsx
+ * const [selectedId, setSelectedId] = useState<string | null>(null);
+ * <MapComponent
+ *   listings={listings}
+ *   selectedListingId={selectedId}
+ *   onSelectedListingChange={setSelectedId}
+ * />
+ * ```
+ */
+export interface MapComponentProps {
+    /** Array of listings to display on the map */
+    listings: Listing[];
+
+    // --- Controlled View State Props ---
+
+    /**
+     * Controlled view state (center, zoom).
+     * When provided, the map operates in controlled mode.
+     * Parent component must update this via onViewStateChange.
+     */
+    viewState?: MapViewState;
+
+    /**
+     * Initial view state for uncontrolled mode.
+     * Only used when `viewState` prop is not provided.
+     * Defaults to URL bounds or first listing location.
+     */
+    defaultViewState?: MapViewState;
+
+    /**
+     * Callback fired when the map view state changes (pan, zoom).
+     * Called on every move in controlled mode.
+     * Provides both viewState and computed bounds.
+     */
+    onViewStateChange?: (event: MapViewStateChangeEvent) => void;
+
+    /**
+     * Callback fired when the map finishes moving (debounced).
+     * Useful for triggering search queries on move end.
+     */
+    onMoveEnd?: (event: MapViewStateChangeEvent) => void;
+
+    // --- Controlled Selection Props ---
+
+    /**
+     * Controlled selected listing ID.
+     * When provided, popup state is controlled by parent.
+     */
+    selectedListingId?: string | null;
+
+    /**
+     * Callback fired when selected listing changes.
+     * Called when user clicks a marker or closes popup.
+     */
+    onSelectedListingChange?: (listingId: string | null) => void;
+
+    // --- Behavior Props ---
+
+    /**
+     * Whether to disable automatic fly-to behavior when listings change.
+     * Useful when parent controls viewport via viewState.
+     * @default false
+     */
+    disableAutoFit?: boolean;
 }
 
 // Mapbox Layer Colors - Synced with Tailwind Zinc Palette
@@ -175,8 +302,42 @@ function getClusterCountLayerDark(textScale: number): LayerProps {
 const ZOOM_DOTS_ONLY = 12;     // Below: all pins are gray dots (no price)
 const ZOOM_TOP_N_PINS = 14;    // 12-14: primary = price pins, mini = dots. 14+: all price pins
 
-export default function MapComponent({ listings }: { listings: Listing[] }) {
-    const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+export default function MapComponent({
+    listings,
+    viewState: controlledViewState,
+    defaultViewState,
+    onViewStateChange,
+    onMoveEnd: onMoveEndProp,
+    selectedListingId: controlledSelectedId,
+    onSelectedListingChange,
+    disableAutoFit = false,
+}: MapComponentProps) {
+    // --- Controlled vs Uncontrolled View State ---
+    // When viewState prop is provided, map runs in controlled mode
+    const isControlledViewState = controlledViewState !== undefined;
+    const [internalViewState, setInternalViewState] = useState<MapViewState | undefined>(undefined);
+
+    // --- Controlled vs Uncontrolled Selection ---
+    // When selectedListingId prop is provided, selection is controlled by parent
+    const isControlledSelection = controlledSelectedId !== undefined;
+    const [internalSelectedListing, setInternalSelectedListing] = useState<Listing | null>(null);
+
+    // Computed selected listing - use controlled ID or internal state
+    const selectedListing = useMemo(() => {
+        if (isControlledSelection) {
+            return controlledSelectedId ? listings.find(l => l.id === controlledSelectedId) ?? null : null;
+        }
+        return internalSelectedListing;
+    }, [isControlledSelection, controlledSelectedId, listings, internalSelectedListing]);
+
+    // Unified setter for selected listing that respects controlled/uncontrolled mode
+    const setSelectedListing = useCallback((listing: Listing | null) => {
+        if (isControlledSelection) {
+            onSelectedListingChange?.(listing?.id ?? null);
+        } else {
+            setInternalSelectedListing(listing);
+        }
+    }, [isControlledSelection, onSelectedListingChange]);
     const [unclusteredListings, setUnclusteredListings] = useState<Listing[]>([]);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [isHighContrast, setIsHighContrast] = useState(false);
@@ -184,18 +345,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const [textScale, setTextScale] = useState(1);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [currentZoom, setCurrentZoom] = useState(12);
-    const [mapStyleKey, setMapStyleKey] = useState<'standard' | 'satellite' | 'transit'>(() => {
-        try {
-            if (typeof window !== 'undefined') {
-                const saved = sessionStorage.getItem('roomshare-map-style');
-                if (saved === 'satellite' || saved === 'transit') return saved;
-            }
-        } catch { /* sessionStorage unavailable (private browsing) */ }
-        return 'standard';
-    });
+    // P2-FIX (#137): Initialize with 'standard' for SSR, then hydrate from sessionStorage
+    // This prevents hydration mismatch since server always renders 'standard'
+    const [mapStyleKey, setMapStyleKey] = useState<'standard' | 'satellite' | 'transit'>('standard');
     const [areTilesLoading, setAreTilesLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const { hoveredId, activeId, setHovered, setActive, requestScrollTo } = useListingFocus();
+    // Keyboard navigation state for arrow key navigation between markers
+    const [keyboardFocusedId, setKeyboardFocusedId] = useState<string | null>(null);
+    const markerRefs = useRef<globalThis.Map<string, HTMLDivElement>>(new globalThis.Map());
     const router = useRouter();
     const searchParams = useSearchParams();
     const transitionContext = useSearchTransitionSafe();
@@ -223,10 +381,13 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     const pendingBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
     const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const searchSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // P2-FIX (#79): Ref to hold latest executeMapSearch to prevent stale closure in nested timeouts
+    const executeMapSearchRef = useRef<((bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }) => void) | null>(null);
     // Track URL bounds for reset functionality
     const urlBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
-    // Request deduplication: skip search if bounds haven't changed
-    const lastSearchBoundsRef = useRef<string | null>(null);
+    // P2-FIX (#154): Store numeric bounds for deduplication instead of string
+    // String comparison with toFixed can have floating-point precision issues
+    const lastSearchBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
     // P0 Issue #25: Track mount state to prevent stale callbacks updating state after unmount
     const isMountedRef = useRef(true);
     // Track map-initiated activeId to avoid re-triggering popup from card "Show on Map"
@@ -294,6 +455,17 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         return () => mq.removeEventListener('change', handler);
     }, []);
 
+    // P2-FIX (#137): Hydrate map style from sessionStorage after mount
+    // This runs only on client after hydration, avoiding SSR mismatch
+    useEffect(() => {
+        try {
+            const saved = sessionStorage.getItem('roomshare-map-style');
+            if (saved === 'satellite' || saved === 'transit') {
+                setMapStyleKey(saved);
+            }
+        } catch { /* sessionStorage unavailable (private browsing) */ }
+    }, []);
+
     // Detect OS/browser font-size scale for map label Dynamic Type support
     useEffect(() => {
         const update = () => {
@@ -359,11 +531,16 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 // Mark as programmatic move to prevent banner showing
                 setProgrammaticMove(true);
                 isClusterExpandingRef.current = true;
-                // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
+                // P1-FIX (#109): Safety timeout to clear BOTH flags if moveEnd/onIdle don't fire.
+                // This prevents isClusterExpandingRef from getting stuck if animation is interrupted.
                 if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
                 programmaticClearTimeoutRef.current = setTimeout(() => {
                     if (isProgrammaticMoveRef.current) {
                         setProgrammaticMove(false);
+                    }
+                    // P1-FIX (#109): Also clear cluster expansion flag on timeout
+                    if (isClusterExpandingRef.current) {
+                        isClusterExpandingRef.current = false;
                     }
                 }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
                 mapRef.current?.flyTo({
@@ -374,6 +551,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 });
             });
         } catch (error) {
+            // P1-FIX (#109): Clear cluster expansion flag on error to prevent stuck state
+            isClusterExpandingRef.current = false;
             console.warn('Cluster expansion failed', error);
         }
     }, [setProgrammaticMove, isProgrammaticMoveRef]);
@@ -414,6 +593,14 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
         // P0 Issue #25: Guard against state update after unmount
         if (!isMountedRef.current) return;
+
+        // CLUSTER FIX: Skip setting empty state during cluster expansion
+        // querySourceFeatures returns [] before tiles load after flyTo
+        // Only allow empty state if NOT expanding (normal pan/zoom to empty area)
+        if (unique.length === 0 && isClusterExpandingRef.current) {
+            return; // Tiles not loaded yet, retry will happen on onIdle
+        }
+
         setUnclusteredListings(unique);
     }, [useClustering]);
 
@@ -421,7 +608,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
     // When clustering, use unclustered listings; otherwise use all listings
     const markersSource = useClustering ? unclusteredListings : listings;
 
+    // P2-FIX (#150): Create stable ID key to avoid recalculating markerPositions
+    // when array reference changes but listing IDs remain the same
+    const markersSourceKey = useMemo(() => {
+        return markersSource.map(l => l.id).sort().join(',');
+    }, [markersSource]);
+
     const markerPositions = useMemo(() => {
+        // Note: markersSourceKey is used for dependency tracking, markersSource for data
+        void markersSourceKey; // Satisfy TypeScript that the variable is read
         const positions: MarkerPosition[] = [];
         const coordsCounts: Record<string, number> = {};
 
@@ -466,13 +661,182 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         });
 
         return positions;
-    }, [markersSource]);
+    // P2-FIX (#150): Depend on stable ID key instead of array reference
+    // This prevents recalculation when listings change but IDs remain the same
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [markersSourceKey]);
+
+    // Sorted marker positions for keyboard navigation (top-to-bottom, left-to-right)
+    // This provides intuitive arrow key navigation order based on visual position
+    const sortedMarkerPositions = useMemo(() => {
+        return [...markerPositions].sort((a, b) => {
+            // Sort by latitude (descending - north to south) first, then longitude (ascending - west to east)
+            const latDiff = b.lat - a.lat;
+            if (Math.abs(latDiff) > 0.001) return latDiff; // ~100m threshold for "same row"
+            return a.lng - b.lng;
+        });
+    }, [markerPositions]);
+
+    // Find marker index in sorted list
+    const findMarkerIndex = useCallback((id: string | null): number => {
+        if (!id) return -1;
+        return sortedMarkerPositions.findIndex(p => p.listing.id === id);
+    }, [sortedMarkerPositions]);
+
+    // Keyboard navigation handler for arrow keys
+    const handleMarkerKeyboardNavigation = useCallback((e: ReactKeyboardEvent<HTMLDivElement>, currentListingId: string) => {
+        const currentIndex = findMarkerIndex(currentListingId);
+        if (currentIndex === -1 || sortedMarkerPositions.length === 0) return;
+
+        let nextIndex: number | null = null;
+        const currentPos = sortedMarkerPositions[currentIndex];
+
+        switch (e.key) {
+            case 'ArrowUp': {
+                // Find the nearest marker above (higher latitude)
+                let bestIndex = -1;
+                let bestDistance = Infinity;
+                for (let i = 0; i < sortedMarkerPositions.length; i++) {
+                    if (i === currentIndex) continue;
+                    const pos = sortedMarkerPositions[i];
+                    if (pos.lat > currentPos.lat) {
+                        const distance = Math.sqrt(
+                            Math.pow(pos.lat - currentPos.lat, 2) +
+                            Math.pow(pos.lng - currentPos.lng, 2)
+                        );
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            bestIndex = i;
+                        }
+                    }
+                }
+                if (bestIndex !== -1) nextIndex = bestIndex;
+                break;
+            }
+            case 'ArrowDown': {
+                // Find the nearest marker below (lower latitude)
+                let bestIndex = -1;
+                let bestDistance = Infinity;
+                for (let i = 0; i < sortedMarkerPositions.length; i++) {
+                    if (i === currentIndex) continue;
+                    const pos = sortedMarkerPositions[i];
+                    if (pos.lat < currentPos.lat) {
+                        const distance = Math.sqrt(
+                            Math.pow(pos.lat - currentPos.lat, 2) +
+                            Math.pow(pos.lng - currentPos.lng, 2)
+                        );
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            bestIndex = i;
+                        }
+                    }
+                }
+                if (bestIndex !== -1) nextIndex = bestIndex;
+                break;
+            }
+            case 'ArrowLeft': {
+                // Find the nearest marker to the left (lower longitude)
+                let bestIndex = -1;
+                let bestDistance = Infinity;
+                for (let i = 0; i < sortedMarkerPositions.length; i++) {
+                    if (i === currentIndex) continue;
+                    const pos = sortedMarkerPositions[i];
+                    if (pos.lng < currentPos.lng) {
+                        const distance = Math.sqrt(
+                            Math.pow(pos.lat - currentPos.lat, 2) +
+                            Math.pow(pos.lng - currentPos.lng, 2)
+                        );
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            bestIndex = i;
+                        }
+                    }
+                }
+                if (bestIndex !== -1) nextIndex = bestIndex;
+                break;
+            }
+            case 'ArrowRight': {
+                // Find the nearest marker to the right (higher longitude)
+                let bestIndex = -1;
+                let bestDistance = Infinity;
+                for (let i = 0; i < sortedMarkerPositions.length; i++) {
+                    if (i === currentIndex) continue;
+                    const pos = sortedMarkerPositions[i];
+                    if (pos.lng > currentPos.lng) {
+                        const distance = Math.sqrt(
+                            Math.pow(pos.lat - currentPos.lat, 2) +
+                            Math.pow(pos.lng - currentPos.lng, 2)
+                        );
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            bestIndex = i;
+                        }
+                    }
+                }
+                if (bestIndex !== -1) nextIndex = bestIndex;
+                break;
+            }
+            case 'Home': {
+                // Jump to first marker
+                if (sortedMarkerPositions.length > 0) {
+                    nextIndex = 0;
+                }
+                break;
+            }
+            case 'End': {
+                // Jump to last marker
+                if (sortedMarkerPositions.length > 0) {
+                    nextIndex = sortedMarkerPositions.length - 1;
+                }
+                break;
+            }
+            default:
+                return; // Don't prevent default for other keys
+        }
+
+        if (nextIndex !== null && nextIndex !== currentIndex) {
+            e.preventDefault();
+            e.stopPropagation();
+            const nextMarker = sortedMarkerPositions[nextIndex];
+            const nextId = nextMarker.listing.id;
+
+            // Update keyboard focus state
+            setKeyboardFocusedId(nextId);
+
+            // Focus the marker element
+            const markerEl = markerRefs.current.get(nextId);
+            if (markerEl) {
+                markerEl.focus();
+            }
+
+            // Pan map to show the focused marker
+            if (mapRef.current) {
+                mapRef.current.easeTo({
+                    center: [nextMarker.lng, nextMarker.lat],
+                    duration: 300
+                });
+            }
+        }
+    }, [findMarkerIndex, sortedMarkerPositions]);
+
+    // Clear keyboard focus when clicking elsewhere or when markers change
+    useEffect(() => {
+        if (keyboardFocusedId && !markerPositions.find(p => p.listing.id === keyboardFocusedId)) {
+            setKeyboardFocusedId(null);
+        }
+    }, [keyboardFocusedId, markerPositions]);
 
     // Stabilize initial view state so it's only computed once on mount.
     // Prevents SF default from being re-applied when listings temporarily become empty.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // In controlled mode, this is used as the starting point before parent provides viewState.
+
     const initialViewState = useMemo(() =>
         (() => {
+            // Use defaultViewState prop if provided (uncontrolled with custom initial)
+            if (defaultViewState) {
+                return defaultViewState;
+            }
+
             const minLat = searchParams.get('minLat');
             const maxLat = searchParams.get('maxLat');
             const minLng = searchParams.get('minLng');
@@ -509,11 +873,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 ? { longitude: listings[0].location.lng, latitude: listings[0].location.lat, zoom: 12 }
                 : { longitude: -122.4194, latitude: 37.7749, zoom: 12 };
         })(),
-    []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [defaultViewState]);
 
     // Auto-fly to listings on search (but not on map move)
     useEffect(() => {
         if (!mapRef.current || listings.length === 0) return;
+
+        // Skip auto-fit when controlled by parent or explicitly disabled
+        if (isControlledViewState || disableAutoFit) return;
 
         // If "search as I move" is ON, the user controls the viewport — don't auto-fly
         if (searchAsMove) return;
@@ -612,13 +980,38 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             setActive(null);
         }
 
+        // P1-FIX (#106): Clear selectedListing popup if the listing no longer exists.
+        // Prevents showing stale popup data after search results update.
+        if (selectedListing && !listings.find(l => l.id === selectedListing.id)) {
+            setSelectedListing(null);
+        }
+
         // E2E testing: expose marker count for test verification
         if (process.env.NEXT_PUBLIC_E2E === 'true') {
             const roomshare = ((window as unknown as Record<string, unknown>).__roomshare || {}) as Record<string, unknown>;
             (window as unknown as Record<string, unknown>).__roomshare = roomshare;
             roomshare.markerCount = listings.length;
         }
-    }, [listings, activeId, setActive]);
+    }, [listings, activeId, setActive, selectedListing]);
+
+    // P0 FIX: Clear isSearching when transition completes, even if listings didn't change
+    // This fixes the "loading forever" bug when panning to an area with identical results
+    useEffect(() => {
+        // Only act when transition just completed AND we're still in searching state
+        if (transitionContext && !transitionContext.isPending && isSearching) {
+            // Small delay to allow listings prop to update first (batched renders)
+            const timeout = setTimeout(() => {
+                if (isMountedRef.current && isSearching) {
+                    setIsSearching(false);
+                    if (searchSafetyTimeoutRef.current) {
+                        clearTimeout(searchSafetyTimeoutRef.current);
+                        searchSafetyTimeoutRef.current = null;
+                    }
+                }
+            }, 500);
+            return () => clearTimeout(timeout);
+        }
+    }, [transitionContext?.isPending, isSearching]);
 
     // Cleanup timers on unmount and mark component as unmounted
     useEffect(() => {
@@ -644,12 +1037,20 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             if (updateUnclusteredDebounceRef.current) {
                 clearTimeout(updateUnclusteredDebounceRef.current);
             }
+            // P1-FIX (#109): Clear cluster expansion flag on unmount
+            isClusterExpandingRef.current = false;
             // Remove sourcedata listener
             if (mapRef.current && sourcedataHandlerRef.current) {
                 try {
                     mapRef.current.getMap().off('sourcedata', sourcedataHandlerRef.current);
                 } catch { /* map may already be destroyed */ }
             }
+            // P2-FIX (#153): Clear refs to help garbage collection
+            sourcedataHandlerRef.current = null;
+            pendingBoundsRef.current = null;
+            urlBoundsRef.current = null;
+            lastSearchBoundsRef.current = null;
+            lastMapActiveRef.current = null;
         };
     }, []);
 
@@ -717,10 +1118,19 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
 
     // Execute the actual search with the given bounds
     const executeMapSearch = useCallback((bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }) => {
-        // Request deduplication: skip if bounds haven't meaningfully changed (rounded to 4 decimal places ~11m precision)
-        const boundsKey = `${bounds.minLng.toFixed(4)},${bounds.maxLng.toFixed(4)},${bounds.minLat.toFixed(4)},${bounds.maxLat.toFixed(4)}`;
-        if (boundsKey === lastSearchBoundsRef.current) return;
-        lastSearchBoundsRef.current = boundsKey;
+        // P2-FIX (#154): Use numeric comparison with tolerance instead of string comparison
+        // This avoids floating-point precision issues with toFixed() rounding
+        // Tolerance of 0.0001 = ~11 meters, same precision as before but more robust
+        const BOUNDS_TOLERANCE = 0.0001;
+        const prev = lastSearchBoundsRef.current;
+        if (prev &&
+            Math.abs(bounds.minLng - prev.minLng) < BOUNDS_TOLERANCE &&
+            Math.abs(bounds.maxLng - prev.maxLng) < BOUNDS_TOLERANCE &&
+            Math.abs(bounds.minLat - prev.minLat) < BOUNDS_TOLERANCE &&
+            Math.abs(bounds.maxLat - prev.maxLat) < BOUNDS_TOLERANCE) {
+            return; // Bounds haven't meaningfully changed, skip search
+        }
+        lastSearchBoundsRef.current = { ...bounds };
 
         const params = new URLSearchParams(searchParams.toString());
 
@@ -741,11 +1151,13 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         lastSearchTimeRef.current = Date.now();
         pendingBoundsRef.current = null;
         setIsSearching(true);
-        // Safety timeout: clear searching state if listings don't update within 10s
+        // P2-FIX (#133): Increased safety timeout from 5s to 8s for slow networks
+        // Previous 5s was too aggressive for 3G/slow connections, causing loader to
+        // disappear before results arrived. 8s balances UX (not "forever") with reliability.
         if (searchSafetyTimeoutRef.current) clearTimeout(searchSafetyTimeoutRef.current);
         searchSafetyTimeoutRef.current = setTimeout(() => {
             if (isMountedRef.current) setIsSearching(false);
-        }, 10_000);
+        }, 8_000);
         // Use replace to update bounds without creating history entries
         // This prevents Back button from stepping through each map pan position
         const url = `/search?${params.toString()}`;
@@ -755,6 +1167,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
             router.replace(url);
         }
     }, [router, searchParams, transitionContext]);
+
+    // P2-FIX (#79): Keep ref updated with latest executeMapSearch to prevent stale closures
+    useEffect(() => {
+        executeMapSearchRef.current = executeMapSearch;
+    }, [executeMapSearch]);
 
     // Register search and reset handlers with context (after executeMapSearch is defined)
     useEffect(() => {
@@ -820,7 +1237,9 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         });
     }, [activeId, listings, setProgrammaticMove]);
 
-    const handleMoveEnd = (e: ViewStateChangeEvent) => {
+    // P1-FIX (#77): Wrap handleMoveEnd in useCallback to prevent stale closures.
+    // Without this, the function captures state values at definition time which can become stale.
+    const handleMoveEnd = useCallback((e: ViewStateChangeEvent) => {
         // Track zoom for two-tier pin display
         setCurrentZoom(e.viewState.zoom);
         // Debounce updateUnclusteredListings to batch rapid moveEnd events (100ms)
@@ -835,12 +1254,33 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         const mapBounds = e.target.getBounds();
         if (!mapBounds) return;
 
-        const bounds = {
+        const bounds: MapBounds = {
             minLng: mapBounds.getWest(),
             maxLng: mapBounds.getEast(),
             minLat: mapBounds.getSouth(),
             maxLat: mapBounds.getNorth()
         };
+
+        // Build view state change event for callbacks
+        const viewStateChangeEvent: MapViewStateChangeEvent = {
+            viewState: {
+                longitude: e.viewState.longitude,
+                latitude: e.viewState.latitude,
+                zoom: e.viewState.zoom,
+                bearing: e.viewState.bearing,
+                pitch: e.viewState.pitch,
+            },
+            bounds,
+            isProgrammatic: isProgrammaticMoveRef.current,
+        };
+
+        // Update internal view state for uncontrolled mode
+        if (!isControlledViewState) {
+            setInternalViewState(viewStateChangeEvent.viewState);
+        }
+
+        // Fire onMoveEnd callback (controlled component API)
+        onMoveEndProp?.(viewStateChangeEvent);
 
         // Always update current bounds in context for location conflict detection
         setCurrentMapBounds(bounds);
@@ -848,7 +1288,8 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         // Skip search/dirty logic during programmatic moves (auto-fly, card click, cluster expand)
         if (isProgrammaticMoveRef.current) {
             setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
-            isClusterExpandingRef.current = false; // Clear cluster expansion flag
+            // CLUSTER FIX: Don't clear isClusterExpandingRef here - wait for onIdle
+            // Tiles may not be loaded yet, clearing here causes empty markers
             return;
         }
 
@@ -893,21 +1334,36 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     // Schedule the pending search for when the throttle window expires
                     const delay = MIN_SEARCH_INTERVAL_MS - timeSinceLastSearch;
                     throttleTimeoutRef.current = setTimeout(() => {
-                        if (pendingBoundsRef.current) {
-                            executeMapSearch(pendingBoundsRef.current);
+                        // P2-FIX (#79): Use ref to get latest executeMapSearch, preventing stale closure
+                        if (pendingBoundsRef.current && executeMapSearchRef.current) {
+                            executeMapSearchRef.current(pendingBoundsRef.current);
                         }
                     }, delay);
                     return;
                 }
 
                 // Execute immediately if outside throttle window
-                executeMapSearch(bounds);
+                // P2-FIX (#79): Use ref to get latest executeMapSearch
+                if (executeMapSearchRef.current) {
+                    executeMapSearchRef.current(bounds);
+                }
             }, 600); // 600ms debounce (matches project spec)
         } else {
             // Search-as-move is OFF - mark bounds as dirty so banner shows
             setBoundsDirty(true);
         }
-    };
+    }, [
+        updateUnclusteredListings,
+        setCurrentMapBounds,
+        isProgrammaticMoveRef,
+        setProgrammaticMove,
+        setHasUserMoved,
+        searchAsMove,
+        setBoundsDirty,
+        executeMapSearch,
+        isControlledViewState,
+        onMoveEndProp,
+    ]);
 
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -920,6 +1376,56 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
         const listing = listings.find(l => l.id === hoveredId);
         return listing ? { lat: listing.location.lat, lng: listing.location.lng } : null;
     }, [hoveredId, listings]);
+
+    // Handler for controlled mode - fires on every move to update parent's viewState
+    const handleMove = useCallback((e: ViewStateChangeEvent) => {
+        if (!isControlledViewState || !onViewStateChange) return;
+
+        const mapBounds = e.target.getBounds();
+        const bounds: MapBounds = mapBounds ? {
+            minLng: mapBounds.getWest(),
+            maxLng: mapBounds.getEast(),
+            minLat: mapBounds.getSouth(),
+            maxLat: mapBounds.getNorth(),
+        } : { minLng: 0, maxLng: 0, minLat: 0, maxLat: 0 };
+
+        onViewStateChange({
+            viewState: {
+                longitude: e.viewState.longitude,
+                latitude: e.viewState.latitude,
+                zoom: e.viewState.zoom,
+                bearing: e.viewState.bearing,
+                pitch: e.viewState.pitch,
+            },
+            bounds,
+            isProgrammatic: isProgrammaticMoveRef.current,
+        });
+    }, [isControlledViewState, onViewStateChange, isProgrammaticMoveRef]);
+
+    // P1-FIX (#83): Memoize handleMarkerClick to prevent recreation on every render
+    const handleMarkerClick = useCallback((listing: Listing, coords: { lng: number; lat: number }) => {
+        triggerHaptic();
+        setSelectedListing(listing);
+        // Set active listing for card highlight and scroll-to
+        lastMapActiveRef.current = listing.id;
+        setActive(listing.id);
+        requestScrollTo(listing.id);
+        // Mark as programmatic move to prevent banner showing
+        setProgrammaticMove(true);
+        // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
+        if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+        programmaticClearTimeoutRef.current = setTimeout(() => {
+            if (isProgrammaticMoveRef.current) {
+                setProgrammaticMove(false);
+            }
+        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+        // Smooth pan to center popup both horizontally and vertically
+        mapRef.current?.easeTo({
+            center: [coords.lng, coords.lat],
+            offset: [0, -150], // NEGATIVE Y pushes marker UP, centering popup below it
+            duration: 400
+        });
+    }, [setSelectedListing, setActive, requestScrollTo, setProgrammaticMove]);
 
     if (!token) {
         return (
@@ -981,10 +1487,37 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 }
             </div>
 
+            {/* Screen reader instructions for keyboard navigation */}
+            <div id="map-marker-instructions" className="sr-only">
+                Use arrow keys to navigate between markers based on their position on the map.
+                Press Enter or Space to select a marker and view listing details.
+                Press Home to jump to the first marker, End to jump to the last marker.
+            </div>
+
+            {/* Screen reader announcement for keyboard navigation */}
+            <div
+                className="sr-only"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+            >
+                {keyboardFocusedId && markerPositions.find(p => p.listing.id === keyboardFocusedId) && (() => {
+                    const focused = markerPositions.find(p => p.listing.id === keyboardFocusedId);
+                    if (!focused) return '';
+                    const index = sortedMarkerPositions.findIndex(p => p.listing.id === keyboardFocusedId);
+                    return `Marker ${index + 1} of ${sortedMarkerPositions.length}: ${focused.listing.title || 'Listing'}, $${focused.listing.price} per month`;
+                })()}
+            </div>
+
             <Map
                 ref={mapRef}
                 mapboxAccessToken={token}
-                initialViewState={initialViewState}
+                // Controlled mode: use viewState prop + onMove handler
+                // Uncontrolled mode: use initialViewState (default behavior)
+                {...(isControlledViewState && controlledViewState
+                    ? { ...controlledViewState, onMove: handleMove }
+                    : { initialViewState }
+                )}
                 style={{ width: '100%', height: '100%' }}
                 scrollZoom={true}
                 dragPan={true}
@@ -1005,6 +1538,16 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 })()}
                 onMoveEnd={handleMoveEnd}
                 onLoad={() => {
+                    // P2-FIX (#84): Clean up old sourcedata listener on style change before adding new one
+                    // When mapStyleKey changes, the map style reloads and onLoad fires again.
+                    // Without cleanup, we'd accumulate duplicate listeners.
+                    if (mapRef.current && sourcedataHandlerRef.current) {
+                        try {
+                            mapRef.current.getMap().off('sourcedata', sourcedataHandlerRef.current);
+                        } catch { /* map may have been destroyed during style change */ }
+                        sourcedataHandlerRef.current = null;
+                    }
+
                     setIsMapLoaded(true);
                     updateUnclusteredListings();
 
@@ -1014,7 +1557,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     if (mapRef.current) {
                         const map = mapRef.current.getMap();
                         const handler = (e: any) => {
-                            if (e.sourceId === 'listings' && e.isSourceLoaded && !e.tile) {
+                            if (e.sourceId !== 'listings' || !e.isSourceLoaded) return;
+                            // CLUSTER FIX: During expansion, accept tile events (e.tile defined)
+                            // Otherwise, only accept source-level events (!e.tile)
+                            if (isClusterExpandingRef.current || !e.tile) {
                                 updateUnclusteredListings();
                             }
                         };
@@ -1050,6 +1596,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 onMoveStart={() => setAreTilesLoading(true)}
                 onIdle={() => {
                     setAreTilesLoading(false);
+                    // CLUSTER FIX: Clear expansion flag AFTER tiles are loaded
+                    // This ensures updateUnclusteredListings has valid data
+                    if (isClusterExpandingRef.current) {
+                        isClusterExpandingRef.current = false;
+                    }
                     // Fix 2: Re-query unclustered features after all tiles rendered.
                     // onIdle is the most reliable signal that tiles are fully loaded.
                     updateUnclusteredListings();
@@ -1058,6 +1609,14 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     // User pin drop takes priority
                     if (isDropMode && e.lngLat) {
                         await handleUserPinClick(e.lngLat.lng, e.lngLat.lat);
+                        return;
+                    }
+                    // P2-FIX (#110): Check if click originated from a marker element.
+                    // stopPropagation on Marker's onClick stops DOM bubbling, but
+                    // mapbox-gl still detects the click via canvas hit-testing.
+                    // Skip cluster handling if click was on a marker to prevent both firing.
+                    const target = e.originalEvent?.target as HTMLElement | undefined;
+                    if (target?.closest('[data-listing-id]')) {
                         return;
                     }
                     // Otherwise handle cluster click
@@ -1111,33 +1670,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                 )}
 
                 {/* Individual price markers - shown for unclustered points or when not clustering */}
-                {markerPositions.map((position) => {
-                    // Shared click handler for both Marker and inner content
-                    const handleMarkerClick = () => {
-                        triggerHaptic();
-                        setSelectedListing(position.listing);
-                        // Set active listing for card highlight and scroll-to
-                        lastMapActiveRef.current = position.listing.id;
-                        setActive(position.listing.id);
-                        requestScrollTo(position.listing.id);
-                        // Mark as programmatic move to prevent banner showing
-                        setProgrammaticMove(true);
-                        // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
-                        if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
-                        programmaticClearTimeoutRef.current = setTimeout(() => {
-                            if (isProgrammaticMoveRef.current) {
-                                setProgrammaticMove(false);
-                            }
-                        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-                        // Smooth pan to center popup both horizontally and vertically
-                        mapRef.current?.easeTo({
-                            center: [position.lng, position.lat],
-                            offset: [0, -150], // NEGATIVE Y pushes marker UP, centering popup below it
-                            duration: 400
-                        });
-                    };
-
-                    return (
+                {markerPositions.map((position) => (
                     <Marker
                         key={position.listing.id}
                         longitude={position.lng}
@@ -1145,23 +1678,48 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         anchor="bottom"
                         onClick={(e: any) => {
                             e.originalEvent.stopPropagation();
-                            handleMarkerClick();
+                            handleMarkerClick(position.listing, { lng: position.lng, lat: position.lat });
                         }}
                     >
                         <div
+                            ref={(el) => {
+                                if (el) {
+                                    markerRefs.current.set(position.listing.id, el);
+                                } else {
+                                    markerRefs.current.delete(position.listing.id);
+                                }
+                            }}
                             className={cn(
                                 "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center",
                                 // Spring easing for scale: cubic-bezier(0.34, 1.56, 0.64, 1)
                                 "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
                                 hoveredId === position.listing.id && "scale-[1.15] z-50",
                                 activeId === position.listing.id && !hoveredId && "z-40",
-                                hoveredId && hoveredId !== position.listing.id && "opacity-60"
+                                hoveredId && hoveredId !== position.listing.id && "opacity-60",
+                                // Keyboard focus styling - distinct from hover
+                                keyboardFocusedId === position.listing.id && "z-50"
                             )}
                             data-listing-id={position.listing.id}
                             role="button"
                             tabIndex={0}
-                            aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}`}
-                            onPointerEnter={() => {
+                            aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`}
+                            aria-describedby="map-marker-instructions"
+                            onFocus={() => {
+                                // Track keyboard focus state
+                                setKeyboardFocusedId(position.listing.id);
+                            }}
+                            onBlur={() => {
+                                // Clear keyboard focus when element loses focus
+                                setKeyboardFocusedId((current) =>
+                                    current === position.listing.id ? null : current
+                                );
+                            }}
+                            onPointerEnter={(e) => {
+                                // P1-FIX (#114): Don't trigger hover on touch devices.
+                                // Touch fires pointerenter on tap, causing unintended scroll.
+                                // Let the click handler manage touch interactions instead.
+                                if (e.pointerType === 'touch') return;
+
                                 setHovered(position.listing.id, "map");
                                 // Debounce scroll request to prevent list jumping as user scans markers
                                 if (hoverScrollTimeoutRef.current) {
@@ -1171,7 +1729,10 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                     requestScrollTo(position.listing.id);
                                 }, 300);
                             }}
-                            onPointerLeave={() => {
+                            onPointerLeave={(e) => {
+                                // P1-FIX (#114): Skip hover cleanup for touch - wasn't activated
+                                if (e.pointerType === 'touch') return;
+
                                 setHovered(null);
                                 // Clear pending scroll request when hover ends
                                 if (hoverScrollTimeoutRef.current) {
@@ -1183,8 +1744,15 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                 if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    handleMarkerClick();
+                                    handleMarkerClick(position.listing, { lng: position.lng, lat: position.lat });
+                                } else if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+                                    handleMarkerKeyboardNavigation(e, position.listing.id);
                                 }
+                            }}
+                            // P1-FIX (#138): Prevent double-click zoom on marker content
+                            onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
                             }}
                         >
                             {/* Zoom-based two-tier pin rendering:
@@ -1255,10 +1823,16 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                         : "border-zinc-400 dark:border-zinc-500 animate-[pulse-ring_2s_ease-in-out_infinite] opacity-30"
                                 )} />
                             )}
+                            {/* Keyboard focus ring - solid visible ring distinct from hover animation */}
+                            {keyboardFocusedId === position.listing.id && (
+                                <div
+                                    className="absolute -inset-3 rounded-full border-[3px] border-blue-500 dark:border-blue-400 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
+                                    aria-hidden="true"
+                                />
+                            )}
                         </div>
                     </Marker>
-                    );
-                })}
+                ))}
 
                 {selectedListing && (
                     <Popup
@@ -1268,7 +1842,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         onClose={() => setSelectedListing(null)}
                         closeOnClick={false}
                         maxWidth="320px"
-                        className={`z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${isDarkMode
+                        className={`z-[60] [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${isDarkMode
                             ? '[&_.mapboxgl-popup-tip]:border-t-zinc-900'
                             : '[&_.mapboxgl-popup-tip]:border-t-white'
                             }`}
@@ -1377,7 +1951,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                     role="switch"
                     aria-checked={searchAsMove}
                     onClick={() => setSearchAsMove(!searchAsMove)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none ${
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                         searchAsMove
                             ? "bg-zinc-900 text-white border-zinc-900 ring-2 ring-green-400/30 dark:bg-white dark:text-zinc-900 dark:border-white dark:ring-green-500/30"
                             : "bg-white text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
@@ -1402,12 +1976,17 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                         const minLat = Math.min(...points.map(p => p.lat));
                         const maxLat = Math.max(...points.map(p => p.lat));
                         setProgrammaticMove(true);
+                        // P2-FIX (#166): Add safety timeout to clear programmatic flag if moveEnd doesn't fire
+                        if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+                        programmaticClearTimeoutRef.current = setTimeout(() => {
+                            if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+                        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
                         mapRef.current.fitBounds(
                             [[minLng, minLat], [maxLng, maxLat]],
                             { padding: 50, duration: 1000 }
                         );
                     }}
-                    className="absolute bottom-4 right-4 z-10 w-11 h-11 flex items-center justify-center bg-white dark:bg-zinc-800 rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                    className="absolute bottom-4 right-4 z-10 w-11 h-11 flex items-center justify-center bg-white dark:bg-zinc-800 rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                     aria-label="Fit all results in view"
                     title="Fit all results"
                 >
@@ -1432,7 +2011,7 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                 try { sessionStorage.setItem('roomshare-map-style', style.key); } catch { /* SSR safe */ }
                             }}
                             className={cn(
-                                "flex items-center gap-1 px-2.5 py-2 text-xs font-medium transition-colors",
+                                "flex items-center gap-1 px-2.5 py-2 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset",
                                 mapStyleKey === style.key
                                     ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
                                     : "bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700"
@@ -1478,6 +2057,11 @@ export default function MapComponent({ listings }: { listings: Listing[] }) {
                                 if (!map) return;
                                 const currentZoom = map.getZoom();
                                 setProgrammaticMove(true);
+                                // P2-FIX (#167): Add safety timeout to clear programmatic flag if moveEnd doesn't fire
+                                if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+                                programmaticClearTimeoutRef.current = setTimeout(() => {
+                                    if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+                                }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
                                 mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
                             }}
                         >

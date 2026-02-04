@@ -45,14 +45,14 @@ export function MapMovedBanner({
       <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-white dark:bg-zinc-800 rounded-full shadow-lg px-2 py-1">
         <button
           onClick={onSearch}
-          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 h-11 px-3 inline-flex items-center"
+          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 h-11 px-3 inline-flex items-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
           {label}
         </button>
         <button
           onClick={onReset}
           aria-label="Reset map view"
-          className="p-1 w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+          className="p-1 w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
           <X className="h-4 w-4" />
         </button>
@@ -70,14 +70,14 @@ export function MapMovedBanner({
       <div className="flex items-center gap-2">
         <button
           onClick={onSearch}
-          className="text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 h-11 px-2 inline-flex items-center"
+          className="text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 h-11 px-2 inline-flex items-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
         >
           {label}
         </button>
         <button
           onClick={onReset}
           aria-label="Reset map view"
-          className="p-1 w-11 h-11 inline-flex items-center justify-center text-amber-500 hover:text-amber-700 dark:hover:text-amber-300"
+          className="p-1 w-11 h-11 inline-flex items-center justify-center text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
         >
           <X className="h-4 w-4" />
         </button>

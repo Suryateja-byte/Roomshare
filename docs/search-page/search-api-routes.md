@@ -25,7 +25,7 @@ Comprehensive reference for all API routes that power the Roomshare search exper
 
 ## GET /api/search/v2
 
-**File**: `src/app/api/search/v2/route.ts`
+**File**: `src/app/api/search/v2/route.ts` (125 lines)
 
 **Purpose**: Unified search endpoint returning both list results and map data in a single response. Delegates to `search-v2-service.ts` for searchDoc-based querying, keyset pagination, and ranking.
 
@@ -37,6 +37,20 @@ The endpoint is gated behind a feature flag. It is enabled when either condition
 - URL param `?v2=1` or `?v2=true` is present (testing override)
 
 If disabled, returns `404`.
+
+**Key Code** (lines 31-40):
+
+```ts
+function isV2Enabled(request: NextRequest): boolean {
+  // Global feature flag takes precedence
+  if (features.searchV2) {
+    return true;
+  }
+  // URL param override for testing: ?v2=1
+  const v2Param = request.nextUrl.searchParams.get("v2");
+  return v2Param === "1" || v2Param === "true";
+}
+```
 
 ### Request
 
@@ -51,14 +65,18 @@ If disabled, returns `404`.
 
 ```jsonc
 {
-  "list": { /* paginated listing results */ },
+  "list": {
+    "items": [{ "id": "...", "title": "...", "price": 1200, "image": "...", "lat": 37.77, "lng": -122.41 }],
+    "nextCursor": "base64url-encoded-cursor-or-null",
+    "total": 42
+  },
   "map": {
     "geojson": { /* GeoJSON FeatureCollection -- ALWAYS present */ },
     "pins": [ /* tiered pins -- ONLY when mode='pins' */ ]
   },
   "meta": {
     "mode": "geojson" | "pins",  // "geojson" when >=50 mapListings, "pins" otherwise
-    "queryHash": "...",
+    "queryHash": "16-char-sha256-hash",
     "generatedAt": "2026-01-31T..."
   }
 }
@@ -90,6 +108,7 @@ This signals the client to prompt the user for a location. Not an error.
 
 ```
 Cache-Control: public, s-maxage=60, max-age=30, stale-while-revalidate=120
+Vary: Accept-Encoding
 ```
 
 CDN caches for 60s, browser for 30s, with stale-while-revalidate up to 120s. Unbounded search responses use `no-cache, no-store`.
@@ -98,31 +117,20 @@ CDN caches for 60s, browser for 30s, with stale-while-revalidate up to 120s. Unb
 
 Uses Redis-backed rate limiting (`withRateLimitRedis`) with type `"map"` (burst: 60 req, sustained: 300 req).
 
-### Key Code
-
-```ts
-// Feature flag check
-function isV2Enabled(request: NextRequest): boolean {
-  if (features.searchV2) return true;
-  const v2Param = request.nextUrl.searchParams.get("v2");
-  return v2Param === "1" || v2Param === "true";
-}
-
-// Delegation to shared service
-const rawParams = buildRawParamsFromSearchParams(searchParams);
-const result = await executeSearchV2({ rawParams });
-```
-
 ### Service Layer Connection
 
-- `buildRawParamsFromSearchParams()` from `@/lib/search-params` -- normalizes URL params
-- `executeSearchV2()` from `@/lib/search/search-v2-service` -- orchestrates searchDoc queries, keyset pagination, ranking, GeoJSON generation
+- `buildRawParamsFromSearchParams()` from `@/lib/search-params` -- normalizes URL params (line 68)
+- `executeSearchV2()` from `@/lib/search/search-v2-service` -- orchestrates searchDoc queries, keyset pagination, ranking, GeoJSON generation (line 71)
+
+### Request Context
+
+All requests are wrapped in `runWithRequestContext()` with a unique `x-request-id` header (lines 43-46).
 
 ---
 
 ## GET /api/search/facets
 
-**File**: `src/app/api/search/facets/route.ts`
+**File**: `src/app/api/search/facets/route.ts` (623 lines)
 
 **Purpose**: Returns facet counts for all filter options (amenities, house rules, room types, price ranges, price histogram) based on current filter state. Used by the filter drawer to show how many listings match each option.
 
@@ -134,16 +142,18 @@ All standard search/filter params as query string. Supports repeated params and 
 |-------|------|-------------|
 | `q` | `string` | Text search query |
 | `minPrice` / `maxPrice` | `number` | Price range |
-| `amenities` | `string[]` | Selected amenities |
-| `houseRules` | `string[]` | Selected house rules |
+| `amenities` | `string[]` | Selected amenities (repeated params or CSV) |
+| `houseRules` | `string[]` | Selected house rules (repeated params or CSV) |
 | `roomType` | `string` | Room type filter |
 | `leaseDuration` | `string` | Lease duration filter |
 | `moveInDate` | `string` | `YYYY-MM-DD` format |
 | `languages` | `string[]` | Household languages |
 | `minLat`, `maxLat`, `minLng`, `maxLng` | `number` | Explicit bounds |
-| `lat`, `lng` | `number` | Center point (derives ~10km bounds) |
+| `lat`, `lng` | `number` | Center point (derives ~10km bounds via `LAT_OFFSET_DEGREES`) |
 
 ### Response Shape
+
+**TypeScript Interface** (lines 58-71):
 
 ```ts
 interface FacetsResponse {
@@ -171,17 +181,38 @@ interface FacetsResponse {
 
 ### Sticky Faceting
 
-Each facet query **excludes its own filter** from the WHERE clause. For example, the amenities facet query omits the amenities filter so users can see counts for all amenity options even when some are already selected. This is the standard "sticky faceting" UX pattern.
+Each facet query **excludes its own filter** from the WHERE clause (lines 92-235). For example, the amenities facet query omits the amenities filter so users can see counts for all amenity options even when some are already selected. This is the standard "sticky faceting" UX pattern.
+
+**Key Code** (lines 206-221):
+
+```ts
+// Amenities filter (AND logic) - exclude when aggregating amenities facet
+if (excludeFilter !== "amenities" && amenities?.length) {
+  const normalizedAmenities = amenities
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean);
+  if (normalizedAmenities.length > 0) {
+    conditions.push(`NOT EXISTS (
+      SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term
+      WHERE NOT EXISTS (
+        SELECT 1 FROM unnest(d.amenities_lower) AS la
+        WHERE la LIKE '%' || search_term || '%'
+      )
+    )`);
+    params.push(normalizedAmenities);
+  }
+}
+```
 
 ### Price Histogram
 
-**New Feature**: The facets endpoint now includes a price histogram with adaptive bucket sizing. The histogram:
+The facets endpoint includes a price histogram with adaptive bucket sizing (lines 384-437). The histogram:
 
 - Uses sticky faceting (excludes price filter to show full distribution)
 - Computes adaptive bucket widths based on price range for optimal visual density
-- Returns null if no valid price range exists
+- Returns null if no valid price range exists (min >= max)
 
-**Adaptive histogram bucket widths**:
+**Adaptive histogram bucket widths** (lines 385-391):
 
 | Range | Bucket Width |
 |-------|-------------|
@@ -192,32 +223,35 @@ Each facet query **excludes its own filter** from the WHERE clause. For example,
 
 ### Validation and Abuse Protection
 
-1. **Text query without bounds is rejected** (400) to prevent full-table scans.
-2. **Invalid coordinates** (NaN/Infinity) are rejected (400).
-3. **Oversized bounds** are silently clamped to `MAX_LAT_SPAN` / `MAX_LNG_SPAN` limits.
-4. Antimeridian-crossing bounds are handled with split envelope queries.
+**Validation Flow** (lines 527-594):
+
+1. **Text query without bounds is rejected** (400) to prevent full-table scans (lines 532-549).
+2. **Invalid coordinates** (NaN/Infinity) are rejected (400) with coordinate logging (lines 555-575).
+3. **Oversized bounds** are silently clamped to `MAX_LAT_SPAN` / `MAX_LNG_SPAN` limits (lines 577-593).
+4. Antimeridian-crossing bounds are handled with split envelope queries (lines 132-146).
 
 ### Caching
 
-- Server-side: `unstable_cache` with 30-second TTL, keyed by normalized filter params.
-- Client headers: `Cache-Control: private, no-store` (client handles its own debouncing).
+- **Server-side**: `unstable_cache` with 30-second TTL (`CACHE_TTL`), keyed by normalized filter params (lines 599-603).
+- **Client headers**: `Cache-Control: private, no-store` with `X-Cache-TTL` header (lines 608-611).
 
 ### Rate Limiting
 
-Uses Redis-backed rate limiting (`withRateLimitRedis`) with type `"search-count"` (burst: 30 req, sustained: 200 req).
+Uses Redis-backed rate limiting (`withRateLimitRedis`) with type `"search-count"` (burst: 30 req, sustained: 200 req) (lines 503-508).
 
 ### Database Queries
 
-All queries run against the `listing_search_docs` materialized table. Four parallel queries plus a sequential histogram:
+All queries run against the `listing_search_docs` materialized table. Four parallel queries plus a sequential histogram (lines 468-489):
 
-1. **Amenities**: `unnest(d.amenities)` with `GROUP BY` / `COUNT(DISTINCT d.id)`, `LIMIT 100`
-2. **House Rules**: Same pattern with `unnest(d.house_rules)`
-3. **Room Types**: `GROUP BY d.room_type`
-4. **Price Ranges**: `MIN`, `MAX`, `percentile_cont(0.5)` aggregate
-5. **Price Histogram** (runs after price ranges): Adaptive bucket width based on range, using `floor(d.price / bucketWidth)` bucketing
+1. **Amenities** (lines 240-272): `unnest(d.amenities)` with `GROUP BY` / `COUNT(DISTINCT d.id)`, `LIMIT 100`
+2. **House Rules** (lines 277-308): Same pattern with `unnest(d.house_rules)`
+3. **Room Types** (lines 313-344): `GROUP BY d.room_type`
+4. **Price Ranges** (lines 349-379): `MIN`, `MAX`, `percentile_cont(0.5)` aggregate
+5. **Price Histogram** (lines 398-437): Runs after price ranges, uses `floor(d.price / bucketWidth)` bucketing
+
+**Example Query** (amenities facet):
 
 ```sql
--- Example: amenities facet query
 SELECT amenity, COUNT(DISTINCT d.id) as count
 FROM listing_search_docs d, unnest(d.amenities) AS amenity
 WHERE d.available_slots > 0 AND d.status = 'ACTIVE'
@@ -228,19 +262,19 @@ GROUP BY amenity ORDER BY count DESC LIMIT 100
 
 ### Text Search
 
-Uses PostgreSQL full-text search: `d.search_tsv @@ plainto_tsquery('english', $n)` for semantic consistency with the main search endpoint.
+Uses PostgreSQL full-text search (lines 162-170): `d.search_tsv @@ plainto_tsquery('english', $n)` for semantic consistency with the main search endpoint.
 
 ---
 
 ## GET /api/search-count
 
-**File**: `src/app/api/search-count/route.ts`
+**File**: `src/app/api/search-count/route.ts` (117 lines)
 
 **Purpose**: Returns a count of listings matching given filters. Used by the filter drawer to show "Show X listings" button text.
 
 ### Request
 
-Same filter params as `/api/search/facets` via `buildRawParamsFromSearchParams()` and `parseSearchParams()`.
+Same filter params as `/api/search/facets` via `buildRawParamsFromSearchParams()` and `parseSearchParams()` (lines 49-52).
 
 ### Response
 
@@ -266,24 +300,24 @@ Same filter params as `/api/search/facets` via `buildRawParamsFromSearchParams()
 
 ### Key Behavior
 
-- `dynamic = "force-dynamic"` disables Next.js static caching.
-- Delegates to `getLimitedCount()` from `@/lib/data` which returns exact count up to 100, or `null` beyond.
-- Unbounded text searches return `{ count: null, boundsRequired: true }` instead of executing.
-- Browse mode (no query, no bounds) returns `{ count: null, browseMode: true }`.
+- `dynamic = "force-dynamic"` disables Next.js static caching (line 30).
+- Delegates to `getLimitedCount()` from `@/lib/data` which returns exact count up to 100, or `null` beyond (line 82).
+- Unbounded text searches return `{ count: null, boundsRequired: true }` instead of executing (lines 56-65).
+- Browse mode (no query, no bounds) returns `{ count: null, browseMode: true }` (lines 69-78).
 
 ### Caching
 
-`Cache-Control: private, no-store` on all responses. Client handles debouncing and in-memory caching.
+`Cache-Control: private, no-store` on all responses (line 95). Client handles debouncing and in-memory caching.
 
 ### Rate Limiting
 
-Uses Redis-backed rate limiting (`withRateLimitRedis`) with type `"search-count"` (burst: 30 req, sustained: 200 req).
+Uses Redis-backed rate limiting (`withRateLimitRedis`) with type `"search-count"` (burst: 30 req, sustained: 200 req) (lines 39-44).
 
 ---
 
 ## GET /api/map-listings
 
-**File**: `src/app/api/map-listings/route.ts`
+**File**: `src/app/api/map-listings/route.ts` (140 lines)
 
 **Purpose**: Fetches map marker data for the persistent map component. Returns listings with coordinates and minimal display data for map pins.
 
@@ -297,9 +331,31 @@ Uses Redis-backed rate limiting (`withRateLimitRedis`) with type `"search-count"
 
 ### Bounds Resolution
 
-1. Tries explicit `minLat/maxLat/minLng/maxLng` first via `validateAndParseBounds()`.
-2. Falls back to `lat/lng` with a ~10km radius (using `LAT_OFFSET_DEGREES` constant, adjusted by `cos(lat)` for longitude).
-3. If neither available, returns `400`.
+1. Tries explicit `minLat/maxLat/minLng/maxLng` first via `validateAndParseBounds()` (lines 39-44).
+2. Falls back to `lat/lng` with a ~10km radius (using `LAT_OFFSET_DEGREES` constant, adjusted by `cos(lat)` for longitude) (lines 50-75).
+3. If neither available, returns `400` (lines 78-86).
+
+**Key Code** (lines 50-75):
+
+```ts
+if (!bounds) {
+  const latStr = searchParams.get("lat");
+  const lngStr = searchParams.get("lng");
+  const lat = latStr ? parseFloat(latStr) : NaN;
+  const lng = lngStr ? parseFloat(lngStr) : NaN;
+
+  if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+    const cosLat = Math.cos((lat * Math.PI) / 180);
+    const lngOffset = cosLat < 0.01 ? 180 : LAT_OFFSET_DEGREES / cosLat;
+    bounds = {
+      minLat: Math.max(-90, lat - LAT_OFFSET_DEGREES),
+      maxLat: Math.min(90, lat + LAT_OFFSET_DEGREES),
+      minLng: Math.max(-180, lng - lngOffset),
+      maxLng: Math.min(180, lng + lngOffset),
+    };
+  }
+}
+```
 
 ### Response
 
@@ -330,17 +386,18 @@ Uses Redis-backed rate limiting (`withRateLimitRedis`) with type `"search-count"
 
 ```
 Cache-Control: public, s-maxage=60, max-age=30, stale-while-revalidate=120
+Vary: Accept-Encoding
 ```
 
-Map markers are not user-specific, so CDN caching is safe.
+Map markers are not user-specific, so CDN caching is safe (lines 120-124).
 
 ### Rate Limiting
 
-Uses Redis-backed rate limiting (`withRateLimitRedis`) with type `"map"` (burst: 60 req, sustained: 300 req).
+Uses Redis-backed rate limiting (`withRateLimitRedis`) with type `"map"` (burst: 60 req, sustained: 300 req) (lines 31-34).
 
 ### Service Layer
 
-Delegates to `getMapListings()` from `@/lib/data` with the full filter params including validated bounds.
+Uses `buildRawParamsFromSearchParams()` and `parseSearchParams()` for canonical parameter handling (lines 91-92), then delegates to `getMapListings()` from `@/lib/data` with the full filter params including validated bounds (line 111).
 
 ---
 
@@ -711,6 +768,17 @@ Delegates entirely to `processSearchAlerts()` from `@/lib/search-alerts`.
 | `/api/reviews` GET | `getReviews` | In-memory | 60/min | -- |
 | Cron endpoints | N/A | Bearer token auth | -- | -- |
 
+**Rate limit configurations** (from `src/lib/with-rate-limit-redis.ts` lines 28-36):
+
+```ts
+const RATE_LIMIT_CONFIGS: Record<RedisRateLimitType, { burstLimit: number; sustainedLimit: number }> = {
+  chat: { burstLimit: 5, sustainedLimit: 30 },
+  map: { burstLimit: 60, sustainedLimit: 300 },
+  metrics: { burstLimit: 100, sustainedLimit: 500 },
+  "search-count": { burstLimit: 30, sustainedLimit: 200 },
+};
+```
+
 Redis-backed rate limiting is **fail-closed** in production: if Redis is unavailable, requests are denied (429) to prevent abuse.
 
 ---
@@ -723,7 +791,39 @@ All endpoints (except cron) use `createContextFromHeaders()` and `runWithRequest
 
 ### Parameter Parsing
 
-`buildRawParamsFromSearchParams()` and `parseSearchParams()` from `@/lib/search-params` provide canonical parsing for all search/filter parameters. This ensures consistent filter interpretation across `/api/search/v2`, `/api/search/facets`, `/api/search-count`, and `/api/map-listings`.
+**Key Files**:
+- `src/lib/search-params.ts` (673 lines)
+
+`buildRawParamsFromSearchParams()` and `parseSearchParams()` provide canonical parsing for all search/filter parameters. This ensures consistent filter interpretation across `/api/search/v2`, `/api/search/facets`, `/api/search-count`, and `/api/map-listings`.
+
+**Supported Params** (from `FilterParams` interface, lines 19-39):
+
+```ts
+interface FilterParams {
+  query?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  amenities?: string[];
+  moveInDate?: string;
+  leaseDuration?: string;
+  houseRules?: string[];
+  roomType?: string;
+  languages?: string[];
+  genderPreference?: string;
+  householdGender?: string;
+  bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number };
+  sort?: SortOption;
+  nearMatches?: boolean;
+}
+```
+
+**Sort Options**: `"recommended"` | `"price_asc"` | `"price_desc"` | `"newest"` | `"rating"`
+
+**Bounds Detection**:
+- Endpoint behavior when bounds are required but missing (from `isBoundsRequired()`, lines 667-672):
+  - `/api/search/v2`: 200 + `{ unboundedSearch: true }`
+  - `/api/search/facets`: 400 + `{ boundsRequired: true }`
+  - `/api/search-count`: 200 + `{ boundsRequired: true }`
 
 ### Search Document Table
 
@@ -753,4 +853,15 @@ All calls use fire-and-forget pattern: `markListingDirty(id, reason).catch(() =>
 
 ### Bounds Validation
 
-`validateAndParseBounds()` from `@/lib/validation` handles coordinate validation. `clampBoundsToMaxSpan()` enforces maximum viewport size. `crossesAntimeridian()` from `@/lib/data` detects and handles antimeridian-crossing bounds with split envelope queries.
+**Key File**: `src/lib/validation.ts` (162 lines)
+
+- `validateAndParseBounds()`: Validates coordinate values, rejects NaN/Infinity, enforces range limits, now clamps oversized bounds instead of rejecting (lines 41-85).
+- `clampBoundsToMaxSpan()`: Clamps bounds to max span while preserving center (lines 95-133).
+- `deriveBoundsFromPoint()`: Derives ~10km radius bounds from a single lat/lng point (lines 147-161).
+
+**Max Span Constants** (from `src/lib/constants.ts`):
+- `MAX_LAT_SPAN`: Maximum latitude span for bounding box queries
+- `MAX_LNG_SPAN`: Maximum longitude span for bounding box queries
+- `LAT_OFFSET_DEGREES`: ~0.09 degrees (~10km) for point-to-bounds derivation
+
+**Antimeridian Handling**: `crossesAntimeridian()` from `@/lib/data` detects and handles antimeridian-crossing bounds with split envelope queries.

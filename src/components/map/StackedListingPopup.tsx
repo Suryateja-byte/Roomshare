@@ -72,7 +72,7 @@ export function StackedListingPopup({
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className={`w-7 h-7 rounded-full ${
+            className={`min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center ${
               isDarkMode
                 ? "hover:bg-zinc-800 text-zinc-400 hover:text-white"
                 : "hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900"

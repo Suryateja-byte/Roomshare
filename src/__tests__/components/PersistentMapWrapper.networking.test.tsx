@@ -367,22 +367,30 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     });
 
     it("handles 429 rate limit response", async () => {
+      // Component auto-retries once on 429, so mock needs to return 429 twice
+      // First 429 triggers automatic retry, second 429 shows error
       mockFetch.mockResolvedValue({
         ok: false,
         status: 429,
-        headers: new Headers({ "Retry-After": "60" }),
-        json: async () => ({ error: "Too many requests", retryAfter: 60 }),
+        headers: new Headers({ "Retry-After": "2" }), // 2 second retry
+        json: async () => ({ error: "Too many requests", retryAfter: 2 }),
       });
 
       const { findByRole } = render(
         <PersistentMapWrapper shouldRenderMap={true} />
       );
 
+      // Initial fetch after 2000ms throttle
       await act(async () => {
         jest.advanceTimersByTime(2000);
       });
 
-      // Error banner should be visible
+      // First 429 schedules a retry - advance past retry delay (2000ms from Retry-After: 2)
+      await act(async () => {
+        jest.advanceTimersByTime(2500);
+      });
+
+      // Second 429 (retry also fails) should now show error banner
       const errorAlert = await findByRole("alert");
       expect(errorAlert).toBeInTheDocument();
       expect(errorAlert.textContent).toContain("Too many requests");
@@ -448,8 +456,11 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
         <PersistentMapWrapper shouldRenderMap={true} />
       );
 
-      // No error banner - oversized bounds are now clamped instead of rejected
-      expect(queryByRole("alert")).not.toBeInTheDocument();
+      // Informational banner shows that bounds were clamped
+      // P2-FIX (#151): Changed from alert to status role since this is informational, not an error
+      const infoBanner = queryByRole("status");
+      expect(infoBanner).toBeInTheDocument();
+      expect(infoBanner?.textContent).toContain("Zoomed in to show results");
 
       // Fetch should proceed with clamped bounds
       await act(async () => {

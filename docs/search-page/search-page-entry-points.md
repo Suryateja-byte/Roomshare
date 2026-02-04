@@ -16,7 +16,6 @@ Comprehensive documentation of the `/search` route: its Next.js file conventions
 - [6. SearchLayoutView -- Split View Manager](#6-searchlayoutview----split-view-manager)
 - [7. SearchHeaderWrapper -- Collapsible Header](#7-searchheaderwrapper----collapsible-header)
 - [8. SearchViewToggle -- Desktop/Mobile Rendering](#8-searchviewtoggle----desktopmobile-rendering)
-- [9. SearchErrorBanner -- Inline Error Alert](#9-searcherrorbanner----inline-error-alert)
 - [Data Flow Diagram](#data-flow-diagram)
 - [Context Providers](#context-providers)
 - [Key Patterns](#key-patterns)
@@ -52,7 +51,6 @@ The search page uses a **persistent layout** pattern. The layout (`layout.tsx`) 
 | `src/components/SearchLayoutView.tsx` | Component | Client | Split view orchestration (list + map) with SearchMapUIProvider |
 | `src/components/SearchHeaderWrapper.tsx` | Component | Client | Collapsible search header (mobile + desktop) |
 | `src/components/SearchViewToggle.tsx` | Component | Client | Desktop split pane / mobile bottom sheet layout |
-| `src/components/SearchErrorBanner.tsx` | Component | Client | Inline warning banner with optional retry |
 
 ---
 
@@ -67,10 +65,15 @@ Wraps every `/search/*` route with:
 2. A fixed-position header containing the search form.
 3. The map + list split view (via `SearchLayoutView`).
 
-### Props
+### Function Signature
 
 ```ts
-{ children: React.ReactNode }
+// Line 33-37
+export default function SearchLayout({
+  children,
+}: {
+  children: React.ReactNode;
+})
 ```
 
 `children` is the page segment (`page.tsx` output or `loading.tsx` / `error.tsx`).
@@ -78,18 +81,24 @@ Wraps every `/search/*` route with:
 ### Provider Nesting Order (layout.tsx level)
 
 ```tsx
+// Lines 39-66
 <SearchTransitionProvider>        // URL transition state (pending navigations)
   <FilterStateProvider>           // Client-side filter draft state
     <MobileSearchProvider>        // Mobile header expand/collapse + filter sheet
-      <MapBoundsProvider>         // Current map viewport bounds
-        <ListingFocusProvider>    // Which listing card/pin is focused
-          <SearchV2DataProvider>  // V2 search data bridge (page -> map)
-            <SearchLayoutView>    // Split view manager (adds SearchMapUIProvider)
-              {children}          // page.tsx output
-            </SearchLayoutView>
-          </SearchV2DataProvider>
-        </ListingFocusProvider>
-      </MapBoundsProvider>
+      <div className="h-screen-safe flex flex-col ...">
+        <header>...</header>      // Fixed SearchHeaderWrapper
+        <div className="flex-1 ...">
+          <MapBoundsProvider>         // Current map viewport bounds
+            <ListingFocusProvider>    // Which listing card/pin is focused
+              <SearchV2DataProvider>  // V2 search data bridge (page -> map)
+                <SearchLayoutView>    // Split view manager (adds SearchMapUIProvider)
+                  {children}          // page.tsx output
+                </SearchLayoutView>
+              </SearchV2DataProvider>
+            </ListingFocusProvider>
+          </MapBoundsProvider>
+        </div>
+      </div>
     </MobileSearchProvider>
   </FilterStateProvider>
 </SearchTransitionProvider>
@@ -97,13 +106,27 @@ Wraps every `/search/*` route with:
 
 **Note**: `SearchMapUIProvider` is added by `SearchLayoutView`, not in the layout itself.
 
+### Imports
+
+```ts
+// Lines 1-8
+import SearchLayoutView from "@/components/SearchLayoutView";
+import SearchHeaderWrapper from "@/components/SearchHeaderWrapper";
+import { MapBoundsProvider } from "@/contexts/MapBoundsContext";
+import { SearchTransitionProvider } from "@/contexts/SearchTransitionContext";
+import { FilterStateProvider } from "@/contexts/FilterStateContext";
+import { ListingFocusProvider } from "@/contexts/ListingFocusContext";
+import { SearchV2DataProvider } from "@/contexts/SearchV2DataContext";
+import { MobileSearchProvider } from "@/contexts/MobileSearchContext";
+```
+
 ### Key Details
 
-- The `<header>` is **fixed** (`fixed top-0 ... z-[1100]`) with `backdrop-blur-xl`.
-- Main content area has explicit top padding matching header height to prevent CLS:
+- The `<header>` is **fixed** (`fixed top-0 left-0 right-0 ... z-[1100]`) with `backdrop-blur-xl` (line 44).
+- Main content area has explicit top padding matching header height to prevent CLS (line 52):
   - Mobile: `pt-[80px]` (py-3 * 2 + h-14 = 80px)
   - Desktop (`sm`+): `pt-[96px]` (py-4 * 2 + sm:h-16 = 96px)
-- The layout uses `h-screen-safe` and `overflow-hidden` to create a full-viewport app shell.
+- The layout uses `h-screen-safe` and `overflow-hidden` to create a full-viewport app shell (line 42).
 
 ### Connections
 
@@ -132,73 +155,120 @@ The main server component that:
 5. Preloads LCP images.
 6. Renders the results list with `SearchResultsClient`.
 
-### Parameters
+### Function Signature
 
 ```ts
-{
-  searchParams: Promise<{
-    q?: string;
-    minPrice?: string;
-    maxPrice?: string;
-    amenities?: string | string[];
-    moveInDate?: string;
-    leaseDuration?: string;
-    houseRules?: string | string[];
-    languages?: string | string[];
-    roomType?: string;
-    genderPreference?: string;
-    householdGender?: string;
-    minLat?: string; maxLat?: string;
-    minLng?: string; maxLng?: string;
-    lat?: string;    lng?: string;
-    page?: string;
-    sort?: string;
-    cursor?: string;
-    v2?: string;
-  }>
-}
+// Lines 45-71
+export default async function SearchPage({
+    searchParams,
+}: {
+    searchParams: Promise<{
+        q?: string;
+        minPrice?: string;
+        maxPrice?: string;
+        amenities?: string | string[];
+        moveInDate?: string;
+        leaseDuration?: string;
+        houseRules?: string | string[];
+        languages?: string | string[];
+        roomType?: string;
+        genderPreference?: string;
+        householdGender?: string;
+        minLat?: string;
+        maxLat?: string;
+        minLng?: string;
+        maxLng?: string;
+        lat?: string;
+        lng?: string;
+        page?: string;
+        sort?: string;
+        cursor?: string;
+        v2?: string;
+    }>;
+})
+```
+
+### Imports
+
+```ts
+// Lines 1-20
+import { auth } from '@/auth';
+import { getListingsPaginated, getSavedListingIds, analyzeFilterImpact, PaginatedResult, PaginatedResultHybrid, ListingData } from '@/lib/data';
+import SortSelect from '@/components/SortSelect';
+import SaveSearchButton from '@/components/SaveSearchButton';
+import { SearchResultsClient } from '@/components/search/SearchResultsClient';
+import Link from 'next/link';
+import { Search, Clock } from 'lucide-react';
+import { headers } from 'next/headers';
+import { checkServerComponentRateLimit } from '@/lib/with-rate-limit';
+import { parseSearchParams, buildRawParamsFromSearchParams } from '@/lib/search-params';
+import { executeSearchV2 } from '@/lib/search/search-v2-service';
+import { V2MapDataSetter } from '@/components/search/V2MapDataSetter';
+import { V1PathResetSetter } from '@/components/search/V1PathResetSetter';
+import { SearchResultsLoadingWrapper } from '@/components/search/SearchResultsLoadingWrapper';
+import { AppliedFilterChips } from '@/components/filters/AppliedFilterChips';
+import { CategoryBar } from '@/components/search/CategoryBar';
+import { RecommendedFilters } from '@/components/search/RecommendedFilters';
+import type { V2MapData } from '@/contexts/SearchV2DataContext';
+import { features } from '@/lib/env';
+import { preload } from 'react-dom';
 ```
 
 ### Key Logic Flow
 
 ```
-1. Await searchParams
-2. Rate limit check (checkServerComponentRateLimit)
+1. Await searchParams (line 72)
+2. Rate limit check (checkServerComponentRateLimit, lines 75-96)
    └─ If blocked → render "Too Many Requests" UI, return early
-3. Authenticate (auth())
-4. Parse params (parseSearchParams) → { q, filterParams, requestedPage, sortOption, boundsRequired, browseMode }
-5. Start savedPromise in parallel (non-blocking)
-6. If boundsRequired → render "Please select a location" UI + V1PathResetSetter, return early
-7. Try V2 search (if feature flag or ?v2=1)
+3. Authenticate (auth(), line 98)
+4. Parse params (parseSearchParams, line 101) → { q, filterParams, requestedPage, sortOption, boundsRequired, browseMode }
+5. Start savedPromise in parallel (non-blocking, line 104)
+6. If boundsRequired → render "Please select a location" UI + V1PathResetSetter, return early (lines 108-138)
+7. Try V2 search if feature flag or ?v2=1 (lines 146-184)
    ├─ Success → usedV2=true, extract paginatedResult + v2MapData
    └─ Failure → warn, fall through to V1
-8. V1 fallback (getListingsPaginated)
-9. Await savedPromise
-10. If zero results → analyzeFilterImpact for suggestions
-11. Preload first 4 listing images (react-dom preload)
-12. Build searchParamsString (exclude cursor/page/v2)
-13. Render: V2MapDataSetter or V1PathResetSetter + SearchResultsLoadingWrapper > listContent
+8. V1 fallback (getListingsPaginated, lines 188-191)
+9. Await savedPromise (line 194)
+10. If total === 0 (confirmed zero) → analyzeFilterImpact for suggestions (lines 208-211)
+11. Preload first 4 listing images (react-dom preload, lines 216-221)
+12. Build searchParamsString (exclude cursor/page/v2, lines 225-234)
+13. Extract initialNextCursor (line 237)
+14. Render: V2MapDataSetter or V1PathResetSetter + SearchResultsLoadingWrapper > listContent (lines 288-303)
 ```
 
 ### Early Return Paths
 
 | Condition | Rendered UI | Key Component |
 |-----------|-------------|---------------|
-| Rate limited | "Too Many Requests" with retry timer | None (inline JSX) |
-| `boundsRequired` (no geo bounds) | "Please select a location" with link to home | `V1PathResetSetter` |
-| `paginatedResult` undefined after both paths | Throws error (caught by error.tsx) | -- |
+| Rate limited (line 77) | "Too Many Requests" with retry timer | None (inline JSX) |
+| `boundsRequired` (no geo bounds, line 108) | "Please select a location" with link to home | `V1PathResetSetter` |
+| `paginatedResult` undefined after both paths (line 197) | Throws error (caught by error.tsx) | -- |
 
 ### V2 vs V1 Search
 
 The page supports two search backends:
 
-- **V2** (`executeSearchV2`): Returns listings + GeoJSON map data in a single call. Activated by `features.searchV2` env flag or `?v2=1` query param. On success, injects map data via `V2MapDataSetter` into `SearchV2DataContext`.
-- **V1** (`getListingsPaginated`): Traditional paginated query. Map data is fetched independently by `PersistentMapWrapper` via `/api/map-listings`. Signals V1 mode via `V1PathResetSetter`.
+- **V2** (`executeSearchV2`, lines 159-177): Returns listings + GeoJSON map data in a single call. Activated by `features.searchV2` env flag or `?v2=1` query param. On success, injects map data via `V2MapDataSetter` into `SearchV2DataContext`.
+- **V1** (`getListingsPaginated`, line 190): Traditional paginated query. Map data is fetched independently by `PersistentMapWrapper` via `/api/map-listings`. Signals V1 mode via `V1PathResetSetter`.
+
+### Total Count Handling
+
+```ts
+// Lines 201-208
+const { items: listings, total: rawTotal } = paginatedResult;
+// IMPORTANT: Keep null distinct from 0 - null means "unknown count (>100 results)"
+// whereas 0 means "confirmed zero results"
+const total = rawTotal;
+
+// Only show zero-results UI when we have confirmed zero results (total === 0)
+// Not when total is null (unknown count, >100 results)
+const hasConfirmedZeroResults = total !== null && total === 0;
+```
 
 ### Image Preloading (LCP Optimization)
 
 ```ts
-// Preloads first 4 listing images as <link rel="preload" as="image">
+// Lines 216-221
 if (listings.length > 0) {
     listings.slice(0, 4).forEach((listing) => {
         const imageUrl = getFirstImageUrl(listing);
@@ -207,45 +277,62 @@ if (listings.length > 0) {
 }
 ```
 
-Uses deterministic placeholder selection when a listing has no images (hash of listing ID mod placeholder count).
+Uses deterministic placeholder selection when a listing has no images (hash of listing ID mod placeholder count, lines 36-43).
+
+### Helper Functions
+
+```ts
+// Lines 36-43
+function getFirstImageUrl(listing: { id: string; images?: string[] }): string {
+    if (listing.images && listing.images.length > 0) {
+        return listing.images[0];
+    }
+    // Deterministic placeholder selection based on listing ID
+    const placeholderIndex = listing.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % PLACEHOLDER_IMAGES.length;
+    return PLACEHOLDER_IMAGES[placeholderIndex];
+}
+```
 
 ### Rendered Output
 
 ```tsx
+// Lines 288-303
 <>
   {v2MapData ? <V2MapDataSetter data={v2MapData} /> : <V1PathResetSetter />}
   <SearchResultsLoadingWrapper>
     <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
       <CategoryBar />
-      <RecommendedFilters />
-      <AppliedFilterChips currentCount={total} />
-      {/* heading + sort + save search */}
-      <SearchResultsClient
-        key={searchParamsString}  // Remounts on filter change (resets cursor)
-        initialListings={listings}
-        initialNextCursor={initialNextCursor}
-        initialTotal={total}
-        savedListingIds={savedListingIds}
-        searchParamsString={searchParamsString}
-        query={q ?? ""}
-        browseMode={browseMode}
-        hasConfirmedZeroResults={hasConfirmedZeroResults}
-        filterSuggestions={filterSuggestions}
-        sortOption={sortOption}
-      />
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+        <RecommendedFilters />
+        <AppliedFilterChips currentCount={total} />
+        {/* heading + sort + save search */}
+        <SearchResultsClient
+          key={searchParamsString}  // Remounts on filter change (resets cursor)
+          initialListings={listings}
+          initialNextCursor={initialNextCursor}
+          initialTotal={total}
+          savedListingIds={savedListingIds}
+          searchParamsString={searchParamsString}
+          query={q ?? ""}
+          browseMode={browseMode}
+          hasConfirmedZeroResults={hasConfirmedZeroResults}
+          filterSuggestions={filterSuggestions}
+          sortOption={sortOption}
+        />
+      </div>
     </div>
   </SearchResultsLoadingWrapper>
 </>
 ```
 
-**Important**: `SearchResultsClient` is keyed by `searchParamsString`. Any filter/sort change causes a full remount, resetting cursor and accumulated listings. This is a deliberate invariant (see CLAUDE.md "Search pagination invariants").
+**Important**: `SearchResultsClient` is keyed by `searchParamsString` (line 272). Any filter/sort change causes a full remount, resetting cursor and accumulated listings. This is a deliberate invariant (see CLAUDE.md "Search pagination invariants").
 
 ### Constants
 
 | Name | Value | Purpose |
 |------|-------|---------|
-| `ITEMS_PER_PAGE` | 12 | Listings per page/cursor fetch |
-| `PLACEHOLDER_IMAGES` | 6 Unsplash URLs | Deterministic fallback images |
+| `ITEMS_PER_PAGE` (line 22) | 12 | Listings per page/cursor fetch |
+| `PLACEHOLDER_IMAGES` (lines 26-33) | 6 Unsplash URLs | Deterministic fallback images |
 
 ---
 
@@ -257,7 +344,10 @@ Uses deterministic placeholder selection when a listing has no images (hash of l
 
 Next.js automatically wraps `page.tsx` in a `<Suspense>` boundary. When the page is streaming (async data fetching), this skeleton is shown.
 
+### Full Implementation
+
 ```tsx
+// Lines 1-5
 import { SearchResultsSkeleton } from "@/components/skeletons/PageSkeleton";
 
 export default function Loading() {
@@ -281,27 +371,51 @@ export default function Loading() {
 
 Client-side error boundary for the search page segment. Catches errors thrown by `page.tsx` (e.g., database failures, network errors).
 
-### Props
+### Props Interface
 
 ```ts
+// Lines 8-14
 {
   error: Error & { digest?: string };
   reset: () => void;  // Re-renders the page segment
 }
 ```
 
+### Function Signature
+
+```ts
+// Lines 8-14
+export default function SearchError({
+    error,
+    reset,
+}: {
+    error: Error & { digest?: string };
+    reset: () => void;
+})
+```
+
+### Imports
+
+```ts
+// Lines 3-6
+import { useEffect } from 'react';
+import Link from 'next/link';
+import { AlertCircle, RefreshCw, Home } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+```
+
 ### Behavior
 
-1. Logs the error via `console.error` on mount.
+1. Logs the error via `console.error` on mount (lines 15-18).
 2. Shows a user-friendly message with two actions:
-   - **Try again** -- calls `reset()` to re-render the page segment.
-   - **Go home** -- links to `/`.
-3. In development mode, shows a collapsible `<details>` with the error message and digest.
+   - **Try again** -- calls `reset()` to re-render the page segment (line 39).
+   - **Go home** -- links to `/` (lines 44-48).
+3. In development mode, shows a collapsible `<details>` with the error message and digest (lines 53-63).
 
 ### Key Details
 
-- Uses `'use client'` directive (required for error boundaries).
-- Padding (`pt-[80px] sm:pt-[96px]`) matches the fixed header height from layout.tsx.
+- Uses `'use client'` directive (line 1, required for error boundaries).
+- Padding (`pt-[80px] sm:pt-[96px]`, line 21) matches the fixed header height from layout.tsx.
 - The error boundary only wraps the page segment; the layout (header, map) remains functional.
 
 ---
@@ -317,35 +431,60 @@ Exports the `fetchMoreListings` server action, called by `SearchResultsClient` w
 ### Interface
 
 ```ts
+// Lines 12-16
 export interface FetchMoreResult {
   items: ListingData[];
   nextCursor: string | null;
   hasNextPage: boolean;
 }
+```
 
+### Function Signature
+
+```ts
+// Lines 18-21
 export async function fetchMoreListings(
   cursor: string,
   rawParams: Record<string, string | string[] | undefined>
 ): Promise<FetchMoreResult>
 ```
 
+### Imports
+
+```ts
+// Lines 3-8
+import { headers } from "next/headers";
+import { executeSearchV2 } from "@/lib/search/search-v2-service";
+import { getListingsPaginated, type ListingData } from "@/lib/data";
+import { parseSearchParams, buildRawParamsFromSearchParams } from "@/lib/search-params";
+import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
+import { features } from "@/lib/env";
+```
+
 ### Logic Flow
 
 ```
-1. Validate cursor (non-empty string)
-2. Rate limit check
-3. If V2 enabled (feature flag):
-   ├─ Build params with cursor → executeSearchV2
-   ├─ Success → return { items, nextCursor, hasNextPage }
-   └─ Failure → warn, fall through
-4. V1 fallback → getListingsPaginated (no cursor support, returns hasNextPage: false)
+1. Validate cursor (non-empty string, lines 23-25)
+2. Rate limit check (lines 28-32)
+3. If V2 enabled (feature flag, line 38):
+   ├─ Build params with cursor → executeSearchV2 (lines 40-55)
+   ├─ Success → return { items, nextCursor, hasNextPage } (lines 57-63)
+   └─ Failure → warn, fall through (lines 64-68)
+4. V1 fallback → getListingsPaginated (lines 73-78)
+   └─ Returns hasNextPage: false (V1 doesn't support cursor continuation)
 ```
 
 ### Key Details
 
-- Marked `"use server"` -- runs exclusively on the server, callable from client components.
-- V1 fallback returns `hasNextPage: false` because V1 does not support cursor-based continuation.
+- Marked `"use server"` (line 1) -- runs exclusively on the server, callable from client components.
+- V1 fallback returns `hasNextPage: false` because V1 does not support cursor-based continuation (lines 80-84).
 - Rate limiting uses the same `checkServerComponentRateLimit` as the page.
+
+### Constants
+
+| Name | Value | Purpose |
+|------|-------|---------|
+| `ITEMS_PER_PAGE` (line 10) | 12 | Listings per cursor fetch |
 
 ---
 
@@ -357,39 +496,85 @@ export async function fetchMoreListings(
 
 Client component that orchestrates the list + map split view. Lives in the layout (persistent). Adds `SearchMapUIProvider` to manage map UI state.
 
-### Props
+### Props Interface
 
 ```ts
+// Lines 13-15
 interface SearchLayoutViewProps {
   children: ReactNode;  // Page segment output (search results)
 }
 ```
 
+### Function Signature
+
+```ts
+// Line 36
+export default function SearchLayoutView({ children }: SearchLayoutViewProps)
+```
+
+### Imports
+
+```ts
+// Lines 3-11
+import { ReactNode } from "react";
+import SearchViewToggle from "./SearchViewToggle";
+import PersistentMapWrapper from "./PersistentMapWrapper";
+import ListScrollBridge from "./listings/ListScrollBridge";
+import { useMapPreference } from "@/hooks/useMapPreference";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useMapMovedBanner } from "@/contexts/MapBoundsContext";
+import { MapMovedBanner } from "./map/MapMovedBanner";
+import { SearchMapUIProvider } from "@/contexts/SearchMapUIContext";
+```
+
 ### Key Logic
 
 ```tsx
-const { shouldShowMap, shouldRenderMap, toggleMap, isLoading } = useMapPreference();
+// Lines 37-42
+const {
+  shouldShowMap,
+  shouldRenderMap,
+  toggleMap,
+  isLoading,
+} = useMapPreference();
 
+// Lines 44-51
 useKeyboardShortcuts([
-  { key: "m", preventInInput: true, action: toggleMap, description: "Toggle map/list view" },
+  {
+    key: "m",
+    preventInInput: true,
+    action: toggleMap,
+    description: "Toggle map/list view",
+  },
 ]);
 
+// Line 54
 const { showBanner, showLocationConflict, onSearch, onReset, areaCount, isAreaCountLoading } = useMapMovedBanner();
 ```
 
 ### Rendered Output
 
 ```tsx
+// Lines 61-85
 <SearchMapUIProvider showMap={toggleMap} shouldShowMap={shouldShowMap}>
-  <ListScrollBridge />  {/* Scrolls listing card into view when map marker clicked */}
+  {/* Bridge: Scrolls listing card into view when map marker clicked */}
+  <ListScrollBridge />
+
   <SearchViewToggle
     mapComponent={<PersistentMapWrapper shouldRenderMap={shouldRenderMap} />}
     shouldShowMap={shouldShowMap}
     onToggle={toggleMap}
     isLoading={isLoading}
   >
+    {/* List variant banner - shows above results when map is hidden or on mobile */}
     {(showBanner || showLocationConflict) && (
-      <MapMovedBanner variant="list" onSearch={handleSearch} onReset={onReset} ... />
+      <MapMovedBanner
+        variant="list"
+        onSearch={handleSearch}
+        onReset={onReset}
+        areaCount={areaCount}
+        isAreaCountLoading={isAreaCountLoading}
+      />
     )}
     {children}
   </SearchViewToggle>
@@ -421,9 +606,31 @@ const { showBanner, showLocationConflict, onSearch, onReset, areaCount, isAreaCo
 
 Manages the search form header that collapses on scroll, with different behaviors for mobile and desktop.
 
-### Props
+### Function Signature
 
-None (reads state from hooks and context).
+```ts
+// Line 32
+export default function SearchHeaderWrapper()
+```
+
+Props: None (reads state from hooks and context).
+
+### Imports
+
+```ts
+// Lines 16-26
+import { Suspense, lazy, useCallback } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { useScrollHeader } from "@/hooks/useScrollHeader";
+import {
+  useKeyboardShortcuts,
+  formatShortcut,
+} from "@/hooks/useKeyboardShortcuts";
+import { useMobileSearch } from "@/contexts/MobileSearchContext";
+import CollapsedMobileSearch from "@/components/CollapsedMobileSearch";
+import { CompactSearchPill } from "@/components/search/CompactSearchPill";
+```
 
 ### States
 
@@ -435,30 +642,43 @@ None (reads state from hooks and context).
 ### Key Logic
 
 ```tsx
+// Lines 33-34
 const { isCollapsed } = useScrollHeader({ threshold: 80 });
 const { isExpanded, expand, openFilters } = useMobileSearch();
+
+// Line 46
 const showCollapsed = isCollapsed && !isExpanded;
 ```
+
+### Keyboard Shortcut
+
+`Cmd/Ctrl+K` focuses the search location input (`#search-location`, lines 36-43).
 
 ### LCP Optimization
 
 `SearchForm` is **lazy-loaded** to defer its large bundle (~875 lines + dependencies). This allows listing images (the actual LCP elements) to render first.
 
 ```tsx
+// Line 30
 const SearchForm = lazy(() => import("@/components/SearchForm"));
 
-<Suspense fallback={
-  <div className="h-14 sm:h-16 w-full bg-zinc-100 ... animate-pulse rounded-xl ..." />
-}>
+// Lines 80-92
+<Suspense
+  fallback={
+    /*
+     * CLS fix: Fallback dimensions must match actual SearchForm height
+     * Mobile: p-1.5 (12px) + button h-11 (44px) = 56px ≈ h-14
+     * Desktop: md:p-2 (16px) + button sm:h-12 (48px) = 64px ≈ sm:h-16
+     * Use rounded-xl to match actual form, not rounded-full
+     */
+    <div className="h-14 sm:h-16 w-full bg-zinc-100 dark:bg-zinc-800 animate-pulse rounded-xl border border-zinc-200/80 dark:border-zinc-700/80" />
+  }
+>
   <SearchForm />
 </Suspense>
 ```
 
 The Suspense fallback dimensions are carefully matched to the actual `SearchForm` height to prevent CLS.
-
-### Keyboard Shortcut
-
-`Cmd/Ctrl+K` focuses the search location input (`#search-location`).
 
 ---
 
@@ -470,17 +690,47 @@ The Suspense fallback dimensions are carefully matched to the actual `SearchForm
 
 Renders the appropriate layout for mobile (map background + bottom sheet) and desktop (side-by-side split).
 
-### Props
+### Props Interface
 
 ```ts
+// Lines 9-20
 interface SearchViewToggleProps {
   children: React.ReactNode;       // List content (page results)
   mapComponent: React.ReactNode;   // PersistentMapWrapper
-  shouldShowMap: boolean;           // Map visibility preference
-  onToggle: () => void;             // Toggle callback
-  isLoading: boolean;               // Preference hydration state
-  resultHeaderText?: string;        // Mobile bottom sheet header text
+  /** Whether the map should be visible */
+  shouldShowMap: boolean;
+  /** Toggle map visibility callback */
+  onToggle: () => void;
+  /** Whether the preference is still loading (hydrating from localStorage) */
+  isLoading: boolean;
+  /** Result count text for mobile bottom sheet header */
+  resultHeaderText?: string;
 }
+```
+
+### Function Signature
+
+```ts
+// Lines 41-48
+export default function SearchViewToggle({
+  children,
+  mapComponent,
+  shouldShowMap,
+  onToggle,
+  isLoading,
+  resultHeaderText,
+}: SearchViewToggleProps)
+```
+
+### Imports
+
+```ts
+// Lines 3-7
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { Map, MapPinOff } from 'lucide-react';
+import MobileBottomSheet from './search/MobileBottomSheet';
+import FloatingMapButton from './search/FloatingMapButton';
+import { useListingFocus } from '@/contexts/ListingFocusContext';
 ```
 
 ### Viewport Detection
@@ -488,13 +738,18 @@ interface SearchViewToggleProps {
 Uses a custom `useIsDesktop` hook (768px breakpoint via `matchMedia`). Returns `undefined` during SSR to prevent hydration mismatch.
 
 ```ts
+// Lines 27-39
 function useIsDesktop(): boolean | undefined {
   const [isDesktop, setIsDesktop] = useState<boolean | undefined>(undefined);
+
   useEffect(() => {
     const mql = window.matchMedia('(min-width: 768px)');
     setIsDesktop(mql.matches);
-    // ...listener
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
   }, []);
+
   return isDesktop;
 }
 ```
@@ -512,8 +767,8 @@ function useIsDesktop(): boolean | undefined {
 └─────────────────────┘
 ```
 
-- When a map pin is tapped (`activeId` changes), the sheet snaps to half.
-- `FloatingMapButton` toggles between collapsed (map visible) and half (list visible).
+- When a map pin is tapped (`activeId` changes), the sheet snaps to half (lines 55-59).
+- `FloatingMapButton` toggles between collapsed (map visible) and half (list visible) (lines 61-65).
 
 ### Desktop Layout
 
@@ -536,43 +791,12 @@ function useIsDesktop(): boolean | undefined {
 The map is rendered in **exactly one** DOM container to prevent dual Mapbox initialization:
 
 ```ts
+// Lines 70-71
 const renderMapInMobile = isDesktop === false;
 const renderMapInDesktop = isDesktop !== false && shouldShowMap;
 ```
 
 During SSR (`isDesktop === undefined`), the desktop container is used since CSS classes (`hidden md:flex`) handle visibility.
-
----
-
-## 9. SearchErrorBanner -- Inline Error Alert
-
-**Path**: `/mnt/d/Documents/roomshare/src/components/SearchErrorBanner.tsx`
-
-### Purpose
-
-A reusable inline warning banner for non-fatal errors (e.g., "Load more" failures, partial data issues). Distinct from `error.tsx` which handles full page errors.
-
-### Props
-
-```ts
-interface SearchErrorBannerProps {
-  message: string;       // Error description
-  retryable?: boolean;   // Show retry button
-  onRetry?: () => void;  // Retry callback
-}
-```
-
-### Rendered Output
-
-```
-┌─ ⚠ ─────────────────────────────────┐
-│ AlertTriangle  {message}   [Try again] │
-└──────────────────────────────────────┘
-```
-
-- Uses `role="alert"` for accessibility.
-- Styled with amber/warning colors (light and dark mode).
-- Retry button only appears when both `retryable` and `onRetry` are provided.
 
 ---
 
@@ -619,12 +843,12 @@ All providers listed below are instantiated across the layout hierarchy and pers
 
 | Provider | Source | Level | Purpose |
 |----------|--------|-------|---------|
-| `SearchTransitionProvider` | `src/contexts/SearchTransitionContext` | layout.tsx | Tracks pending URL transitions (for loading indicators) |
+| `SearchTransitionProvider` | `src/contexts/SearchTransitionContext` | layout.tsx (outer) | Tracks pending URL transitions (for loading indicators) |
 | `FilterStateProvider` | `src/contexts/FilterStateContext` | layout.tsx | Draft filter state before applying to URL |
 | `MobileSearchProvider` | `src/contexts/MobileSearchContext` | layout.tsx | Mobile header expand/collapse, filter sheet open/close |
-| `MapBoundsProvider` | `src/contexts/MapBoundsContext` | layout.tsx | Current map viewport bounds; "search this area" banner state |
-| `ListingFocusProvider` | `src/contexts/ListingFocusContext` | layout.tsx | Syncs focused listing between list cards and map pins |
-| `SearchV2DataProvider` | `src/contexts/SearchV2DataContext` | layout.tsx | Bridge for V2 search data from page to persistent map |
+| `MapBoundsProvider` | `src/contexts/MapBoundsContext` | layout.tsx (content div) | Current map viewport bounds; "search this area" banner state |
+| `ListingFocusProvider` | `src/contexts/ListingFocusContext` | layout.tsx (content div) | Syncs focused listing between list cards and map pins |
+| `SearchV2DataProvider` | `src/contexts/SearchV2DataContext` | layout.tsx (content div) | Bridge for V2 search data from page to persistent map |
 | `SearchMapUIProvider` | `src/contexts/SearchMapUIContext` | SearchLayoutView | Map UI state and controls (showMap callback, shouldShowMap state) |
 
 ---

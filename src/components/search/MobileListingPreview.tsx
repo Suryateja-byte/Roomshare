@@ -25,6 +25,9 @@ export default function MobileListingPreview({
 }: MobileListingPreviewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
+  // P2-FIX (#143): Use debounced timeout instead of single rAF for scroll detection
+  // Single rAF (~16ms) wasn't enough time for scroll animations to settle
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Scroll to active listing when it changes externally (e.g., pin tap)
   useEffect(() => {
@@ -37,26 +40,43 @@ export default function MobileListingPreview({
     container.scrollTo({ left: index * cardWidth, behavior: "smooth" });
   }, [activeListingId, listingIds]);
 
+  // Cleanup scroll timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Detect which listing is centered after scroll ends
   const handleScroll = () => {
     if (!scrollRef.current || !onListingChange) return;
     isScrollingRef.current = true;
 
-    // Use scrollend-like debounce
-    const container = scrollRef.current;
-    const cardWidth = container.offsetWidth;
-    if (cardWidth === 0) return;
-
-    const index = Math.round(container.scrollLeft / cardWidth);
-    const id = listingIds[index];
-    if (id && id !== activeListingId) {
-      onListingChange(id);
+    // Clear any pending scroll detection
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
     }
 
-    // Reset scroll guard after a tick
-    requestAnimationFrame(() => {
+    // P2-FIX (#143): Debounce scroll detection - only fire after 150ms of no scroll events
+    // This prevents race conditions between user scroll, programmatic scroll, and state updates
+    scrollTimeoutRef.current = setTimeout(() => {
+      if (!scrollRef.current) return;
+
+      const container = scrollRef.current;
+      const cardWidth = container.offsetWidth;
+      if (cardWidth === 0) return;
+
+      const index = Math.round(container.scrollLeft / cardWidth);
+      const id = listingIds[index];
+      if (id && id !== activeListingId) {
+        onListingChange(id);
+      }
+
+      // Reset scroll guard after processing
       isScrollingRef.current = false;
-    });
+    }, 150);
   };
 
   if (listingIds.length === 0) return null;

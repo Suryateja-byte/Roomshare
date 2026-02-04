@@ -19,6 +19,9 @@ Comprehensive documentation for the Roomshare search system covering saved searc
   - [Search V2 Types](#search-v2-types)
   - [Filter Suggestions](#filter-suggestions)
 - [Search V1/V2 Data Flow Components](#search-v1v2-data-flow-components)
+- [Natural Language Parser](#natural-language-parser)
+- [Split Stay Logic](#split-stay-logic)
+- [Search Ranking System](#search-ranking-system)
 - [Scripts and Maintenance Tooling](#scripts-and-maintenance-tooling)
 - [Unit Test Coverage](#unit-test-coverage)
 - [E2E Test Coverage](#e2e-test-coverage)
@@ -368,16 +371,19 @@ export const RADIUS_OPTIONS = [
 
 ### Search V2 Types
 
-**File:** `/mnt/d/Documents/roomshare/src/lib/search/types.ts`
+**File:** `/mnt/d/Documents/roomshare/src/lib/search/types.ts` (Lines 1-119)
 
 The Search API v2 returns a unified response combining list results and map data in a single endpoint.
 
 #### Constants
 
 ```ts
+// Re-exported from @/lib/constants for backward compatibility
 export const CLUSTER_THRESHOLD = 50;    // >= 50 listings = 'geojson' mode, < 50 = 'pins' mode
 export const BOUNDS_EPSILON = 0.001;    // ~100m precision for cache key normalization
 ```
+
+**Source file for constants:** `/mnt/d/Documents/roomshare/src/lib/constants.ts`
 
 #### Response Structure
 
@@ -413,12 +419,51 @@ export interface SearchV2Pin {
 }
 ```
 
+**GeoJSON types:**
+
+```ts
+/** Properties for GeoJSON point features */
+export interface SearchV2FeatureProperties {
+  id: string;
+  title: string;
+  price: number | null;
+  image: string | null;
+  availableSlots: number;
+  ownerId: string;
+}
+
+/** A single point feature for the map */
+export type SearchV2Feature = Feature<Point, SearchV2FeatureProperties>;
+
+/** GeoJSON FeatureCollection for Mapbox clustering */
+export type SearchV2GeoJSON = FeatureCollection<Point, SearchV2FeatureProperties>;
+```
+
 **Debug signals** (when `?debugRank=1`):
 
 ```ts
 export interface SearchV2DebugSignals {
   id: string; quality: number; rating: number;
   price: number; recency: number; geo: number; total: number;
+}
+```
+
+**Metadata:**
+
+```ts
+export interface SearchV2Meta {
+  /** 16-char SHA256 hash of query params (bounds quantized with BOUNDS_EPSILON) */
+  queryHash: string;
+  /** ISO timestamp when response was generated */
+  generatedAt: string;
+  /** Mode based on mapListings.length: 'geojson' if >= 50, 'pins' if < 50 */
+  mode: SearchV2Mode;
+  /** Ranking version (debug only, when ?debugRank=1) */
+  rankingVersion?: string;
+  /** Whether ranking was applied (debug only) */
+  rankingEnabled?: boolean;
+  /** Top signals for debugging (capped at 5, no PII, debug only) */
+  topSignals?: SearchV2DebugSignals[];
 }
 ```
 
@@ -463,6 +508,188 @@ The mirror of `V2MapDataSetter`. When v2 fails and v1 fallback runs, this compon
 - `v2MapData = null` (clears stale data)
 
 This prevents a deadlock where the map wrapper loops waiting for v2 data that will never arrive.
+
+---
+
+## Natural Language Parser
+
+**File:** `/mnt/d/Documents/roomshare/src/lib/search/natural-language-parser.ts` (Lines 1-230)
+
+Extracts structured filter params from natural language queries using pattern matching and keyword extraction (no LLM needed).
+
+### Interface
+
+```ts
+export interface ParsedNLQuery {
+  location: string;
+  minPrice?: string;
+  maxPrice?: string;
+  roomType?: string;
+  amenities: string[];
+  houseRules: string[];
+  leaseDuration?: string;
+}
+```
+
+### Supported Patterns
+
+#### Price Patterns
+| Pattern | Example | Extraction |
+|---------|---------|------------|
+| under/below/less than/max/up to | "under $1000" | `maxPrice: "1000"` |
+| over/above/more than/min/at least | "over $800" | `minPrice: "800"` |
+| range with dash/to | "$800-$1200" | `minPrice: "800", maxPrice: "1200"` |
+| between X and Y | "between $800 and $1200" | `minPrice: "800", maxPrice: "1200"` |
+
+#### Room Type Patterns
+| Pattern | Extracted Value |
+|---------|-----------------|
+| private room, private | `"Private Room"` |
+| shared room, shared | `"Shared Room"` |
+| entire place, whole place, entire home, full apartment, studio | `"Entire Place"` |
+
+#### Amenity Patterns (Lines 74-84)
+Recognized: wifi/wi-fi/internet, ac/air conditioning, parking/garage, washer/laundry, dryer, kitchen/cook, gym/fitness, pool/swimming, furnished/furniture
+
+#### House Rule Patterns (Lines 86-91)
+Recognized: pet friendly/pets allowed/dog/cat, smoking ok/allowed, couples ok/allowed, guests ok/allowed
+
+#### Lease Duration Patterns (Lines 93-118)
+| Pattern | Extracted Value |
+|---------|-----------------|
+| month-to-month, mtm, monthly, short-term, temporary | `"Month-to-month"` |
+| flexible, flex | `"Flexible"` |
+| 3 month | `"3 months"` |
+| 6 month | `"6 months"` |
+| 12 month, 1 year, yearly, annual | `"12 months"` |
+
+### URL Conversion
+
+```ts
+export function nlQueryToSearchParams(parsed: ParsedNLQuery): URLSearchParams
+```
+
+Converts parsed query to URL search params, omitting empty fields.
+
+---
+
+## Split Stay Logic
+
+**File:** `/mnt/d/Documents/roomshare/src/lib/search/split-stay.ts` (Lines 1-56)
+
+Finds complementary listing pairs for long stays where no single listing covers all dates.
+
+### Interface
+
+```ts
+export interface SplitStayPair {
+  first: ListingData;
+  second: ListingData;
+  /** Total combined price for the full stay */
+  combinedPrice: number;
+  /** Label like "2 weeks + 2 weeks" */
+  splitLabel: string;
+}
+```
+
+### Function
+
+```ts
+export function findSplitStays(
+  listings: ListingData[],
+  stayMonths?: number,
+): SplitStayPair[]
+```
+
+**Behavior:**
+- Returns empty array if `stayMonths < 6` or `listings.length < 2`
+- Sorts listings by price to pair budget-friendly with premium options
+- Returns up to 2 pairs maximum
+- Generates label like `"3 mo + 3 mo"` for a 6-month stay
+- Calculates `combinedPrice` as: `first.price * halfMonths + second.price * remainderMonths`
+
+---
+
+## Search Ranking System
+
+**Directory:** `/mnt/d/Documents/roomshare/src/lib/search/ranking/`
+
+Heuristic-based ranking system that scores listings for map pin tiering and search result ordering.
+
+### Types
+
+**File:** `/mnt/d/Documents/roomshare/src/lib/search/ranking/types.ts` (Lines 1-96)
+
+```ts
+export interface RankingContext {
+  sort: string;
+  center?: { lat: number; lng: number };
+  localMedianPrice?: number;
+  debug?: boolean;
+}
+
+export interface RankingWeights {
+  quality: number;  // Pre-computed from SearchDoc
+  rating: number;   // With review count confidence adjustment
+  price: number;    // Relative to local median
+  recency: number;  // Listing age decay
+  geo: number;      // Distance from map center
+}
+
+export interface RankableListing {
+  id: string;
+  recommendedScore?: number | null;
+  avgRating?: number | null;
+  reviewCount?: number | null;
+  price?: number | null;
+  createdAt?: Date | string | null;
+  lat?: number | null;
+  lng?: number | null;
+}
+
+export interface DebugSignals {
+  id: string;
+  quality: number;
+  rating: number;
+  price: number;
+  recency: number;
+  geo: number;
+  total: number;
+}
+```
+
+### Scoring Functions
+
+**File:** `/mnt/d/Documents/roomshare/src/lib/search/ranking/score.ts`
+
+| Function | Description |
+|----------|-------------|
+| `normalizeRecommendedScore(score)` | Normalizes 0-100+ score to 0-1, returns 0.3 for null/negative |
+| `normalizeRating(rating, reviewCount)` | Bayesian average with prior of 3.5 |
+| `normalizePriceCompetitiveness(price, median)` | Gaussian decay around median price |
+| `normalizeRecency(date)` | Exponential decay with 30-day half-life |
+| `normalizeDistance(lat, lng, center)` | Exponential decay with 5km half-life |
+| `computeMedianPrice(listings)` | Ignores null/zero prices |
+| `getBoundsCenter(bounds)` | Returns center point of bounds |
+| `computeScore(listing, context)` | Weighted combination of all signals |
+| `computeSignals(listing, context)` | Returns individual signal values |
+
+**Default Weights** (sum to 1.0):
+- `quality`: 0.35
+- `rating`: 0.25
+- `price`: 0.15
+- `recency`: 0.15
+- `geo`: 0.10
+
+### Ranking Functions
+
+**File:** `/mnt/d/Documents/roomshare/src/lib/search/ranking/rank.ts`
+
+| Function | Description |
+|----------|-------------|
+| `buildScoreMap(listings, context)` | Returns `Map<id, score>` for all listings |
+| `rankListings(items, scoreMap)` | Sorts by score descending, stable tie-break by id |
+| `getDebugSignals(listings, scoreMap, context, limit)` | Returns top N debug signals (no PII) |
 
 ---
 
@@ -518,7 +745,251 @@ SUMMARY
 
 ## Unit Test Coverage
 
-Comprehensive unit tests ensure filter system correctness, idempotence, and security.
+Comprehensive unit tests ensure search system correctness, idempotence, and security.
+
+### Search Module Tests
+
+**Directory:** `/mnt/d/Documents/roomshare/src/__tests__/lib/search/`
+
+#### Cursor Tests
+
+**File:** `cursor.test.ts` (42 tests)
+
+Tests keyset cursor encoding, decoding, and cursor building for stable pagination.
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| Encode/decode roundtrip | 8 |
+| Decode validation | 8 |
+| Key count validation per sort | 5 |
+| `buildCursorFromRow` | 7 |
+| `decodeLegacyCursor` | 5 |
+| `decodeCursorAny` | 5 |
+| `SORT_OPTIONS` constant | 2 |
+
+**Key scenarios:**
+- Validates version, sort option, id presence, key count
+- Returns null for invalid base64, malformed JSON, wrong version
+- Validates cursor sort matches expected sort
+- Legacy cursor detection and fallback
+
+#### FTS Database Tests
+
+**File:** `fts-db.test.ts` (7 tests)
+
+Database assertions verifying Full-Text Search infrastructure against PostgreSQL.
+
+**Gate:** `RUN_DB_ASSERTIONS=1 pnpm test src/__tests__/lib/search/fts-db.test.ts`
+
+| Check | Description |
+|-------|-------------|
+| CHECK 1 | Trigger populates `search_tsv` on INSERT |
+| CHECK 2 | GIN index `search_doc_tsv_gin_idx` exists |
+| CHECK 3 | Null-safe tsvector build (COALESCE protection) |
+| CHECK 4 | `plainto_tsquery` AND semantics, case-insensitive |
+| CHECK 6 | Trigger is column-specific (UPDATE OF clause) |
+
+#### FTS Query Tests
+
+**File:** `fts-query.test.ts` (15 tests)
+
+Tests FTS query helpers (`sanitizeSearchQuery`, `isValidQuery`).
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| Query sanitization | 5 |
+| Query validation | 4 |
+| Edge cases (case, whitespace, numbers, hyphens) | 6 |
+
+#### Hash Tests
+
+**File:** `hash.test.ts` (25 tests)
+
+Tests query hash generation and cursor encoding for pagination.
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| Hash generation | 12 |
+| Bounds quantization | 3 |
+| Cursor encoding | 3 |
+| Cursor decoding | 7 |
+
+**Key scenarios:**
+- Same hash for same params in different order
+- Same hash for arrays in different order
+- Case-insensitive for query, roomType, leaseDuration
+- Bounds quantization within BOUNDS_EPSILON
+
+#### Keyset Pagination Tests
+
+**File:** `keyset-pagination.test.ts` (12 tests)
+
+Integration tests for keyset pagination service layer.
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| Service layer keyset integration | 8 |
+| Keyset disabled fallback | 1 |
+| Cursor building | 3 |
+
+**Key scenarios:**
+- First page vs cursor-based subsequent pages
+- No duplicate items across pages
+- Legacy cursor migration to keyset
+- Sort mismatch validation
+
+#### Search Doc Dirty Tests
+
+**File:** `search-doc-dirty.test.ts` (8 tests)
+
+Tests `markListingDirty` and `markListingsDirty` functions.
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| `markListingDirty` | 3 |
+| `markListingsDirty` | 5 |
+
+#### Search Doc Queries Tests
+
+**File:** `search-doc-queries.test.ts` (10 tests)
+
+Tests feature flag logic for SearchDoc queries.
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| URL override precedence | 4 |
+| Environment variable fallback | 4 |
+| Edge cases | 2 |
+
+#### Search Orchestrator Tests
+
+**File:** `search-orchestrator.test.ts` (5 tests)
+
+Tests v2 to v1 fallback behavior.
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| v2 null response fallback | 1 |
+| v2 success (no v1 call) | 1 |
+| v2 disabled direct v1 | 1 |
+| Both v1 and v2 fail | 1 |
+| Non-Error v1 exception | 1 |
+
+#### Transform Tests
+
+**File:** `transform.test.ts` (32 tests)
+
+Tests data transformation from existing shapes to v2 response format.
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| `determineMode` | 3 |
+| `shouldIncludePins` | 4 |
+| `transformToListItem` | 5 |
+| `transformToListItems` | 2 |
+| `transformToGeoJSON` | 6 |
+| `transformToPins` | 8 |
+| `transformToMapResponse` | 6 |
+
+**Key scenarios:**
+- GeoJSON coordinate order [lng, lat]
+- Pin tiering (primary vs mini)
+- Pin stacking at same coordinates
+- Threshold boundary behavior (49 vs 50 listings)
+
+#### Hybrid Count Threshold Tests
+
+**File:** `hybrid-count-threshold.test.ts` (12 tests)
+
+Tests HYBRID_COUNT_THRESHOLD (100) behavior in `getSearchDocLimitedCount()`.
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| Threshold behavior | 6 |
+| Filters interaction | 3 |
+| Text search + hybrid count | 3 |
+
+**Key scenarios:**
+- Returns exact count when count <= 100
+- Returns null when count > 100
+- Boundary cases at 100 and 101
+- LIMIT 101 subquery pattern verification
+
+#### Unbounded Browse Protection Tests
+
+**File:** `unbounded-browse-protection.test.ts` (21 tests)
+
+Tests protection against full-table scans on browse-all queries.
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| `getSearchDocLimitedCount` | 4 |
+| `getSearchDocMapListings` | 4 |
+| `getSearchDocListingsPaginated` | 4 |
+| FeaturedListings compatibility | 1 |
+| V1 fallback protection | 8 |
+
+**Key constants:**
+- `MAX_UNBOUNDED_RESULTS = 48` (4 pages of 12 items)
+- `MAX_BROWSE_PAGES = 4`
+
+### Ranking Module Tests
+
+**Directory:** `/mnt/d/Documents/roomshare/src/lib/search/ranking/__tests__/`
+
+#### Rank Tests
+
+**File:** `rank.test.ts` (17 tests)
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| `buildScoreMap` | 4 |
+| `rankListings` | 7 |
+| `getDebugSignals` | 6 |
+
+**Key scenarios:**
+- Score determinism
+- Stable tie-break by id
+- Does not modify original array
+- Debug signals capped at limit, no PII
+
+#### Score Tests
+
+**File:** `score.test.ts` (38 tests)
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| `normalizeRecommendedScore` | 5 |
+| `normalizeRating` | 6 |
+| `normalizePriceCompetitiveness` | 5 |
+| `normalizeRecency` | 7 |
+| `normalizeDistance` | 5 |
+| `computeMedianPrice` | 5 |
+| `getBoundsCenter` | 1 |
+| `computeScore` | 4 |
+| `computeSignals` | 2 |
+
+**Key scenarios:**
+- Bayesian average for ratings
+- Symmetric price decay in log space
+- 30-day half-life for recency
+- 5km half-life for distance
+- Weights sum to 1.0
+
+### Natural Language Parser Tests
+
+**File:** `/mnt/d/Documents/roomshare/src/lib/search/__tests__/natural-language-parser.test.ts` (18 tests)
+
+| Coverage Area | Test Count |
+|---------------|------------|
+| Empty/plain location input | 3 |
+| Price extraction | 5 |
+| Room type extraction | 2 |
+| Amenity extraction | 1 |
+| House rules extraction | 1 |
+| Lease duration extraction | 2 |
+| Location extraction | 2 |
+| `nlQueryToSearchParams` | 2 |
 
 ### Filter Schema Tests
 
@@ -764,13 +1235,27 @@ All tests use **authenticated storage state** (`playwright/.auth/user.json`).
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
-| `filter-schema.test.ts` | 100+ | All filter normalization, validation, security |
+| `cursor.test.ts` | 42 | Keyset cursor encoding/decoding/validation |
+| `fts-db.test.ts` | 7 | FTS database assertions |
+| `fts-query.test.ts` | 15 | FTS query helpers |
+| `hash.test.ts` | 25 | Query hash and cursor encoding |
+| `keyset-pagination.test.ts` | 12 | Keyset pagination integration |
+| `search-doc-dirty.test.ts` | 8 | Dirty flag helpers |
+| `search-doc-queries.test.ts` | 10 | Feature flag logic |
+| `search-orchestrator.test.ts` | 5 | v2/v1 fallback |
+| `transform.test.ts` | 32 | Data transformation |
+| `hybrid-count-threshold.test.ts` | 12 | Hybrid count optimization |
+| `unbounded-browse-protection.test.ts` | 21 | Browse protection |
+| `rank.test.ts` | 17 | Ranking functions |
+| `score.test.ts` | 38 | Scoring functions |
+| `natural-language-parser.test.ts` | 18 | NL parsing |
+| `filter-schema.test.ts` | 100+ | Filter normalization, validation, security |
 | `useBatchedFilters.test.ts` | 24 | Hook state management, URL parsing |
 | `filter-properties.test.ts` | 100+ | Property-based tests for 12 invariants |
-| **Total Unit** | **~224** | Comprehensive filter system validation |
+| **Total Unit** | **~486** | Comprehensive search system validation |
 
 ### Combined Test Coverage
 
-**Total Tests:** ~337 (113 E2E + 224 unit)
-**Coverage Areas:** Filter system, search UX, saved searches, pagination, accessibility, security, performance
-**Test Strategies:** Unit, integration, E2E, property-based, fuzz testing
+**Total Tests:** ~599 (113 E2E + 486 unit)
+**Coverage Areas:** Filter system, search UX, saved searches, pagination, accessibility, security, performance, ranking, FTS, natural language parsing
+**Test Strategies:** Unit, integration, E2E, property-based, fuzz testing, database assertions

@@ -141,9 +141,11 @@ export function UserMarker({
                                 ) : (
                                     <span className="text-zinc-400">Custom pin</span>
                                 )}
+                                {/* P1-FIX (#97): Ensure 44px minimum touch target for WCAG 2.5.5.
+                                    The visual icon is small (12px) but touch area is 44x44 via negative margin. */}
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onSetPin(null); }}
-                                    className="ml-1 hover:text-rose-500 flex-shrink-0"
+                                    className="ml-1 hover:text-rose-500 flex-shrink-0 min-w-[44px] min-h-[44px] -m-3 p-3 flex items-center justify-center touch-manipulation"
                                     aria-label="Remove pin"
                                 >
                                     <X className="w-3 h-3" />
