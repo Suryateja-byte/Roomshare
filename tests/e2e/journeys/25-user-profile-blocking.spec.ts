@@ -6,7 +6,7 @@
  * J37: Edit profile fields
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 // ─── J35: View Public User Profile ────────────────────────────────────────────
 test.describe("J35: View Public User Profile", () => {
@@ -18,7 +18,8 @@ test.describe("J35: View Public User Profile", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const container = searchResultsContainer(page);
+    const cards = container.locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "No listings — skipping");
 
     await nav.clickListingCard(0);
@@ -69,12 +70,15 @@ test.describe("J36: Block a User", () => {
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
 
     // Wait for listing cards to appear (up to 10s)
-    const cardLocator = page.locator(selectors.listingCard);
+    let j36Container = searchResultsContainer(page);
+    let cardLocator = j36Container.locator(selectors.listingCard);
     try {
       await cardLocator.first().waitFor({ state: "visible", timeout: 10000 });
     } catch {
       // Retry with broader search
       await nav.goToSearch({ bounds: SF_BOUNDS });
+      j36Container = searchResultsContainer(page);
+      cardLocator = j36Container.locator(selectors.listingCard);
       try {
         await cardLocator.first().waitFor({ state: "visible", timeout: 10000 });
       } catch {

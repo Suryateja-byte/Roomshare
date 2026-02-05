@@ -12,7 +12,7 @@
  *   pnpm playwright test tests/e2e/map-features.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, searchResultsContainer } from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -63,7 +63,8 @@ test.describe("Map smoke test", () => {
   test("search page renders listing cards", async ({ page }) => {
     await waitForSearchPage(page);
 
-    const cards = page.locator(selectors.listingCard);
+    const cardsContainer = searchResultsContainer(page);
+    const cards = cardsContainer.locator(selectors.listingCard);
     try {
       await cards.first().waitFor({ state: "attached", timeout: 15_000 });
       const count = await cards.count();
@@ -84,8 +85,9 @@ test.describe("1.3: Synchronized highlighting", () => {
     await waitForSearchPage(page);
 
     // Cards may be in DOM but not visible (e.g., in bottom sheet on mobile viewport).
-    // Use a visible card, or scroll into view first.
-    const card = page.locator(selectors.listingCard).first();
+    // Scope to visible container to avoid hidden mobile/desktop duplicate.
+    const hoverContainer = searchResultsContainer(page);
+    const card = hoverContainer.locator(selectors.listingCard).first();
     if ((await card.count()) === 0) {
       test.skip(true, "No listing cards found");
       return;

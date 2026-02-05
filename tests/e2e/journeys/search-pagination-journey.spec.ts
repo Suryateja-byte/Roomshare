@@ -9,7 +9,7 @@
  * Uses SF_BOUNDS which has guaranteed seed data.
  */
 
-import { test, expect, selectors, timeouts, tags, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 test.describe("Search Pagination Journey", () => {
   // Use slow mode for map operations that can take time
@@ -28,11 +28,11 @@ test.describe("Search Pagination Journey", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listings to load
-    const listingCard = page.locator(selectors.listingCard).first();
+    const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await expect(listingCard).toBeVisible({ timeout: 15000 });
 
     // Capture first listing ID on page 1
-    const firstListingPage1 = await page
+    const firstListingPage1 = await searchResultsContainer(page)
       .locator(selectors.listingCard)
       .first()
       .getAttribute("data-listing-id")
@@ -68,7 +68,7 @@ test.describe("Search Pagination Journey", () => {
     expect(hasCursor || hasPageParam).toBe(true);
 
     // Step 5: Verify different listing is shown
-    const firstListingPage2 = await page
+    const firstListingPage2 = await searchResultsContainer(page)
       .locator(selectors.listingCard)
       .first()
       .getAttribute("data-listing-id")
@@ -101,7 +101,7 @@ test.describe("Search Pagination Journey", () => {
       expect(isPage1).toBe(true);
 
       // Step 8: Verify same listing as original page 1
-      const firstListingBack = await page
+      const firstListingBack = await searchResultsContainer(page)
         .locator(selectors.listingCard)
         .first()
         .getAttribute("data-listing-id")
@@ -119,7 +119,7 @@ test.describe("Search Pagination Journey", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listings
-    const listingCard = page.locator(selectors.listingCard).first();
+    const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await expect(listingCard).toBeVisible({ timeout: 15000 });
 
     // Step 2: Navigate to page 2 if possible
@@ -204,7 +204,7 @@ test.describe("Search Pagination Journey", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listings
-    const listingCard = page.locator(selectors.listingCard).first();
+    const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await expect(listingCard).toBeVisible({ timeout: 15000 });
 
     // Step 2: Navigate to page 2
@@ -221,7 +221,7 @@ test.describe("Search Pagination Journey", () => {
 
       // Step 3: Capture URL and first listing ID
       const urlBeforeRefresh = page.url();
-      const firstListingBeforeRefresh = await page
+      const firstListingBeforeRefresh = await searchResultsContainer(page)
         .locator(selectors.listingCard)
         .first()
         .getAttribute("data-listing-id")
@@ -233,7 +233,7 @@ test.describe("Search Pagination Journey", () => {
       await page.waitForTimeout(timeouts.animation);
 
       // Wait for listings to load after refresh
-      await expect(page.locator(selectors.listingCard).first()).toBeVisible({
+      await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
         timeout: 15000,
       });
 
@@ -257,7 +257,7 @@ test.describe("Search Pagination Journey", () => {
       }
 
       // Step 6: Verify same listing is displayed
-      const firstListingAfterRefresh = await page
+      const firstListingAfterRefresh = await searchResultsContainer(page)
         .locator(selectors.listingCard)
         .first()
         .getAttribute("data-listing-id")

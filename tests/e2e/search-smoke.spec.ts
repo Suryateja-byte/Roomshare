@@ -7,7 +7,7 @@
  * Run: pnpm playwright test tests/e2e/search-smoke.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, selectors } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, searchResultsContainer } from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -31,8 +31,9 @@ test.describe("REG-001: Search page loads", () => {
     const headings = page.locator('h3').filter({ hasText: /.+/ });
     await expect(headings.first()).toBeAttached({ timeout: 30_000 });
 
-    // Verify listing links are present in the DOM
-    const cards = page.locator('a[href^="/listings/c"]');
+    // Verify listing links are present in the DOM — scope to visible container
+    const container = searchResultsContainer(page);
+    const cards = container.locator('a[href^="/listings/c"]');
     const count = await cards.count();
     expect(count).toBeGreaterThanOrEqual(1);
 
@@ -127,7 +128,8 @@ test.describe("REG-003: Whitespace query bypass protection", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Either shows a location prompt / zero state, or capped browse results
-    const cards = page.locator(selectors.listingCard);
+    const reg3Container = searchResultsContainer(page);
+    const cards = reg3Container.locator(selectors.listingCard);
 
     // Give cards time to render (but they may not appear at all)
     try {

@@ -7,7 +7,7 @@
  * J34: Form validation errors on create
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 // ─── J31: Edit Listing and Verify ─────────────────────────────────────────────
 test.describe("J31: Edit Listing and Verify", () => {
@@ -22,7 +22,7 @@ test.describe("J31: Edit Listing and Verify", () => {
     });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "No listings found — skipping");
 
     // Step 2: Open listing detail
@@ -100,7 +100,7 @@ test.describe("J32: Pause and Unpause Listing", () => {
     });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "Listing not found — skipping");
 
     await nav.clickListingCard(0);
@@ -157,7 +157,7 @@ test.describe("J33: Delete Listing with Confirmation", () => {
     await nav.goToSearch({ q: "Sunny Mission", bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "No owned listing found — skipping");
 
     await nav.clickListingCard(0);

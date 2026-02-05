@@ -14,7 +14,7 @@
  * Run with: pnpm playwright test tests/e2e/map-loading.anon.spec.ts --project=chromium-anon
  */
 
-import { test, expect, SF_BOUNDS, selectors, waitForMapMarkers } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, waitForMapMarkers, searchResultsContainer } from "./helpers/test-utils";
 
 // Build URL query string from SF bounds
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -157,7 +157,7 @@ test.describe("1.2: Map displays markers for listings in bounds", () => {
       expect(bodyVisible).toBe(true);
 
       // Check if listing cards loaded (alternative verification)
-      const cards = page.locator(selectors.listingCard);
+      const cards = searchResultsContainer(page).locator(selectors.listingCard);
       const cardCount = await cards.count();
       // If we have listings in data but no markers, it's a WebGL issue - not a failure
       if (cardCount > 0) {

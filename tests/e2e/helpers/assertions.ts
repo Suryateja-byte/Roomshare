@@ -1,5 +1,5 @@
 import { Page, expect, Locator } from '@playwright/test';
-import { selectors, timeouts } from './test-utils';
+import { selectors, timeouts, searchResultsContainer } from './test-utils';
 
 /**
  * Custom assertion helpers
@@ -69,7 +69,8 @@ export function assertionHelpers(page: Page) {
      * Assert listings are displayed
      */
     async listingsDisplayed(minCount = 1) {
-      const cards = page.locator(selectors.listingCard);
+      const container = searchResultsContainer(page);
+      const cards = container.locator(selectors.listingCard);
       await expect(cards.first()).toBeVisible({ timeout: 10000 });
       const count = await cards.count();
       expect(count).toBeGreaterThanOrEqual(minCount);

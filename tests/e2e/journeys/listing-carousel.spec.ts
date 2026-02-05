@@ -8,7 +8,7 @@
  * - Single image cards don't show carousel controls
  */
 
-import { test, expect, selectors, timeouts, tags } from "../helpers";
+import { test, expect, selectors, timeouts, tags, searchResultsContainer } from "../helpers";
 
 test.describe("Listing Card Carousel", () => {
   // Run as anonymous user
@@ -19,14 +19,14 @@ test.describe("Listing Card Carousel", () => {
     await nav.goToSearch();
 
     // Wait for listings to load
-    await expect(page.locator(selectors.listingCard).first()).toBeVisible({
+    await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
       timeout: timeouts.navigation,
     });
   });
 
   test(`${tags.anon} - Carousel shows controls on hover`, async ({ page }) => {
     // Find a listing card with the carousel (has multiple images)
-    const carouselRegion = page
+    const carouselRegion = searchResultsContainer(page)
       .locator('[aria-label^="Image carousel"]')
       .first();
 
@@ -60,7 +60,7 @@ test.describe("Listing Card Carousel", () => {
   test(`${tags.anon} - Clicking next button changes image`, async ({
     page,
   }) => {
-    const carouselRegion = page
+    const carouselRegion = searchResultsContainer(page)
       .locator('[aria-label^="Image carousel"]')
       .first();
 
@@ -103,7 +103,7 @@ test.describe("Listing Card Carousel", () => {
   });
 
   test(`${tags.anon} - Clicking dot navigates to image`, async ({ page }) => {
-    const carouselRegion = page
+    const carouselRegion = searchResultsContainer(page)
       .locator('[aria-label^="Image carousel"]')
       .first();
 
@@ -139,7 +139,7 @@ test.describe("Listing Card Carousel", () => {
   test(`${tags.anon} - Previous button appears after navigation`, async ({
     page,
   }) => {
-    const carouselRegion = page
+    const carouselRegion = searchResultsContainer(page)
       .locator('[aria-label^="Image carousel"]')
       .first();
 
@@ -176,7 +176,7 @@ test.describe("Listing Card Carousel", () => {
   test(`${tags.anon} ${tags.a11y} - Carousel has proper ARIA attributes`, async ({
     page,
   }) => {
-    const carouselRegion = page
+    const carouselRegion = searchResultsContainer(page)
       .locator('[aria-label^="Image carousel"]')
       .first();
 
@@ -212,7 +212,7 @@ test.describe("Listing Card Carousel", () => {
     page,
   }) => {
     // Look for listing cards
-    const cards = page.locator(selectors.listingCard);
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
     const cardCount = await cards.count();
     expect(cardCount).toBeGreaterThan(0);
 

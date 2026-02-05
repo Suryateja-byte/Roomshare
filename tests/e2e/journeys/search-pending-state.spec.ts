@@ -8,7 +8,7 @@
  * - SlowTransitionBadge for slow transitions
  */
 
-import { test, expect, tags, selectors, timeouts } from "../helpers";
+import { test, expect, tags, selectors, timeouts, searchResultsContainer } from "../helpers";
 
 test.describe("Breathing Pending State (PR1)", () => {
   // Filter tests run as anonymous user
@@ -89,8 +89,8 @@ test.describe("Breathing Pending State (PR1)", () => {
       await page.goto("/search?minPrice=500");
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for listing cards to appear (use shared selector with fallbacks)
-      const listingCards = page.locator(selectors.listingCard);
+      // Wait for listing cards to appear — scope to visible container
+      const listingCards = searchResultsContainer(page).locator(selectors.listingCard);
       await expect(listingCards.first()).toBeVisible({
         timeout: timeouts.navigation,
       });

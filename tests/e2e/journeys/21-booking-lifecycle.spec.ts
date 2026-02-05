@@ -7,7 +7,7 @@
  * J24: Double-booking prevention
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 // ─── J21: Full Booking Request Submission ─────────────────────────────────────
 test.describe("J21: Full Booking Request Submission", () => {
@@ -20,7 +20,7 @@ test.describe("J21: Full Booking Request Submission", () => {
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
     const count = await cards.count();
     test.skip(count === 0, "Reviewer listing not found — skipping");
 
@@ -192,20 +192,20 @@ test.describe("J24: Double-Booking Prevention", () => {
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
     await page.waitForTimeout(3000);
 
-    let cards = page.locator(selectors.listingCard);
+    let cards = searchResultsContainer(page).locator(selectors.listingCard);
     let count = await cards.count();
     if (count === 0) {
       // Retry with fresh navigation
       await nav.goToSearch({ q: "Reviewer", bounds: SF_BOUNDS });
       await page.waitForTimeout(3000);
-      cards = page.locator(selectors.listingCard);
+      cards = searchResultsContainer(page).locator(selectors.listingCard);
       count = await cards.count();
     }
     if (count === 0) {
       // Last resort: search all listings in bounds
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForTimeout(3000);
-      cards = page.locator(selectors.listingCard);
+      cards = searchResultsContainer(page).locator(selectors.listingCard);
       count = await cards.count();
     }
     test.skip(count === 0, "Reviewer listing not found — skipping");

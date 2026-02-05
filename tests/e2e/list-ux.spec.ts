@@ -5,7 +5,7 @@
  * skeleton loading, pagination progress, heart animation, date pills.
  */
 
-import { test, expect, SF_BOUNDS } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, searchResultsContainer } from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -17,8 +17,11 @@ test.describe("2.1: Image carousel enhancements", () => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
 
+    // Scope to visible search results container (dual-container layout)
+    const container = searchResultsContainer(page);
+
     // Find a carousel with dots
-    const dotContainers = page.locator('[role="tablist"][aria-label="Image navigation"]');
+    const dotContainers = container.locator('[role="tablist"][aria-label="Image navigation"]');
     const count = await dotContainers.count();
 
     if (count === 0) {
@@ -38,8 +41,11 @@ test.describe("2.1: Image carousel enhancements", () => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
 
-    const prevButtons = page.locator('[aria-label="Previous image"]');
-    const nextButtons = page.locator('[aria-label="Next image"]');
+    // Scope to visible search results container (dual-container layout)
+    const container = searchResultsContainer(page);
+
+    const prevButtons = container.locator('[aria-label="Previous image"]');
+    const nextButtons = container.locator('[aria-label="Next image"]');
 
     // At least one carousel should have navigation buttons
     const prevCount = await prevButtons.count();
@@ -63,8 +69,11 @@ test.describe("2.2: Trust badges", () => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
 
+    // Scope to visible search results container (dual-container layout)
+    const container = searchResultsContainer(page);
+
     // Check if any trust badges exist (they may not if no listing has rating >= 4.9)
-    const badges = page.getByText("Guest Favorite");
+    const badges = container.getByText("Guest Favorite");
     const badgeCount = await badges.count();
 
     // Just verify no crash — badge count depends on seed data
@@ -211,7 +220,10 @@ test.describe("2.6: Wishlist heart button", () => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
 
-    const heartButtons = page.locator('[aria-label="Save listing"], [aria-label="Remove from saved"]');
+    // Scope to visible search results container (dual-container layout)
+    const container = searchResultsContainer(page);
+
+    const heartButtons = container.locator('[aria-label="Save listing"], [aria-label="Remove from saved"]');
     const heartCount = await heartButtons.count();
 
     expect(heartCount).toBeGreaterThanOrEqual(1);
@@ -226,7 +238,8 @@ test.describe("2.6: Wishlist heart button", () => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
 
-    const card = page.locator('[data-testid="listing-card"]').first();
+    const container = searchResultsContainer(page);
+    const card = container.locator('[data-testid="listing-card"]').first();
     const heartBtn = card.locator('[aria-label="Save listing"]');
     const heartCount = await heartBtn.count();
 
@@ -249,7 +262,8 @@ test.describe("General: Listing cards integrity", () => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
 
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     const cardCount = await cards.count();
     expect(cardCount).toBeGreaterThanOrEqual(1);
 
@@ -272,7 +286,8 @@ test.describe("General: Listing cards integrity", () => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
 
-    const articles = page.locator('[data-testid="listing-card"][role="article"]');
+    const container = searchResultsContainer(page);
+    const articles = container.locator('[data-testid="listing-card"][role="article"]');
     const count = await articles.count();
 
     if (count === 0) {

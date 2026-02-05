@@ -4,7 +4,7 @@
  * These simulate real-world user behavior patterns to find issues.
  * Each journey represents a distinct user persona and intent.
  */
-import { test, expect } from '../helpers/test-utils';
+import { test, expect, searchResultsContainer } from '../helpers/test-utils';
 import { selectors } from '../helpers/test-utils';
 
 /** Helper: wait for search page to be ready (handles slow compilation) */
@@ -58,7 +58,8 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/search');
     await waitForSearchReady(page);
 
-    const hasListings = await page.locator(selectors.listingCard).count() > 0;
+    const s1Container = searchResultsContainer(page);
+    const hasListings = await s1Container.locator(selectors.listingCard).count() > 0;
     const hasEmpty = await page.locator(selectors.emptyState).count() > 0;
     expect(hasListings || hasEmpty).toBeTruthy();
 
@@ -85,7 +86,8 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/search');
     await waitForSearchReady(page);
 
-    const firstCard = page.locator('a[href^="/listings/"]').first();
+    const s3Container = searchResultsContainer(page);
+    const firstCard = s3Container.locator('a[href^="/listings/"]').first();
     if (await firstCard.count() > 0) {
       const href = await firstCard.getAttribute('href');
       await page.goto(href!);
@@ -202,7 +204,8 @@ test.describe('30 Critical User Journey Simulations', () => {
 
     await expect(page.locator('#main-content')).toBeVisible();
 
-    const listings = page.locator(selectors.listingCard);
+    const s8Container = searchResultsContainer(page);
+    const listings = s8Container.locator(selectors.listingCard);
     const count = await listings.count();
 
     if (count > 0) {
@@ -302,7 +305,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/search');
     await waitForSearchReady(page);
 
-    if (await page.locator(selectors.listingCard).count() === 0) {
+    if (await searchResultsContainer(page).locator(selectors.listingCard).count() === 0) {
       test.skip();
       return;
     }
@@ -327,7 +330,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/search');
     await waitForSearchReady(page);
 
-    if (await page.locator(selectors.listingCard).count() === 0) {
+    if (await searchResultsContainer(page).locator(selectors.listingCard).count() === 0) {
       test.skip();
       return;
     }
@@ -347,7 +350,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/search');
     await waitForSearchReady(page);
 
-    if (await page.locator(selectors.listingCard).count() === 0) {
+    if (await searchResultsContainer(page).locator(selectors.listingCard).count() === 0) {
       test.skip();
       return;
     }
@@ -361,7 +364,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/search');
     await waitForSearchReady(page);
 
-    if (await page.locator(selectors.listingCard).count() === 0) {
+    if (await searchResultsContainer(page).locator(selectors.listingCard).count() === 0) {
       test.skip();
       return;
     }
@@ -397,13 +400,14 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/search');
     await waitForSearchReady(page);
 
-    if (await page.locator(selectors.listingCard).count() === 0) {
+    const s20Container = searchResultsContainer(page);
+    if (await s20Container.locator(selectors.listingCard).count() === 0) {
       test.skip();
       return;
     }
 
     // Click first listing card link
-    const href = await page.locator(selectors.listingCard).first().locator('a[href^="/listings/"]').first().getAttribute('href');
+    const href = await s20Container.locator(selectors.listingCard).first().locator('a[href^="/listings/"]').first().getAttribute('href');
     if (href) {
       await page.goto(href);
       await page.waitForLoadState('domcontentloaded');
@@ -455,7 +459,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/search');
     await waitForSearchReady(page);
 
-    if (await page.locator(selectors.listingCard).count() === 0) {
+    if (await searchResultsContainer(page).locator(selectors.listingCard).count() === 0) {
       test.skip();
       return;
     }

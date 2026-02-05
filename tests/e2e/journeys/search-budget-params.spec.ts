@@ -11,7 +11,7 @@
  * DB stores price as Float (dollars, not cents) - no conversion needed.
  */
 
-import { test, expect, tags } from "../helpers";
+import { test, expect, tags, searchResultsContainer } from "../helpers";
 
 test.describe("Budget URL Param Aliases", () => {
   // Filter tests run as anonymous user
@@ -29,11 +29,11 @@ test.describe("Budget URL Param Aliases", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for listing cards to load
-      const listingCards = page.locator('[data-testid^="listing-card-"]');
+      const listingCards = searchResultsContainer(page).locator('[data-testid^="listing-card-"]');
       await listingCards.first().waitFor({ state: "visible", timeout: 15000 });
 
       // Get all visible listing prices
-      const priceElements = page.locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
       const priceCount = await priceElements.count();
 
       // CRITICAL ASSERTION: All visible listing prices must be within range
@@ -63,11 +63,11 @@ test.describe("Budget URL Param Aliases", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for listing cards
-      const listingCards = page.locator('[data-testid^="listing-card-"]');
+      const listingCards = searchResultsContainer(page).locator('[data-testid^="listing-card-"]');
       await listingCards.first().waitFor({ state: "visible", timeout: 15000 });
 
       // Verify prices are within range
-      const priceElements = page.locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
@@ -125,11 +125,11 @@ test.describe("Budget URL Param Aliases", () => {
       await expect(minPriceInput).toHaveValue("700");
 
       // Wait for listing cards
-      const listingCards = page.locator('[data-testid^="listing-card-"]');
+      const listingCards = searchResultsContainer(page).locator('[data-testid^="listing-card-"]');
       await listingCards.first().waitFor({ state: "visible", timeout: 15000 });
 
       // Verify prices respect canonical minPrice=700, not alias minBudget=500
-      const priceElements = page.locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
@@ -158,11 +158,11 @@ test.describe("Budget URL Param Aliases", () => {
       await expect(maxPriceInput).toHaveValue("1200");
 
       // Wait for listing cards
-      const listingCards = page.locator('[data-testid^="listing-card-"]');
+      const listingCards = searchResultsContainer(page).locator('[data-testid^="listing-card-"]');
       await listingCards.first().waitFor({ state: "visible", timeout: 15000 });
 
       // Verify prices respect canonical maxPrice=1200
-      const priceElements = page.locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
@@ -194,11 +194,11 @@ test.describe("Budget URL Param Aliases", () => {
       await expect(maxPriceInput).toHaveValue("1500");
 
       // Wait for listing cards
-      const listingCards = page.locator('[data-testid^="listing-card-"]');
+      const listingCards = searchResultsContainer(page).locator('[data-testid^="listing-card-"]');
       await listingCards.first().waitFor({ state: "visible", timeout: 15000 });
 
       // Verify prices are in range
-      const priceElements = page.locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
@@ -227,11 +227,11 @@ test.describe("Budget URL Param Aliases", () => {
       await expect(maxPriceInput).toHaveValue("1800");
 
       // Wait for listing cards
-      const listingCards = page.locator('[data-testid^="listing-card-"]');
+      const listingCards = searchResultsContainer(page).locator('[data-testid^="listing-card-"]');
       await listingCards.first().waitFor({ state: "visible", timeout: 15000 });
 
       // Verify prices are in range
-      const priceElements = page.locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {

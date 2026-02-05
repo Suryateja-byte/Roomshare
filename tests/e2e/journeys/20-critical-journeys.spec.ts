@@ -24,7 +24,7 @@
  * J20: Error handling & 404
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 // ─── J1: Home Page Load & Hero CTA ────────────────────────────────────────────
 test.describe("J1: Home Page Load & Hero CTA", () => {
@@ -75,7 +75,7 @@ test.describe("J2: Search With Text Query", () => {
     await page.waitForTimeout(2000);
 
     // Should show either listings or empty state
-    const listings = page.locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(selectors.listingCard);
     const emptyState = page.locator(selectors.emptyState);
     const hasListings = (await listings.count()) > 0;
     const hasEmpty = await emptyState.isVisible().catch(() => false);
@@ -147,7 +147,7 @@ test.describe("J4: Map & Listing Sync", () => {
 
     // Map may not render in test env (no Mapbox token), but container should exist
     // or search results should show
-    const listings = page.locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(selectors.listingCard);
     const hasListings = (await listings.count()) > 0;
 
     // At minimum, the page should render without errors
@@ -166,7 +166,7 @@ test.describe("J5: Listing Detail Page", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const listings = page.locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(selectors.listingCard);
     const count = await listings.count();
 
     if (count === 0) {
@@ -206,7 +206,7 @@ test.describe("J6: Image Carousel on Listing", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const listings = page.locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(selectors.listingCard);
     if ((await listings.count()) === 0) {
       test.skip();
       return;
@@ -291,7 +291,7 @@ test.describe("J10: Booking Request Flow", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const listings = page.locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(selectors.listingCard);
     if ((await listings.count()) === 0) {
       test.skip();
       return;
@@ -428,7 +428,7 @@ test.describe("J14: Favorites — Save & View", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const listings = page.locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(selectors.listingCard);
     if ((await listings.count()) === 0) {
       test.skip();
       return;
@@ -495,7 +495,7 @@ test.describe("J17: Reviews on Listing", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const listings = page.locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(selectors.listingCard);
     if ((await listings.count()) === 0) {
       test.skip();
       return;

@@ -4,7 +4,7 @@
  * Captures baseline screenshots for the search UI migration.
  * Uses fixed viewports and masks non-deterministic elements (map tiles).
  */
-import { test, expect, SF_BOUNDS } from "../helpers";
+import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 test.describe("Search Visual Regression", () => {
   test.beforeEach(async ({ page }) => {
@@ -22,7 +22,7 @@ test.describe("Search Visual Regression", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listing cards to load (stable selector)
-    const listingCards = page.locator('a[href^="/listings/"]');
+    const listingCards = searchResultsContainer(page).locator('a[href^="/listings/"]');
     await expect(listingCards.first()).toBeVisible({ timeout: 30000 });
 
     // Wait for content to stabilize
@@ -49,7 +49,7 @@ test.describe("Search Visual Regression", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listing cards to load
-    const listingCards = page.locator('a[href^="/listings/"]');
+    const listingCards = searchResultsContainer(page).locator('a[href^="/listings/"]');
     await expect(listingCards.first()).toBeVisible({ timeout: 30000 });
 
     // Wait for content to stabilize
@@ -88,7 +88,7 @@ test.describe("Search Visual Regression", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listing cards to load
-    const listingCards = page.locator('a[href^="/listings/"]');
+    const listingCards = searchResultsContainer(page).locator('a[href^="/listings/"]');
     await expect(listingCards.first()).toBeVisible({ timeout: 30000 });
 
     // Wait for images to load

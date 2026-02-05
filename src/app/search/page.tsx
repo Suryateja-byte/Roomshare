@@ -165,6 +165,7 @@ export default async function SearchPage({
     let usedV2 = false;
     let v2MapData: V2MapData | null = null;
     let paginatedResult: PaginatedResult<ListingData> | PaginatedResultHybrid<ListingData> | undefined;
+    let v2NextCursor: string | null = null;
 
     // Check if v2 is enabled via feature flag OR query param override (?v2=1)
     const v2Override = rawParams.v2 === '1' || rawParams.v2 === 'true';
@@ -200,6 +201,7 @@ export default async function SearchPage({
                 // V2 succeeded - use its data
                 usedV2 = true;
                 paginatedResult = v2Result.paginatedResult;
+                v2NextCursor = v2Result.response.list.nextCursor ?? null;
 
                 // Construct v2MapData for context injection
                 // PersistentMapWrapper (in layout) will read this via SearchV2DataContext
@@ -275,8 +277,8 @@ export default async function SearchPage({
     }
     const searchParamsString = apiParams.toString();
 
-    // Extract nextCursor from paginated result
-    const initialNextCursor = 'nextCursor' in paginatedResult ? (paginatedResult.nextCursor ?? null) : null;
+    // Extract nextCursor: prefer V2 response cursor, fallback to paginatedResult for keyset path
+    const initialNextCursor = v2NextCursor ?? ('nextCursor' in paginatedResult ? (paginatedResult.nextCursor ?? null) : null);
 
     const listContent = (
         <div className="max-w-[840px] mx-auto pb-24 md:pb-6">

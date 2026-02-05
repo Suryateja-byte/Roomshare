@@ -4,7 +4,7 @@
  * high-contrast styling, and performance marks.
  */
 
-import { test, expect, SF_BOUNDS } from "../helpers";
+import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 /** Wait for search results to load by checking for heading */
 async function waitForResults(page: import("@playwright/test").Page) {
@@ -29,8 +29,11 @@ test.describe("Accessibility & Performance", () => {
       // Main content target exists
       await expect(page.locator("#main-content")).toBeAttached();
 
+      // Scope to visible search results container (dual-container layout)
+      const container = searchResultsContainer(page);
+
       // Listing cards have article role (DOM attribute check)
-      const articleCard = page.locator('[role="article"][data-testid="listing-card"]').first();
+      const articleCard = container.locator('[role="article"][data-testid="listing-card"]').first();
       await articleCard.waitFor({ state: "attached", timeout: 10000 });
 
       // Article card has aria-label with price info
@@ -46,7 +49,8 @@ test.describe("Accessibility & Performance", () => {
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await waitForResults(page);
 
-      const articles = page.locator('[role="article"][data-testid="listing-card"]');
+      const container = searchResultsContainer(page);
+      const articles = container.locator('[role="article"][data-testid="listing-card"]');
       await articles.first().waitFor({ state: "attached", timeout: 10000 });
       expect(await articles.count()).toBeGreaterThan(0);
 
@@ -76,8 +80,11 @@ test.describe("Accessibility & Performance", () => {
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await waitForResults(page);
 
+      // Scope to visible search results container (dual-container layout)
+      const container = searchResultsContainer(page);
+
       // Verify carousel regions exist with proper ARIA
-      const carousel = page.locator('[aria-roledescription="carousel"]').first();
+      const carousel = container.locator('[aria-roledescription="carousel"]').first();
       await carousel.waitFor({ state: "attached", timeout: 10000 });
 
       // Carousel should have tabindex for keyboard access
@@ -100,8 +107,9 @@ test.describe("Accessibility & Performance", () => {
       const errors: string[] = [];
       page.on("pageerror", (err) => errors.push(err.message));
 
-      // Cards exist
-      const cards = page.locator('[data-testid="listing-card"]');
+      // Cards exist — scope to visible container
+      const container = searchResultsContainer(page);
+      const cards = container.locator('[data-testid="listing-card"]');
       await cards.first().waitFor({ state: "attached", timeout: 10000 });
       expect(await cards.count()).toBeGreaterThan(0);
       expect(errors).toHaveLength(0);
@@ -154,8 +162,11 @@ test.describe("Accessibility & Performance", () => {
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await waitForResults(page);
 
+      // Scope to visible container
+      const container = searchResultsContainer(page);
+
       // next/image elements inside carousel have sizes
-      const carouselImg = page.locator('[aria-roledescription="carousel"] img').first();
+      const carouselImg = container.locator('[aria-roledescription="carousel"] img').first();
       await carouselImg.waitFor({ state: "attached", timeout: 10000 });
 
       const sizes = await carouselImg.getAttribute("sizes");

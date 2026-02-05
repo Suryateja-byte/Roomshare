@@ -6,7 +6,7 @@
  * J27: Empty messages inbox
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 // ─── J25: Send Message in Conversation ────────────────────────────────────────
 test.describe("J25: Send Message in Conversation", () => {
@@ -69,7 +69,7 @@ test.describe("J26: Start Conversation from Listing", () => {
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "Reviewer listing not found — skipping");
 
     // Step 2: Go to listing detail
