@@ -6,7 +6,7 @@
  * J44: Recently viewed tracking
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 // ─── J42: Filter Refinement Chain ─────────────────────────────────────────────
 test.describe("J42: Filter Refinement Chain", () => {
@@ -26,8 +26,9 @@ test.describe("J42: Filter Refinement Chain", () => {
     expect(url1).toContain("minPrice");
     expect(url1).toContain("maxPrice");
 
-    // Count initial results
-    const cards1 = page.locator(selectors.listingCard);
+    // Count initial results — scope to visible container
+    const container1 = searchResultsContainer(page);
+    const cards1 = container1.locator(selectors.listingCard);
     const count1 = await cards1.count();
 
     // Step 2: Add room type filter via URL (most reliable)
@@ -42,8 +43,9 @@ test.describe("J42: Filter Refinement Chain", () => {
     const url2 = page.url();
     expect(url2).toContain("roomType");
 
-    // Count narrowed results
-    const cards2 = page.locator(selectors.listingCard);
+    // Count narrowed results — scope to visible container
+    const container2 = searchResultsContainer(page);
+    const cards2 = container2.locator(selectors.listingCard);
     const count2 = await cards2.count();
 
     // Narrowed results should be <= initial (or both 0)
@@ -76,7 +78,8 @@ test.describe("J43: Search → Detail → Back Preserves State", () => {
     const searchUrl = page.url();
     expect(searchUrl).toContain("minPrice");
 
-    const cards = page.locator(selectors.listingCard);
+    const container = searchResultsContainer(page);
+    const cards = container.locator(selectors.listingCard);
     const count = await cards.count();
     test.skip(count === 0, "No listings — skipping");
 
@@ -93,8 +96,9 @@ test.describe("J43: Search → Detail → Back Preserves State", () => {
     const backUrl = page.url();
     expect(backUrl).toContain("minPrice");
 
-    // Step 5: Verify results still present
-    const cardsAfter = page.locator(selectors.listingCard);
+    // Step 5: Verify results still present — scope to visible container
+    const containerAfter = searchResultsContainer(page);
+    const cardsAfter = containerAfter.locator(selectors.listingCard);
     const countAfter = await cardsAfter.count();
     // Should have similar results (may re-fetch)
     expect(countAfter).toBeGreaterThanOrEqual(0);
@@ -111,7 +115,8 @@ test.describe("J44: Recently Viewed Tracking", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const j44Container = searchResultsContainer(page);
+    const cards = j44Container.locator(selectors.listingCard);
     const count = await cards.count();
     test.skip(count < 2, "Need at least 2 listings — skipping");
 

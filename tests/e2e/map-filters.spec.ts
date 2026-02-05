@@ -20,6 +20,7 @@ import {
   selectors,
   tags,
   waitForMapMarkers,
+  searchResultsContainer,
 } from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
@@ -557,7 +558,7 @@ test.describe("Map + Filter Interactions", () => {
       expect(pageTitle).toBeTruthy();
 
       // Check for listings or empty state
-      const hasListings = await page.locator(selectors.listingCard).count() > 0;
+      const hasListings = await searchResultsContainer(page).locator(selectors.listingCard).count() > 0;
       const hasEmptyState = await page.locator(selectors.emptyState).count() > 0;
 
       // Either listings or empty state should be present

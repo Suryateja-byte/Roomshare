@@ -6,7 +6,7 @@
  * error handling, and edge case scenarios.
  */
 
-import { test, expect, tags, selectors, timeouts } from '../helpers';
+import { test, expect, tags, selectors, timeouts, searchResultsContainer } from '../helpers';
 
 test.describe('Accessibility Journeys', () => {
   test.describe('J087: Keyboard navigation', () => {
@@ -249,7 +249,7 @@ test.describe('Edge Case Journeys', () => {
       await nav.goToSearch();
 
       // Check that listing cards handle long text
-      const listingCard = page.locator(selectors.listingCard).first();
+      const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
 
       if (await listingCard.isVisible()) {
         // Card should be properly sized

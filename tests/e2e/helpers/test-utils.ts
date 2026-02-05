@@ -1,4 +1,4 @@
-import { test as base, expect, Page, BrowserContext } from "@playwright/test";
+import { test as base, expect, Page, Locator, BrowserContext } from "@playwright/test";
 import { authHelpers } from "./auth-helpers";
 import { navigationHelpers } from "./navigation-helpers";
 import { networkHelpers, NetworkCondition } from "./network-helpers";
@@ -182,4 +182,34 @@ export async function takeScreenshot(
  */
 export function logStep(step: string, data?: Record<string, unknown>) {
   console.log(`[E2E] ${step}`, data ? JSON.stringify(data) : "");
+}
+
+/**
+ * Returns the visible search results container scoped to the current viewport.
+ *
+ * SearchViewToggle renders {children} in TWO containers (mobile + desktop).
+ * On desktop (≥768px), the mobile container has `display: none` via `md:hidden`.
+ * On mobile (<768px), the desktop container has `display: none` via `hidden md:flex`.
+ *
+ * Use this to scope selectors and avoid:
+ * - Strict mode violations (2 matching elements)
+ * - `.first()` returning the hidden mobile instance on desktop
+ * - `.count()` double-counting across both containers
+ */
+export function searchResultsContainer(page: Page): Locator {
+  const viewport = page.viewportSize();
+  const isMobile = viewport ? viewport.width < 768 : false;
+
+  if (isMobile) {
+    return page.locator('[data-testid="mobile-search-results-container"]');
+  }
+  return page.locator('[data-testid="search-results-container"]');
+}
+
+/**
+ * Returns a scoped listing card locator within the visible search container.
+ * Equivalent to: searchResultsContainer(page).locator('[data-testid="listing-card"]')
+ */
+export function scopedCards(page: Page): Locator {
+  return searchResultsContainer(page).locator('[data-testid="listing-card"]');
 }

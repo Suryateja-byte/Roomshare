@@ -20,6 +20,7 @@ import {
   tags,
   SF_BOUNDS,
   waitForMapMarkers,
+  searchResultsContainer,
 } from "../helpers";
 import {
   setupStackedMarkerMock,
@@ -156,8 +157,8 @@ test.describe("List ↔ Map Sync", () => {
     // This enables immediate marker fetch (skips 2s throttle in PersistentMapWrapper)
     await nav.goToSearch({ bounds: SF_BOUNDS });
 
-    // Wait for listings to load
-    await expect(page.locator(selectors.listingCard).first()).toBeVisible({
+    // Wait for listings to load — scope to visible container
+    await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
       timeout: timeouts.navigation,
     });
   });
@@ -166,7 +167,7 @@ test.describe("List ↔ Map Sync", () => {
     page,
   }) => {
     // Get the first listing card
-    const firstCard = page.locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await expect(firstCard).toBeVisible();
 
     // Get the listing ID from the card
@@ -211,7 +212,7 @@ test.describe("List ↔ Map Sync", () => {
   test(`${tags.anon} - Listing card gets ring highlight when focused`, async ({
     page,
   }) => {
-    const firstCard = page.locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await expect(firstCard).toBeVisible();
 
     // Initially no ring highlight
@@ -310,7 +311,7 @@ test.describe("List ↔ Map Sync", () => {
     page,
   }) => {
     // Get first listing card
-    const firstCard = page.locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await expect(firstCard).toBeVisible();
 
     // Tab to focus the first card
@@ -701,7 +702,7 @@ test.describe("List ↔ Map Sync", () => {
     // beforeEach already navigated to search page with SF_BOUNDS
 
     // Get first listing card ID
-    const firstCard = page.locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await expect(firstCard).toBeVisible();
     const listingId = await firstCard.getAttribute("data-listing-id");
     expect(listingId).toBeTruthy();
@@ -735,7 +736,7 @@ test.describe("List ↔ Map Sync", () => {
     page,
   }) => {
     // Get first listing card ID
-    const firstCard = page.locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await expect(firstCard).toBeVisible();
     const listingId = await firstCard.getAttribute("data-listing-id");
     expect(listingId).toBeTruthy();
@@ -778,7 +779,7 @@ test.describe("List ↔ Map Sync", () => {
 
     // Wait ONLY for the listing card to be visible (not for full page load)
     // This catches the button during the hydration window
-    const firstCard = page.locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await expect(firstCard).toBeVisible({ timeout: timeouts.navigation });
 
     // Get listing ID immediately
@@ -970,7 +971,7 @@ test.describe("List ↔ Map Sync", () => {
     await expect(popup).toBeVisible({ timeout: timeouts.action });
 
     // Now click a listing card (this should dismiss the popup before navigation)
-    const firstCard = page.locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     const listingId = await firstCard.getAttribute("data-listing-id");
     expect(listingId).toBeTruthy();
 

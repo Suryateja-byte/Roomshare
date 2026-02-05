@@ -6,7 +6,7 @@
  * J30: Review summary display
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 // ─── J28: Write a Review ──────────────────────────────────────────────────────
 test.describe("J28: Write a Review", () => {
@@ -18,7 +18,7 @@ test.describe("J28: Write a Review", () => {
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "Reviewer listing not found — skipping");
 
     // Step 2: Go to listing detail
@@ -87,7 +87,7 @@ test.describe("J29: Host Responds to Review", () => {
     });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
     const count = await cards.count();
     test.skip(count === 0, "Seeded listing not found — skipping");
 
@@ -140,7 +140,7 @@ test.describe("J30: Review Summary Display", () => {
     });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "Listing not found — skipping");
 
     // Step 2: Open listing

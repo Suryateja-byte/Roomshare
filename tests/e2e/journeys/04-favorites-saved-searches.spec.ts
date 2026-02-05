@@ -6,7 +6,7 @@
  * and alert configurations.
  */
 
-import { test, expect, tags, selectors } from "../helpers";
+import { test, expect, tags, selectors, searchResultsContainer } from "../helpers";
 
 test.describe("Favorites & Saved Searches Journeys", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
@@ -21,7 +21,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Find favorite button on first listing
-      const favoriteButton = page
+      const favoriteButton = searchResultsContainer(page)
         .locator(selectors.listingCard)
         .first()
         .locator(

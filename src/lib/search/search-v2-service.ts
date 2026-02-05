@@ -402,7 +402,7 @@ export async function executeSearchV2(
       cached: false,
     }));
 
-    return { response, paginatedResult: listResult };
+    return { response, paginatedResult: { ...listResult, nextCursor } };
   } catch (error) {
     // Log without PII (no user data, just error context)
     logger.sync.error("SearchV2 service error", {

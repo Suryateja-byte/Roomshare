@@ -9,7 +9,7 @@
  * J50: Cross-page navigation chain
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 // ─── J45: Report a Listing ────────────────────────────────────────────────────
 test.describe("J45: Report a Listing", () => {
@@ -21,7 +21,8 @@ test.describe("J45: Report a Listing", () => {
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const container = searchResultsContainer(page);
+    const cards = container.locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "No listings — skipping");
 
     // Step 2: Go to listing
@@ -128,7 +129,8 @@ test.describe("J47: Rate Limit Feedback", () => {
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
     await page.waitForTimeout(2000);
 
-    const cards = page.locator(selectors.listingCard);
+    const j47Container = searchResultsContainer(page);
+    const cards = j47Container.locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "No listings — skipping");
 
     await nav.clickListingCard(0);
@@ -232,7 +234,8 @@ test.describe("J50: Cross-Page Navigation Chain", () => {
     expect(page.url()).toContain("/search");
 
     // Step 3: Listing detail (if available)
-    const cards = page.locator(selectors.listingCard);
+    const j50Container = searchResultsContainer(page);
+    const cards = j50Container.locator(selectors.listingCard);
     if ((await cards.count()) > 0) {
       await nav.clickListingCard(0);
       await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });

@@ -5,7 +5,7 @@
  * on the Roomshare search page. Each journey tests a distinct user scenario.
  */
 
-import { test, expect, selectors, timeouts, tags, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 const SEARCH_URL_WITH_BOUNDS = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -23,12 +23,13 @@ test.describe("20 Critical Search Page Journeys", () => {
     const headingText = await heading.textContent();
     expect(headingText).toMatch(/\d+\+?\s+place/i);
 
-    // Listing cards exist in the DOM (cards render in both mobile/desktop containers)
-    const cards = page.locator(selectors.listingCard);
+    // Listing cards scoped to visible container (avoids double-counting from dual mobile/desktop containers)
+    const j1Container = searchResultsContainer(page);
+    const cards = j1Container.locator(selectors.listingCard);
     await cards.first().waitFor({ state: "attached", timeout: 15000 });
     const count = await cards.count();
     expect(count).toBeGreaterThan(0);
-    // Cards appear in both mobile + desktop containers, so count may be 2x ITEMS_PER_PAGE
+    // Scoped to visible container, count should match ITEMS_PER_PAGE
     expect(count).toBeLessThanOrEqual(24);
   });
 
@@ -215,7 +216,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
 
-    const firstCard = page.locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await firstCard.waitFor({ state: "attached", timeout: 15000 });
 
     // Get href and navigate directly (card may be in scroll container reported as hidden)
@@ -238,7 +239,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     // Click a listing
-    const firstCard = page.locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await firstCard.waitFor({ state: "attached", timeout: 10000 });
     const href = await firstCard.getAttribute("href");
     if (href) {
@@ -495,7 +496,7 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Listing cards or empty state should exist after page renders
     await expect(async () => {
-      const cardCount = await page.locator(selectors.listingCard).count();
+      const cardCount = await searchResultsContainer(page).locator(selectors.listingCard).count();
       const hasEmpty = await page.getByText(/no matches|no listings|0 places/i).isVisible().catch(() => false);
       expect(cardCount > 0 || hasEmpty).toBeTruthy();
     }).toPass({ timeout: 30000 });

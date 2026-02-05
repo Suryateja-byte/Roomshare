@@ -8,7 +8,7 @@
  * These extend the 21 journeys in 02-search-critical-journeys.spec.ts.
  */
 
-import { test, expect, selectors, tags, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 const BOUNDS_PARAMS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -730,7 +730,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
 
     // Verify listing cards are present in the DOM (count > 0 or empty state text exists)
     await expect(async () => {
-      const cardCount = await page.locator(selectors.listingCard).count();
+      const cardCount = await searchResultsContainer(page).locator(selectors.listingCard).count();
       const hasEmpty = await page.getByText(/no matches|no listings|0 places/i).isVisible().catch(() => false);
       expect(cardCount > 0 || hasEmpty).toBeTruthy();
     }).toPass({ timeout: 30000 });
