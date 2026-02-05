@@ -8,7 +8,7 @@
  * Run: pnpm playwright test tests/e2e/search-url-roundtrip.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, timeouts, searchResultsContainer } from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -41,7 +41,8 @@ async function assertUrlExcludesParams(page: Page, keys: string[]) {
 
 /** Wait for search results or zero-results state to render. */
 async function waitForSearchContent(page: Page) {
-  const cards = page.locator('[data-testid="listing-card"]');
+  const container = searchResultsContainer(page);
+  const cards = container.locator('[data-testid="listing-card"]');
   const zeroResults = page.locator('h2:has-text("No matches found")');
   await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
 }

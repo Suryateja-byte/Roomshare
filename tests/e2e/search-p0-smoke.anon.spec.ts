@@ -136,7 +136,8 @@ test.describe("Search P0 Smoke Suite", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Either results appear or we get a valid zero-results state
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     const zeroResults = page.locator('h2:has-text("No matches found")');
 
     // Wait for either cards or zero results heading
@@ -156,7 +157,8 @@ test.describe("Search P0 Smoke Suite", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for the page to settle -- either results or zero results
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     const zeroResults = page.locator('h2:has-text("No matches found")');
     await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
 
@@ -184,7 +186,8 @@ test.describe("Search P0 Smoke Suite", () => {
   test("S06: sort by price reorders results", async ({ page }) => {
     await page.goto(SEARCH_URL);
 
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     await expect(cards.first()).toBeAttached({ timeout: 30_000 });
 
     // Desktop sort: use the Select dropdown (hidden on mobile)
@@ -217,10 +220,10 @@ test.describe("Search P0 Smoke Suite", () => {
     await expect(page).toHaveURL(/sort=price_asc/);
 
     // Verify ordering: first card price <= last card price
-    const updatedCards = page.locator('[data-testid="listing-card"]');
+    const updatedCards = container.locator('[data-testid="listing-card"]');
     await expect(updatedCards.first()).toBeAttached({ timeout: 15_000 });
 
-    const priceElements = page.locator('[data-testid="listing-card"] .font-bold.text-xl');
+    const priceElements = container.locator('[data-testid="listing-card"] .font-bold.text-xl');
     const priceCount = await priceElements.count();
 
     if (priceCount >= 2) {
@@ -238,7 +241,8 @@ test.describe("Search P0 Smoke Suite", () => {
   test("S07: click listing card navigates to detail", async ({ page }) => {
     await page.goto(SEARCH_URL);
 
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     await expect(cards.first()).toBeAttached({ timeout: 30_000 });
 
     // Get the href from the first card's link
@@ -256,7 +260,8 @@ test.describe("Search P0 Smoke Suite", () => {
   test("S08: load more appends without duplicates", async ({ page }) => {
     await page.goto(SEARCH_URL);
 
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     await expect(cards.first()).toBeAttached({ timeout: 30_000 });
 
     // Collect initial listing IDs
@@ -284,7 +289,7 @@ test.describe("Search P0 Smoke Suite", () => {
       });
 
       // Collect all IDs after loading more
-      const allIds = await page.locator('[data-testid="listing-card"]').evaluateAll(
+      const allIds = await container.locator('[data-testid="listing-card"]').evaluateAll(
         (elements) =>
           elements.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
       );
@@ -402,7 +407,8 @@ test.describe("Search P0 Smoke Suite", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for page to settle
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     const zeroResults = page.locator('h2:has-text("No matches found")');
     await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
 
@@ -420,7 +426,8 @@ test.describe("Search P0 Smoke Suite", () => {
     const response = await page.goto(SEARCH_URL);
     expect(response?.status()).toBe(200);
 
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     await expect(cards.first()).toBeAttached({ timeout: 30_000 });
 
     const count = await cards.count();
@@ -444,7 +451,8 @@ test.describe("Search P0 Smoke Suite", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Check if the page rendered (SSR path may succeed despite API route interception)
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     const errorBoundary = page.locator('h1:has-text("Unable to load search results")');
     const rateLimitMsg = page.locator('h1:has-text("Too Many Requests")');
 
@@ -483,7 +491,8 @@ test.describe("Search P0 Smoke Suite", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for results or zero state
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     const zeroResults = page.locator('h2:has-text("No matches found")');
     await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
 
@@ -504,7 +513,8 @@ test.describe("Search P0 Smoke Suite", () => {
 
     await page.goto(SEARCH_URL);
 
-    const cards = page.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     await expect(cards.first()).toBeAttached({ timeout: 30_000 });
 
     // Filter benign errors

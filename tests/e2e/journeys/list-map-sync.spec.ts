@@ -726,7 +726,7 @@ test.describe("List ↔ Map Sync", () => {
     await expect(popup).toBeVisible({ timeout: 5000 });
 
     // Card should be marked as active (stable data attribute)
-    const card = page.locator(`[data-testid="listing-card-${listingId}"]`);
+    const card = searchResultsContainer(page).locator(`[data-testid="listing-card-${listingId}"]`);
     await expect(card).toHaveAttribute("data-active", "true", {
       timeout: 2000,
     });
@@ -755,7 +755,7 @@ test.describe("List ↔ Map Sync", () => {
     await expect(map).toBeVisible({ timeout: timeouts.navigation });
 
     // Card should be marked as active
-    const card = page.locator(`[data-testid="listing-card-${listingId}"]`);
+    const card = searchResultsContainer(page).locator(`[data-testid="listing-card-${listingId}"]`);
     await expect(card).toHaveAttribute("data-active", "true", {
       timeout: 2000,
     });
@@ -800,7 +800,7 @@ test.describe("List ↔ Map Sync", () => {
     await expect(map).toBeVisible({ timeout: 10000 });
 
     // The clicked listing should be marked as active
-    const card = page.locator(`[data-testid="listing-card-${listingId}"]`);
+    const card = searchResultsContainer(page).locator(`[data-testid="listing-card-${listingId}"]`);
     await expect(card).toHaveAttribute("data-active", "true", {
       timeout: 2000,
     });

@@ -20,7 +20,7 @@
  *   pnpm playwright test tests/e2e/map-interactions-advanced.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS } from "./helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "./helpers";
 import {
   waitForMapRef,
   isMapAvailable,
@@ -787,8 +787,8 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         expect(lngDiff).toBeLessThan(0.01);
 
         // Both pages should show listing cards
-        const cards1 = page.locator('[data-testid="listing-card"]');
-        const cards2 = page2.locator('[data-testid="listing-card"]');
+        const cards1 = searchResultsContainer(page).locator('[data-testid="listing-card"]');
+        const cards2 = searchResultsContainer(page2).locator('[data-testid="listing-card"]');
 
         // At least verify both pages loaded content (cards may or may not exist
         // depending on seed data, but body should be visible)

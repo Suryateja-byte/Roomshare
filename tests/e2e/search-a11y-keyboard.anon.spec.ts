@@ -14,6 +14,7 @@ import {
   selectors,
   timeouts,
   tags,
+  searchResultsContainer,
 } from "./helpers/test-utils";
 
 // --------------------------------------------------------------------------
@@ -86,7 +87,8 @@ test.describe("Search A11y: Keyboard Navigation", () => {
   test("2. listing cards are focusable via Tab", { tag: [tags.a11y] }, async ({ page }) => {
     // Listing cards contain links to detail pages
     // Users should be able to Tab to listing card links
-    const listingLinks = page.locator('[data-testid="listing-card"] a[href^="/listings/"]');
+    const container = searchResultsContainer(page);
+    const listingLinks = container.locator('[data-testid="listing-card"] a[href^="/listings/"]');
     const count = await listingLinks.count();
     expect(count).toBeGreaterThan(0);
 
@@ -155,7 +157,8 @@ test.describe("Search A11y: Keyboard Navigation", () => {
   // 4. Enter on listing card navigates to detail
   test("4. Enter on listing card navigates to detail page", { tag: [tags.a11y] }, async ({ page }) => {
     // Focus a listing card link directly
-    const listingLink = page.locator('[data-testid="listing-card"] a[href^="/listings/"]').first();
+    const container = searchResultsContainer(page);
+    const listingLink = container.locator('[data-testid="listing-card"] a[href^="/listings/"]').first();
     await listingLink.waitFor({ state: "attached", timeout: timeouts.action });
 
     const href = await listingLink.getAttribute("href");

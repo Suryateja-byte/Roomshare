@@ -15,6 +15,7 @@ import {
   selectors,
   timeouts,
   tags,
+  searchResultsContainer,
 } from "./helpers/test-utils";
 
 // --------------------------------------------------------------------------
@@ -268,7 +269,8 @@ test.describe("Search Loading States", () => {
     const feed = page.locator('[role="feed"]');
     await expect(feed).toBeVisible();
 
-    const cards = feed.locator('[data-testid="listing-card"]');
+    const container = searchResultsContainer(page);
+    const cards = container.locator('[data-testid="listing-card"]');
     const cardCount = await cards.count();
     expect(cardCount).toBeGreaterThan(0);
   });
@@ -346,7 +348,8 @@ test.describe("Search Loading States", () => {
       const feedVisible = await feed.isVisible().catch(() => false);
 
       if (feedVisible) {
-        const cards = feed.locator('[data-testid="listing-card"]');
+        const container = searchResultsContainer(page);
+        const cards = container.locator('[data-testid="listing-card"]');
         const cardCount = await cards.count();
         // Should have results (or confirmed zero results)
         // The key point is no crash or stuck loading state
