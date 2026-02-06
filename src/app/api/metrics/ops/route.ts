@@ -17,8 +17,8 @@ export async function GET(request: Request) {
     const authHeader = request.headers.get('authorization');
     const expectedToken = process.env.METRICS_SECRET;
 
-    // If METRICS_SECRET is configured, require valid bearer token
-    if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+    // Default-deny: require METRICS_SECRET to be configured AND bearer token to match
+    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
         return new Response('Unauthorized', { status: 401 });
     }
 

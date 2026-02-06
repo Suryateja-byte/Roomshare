@@ -24,7 +24,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
 
     const userId = session.user.id;
 
-    if (!conversation || !conversation.participants.some(p => p.id === userId)) {
+    if (!conversation || conversation.deletedAt || !conversation.participants.some(p => p.id === userId)) {
         // Handle unauthorized or not found
         return (
             <div className="flex items-center justify-center h-full">

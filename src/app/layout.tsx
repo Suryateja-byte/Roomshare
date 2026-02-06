@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { auth } from "@/auth";
 import Navbar from "@/components/Navbar";
@@ -15,10 +15,11 @@ import SuspensionBannerWrapper from "@/components/SuspensionBannerWrapper";
 import CustomScrollContainer from "@/components/ui/CustomScrollContainer";
 import { WebVitals } from "@/components/WebVitals";
 
-const inter = Inter({
-  subsets: ["latin"],
+const inter = localFont({
+  src: "../fonts/InterVariable.woff2",
   display: "swap",
   variable: "--font-inter",
+  weight: "100 900",
 });
 
 export const metadata: Metadata = {

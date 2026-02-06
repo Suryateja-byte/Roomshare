@@ -69,7 +69,8 @@ export async function GET(request: Request) {
         } else {
             // P1-03: Fetch all conversations for the user with pagination
             const conversationWhere = {
-                deletedAt: null,
+                deletedAt: null, // Exclude admin-deleted
+                deletions: { none: { userId } }, // Exclude per-user deleted
                 participants: {
                     some: { id: userId },
                 },
@@ -156,13 +157,13 @@ export async function POST(request: Request) {
             );
         }
 
-        // Verify user is a participant in this conversation
+        // Verify user is a participant in a non-deleted conversation
         const conversation = await prisma.conversation.findUnique({
             where: { id: conversationId },
             include: { participants: { select: { id: true } } },
         });
 
-        if (!conversation || !conversation.participants.some(p => p.id === userId)) {
+        if (!conversation || conversation.deletedAt || !conversation.participants.some(p => p.id === userId)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
@@ -182,7 +183,11 @@ export async function POST(request: Request) {
             prisma.conversation.update({
                 where: { id: conversationId },
                 data: { updatedAt: new Date() },
-            })
+            }),
+            // New message resurrects conversation for all users
+            prisma.conversationDeletion.deleteMany({
+                where: { conversationId },
+            }),
         ]);
 
         // P2-1: Mutation responses must not be cached

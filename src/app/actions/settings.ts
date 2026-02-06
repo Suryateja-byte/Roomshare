@@ -79,8 +79,8 @@ export async function changePassword(
         return { success: false, error: 'Not authenticated' };
     }
 
-    if (newPassword.length < 6) {
-        return { success: false, error: 'New password must be at least 6 characters' };
+    if (newPassword.length < 12) {
+        return { success: false, error: 'New password must be at least 12 characters' };
     }
 
     try {

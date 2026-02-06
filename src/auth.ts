@@ -6,12 +6,12 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { logger } from "@/lib/logger"
-import { isGoogleEmailVerified, AUTH_ROUTES } from "@/lib/auth-helpers"
+import { isGoogleEmailVerified, AUTH_ROUTES, normalizeEmail } from "@/lib/auth-helpers"
 
 async function getUser(email: string) {
     try {
         const user = await prisma.user.findUnique({
-            where: { email },
+            where: { email: normalizeEmail(email) },
         })
         return user
     } catch (error) {
@@ -149,7 +149,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     .safeParse(credentials)
 
                 if (parsedCredentials.success) {
-                    const { email, password } = parsedCredentials.data
+                    const { password } = parsedCredentials.data
+                    const email = normalizeEmail(parsedCredentials.data.email)
                     const user = await getUser(email)
                     if (!user) return null
                     if (!user.password) return null

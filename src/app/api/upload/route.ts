@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
             }
 
             return NextResponse.json(
-                { error: 'Failed to upload file: ' + uploadError.message },
+                { error: 'Failed to upload file' },
                 { status: 500 }
             );
         }
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json(
-            { error: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error') },
+            { error: 'Internal server error' },
             { status: 500 }
         );
     }

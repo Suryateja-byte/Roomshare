@@ -652,7 +652,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This will remove this conversation from your view. The other participant may still see it.
+                                        This will remove this conversation from your view. You can start a new conversation with this person later.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>

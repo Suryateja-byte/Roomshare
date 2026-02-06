@@ -7,6 +7,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
 /**
+ * Normalize email to lowercase and trimmed for consistent lookups.
+ * Prevents case-variant duplicate accounts and login/reset mismatches.
+ */
+export function normalizeEmail(email: string): string {
+    return email.toLowerCase().trim();
+}
+
+/**
  * Public routes that don't require authentication or suspension check.
  * Suspended users can still access these routes.
  */
@@ -67,7 +75,7 @@ export function isPublicRoute(pathname: string): boolean {
     // Exact match for root
     if (path === '/') return pathname === '/';
     // Prefix match for other paths
-    return pathname === path || pathname.startsWith(`${path}/`) || pathname.startsWith(path);
+    return pathname === path || pathname.startsWith(`${path}/`);
   });
 }
 
