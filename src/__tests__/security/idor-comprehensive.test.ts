@@ -28,6 +28,10 @@ jest.mock('@/lib/prisma', () => ({
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    conversationDeletion: {
+      upsert: jest.fn(),
+      deleteMany: jest.fn(),
+    },
     message: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
@@ -241,6 +245,7 @@ describe('Comprehensive IDOR Protection Tests', () => {
         { id: 'alice-123', name: 'Alice' },
         { id: 'bob-456', name: 'Bob' },
       ],
+      deletions: [],
       listing: { id: 'listing-xyz', title: 'Test Listing' },
     };
 
@@ -389,15 +394,16 @@ describe('Comprehensive IDOR Protection Tests', () => {
           ...mockConversation,
           deletedBy: null,
         });
-        (prisma.conversation.update as jest.Mock).mockResolvedValue({
-          ...mockConversation,
-          deletedBy: 'alice-123',
+        (prisma.conversationDeletion.upsert as jest.Mock).mockResolvedValue({
+          id: 'deletion-1',
+          conversationId: 'conv-123',
+          userId: 'alice-123',
         });
 
         const result = await deleteConversation('conv-123');
 
         expect(result.success).toBe(true);
-        expect(prisma.conversation.update).toHaveBeenCalled();
+        expect(prisma.conversationDeletion.upsert).toHaveBeenCalled();
       });
 
       it('returns error for non-existent conversation (prevents enumeration)', async () => {
