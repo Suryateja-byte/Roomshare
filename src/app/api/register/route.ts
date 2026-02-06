@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { normalizeEmail } from '@/lib/normalize-email';
 import crypto from 'crypto';
 
 const registerSchema = z.object({
@@ -25,7 +26,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
         }
 
-        const { name, email, password } = result.data;
+        const { name, password } = result.data;
+        const email = normalizeEmail(result.data.email);
 
         // Check if user exists
         const existingUser = await prisma.user.findUnique({

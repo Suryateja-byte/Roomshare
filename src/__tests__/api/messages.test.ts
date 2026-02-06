@@ -19,6 +19,9 @@ jest.mock('@/lib/prisma', () => ({
     user: {
       findUnique: jest.fn(),
     },
+    conversationDeletion: {
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
   },
 }))
 
@@ -76,6 +79,7 @@ describe('Messages API', () => {
       const mockConversation = {
         id: 'conv-123',
         participants: [{ id: 'user-123' }, { id: 'user-456' }],
+        deletions: [],
       }
       const mockMessages = [
         { id: 'msg-1', content: 'Hello', sender: { id: 'user-123', name: 'User', image: null } },
@@ -97,6 +101,7 @@ describe('Messages API', () => {
       ;(prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conv-123',
         participants: [{ id: 'other-1' }, { id: 'other-2' }],
+        deletions: [],
       })
 
       const request = new Request('http://localhost/api/messages?conversationId=conv-123')

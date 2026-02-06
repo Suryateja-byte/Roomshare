@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
+// Re-export from standalone module for backward compatibility (auth.ts imports from here)
+export { normalizeEmail } from './normalize-email';
+
 /**
  * Public routes that don't require authentication or suspension check.
  * Suspended users can still access these routes.
@@ -67,7 +70,7 @@ export function isPublicRoute(pathname: string): boolean {
     // Exact match for root
     if (path === '/') return pathname === '/';
     // Prefix match for other paths
-    return pathname === path || pathname.startsWith(`${path}/`) || pathname.startsWith(path);
+    return pathname === path || pathname.startsWith(`${path}/`);
   });
 }
 

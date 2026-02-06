@@ -56,8 +56,8 @@ function ResetPasswordForm() {
             return;
         }
 
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters');
+        if (password.length < 12) {
+            setError('Password must be at least 12 characters');
             return;
         }
 
@@ -167,7 +167,7 @@ function ResetPasswordForm() {
                     <div className="mb-8">
                         <h1 className="text-2xl font-bold text-zinc-900 mb-2">Set new password</h1>
                         <p className="text-zinc-500">
-                            Your new password must be at least 6 characters long.
+                            Your new password must be at least 12 characters long.
                         </p>
                     </div>
 
@@ -184,7 +184,7 @@ function ResetPasswordForm() {
                                     placeholder="Enter new password"
                                     className="pl-10 pr-10"
                                     required
-                                    minLength={6}
+                                    minLength={12}
                                     disabled={isLoading}
                                 />
                                 <button
@@ -209,7 +209,7 @@ function ResetPasswordForm() {
                                     placeholder="Confirm new password"
                                     className="pl-10"
                                     required
-                                    minLength={6}
+                                    minLength={12}
                                     disabled={isLoading}
                                 />
                             </div>

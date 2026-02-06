@@ -45,7 +45,7 @@ export function calculatePasswordStrength(password: string): {
     checks: StrengthCheck[];
 } {
     const checks: StrengthCheck[] = [
-        { label: 'At least 8 characters', passed: password.length >= 8 },
+        { label: 'At least 12 characters', passed: password.length >= 12 },
         { label: 'Contains lowercase letter', passed: /[a-z]/.test(password) },
         { label: 'Contains uppercase letter', passed: /[A-Z]/.test(password) },
         { label: 'Contains a number', passed: /[0-9]/.test(password) },

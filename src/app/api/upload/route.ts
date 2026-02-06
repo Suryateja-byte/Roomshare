@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
                 hasKey: !!supabaseServiceKey
             });
             return NextResponse.json(
-                { error: 'Storage not configured. Please check your Supabase environment variables.' },
+                { error: 'Storage not configured' },
                 { status: 500 }
             );
         }
@@ -140,13 +140,13 @@ export async function POST(request: NextRequest) {
             // Provide more specific error messages
             if (uploadError.message.includes('Bucket not found')) {
                 return NextResponse.json(
-                    { error: 'Storage bucket not configured. Please create an "images" bucket in Supabase.' },
+                    { error: 'Storage not configured' },
                     { status: 500 }
                 );
             }
 
             return NextResponse.json(
-                { error: 'Failed to upload file: ' + uploadError.message },
+                { error: 'Failed to upload file' },
                 { status: 500 }
             );
         }
@@ -166,13 +166,13 @@ export async function POST(request: NextRequest) {
         // Handle specific error types
         if (error instanceof TypeError && error.message.includes('fetch')) {
             return NextResponse.json(
-                { error: 'Network error: Unable to connect to storage service. Please check your internet connection and Supabase configuration.' },
+                { error: 'Unable to connect to storage service' },
                 { status: 503 }
             );
         }
 
         return NextResponse.json(
-            { error: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error') },
+            { error: 'Internal server error' },
             { status: 500 }
         );
     }

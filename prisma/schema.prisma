@@ -70,6 +70,7 @@ model User {
   blockedByUsers          BlockedUser[]         @relation("BlocksReceived")
   auditLogs               AuditLog[]            @relation("AuditLogs")
   typingStatuses          TypingStatus[]
+  conversationDeletions   ConversationDeletion[]
 }
 
 model VerificationToken {
@@ -221,15 +222,29 @@ model Location {
 }
 
 model Conversation {
-  id             String         @id @default(cuid())
+  id             String                  @id @default(cuid())
   listingId      String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  deletedAt      DateTime?      // Soft delete timestamp
-  listing        Listing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  deletedAt      DateTime?               // Admin-level delete: hides from ALL participants
+  listing        Listing                 @relation(fields: [listingId], references: [id], onDelete: Cascade)
   messages       Message[]
-  participants   User[]         @relation("ConversationParticipants")
+  participants   User[]                  @relation("ConversationParticipants")
   typingStatuses TypingStatus[]
+  deletions      ConversationDeletion[]  // Per-user deletion records
+}
+
+model ConversationDeletion {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  deletedAt      DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
 }
 
 model Message {

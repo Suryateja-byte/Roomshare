@@ -186,7 +186,7 @@ export async function PATCH(
 
         // Validate numeric fields
         const priceNum = parseFloat(price);
-        const totalSlotsNum = parseInt(totalSlots) || 1;
+        const totalSlotsNum = parseInt(totalSlots);
 
         if (isNaN(priceNum) || priceNum <= 0) {
             return NextResponse.json({ error: 'Invalid price value' }, { status: 400 });

@@ -727,18 +727,18 @@ describe("Auth Edge Cases - Category A", () => {
   // A16: Password complexity validation edge cases
   describe("A16: Password complexity edge cases", () => {
     it("accepts password at minimum length boundary", () => {
-      const password = "12345678"; // Exactly 8 characters
-      expect(password.length).toBeGreaterThanOrEqual(8);
+      const password = "123456789012"; // Exactly 12 characters
+      expect(password.length).toBeGreaterThanOrEqual(12);
     });
 
     it("rejects password below minimum length", () => {
-      const password = "1234567"; // 7 characters
-      expect(password.length).toBeLessThan(8);
+      const password = "12345678901"; // 11 characters
+      expect(password.length).toBeLessThan(12);
     });
 
     it("handles unicode characters in password", () => {
-      const password = "密码Test123!"; // Chinese + English + numbers + special
-      expect(password.length).toBeGreaterThanOrEqual(8);
+      const password = "密码Test12345!"; // Chinese + English + numbers + special (12+ chars)
+      expect(password.length).toBeGreaterThanOrEqual(12);
     });
   });
 

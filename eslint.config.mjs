@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Generated files - should not be linted
     "playwright-report/**",
+    "test-results/**",
     "coverage/**",
     // CommonJS config files (Next.js/Jest require CommonJS format)
     "jest.config.js",

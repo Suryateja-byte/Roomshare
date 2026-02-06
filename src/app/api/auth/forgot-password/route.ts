@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { normalizeEmail } from '@/lib/normalize-email';
 
 export async function POST(request: NextRequest) {
     // Rate limit: 3 password reset requests per hour per IP
@@ -19,9 +20,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const normalizedEmail = normalizeEmail(email);
+
         // Check if user exists
         const user = await prisma.user.findUnique({
-            where: { email: email.toLowerCase() }
+            where: { email: normalizedEmail }
         });
 
         // Always return success to prevent email enumeration attacks
@@ -33,7 +36,7 @@ export async function POST(request: NextRequest) {
 
         // Delete any existing reset tokens for this email
         await prisma.passwordResetToken.deleteMany({
-            where: { email: email.toLowerCase() }
+            where: { email: normalizedEmail }
         });
 
         // Generate a secure random token
@@ -45,7 +48,7 @@ export async function POST(request: NextRequest) {
         // Save the token
         await prisma.passwordResetToken.create({
             data: {
-                email: email.toLowerCase(),
+                email: normalizedEmail,
                 token,
                 expires
             }
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Send password reset email
-        await sendNotificationEmail('passwordReset', email.toLowerCase(), {
+        await sendNotificationEmail('passwordReset', normalizedEmail, {
             userName: user.name || 'User',
             resetLink: resetUrl
         });

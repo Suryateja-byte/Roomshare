@@ -137,7 +137,7 @@ describe('SignUpPage', () => {
     // Password strength meter only shows after typing starts
     await userEvent.type(screen.getByLabelText('Password'), 'a')
 
-    expect(screen.getByText('At least 8 characters')).toBeInTheDocument()
+    expect(screen.getByText('At least 12 characters')).toBeInTheDocument()
   })
 
   it('handles network errors', async () => {

@@ -36,10 +36,11 @@ export async function startConversation(listingId: string) {
         return { error: blockCheck.message };
     }
 
-    // Check existing conversation
+    // Check existing conversation (exclude admin-deleted, but include per-user deleted for resurrection)
     const existing = await prisma.conversation.findFirst({
         where: {
             listingId,
+            deletedAt: null, // Only exclude admin-deleted
             AND: [
                 { participants: { some: { id: userId } } },
                 { participants: { some: { id: listing.ownerId } } },
@@ -47,7 +48,13 @@ export async function startConversation(listingId: string) {
         },
     });
 
-    if (existing) return { conversationId: existing.id };
+    if (existing) {
+        // Resurrect: clear per-user deletion record if it exists
+        await prisma.conversationDeletion.deleteMany({
+            where: { conversationId: existing.id, userId },
+        });
+        return { conversationId: existing.id };
+    }
 
     const conversation = await prisma.conversation.create({
         data: {
@@ -92,7 +99,7 @@ export async function sendMessage(conversationId: string, content: string) {
         }
     });
 
-    if (!conversation) {
+    if (!conversation || conversation.deletedAt) {
         return { error: 'Conversation not found' };
     }
 
@@ -120,10 +127,17 @@ export async function sendMessage(conversationId: string, content: string) {
         },
     });
 
-    await prisma.conversation.update({
-        where: { id: conversationId },
-        data: { updatedAt: new Date() },
-    });
+    // Resurrect conversation for all users + update timestamp
+    await Promise.all([
+        prisma.conversation.update({
+            where: { id: conversationId },
+            data: { updatedAt: new Date() },
+        }),
+        // New message resurrects conversation for everyone
+        prisma.conversationDeletion.deleteMany({
+            where: { conversationId },
+        }),
+    ]);
 
     // Get sender info
     const sender = await prisma.user.findUnique({
@@ -170,7 +184,8 @@ export async function getConversations() {
             participants: {
                 some: { id: session.user.id },
             },
-            deletedAt: null, // Exclude soft-deleted conversations
+            deletedAt: null, // Exclude admin-deleted conversations
+            deletions: { none: { userId: session.user.id } }, // Exclude per-user deleted
         },
         include: {
             participants: {
@@ -223,13 +238,16 @@ export async function getMessages(conversationId: string) {
 
     const userId = session.user.id;
 
-    // Verify participant
+    // Verify participant and check both admin-delete and per-user delete
     const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
-        include: { participants: { select: { id: true } } },
+        include: {
+            participants: { select: { id: true } },
+            deletions: { where: { userId }, select: { id: true } },
+        },
     });
 
-    if (!conversation || !conversation.participants.some(p => p.id === userId)) {
+    if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === userId)) {
         return { error: 'Unauthorized', messages: [] };
     }
 
@@ -273,7 +291,8 @@ export async function getUnreadMessageCount() {
                 participants: {
                     some: { id: session.user.id },
                 },
-                deletedAt: null, // Exclude soft-deleted conversations
+                deletedAt: null, // Exclude admin-deleted conversations
+                deletions: { none: { userId: session.user.id } }, // Exclude per-user deleted
             },
             senderId: { not: session.user.id },
             read: false,
@@ -294,13 +313,14 @@ export async function markAllMessagesAsRead() {
     }
 
     try {
-        // Get all conversations the user is part of
+        // Get all conversations the user is part of (excluding deleted)
         const conversations = await prisma.conversation.findMany({
             where: {
                 participants: {
                     some: { id: session.user.id }
                 },
-                deletedAt: null
+                deletedAt: null, // Exclude admin-deleted
+                deletions: { none: { userId: session.user.id } }, // Exclude per-user deleted
             },
             select: { id: true }
         });
@@ -381,8 +401,8 @@ export async function deleteMessage(messageId: string): Promise<{ success: boole
 }
 
 /**
- * Soft delete a conversation - only participants can delete
- * This hides the conversation from the user's view but preserves data
+ * Per-user soft delete a conversation - hides from this user's view only.
+ * Other participants can still see it. Sending a new message resurrects it.
  */
 export async function deleteConversation(conversationId: string): Promise<{ success: boolean; error?: string; code?: string }> {
     const session = await auth();
@@ -404,7 +424,7 @@ export async function deleteConversation(conversationId: string): Promise<{ succ
         }
 
         if (conversation.deletedAt) {
-            return { success: false, error: 'Conversation already deleted' };
+            return { success: false, error: 'Conversation not found' };
         }
 
         const isParticipant = conversation.participants.some(p => p.id === session.user.id);
@@ -412,10 +432,21 @@ export async function deleteConversation(conversationId: string): Promise<{ succ
             return { success: false, error: 'You are not part of this conversation' };
         }
 
-        // Soft delete the conversation
-        await prisma.conversation.update({
-            where: { id: conversationId },
-            data: { deletedAt: new Date() }
+        // Per-user soft delete: upsert deletion record for THIS user only
+        await prisma.conversationDeletion.upsert({
+            where: {
+                conversationId_userId: {
+                    conversationId,
+                    userId: session.user.id,
+                },
+            },
+            update: {
+                deletedAt: new Date(),
+            },
+            create: {
+                conversationId,
+                userId: session.user.id,
+            },
         });
 
         return { success: true };
@@ -436,6 +467,18 @@ export async function setTypingStatus(conversationId: string, isTyping: boolean)
     if (!session?.user?.id) return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
 
     try {
+        // Verify user is a participant in a non-deleted conversation (admin + per-user)
+        const conversation = await prisma.conversation.findUnique({
+            where: { id: conversationId },
+            include: {
+                participants: { select: { id: true } },
+                deletions: { where: { userId: session.user.id }, select: { id: true } },
+            }
+        });
+        if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === session.user.id)) {
+            return { error: 'Unauthorized' };
+        }
+
         await prisma.typingStatus.upsert({
             where: {
                 userId_conversationId: {
@@ -472,6 +515,18 @@ export async function getTypingStatus(conversationId: string) {
     if (!session?.user?.id) return { typingUsers: [] };
 
     try {
+        // Verify user is a participant in a non-deleted conversation (admin + per-user)
+        const conversation = await prisma.conversation.findUnique({
+            where: { id: conversationId },
+            include: {
+                participants: { select: { id: true } },
+                deletions: { where: { userId: session.user.id }, select: { id: true } },
+            }
+        });
+        if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === session.user.id)) {
+            return { typingUsers: [] };
+        }
+
         // Get typing statuses from other users, updated within last 5 seconds
         const fiveSecondsAgo = new Date(Date.now() - 5000);
 
@@ -512,6 +567,18 @@ export async function pollMessages(conversationId: string, lastMessageId?: strin
     if (!session?.user?.id) return { messages: [], typingUsers: [], hasNewMessages: false };
 
     try {
+        // Verify user is a participant in a non-deleted conversation (admin + per-user)
+        const conversation = await prisma.conversation.findUnique({
+            where: { id: conversationId },
+            include: {
+                participants: { select: { id: true } },
+                deletions: { where: { userId: session.user.id }, select: { id: true } },
+            }
+        });
+        if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === session.user.id)) {
+            return { messages: [], typingUsers: [], hasNewMessages: false };
+        }
+
         // Get typing status
         const { typingUsers } = await getTypingStatus(conversationId);
 
