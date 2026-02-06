@@ -593,11 +593,8 @@ describe("Search API v2 route", () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data.list.items).toHaveLength(0);
-      expect(data.list.total).toBe(0);
-      expect(data.list.nextCursor).toBeNull();
-      expect(data.map.geojson.features).toHaveLength(1);
+      expect(response.status).toBe(503);
+      expect(data.error).toBe("Search temporarily unavailable");
     });
 
     it("should return fully empty response when both queries fail", async () => {
@@ -612,9 +609,8 @@ describe("Search API v2 route", () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data.list.items).toHaveLength(0);
-      expect(data.map.geojson.features).toHaveLength(0);
+      expect(response.status).toBe(503);
+      expect(data.error).toBe("Search temporarily unavailable");
     });
   });
 
