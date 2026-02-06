@@ -160,7 +160,7 @@ describe("settings actions", () => {
     it("returns error when not authenticated", async () => {
       (auth as jest.Mock).mockResolvedValue(null);
 
-      const result = await changePassword("oldpass", "newpass123");
+      const result = await changePassword("oldpass", "newpass123!!");
 
       expect(result.success).toBe(false);
       expect(result.error).toBe("Not authenticated");
@@ -178,7 +178,7 @@ describe("settings actions", () => {
         password: null,
       });
 
-      const result = await changePassword("oldpass", "newpass123");
+      const result = await changePassword("oldpass", "newpass123!!");
 
       expect(result.success).toBe(false);
       expect(result.error).toBe(
@@ -192,7 +192,7 @@ describe("settings actions", () => {
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      const result = await changePassword("wrongpass", "newpass123");
+      const result = await changePassword("wrongpass", "newpass123!!");
 
       expect(result.success).toBe(false);
       expect(result.error).toBe("Current password is incorrect");
@@ -206,7 +206,7 @@ describe("settings actions", () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue("newhashed");
       (prisma.user.update as jest.Mock).mockResolvedValue({ id: "user-123" });
 
-      await changePassword("correctpass", "newpass123");
+      await changePassword("correctpass", "newpass123!!");
 
       expect(bcrypt.compare).toHaveBeenCalledWith(
         "correctpass",
@@ -222,9 +222,9 @@ describe("settings actions", () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue("newhashed");
       (prisma.user.update as jest.Mock).mockResolvedValue({ id: "user-123" });
 
-      await changePassword("correctpass", "newpass123");
+      await changePassword("correctpass", "newpass123!!");
 
-      expect(bcrypt.hash).toHaveBeenCalledWith("newpass123", 10);
+      expect(bcrypt.hash).toHaveBeenCalledWith("newpass123!!", 10);
     });
 
     it("updates user password in database", async () => {
@@ -235,7 +235,7 @@ describe("settings actions", () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue("newhashed");
       (prisma.user.update as jest.Mock).mockResolvedValue({ id: "user-123" });
 
-      const result = await changePassword("correctpass", "newpass123");
+      const result = await changePassword("correctpass", "newpass123!!");
 
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-123" },
@@ -249,7 +249,7 @@ describe("settings actions", () => {
         new Error("DB Error"),
       );
 
-      const result = await changePassword("correctpass", "newpass123");
+      const result = await changePassword("correctpass", "newpass123!!");
 
       expect(result.success).toBe(false);
       expect(result.error).toBe("Failed to change password");

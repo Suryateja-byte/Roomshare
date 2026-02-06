@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
-import { normalizeEmail } from '@/lib/auth-helpers';
+import { normalizeEmail } from '@/lib/normalize-email';
 
 export async function POST(request: NextRequest) {
     // Rate limit: 3 password reset requests per hour per IP

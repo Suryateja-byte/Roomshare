@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
-import { normalizeEmail } from '@/lib/auth-helpers';
+import { normalizeEmail } from '@/lib/normalize-email';
 import crypto from 'crypto';
 
 const registerSchema = z.object({

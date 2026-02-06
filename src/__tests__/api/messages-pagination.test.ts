@@ -24,6 +24,9 @@ jest.mock('@/lib/prisma', () => ({
       update: jest.fn(),
       count: jest.fn(),
     },
+    conversationDeletion: {
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
   },
 }));
 
@@ -132,6 +135,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc');
@@ -152,6 +156,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc&limit=50');
@@ -169,6 +174,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc&limit=200');
@@ -192,6 +198,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc&limit=20');
@@ -210,6 +217,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc&limit=20');
@@ -228,6 +236,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc&cursor=message-19');
@@ -248,6 +257,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc&cursor=invalid<script>');
@@ -262,6 +272,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc&limit=-5');
@@ -276,6 +287,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc&limit=abc');
@@ -293,6 +305,7 @@ describe('Messages Pagination (P1-03)', () => {
       (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
+        deletions: [],
       });
 
       const request = createMockRequest('http://localhost:3000/api/messages?conversationId=conversation-abc');

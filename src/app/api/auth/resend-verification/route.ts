@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
-import { normalizeEmail } from '@/lib/auth-helpers';
+import { normalizeEmail } from '@/lib/normalize-email';
 import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {

@@ -6,13 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
-/**
- * Normalize email to lowercase and trimmed for consistent lookups.
- * Prevents case-variant duplicate accounts and login/reset mismatches.
- */
-export function normalizeEmail(email: string): string {
-    return email.toLowerCase().trim();
-}
+// Re-export from standalone module for backward compatibility (auth.ts imports from here)
+export { normalizeEmail } from './normalize-email';
 
 /**
  * Public routes that don't require authentication or suspension check.

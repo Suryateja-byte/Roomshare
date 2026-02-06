@@ -22,6 +22,10 @@ jest.mock('@/lib/prisma', () => ({
       create: jest.fn(),
       update: jest.fn(),
     },
+    conversationDeletion: {
+      upsert: jest.fn(),
+      deleteMany: jest.fn(),
+    },
     message: {
       findMany: jest.fn(),
       create: jest.fn(),
@@ -90,6 +94,7 @@ describe('Chat Actions', () => {
         emailVerified: new Date(),
         isSuspended: false,
       })
+      ;(prisma.conversationDeletion.deleteMany as jest.Mock).mockResolvedValue({ count: 0 })
     })
 
     it('returns error when not authenticated', async () => {
@@ -170,6 +175,7 @@ describe('Chat Actions', () => {
       ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
       ;(prisma.message.create as jest.Mock).mockResolvedValue(mockMessage)
       ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ name: 'Test User', emailVerified: new Date() })
+      ;(prisma.conversationDeletion.deleteMany as jest.Mock).mockResolvedValue({ count: 0 })
     })
 
     it('returns error when not authenticated', async () => {
@@ -255,6 +261,7 @@ describe('Chat Actions', () => {
               some: { id: 'user-123' },
             },
             deletedAt: null,
+            deletions: { none: { userId: 'user-123' } },
           },
           orderBy: { updatedAt: 'desc' },
         })
@@ -266,6 +273,7 @@ describe('Chat Actions', () => {
     const mockConversation = {
       id: 'conv-123',
       participants: [{ id: 'user-123' }, { id: 'other-456' }],
+      deletions: [],
     }
 
     const mockMessages = [
@@ -291,6 +299,7 @@ describe('Chat Actions', () => {
       ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conv-123',
         participants: [{ id: 'other-1' }, { id: 'other-2' }], // user-123 not included
+        deletions: [],
       })
 
       const result = await getMessages('conv-123')
@@ -348,6 +357,7 @@ describe('Chat Actions', () => {
                 some: { id: 'user-123' },
               },
               deletedAt: null,
+              deletions: { none: { userId: 'user-123' } },
             },
             senderId: { not: 'user-123' },
             read: false,
