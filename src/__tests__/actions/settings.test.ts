@@ -170,7 +170,7 @@ describe("settings actions", () => {
       const result = await changePassword("oldpass", "12345");
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe("New password must be at least 6 characters");
+      expect(result.error).toBe("New password must be at least 12 characters");
     });
 
     it("returns error when user has no password (OAuth account)", async () => {

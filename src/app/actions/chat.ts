@@ -238,13 +238,16 @@ export async function getMessages(conversationId: string) {
 
     const userId = session.user.id;
 
-    // Verify participant
+    // Verify participant and check both admin-delete and per-user delete
     const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
-        include: { participants: { select: { id: true } } },
+        include: {
+            participants: { select: { id: true } },
+            deletions: { where: { userId }, select: { id: true } },
+        },
     });
 
-    if (!conversation || conversation.deletedAt || !conversation.participants.some(p => p.id === userId)) {
+    if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === userId)) {
         return { error: 'Unauthorized', messages: [] };
     }
 
@@ -464,12 +467,15 @@ export async function setTypingStatus(conversationId: string, isTyping: boolean)
     if (!session?.user?.id) return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
 
     try {
-        // Verify user is a participant in a non-deleted conversation
+        // Verify user is a participant in a non-deleted conversation (admin + per-user)
         const conversation = await prisma.conversation.findUnique({
             where: { id: conversationId },
-            include: { participants: { select: { id: true } } }
+            include: {
+                participants: { select: { id: true } },
+                deletions: { where: { userId: session.user.id }, select: { id: true } },
+            }
         });
-        if (!conversation || conversation.deletedAt || !conversation.participants.some(p => p.id === session.user.id)) {
+        if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === session.user.id)) {
             return { error: 'Unauthorized' };
         }
 
@@ -509,12 +515,15 @@ export async function getTypingStatus(conversationId: string) {
     if (!session?.user?.id) return { typingUsers: [] };
 
     try {
-        // Verify user is a participant in a non-deleted conversation
+        // Verify user is a participant in a non-deleted conversation (admin + per-user)
         const conversation = await prisma.conversation.findUnique({
             where: { id: conversationId },
-            include: { participants: { select: { id: true } } }
+            include: {
+                participants: { select: { id: true } },
+                deletions: { where: { userId: session.user.id }, select: { id: true } },
+            }
         });
-        if (!conversation || conversation.deletedAt || !conversation.participants.some(p => p.id === session.user.id)) {
+        if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === session.user.id)) {
             return { typingUsers: [] };
         }
 
@@ -558,12 +567,15 @@ export async function pollMessages(conversationId: string, lastMessageId?: strin
     if (!session?.user?.id) return { messages: [], typingUsers: [], hasNewMessages: false };
 
     try {
-        // Verify user is a participant in a non-deleted conversation
+        // Verify user is a participant in a non-deleted conversation (admin + per-user)
         const conversation = await prisma.conversation.findUnique({
             where: { id: conversationId },
-            include: { participants: { select: { id: true } } }
+            include: {
+                participants: { select: { id: true } },
+                deletions: { where: { userId: session.user.id }, select: { id: true } },
+            }
         });
-        if (!conversation || conversation.deletedAt || !conversation.participants.some(p => p.id === session.user.id)) {
+        if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === session.user.id)) {
             return { messages: [], typingUsers: [], hasNewMessages: false };
         }
 

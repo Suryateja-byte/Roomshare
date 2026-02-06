@@ -12,19 +12,20 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
         redirect('/login');
     }
 
-    // Fetch conversation to verify access and get other participant info
+    const userId = session.user.id;
+
+    // Fetch conversation to verify access and get other participant info (check admin + per-user delete)
     const conversation = await prisma.conversation.findUnique({
         where: { id },
         include: {
             participants: {
                 select: { id: true, name: true, image: true }
-            }
+            },
+            deletions: { where: { userId }, select: { id: true } },
         }
     });
 
-    const userId = session.user.id;
-
-    if (!conversation || conversation.deletedAt || !conversation.participants.some(p => p.id === userId)) {
+    if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === userId)) {
         // Handle unauthorized or not found
         return (
             <div className="flex items-center justify-center h-full">

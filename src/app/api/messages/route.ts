@@ -32,14 +32,17 @@ export async function GET(request: Request) {
         const { cursor, limit } = paginationResult.data;
 
         if (conversationId) {
-            // Fetch messages for a specific conversation
+            // Fetch messages for a specific conversation (check admin + per-user delete)
             const conversation = await prisma.conversation.findFirst({
                 where: { id: conversationId, deletedAt: null },
-                include: { participants: { select: { id: true } } },
+                include: {
+                    participants: { select: { id: true } },
+                    deletions: { where: { userId }, select: { id: true } },
+                },
             });
 
-            // Verify user is a participant
-            if (!conversation || !conversation.participants.some(p => p.id === userId)) {
+            // Verify user is a participant and conversation isn't per-user deleted
+            if (!conversation || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === userId)) {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
             }
 

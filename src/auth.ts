@@ -108,7 +108,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // Always check database to ensure we have the latest suspension status
             if (user?.email) {
                 const dbUser = await prisma.user.findUnique({
-                    where: { email: user.email },
+                    where: { email: normalizeEmail(user.email) },
                     select: { isSuspended: true }
                 });
 
