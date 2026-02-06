@@ -126,13 +126,18 @@
       "Bash(pnpm run clean:next-locks:*)",
       "mcp__playwright__browser_type",
       "mcp__playwright__browser_press_key",
-      "mcp__playwright__browser_run_code"
+      "mcp__playwright__browser_run_code",
+      "Bash(gh pr checks:*)"
     ],
     "deny": [],
     "ask": []
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["context7", "memory", "github"],
+  "enabledMcpjsonServers": [
+    "context7",
+    "memory",
+    "github"
+  ],
   "hooks": {
     "PostToolUse": [
       {
