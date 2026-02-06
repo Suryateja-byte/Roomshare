@@ -1,17 +1,37 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 
+const toErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
+
+const logError = (message: string, meta?: Record<string, unknown>) => {
+    console.error(`[SUPABASE] ${message}`, meta ?? '');
+};
+
+const logWarn = (message: string, meta?: Record<string, unknown>) => {
+    console.warn(`[SUPABASE] ${message}`, meta ?? '');
+};
+
+const logDebug = (message: string, meta?: Record<string, unknown>) => {
+    if (process.env.NODE_ENV !== 'production') {
+        console.debug(`[SUPABASE] ${message}`, meta ?? '');
+    }
+};
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Log configuration status at startup
 if (!supabaseUrl || !supabaseAnonKey) {
     if (process.env.NODE_ENV === 'production') {
-        console.error('[SUPABASE] Missing environment variables - real-time features disabled', {
+        logError('Supabase env missing - real-time features disabled', {
             hasUrl: !!supabaseUrl,
             hasKey: !!supabaseAnonKey,
         });
     } else {
-        console.warn('[SUPABASE] Missing environment variables. Real-time features may not work.');
+        logWarn('Supabase env missing - real-time features may not work', {
+            hasUrl: !!supabaseUrl,
+            hasKey: !!supabaseAnonKey,
+        });
     }
 }
 
@@ -55,10 +75,11 @@ export async function broadcastTyping(
             payload: { userId, userName, isTyping }
         });
     } catch (error) {
-        // Log in development for debugging, silent in production
-        if (process.env.NODE_ENV !== 'production') {
-            console.debug('[SUPABASE] Channel not ready for broadcast:', error);
-        }
+        logWarn('Supabase typing broadcast failed', {
+            userId,
+            isTyping,
+            error: toErrorMessage(error),
+        });
     }
 }
 
@@ -77,11 +98,11 @@ export async function trackPresence(
             user_name: userName
         });
     } catch (error) {
-        // Log in development for debugging, silent in production
-        // Presence is non-critical - don't crash the app
-        if (process.env.NODE_ENV !== 'production') {
-            console.debug('[SUPABASE] Presence tracking failed:', error);
-        }
+        // Presence is non-critical - warn with context but never throw.
+        logWarn('Supabase presence tracking failed', {
+            userId,
+            error: toErrorMessage(error),
+        });
     }
 }
 
@@ -93,10 +114,9 @@ export function safeRemoveChannel(channel: RealtimeChannel | null): void {
     try {
         supabase.removeChannel(channel);
     } catch (error) {
-        // Silently handle errors during channel cleanup
-        // This can occur during Turbopack HMR or navigation when WebSocket is already closed
-        if (process.env.NODE_ENV !== 'production') {
-            console.debug('[SUPABASE] Channel removal error (safe to ignore):', error);
-        }
+        // Channel cleanup is non-critical; keep this at debug level to avoid noisy logs.
+        logDebug('Supabase channel removal error (safe to ignore)', {
+            error: toErrorMessage(error),
+        });
     }
 }
