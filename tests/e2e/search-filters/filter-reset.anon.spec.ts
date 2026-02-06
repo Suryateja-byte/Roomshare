@@ -14,43 +14,17 @@
  * via the PRESERVED_PARAMS constant in the codebase.
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-function urlHasParam(page: Page, key: string): boolean {
-  return new URL(page.url()).searchParams.has(key);
-}
-
-function appliedFiltersRegion(page: Page) {
-  return searchResultsContainer(page).locator('[aria-label="Applied filters"]');
-}
-
-function filtersButton(page: Page) {
-  return page.getByRole("button", { name: /^Filters/ });
-}
-
-function filterDialog(page: Page) {
-  return page.getByRole("dialog", { name: /filters/i });
-}
-
-function modalClearAllButton(page: Page) {
-  return page.locator('[data-testid="filter-modal-clear-all"]');
-}
-
-function chipsClearAllButton(page: Page) {
-  return searchResultsContainer(page).locator('button[aria-label="Clear all filters"]');
-}
+import { test, expect, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
+import {
+  boundsQS,
+  SEARCH_URL,
+  getUrlParam,
+  appliedFiltersRegion,
+  filtersButton,
+  filterDialog,
+  clearAllButton,
+  chipsClearAllButton,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -79,7 +53,7 @@ test.describe("Filter Reset", () => {
     await expect(dialog).toBeVisible({ timeout: timeouts.action });
 
     // The "Clear all" button should be visible when filters are active
-    const clearAll = modalClearAllButton(page);
+    const clearAll = clearAllButton(page);
     await expect(clearAll).toBeVisible({ timeout: timeouts.action });
 
     // Click "Clear all" inside the modal

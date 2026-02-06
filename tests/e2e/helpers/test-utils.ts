@@ -53,6 +53,7 @@ export const tags = {
   verified: "@verified",
   core: "@core",
   smoke: "@smoke",
+  filter: "@filter",
 } as const;
 
 /**

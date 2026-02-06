@@ -15,65 +15,17 @@
  * - Debounce: 300ms — rapid changes coalesce into a single request
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Wait for the search page to be ready with content loaded */
-async function waitForSearchReady(page: Page) {
-  await page.goto(SEARCH_URL);
-  await page.waitForLoadState("domcontentloaded");
-  await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 });
-}
-
-/**
- * Locate the Filters trigger button.
- * Matches both "Filters" (no active filters) and "Filters (N active)" states.
- */
-function filtersButton(page: Page) {
-  return page.getByRole("button", { name: /^Filters/ });
-}
-
-/** Locate the filter dialog */
-function filterDialog(page: Page) {
-  return page.getByRole("dialog", { name: /filters/i });
-}
-
-/** Locate the Apply button inside the dialog */
-function applyButton(page: Page) {
-  return page.locator('[data-testid="filter-modal-apply"]');
-}
-
-/** Open the filter modal and wait until it is visible */
-async function openFilterModal(page: Page) {
-  const btn = filtersButton(page);
-  await expect(btn).toBeVisible({ timeout: 10_000 });
-  await btn.click();
-
-  const dialog = filterDialog(page);
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-  return dialog;
-}
-
-/**
- * Toggle a single amenity button inside the filter modal.
- * The amenity group is [aria-label="Select amenities"].
- */
-async function toggleAmenity(page: Page, name: string) {
-  const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
-  const btn = amenitiesGroup.getByRole("button", { name: new RegExp(`^${name}`, "i") });
-  await expect(btn).toBeVisible({ timeout: 5_000 });
-  await btn.click();
-}
+import { test, expect, tags } from "../helpers/test-utils";
+import {
+  SEARCH_URL,
+  waitForSearchReady,
+  filtersButton,
+  filterDialog,
+  applyButton,
+  openFilterModal,
+  toggleAmenity,
+  amenitiesGroup,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -233,11 +185,11 @@ test.describe("Filter Count Preview", () => {
     await openFilterModal(page);
 
     // Rapidly toggle 3 amenities within ~200ms (faster than the 300ms debounce)
-    const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
+    const group = amenitiesGroup(page);
 
-    const wifi = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
-    const parking = amenitiesGroup.getByRole("button", { name: /^Parking/i });
-    const furnished = amenitiesGroup.getByRole("button", { name: /^Furnished/i });
+    const wifi = group.getByRole("button", { name: /^Wifi/i });
+    const parking = group.getByRole("button", { name: /^Parking/i });
+    const furnished = group.getByRole("button", { name: /^Furnished/i });
 
     // Click in rapid succession
     await wifi.click();

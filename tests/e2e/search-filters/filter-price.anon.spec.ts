@@ -13,24 +13,24 @@
  * - Pagination params (cursor, page) are deleted on filter change
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  tags,
+  selectors,
+  searchResultsContainer,
+  boundsQS,
+  SEARCH_URL,
+  waitForSearchReady,
+  getUrlParam,
+  waitForUrlParam,
+  waitForNoUrlParam,
+} from "../helpers";
 import type { Page } from "@playwright/test";
 
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
 // ---------------------------------------------------------------------------
-// Helpers
+// Domain-specific helpers (price filter inline inputs)
 // ---------------------------------------------------------------------------
-
-async function waitForSearchReady(page: Page) {
-  await page.goto(SEARCH_URL);
-  await page.waitForLoadState("domcontentloaded");
-  await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 });
-}
 
 /** Fill the inline budget min input and submit the form */
 async function setInlineMinPrice(page: Page, value: string) {
@@ -53,33 +53,6 @@ async function submitSearch(page: Page) {
   // Wait for navigation
   await page.waitForLoadState("domcontentloaded");
   await page.waitForTimeout(1_000);
-}
-
-/** Get URL param value */
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-/** Wait for URL to contain a specific param */
-async function waitForUrlParam(page: Page, key: string, value?: string) {
-  await page.waitForURL(
-    (url) => {
-      const params = new URL(url).searchParams;
-      if (value !== undefined) {
-        return params.get(key) === value;
-      }
-      return params.has(key);
-    },
-    { timeout: 15_000 },
-  );
-}
-
-/** Wait for URL to not contain a specific param */
-async function waitForNoUrlParam(page: Page, key: string) {
-  await page.waitForURL(
-    (url) => !new URL(url).searchParams.has(key),
-    { timeout: 15_000 },
-  );
 }
 
 // ---------------------------------------------------------------------------

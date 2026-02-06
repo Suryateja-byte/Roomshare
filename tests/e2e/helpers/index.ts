@@ -57,3 +57,6 @@ export {
   SNAP_EXPANDED,
   SNAP_POINTS,
 } from "./mobile-helpers";
+
+// Filter test helpers for search filter E2E tests
+export * from "./filter-helpers";

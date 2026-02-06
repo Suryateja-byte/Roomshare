@@ -13,69 +13,16 @@
  * - Changes are pending until Apply is clicked (useBatchedFilters)
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-const LEASE_DURATIONS = [
-  "Month-to-month",
-  "3 months",
-  "6 months",
-  "12 months",
-  "Flexible",
-] as const;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function waitForSearchReady(page: Page) {
-  await page.goto(SEARCH_URL);
-  await page.waitForLoadState("domcontentloaded");
-  await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 });
-}
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-/** Open filter modal and return the dialog locator */
-async function openFilterModal(page: Page) {
-  const filtersBtn = page.getByRole("button", { name: "Filters", exact: true });
-  await expect(filtersBtn).toBeVisible({ timeout: 10_000 });
-  await filtersBtn.click();
-
-  const dialog = page.getByRole("dialog", { name: /filters/i });
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-  return dialog;
-}
-
-/** Click Apply and wait for the modal to close */
-async function applyFilters(page: Page) {
-  const applyBtn = page.locator('[data-testid="filter-modal-apply"]');
-  await applyBtn.click();
-  // Wait for modal to close and URL to update
-  await page.waitForTimeout(1_500);
-}
-
-/** Select a lease duration option from the Radix Select dropdown */
-async function selectLeaseDuration(page: Page, dialog: ReturnType<typeof page.locator>, value: string) {
-  const trigger = dialog.locator("#filter-lease");
-  await expect(trigger).toBeVisible({ timeout: 5_000 });
-  await trigger.click();
-  await page.waitForTimeout(300);
-
-  const option = page.getByRole("option", { name: new RegExp(`^${value}$`, "i") });
-  if (await option.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await option.click();
-    await page.waitForTimeout(300);
-  }
-}
+import { test, expect, tags, searchResultsContainer } from "../helpers/test-utils";
+import {
+  SEARCH_URL,
+  LEASE_DURATIONS,
+  waitForSearchReady,
+  getUrlParam,
+  openFilterModal,
+  applyFilters,
+  selectDropdownOption,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -88,9 +35,9 @@ test.describe("Lease Duration Filter", () => {
   test(`${tags.core} - selecting each lease duration option updates URL`, async ({ page }) => {
     for (const duration of LEASE_DURATIONS) {
       await waitForSearchReady(page);
-      const dialog = await openFilterModal(page);
+      await openFilterModal(page);
 
-      await selectLeaseDuration(page, dialog, duration);
+      await selectDropdownOption(page, "filter-lease", new RegExp(`^${duration}$`, "i"));
       await applyFilters(page);
 
       await page.waitForURL(
@@ -114,19 +61,10 @@ test.describe("Lease Duration Filter", () => {
 
     expect(getUrlParam(page, "leaseDuration")).toBe("6 months");
 
-    const dialog = await openFilterModal(page);
+    await openFilterModal(page);
 
     // Select "Any" to clear the lease duration
-    const trigger = dialog.locator("#filter-lease");
-    await expect(trigger).toBeVisible({ timeout: 5_000 });
-    await trigger.click();
-    await page.waitForTimeout(300);
-
-    const anyOption = page.getByRole("option", { name: /^any$/i });
-    if (await anyOption.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await anyOption.click();
-      await page.waitForTimeout(300);
-    }
+    await selectDropdownOption(page, "filter-lease", /^Any$/i);
 
     await applyFilters(page);
 

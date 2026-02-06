@@ -16,26 +16,16 @@
  * - Scalar params (roomType, leaseDuration, maxPrice) set directly
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
+import { test, expect, searchResultsContainer } from "../helpers/test-utils";
+import { SEARCH_URL, getUrlParam, appliedFiltersRegion } from "../helpers";
 import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
 function recommendedRow(page: Page) {
   return searchResultsContainer(page).locator('.flex.items-center.gap-2').filter({ hasText: "Try:" });
-}
-
-function appliedFiltersRegion(page: Page) {
-  return searchResultsContainer(page).locator('[aria-label="Applied filters"]');
 }
 
 // ---------------------------------------------------------------------------

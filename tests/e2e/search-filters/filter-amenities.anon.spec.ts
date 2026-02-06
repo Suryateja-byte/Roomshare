@@ -13,60 +13,21 @@
  * - Active amenities show an X icon for visual deselect
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function waitForSearchReady(page: Page) {
-  await page.goto(SEARCH_URL);
-  await page.waitForLoadState("domcontentloaded");
-  await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 });
-}
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-/** Open filter modal and return the dialog locator */
-async function openFilterModal(page: Page) {
-  const filtersBtn = page.getByRole("button", { name: "Filters", exact: true });
-  await expect(filtersBtn).toBeVisible({ timeout: 10_000 });
-  await filtersBtn.click();
-
-  const dialog = page.getByRole("dialog", { name: /filters/i });
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-  return dialog;
-}
-
-/** Get the amenities group inside the filter modal */
-function amenitiesGroup(page: Page) {
-  return page.locator('[aria-label="Select amenities"]');
-}
-
-/** Click an amenity toggle button by name */
-async function toggleAmenity(page: Page, name: string) {
-  const group = amenitiesGroup(page);
-  const btn = group.getByRole("button", { name: new RegExp(`^${name}`, "i") });
-  await btn.click();
-  await page.waitForTimeout(300);
-}
-
-/** Apply filters via the Apply button */
-async function applyFilters(page: Page) {
-  const applyBtn = page.locator('[data-testid="filter-modal-apply"]');
-  await applyBtn.click();
-  // Wait for modal to close and URL to update
-  await page.waitForTimeout(1_500);
-}
+import {
+  test,
+  expect,
+  tags,
+  selectors,
+  searchResultsContainer,
+  SEARCH_URL,
+  VALID_AMENITIES,
+  getUrlParam,
+  waitForSearchReady,
+  openFilterModal,
+  amenitiesGroup,
+  toggleAmenity,
+  applyFilters,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -262,10 +223,9 @@ test.describe("Amenities Filter", () => {
     await waitForSearchReady(page);
     await openFilterModal(page);
 
-    const validAmenities = ["Wifi", "AC", "Parking", "Washer", "Dryer", "Kitchen", "Gym", "Pool", "Furnished"];
     const group = amenitiesGroup(page);
 
-    for (const amenity of validAmenities) {
+    for (const amenity of VALID_AMENITIES) {
       const btn = group.getByRole("button", { name: new RegExp(`^${amenity}`, "i") });
       const btnCount = await btn.count();
       // Each amenity should have a corresponding button

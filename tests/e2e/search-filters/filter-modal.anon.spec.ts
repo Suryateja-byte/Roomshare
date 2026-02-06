@@ -15,58 +15,30 @@
  * - With filters: "Filters (N active)"
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  tags,
+  SEARCH_URL,
+  boundsQS,
+  waitForSearchReady,
+  filtersButton,
+  filterDialog,
+  applyButton,
+  closeButton,
+  clearAllButton,
+} from "../helpers";
 import type { Page } from "@playwright/test";
 
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
 // ---------------------------------------------------------------------------
-// Helpers
+// Domain-specific Helpers
 // ---------------------------------------------------------------------------
-
-/** Wait for the search page to be ready with content loaded */
-async function waitForSearchReady(page: Page) {
-  await page.goto(SEARCH_URL);
-  await page.waitForLoadState("domcontentloaded");
-  // Wait for either listings or empty state to confirm page rendered
-  await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 });
-}
-
-/**
- * Locate the Filters trigger button.
- * Matches both "Filters" (no active filters) and "Filters (N active)" states.
- */
-function filtersButton(page: Page) {
-  return page.getByRole("button", { name: /^Filters/ });
-}
 
 /** Locate the Filters button with no active filters (exact match) */
 function filtersButtonExact(page: Page) {
   return page.getByRole("button", { name: "Filters", exact: true });
-}
-
-/** Locate the filter dialog (named to avoid strict mode issues) */
-function filterDialog(page: Page) {
-  return page.getByRole("dialog", { name: /filters/i });
-}
-
-/** Locate the Apply button inside the dialog */
-function applyButton(page: Page) {
-  return page.locator('[data-testid="filter-modal-apply"]');
-}
-
-/** Locate the Close button inside the dialog */
-function closeButton(page: Page) {
-  return filterDialog(page).getByRole("button", { name: /close filters/i });
-}
-
-/** Locate the Clear All button inside the dialog */
-function clearAllButton(page: Page) {
-  return page.locator('[data-testid="filter-modal-clear-all"]');
 }
 
 // ---------------------------------------------------------------------------

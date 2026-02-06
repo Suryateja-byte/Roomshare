@@ -13,47 +13,22 @@
  * - Filter chip shows formatted date: "Move-in: Mon DD, YYYY"
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
+import {
+  test,
+  expect,
+  tags,
+  searchResultsContainer,
+  boundsQS,
+  SEARCH_URL,
+  waitForSearchReady,
+  getUrlParam,
+  openFilterModal,
+  applyFilters,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Domain-specific Helpers
 // ---------------------------------------------------------------------------
-
-async function waitForSearchReady(page: Page) {
-  await page.goto(SEARCH_URL);
-  await page.waitForLoadState("domcontentloaded");
-  await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 });
-}
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-/** Open filter modal and return the dialog locator */
-async function openFilterModal(page: Page) {
-  const filtersBtn = page.getByRole("button", { name: /^Filters/, exact: false });
-  await expect(filtersBtn).toBeVisible({ timeout: 10_000 });
-  await filtersBtn.click();
-
-  const dialog = page.getByRole("dialog", { name: /filters/i });
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-  return dialog;
-}
-
-/** Apply filters via the Apply button */
-async function applyFilters(page: Page) {
-  const applyBtn = page.locator('[data-testid="filter-modal-apply"]');
-  await applyBtn.click();
-  // Wait for modal to close and URL to update
-  await page.waitForTimeout(1_500);
-}
 
 /**
  * Compute the YYYY-MM-DD string for the 15th of next month.

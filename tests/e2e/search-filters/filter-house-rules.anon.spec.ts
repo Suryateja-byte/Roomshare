@@ -14,67 +14,19 @@
  * - Active rules show an X icon for visual deselect
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-const HOUSE_RULES = [
-  "Pets allowed",
-  "Smoking allowed",
-  "Couples allowed",
-  "Guests allowed",
-] as const;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function waitForSearchReady(page: Page) {
-  await page.goto(SEARCH_URL);
-  await page.waitForLoadState("domcontentloaded");
-  await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 });
-}
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-/** Open filter modal and return the dialog locator */
-async function openFilterModal(page: Page) {
-  const filtersBtn = page.getByRole("button", { name: "Filters", exact: true });
-  await expect(filtersBtn).toBeVisible({ timeout: 10_000 });
-  await filtersBtn.click();
-
-  const dialog = page.getByRole("dialog", { name: /filters/i });
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-  return dialog;
-}
-
-/** Get the house rules group inside the filter modal */
-function houseRulesGroup(page: Page) {
-  return page.locator('[aria-label="Select house rules"]');
-}
-
-/** Click a house rule toggle button by name */
-async function toggleHouseRule(page: Page, name: string) {
-  const group = houseRulesGroup(page);
-  const btn = group.getByRole("button", { name: new RegExp(`^${name}`, "i") });
-  await btn.click();
-  await page.waitForTimeout(300);
-}
-
-/** Click Apply and wait for the modal to close */
-async function applyFilters(page: Page) {
-  const applyBtn = page.locator('[data-testid="filter-modal-apply"]');
-  await applyBtn.click();
-  // Wait for modal to close and URL to update
-  await page.waitForTimeout(1_500);
-}
+import {
+  test,
+  expect,
+  tags,
+  searchResultsContainer,
+  SEARCH_URL,
+  getUrlParam,
+  waitForSearchReady,
+  openFilterModal,
+  houseRulesGroup,
+  toggleHouseRule,
+  applyFilters,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests

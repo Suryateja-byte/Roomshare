@@ -16,36 +16,19 @@
  * - Invalid values silently dropped (no error UI, no chips)
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-// Valid amenities for reference
-const VALID_AMENITIES = ["Wifi", "AC", "Parking", "Washer", "Dryer", "Kitchen", "Gym", "Pool", "Furnished"] as const;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-function appliedFiltersRegion(page: Page) {
-  return searchResultsContainer(page).locator('[aria-label="Applied filters"]');
-}
-
-async function chipCount(page: Page): Promise<number> {
-  const region = appliedFiltersRegion(page);
-  const visible = await region.isVisible().catch(() => false);
-  if (!visible) return 0;
-
-  // Count remove buttons (one per chip)
-  const removeButtons = region.getByRole("button", { name: /remove filter/i });
-  return removeButtons.count();
-}
+import {
+  test,
+  expect,
+  selectors,
+  tags,
+  searchResultsContainer,
+  boundsQS,
+  SEARCH_URL,
+  VALID_AMENITIES,
+  getUrlParam,
+  appliedFiltersRegion,
+  chipCount,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests

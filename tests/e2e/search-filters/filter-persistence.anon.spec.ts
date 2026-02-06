@@ -13,35 +13,15 @@
  * - Deep links with filter params pre-populate the filter modal and chips
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-function getUrlParams(page: Page): URLSearchParams {
-  return new URL(page.url()).searchParams;
-}
-
-function appliedFiltersRegion(page: Page) {
-  return searchResultsContainer(page).locator('[aria-label="Applied filters"]');
-}
-
-function filtersButton(page: Page) {
-  return page.getByRole("button", { name: /^Filters/ });
-}
-
-function filterDialog(page: Page) {
-  return page.getByRole("dialog", { name: /filters/i });
-}
+import { test, expect, SF_BOUNDS, selectors, tags, searchResultsContainer } from "../helpers/test-utils";
+import {
+  boundsQS,
+  SEARCH_URL,
+  getUrlParam,
+  appliedFiltersRegion,
+  filtersButton,
+  filterDialog,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests

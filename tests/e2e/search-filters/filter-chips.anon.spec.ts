@@ -17,23 +17,16 @@
  * - "Clear all" preserves q, lat, lng, bounds, sort
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-function appliedFiltersRegion(page: Page) {
-  return searchResultsContainer(page).locator('[aria-label="Applied filters"]');
-}
+import {
+  test,
+  expect,
+  tags,
+  searchResultsContainer,
+  boundsQS,
+  SEARCH_URL,
+  getUrlParam,
+  appliedFiltersRegion,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests

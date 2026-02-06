@@ -16,36 +16,19 @@
  *   remounts the component and resets cursor + accumulated listings
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function waitForSearchReady(page: Page) {
-  await page.goto(SEARCH_URL);
-  await page.waitForLoadState("domcontentloaded");
-  await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 });
-}
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-function getUrlParams(page: Page): URLSearchParams {
-  return new URL(page.url()).searchParams;
-}
-
-function appliedFiltersRegion(page: Page) {
-  return searchResultsContainer(page).locator('[aria-label="Applied filters"]');
-}
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  tags,
+  searchResultsContainer,
+  boundsQS,
+  SEARCH_URL,
+  getUrlParam,
+  getUrlParams,
+  appliedFiltersRegion,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests

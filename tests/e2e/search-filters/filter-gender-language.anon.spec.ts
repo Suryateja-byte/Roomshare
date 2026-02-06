@@ -26,64 +26,19 @@
  * - All changes are pending until Apply is clicked (useBatchedFilters)
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags } from "../helpers/test-utils";
-import type { Page } from "@playwright/test";
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function waitForSearchReady(page: Page) {
-  await page.goto(SEARCH_URL);
-  await page.waitForLoadState("domcontentloaded");
-  await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 });
-}
-
-function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
-}
-
-/** Open filter modal and return the dialog locator */
-async function openFilterModal(page: Page) {
-  const filtersBtn = page.getByRole("button", { name: /^Filters/, exact: false });
-  await expect(filtersBtn).toBeVisible({ timeout: 10_000 });
-  await filtersBtn.click();
-
-  const dialog = page.getByRole("dialog", { name: /filters/i });
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-  return dialog;
-}
-
-/** Apply filters via the Apply button */
-async function applyFilters(page: Page) {
-  const applyBtn = page.locator('[data-testid="filter-modal-apply"]');
-  await applyBtn.click();
-  // Wait for modal to close and URL to update
-  await page.waitForTimeout(1_500);
-}
-
-/**
- * Select an option from a Radix Select dropdown by trigger ID and option label.
- * Scrolls the trigger into view, clicks it, then selects the matching option.
- */
-async function selectDropdownOption(page: Page, dialog: ReturnType<typeof page.getByRole>, triggerId: string, optionLabel: RegExp) {
-  const trigger = dialog.locator(triggerId);
-  await trigger.scrollIntoViewIfNeeded();
-  await expect(trigger).toBeVisible({ timeout: 5_000 });
-  await trigger.click();
-  await page.waitForTimeout(300);
-
-  const option = page.getByRole("option", { name: optionLabel });
-  await expect(option).toBeVisible({ timeout: 3_000 });
-  await option.click();
-  await page.waitForTimeout(300);
-}
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  tags,
+  SEARCH_URL,
+  waitForSearchReady,
+  getUrlParam,
+  openFilterModal,
+  applyFilters,
+  selectDropdownOption,
+} from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -98,7 +53,7 @@ test.describe("Gender & Language Filters", () => {
     const dialog = await openFilterModal(page);
 
     // Select "Female Identifying Only" from the gender preference dropdown
-    await selectDropdownOption(page, dialog, "#filter-gender-pref", /female identifying only/i);
+    await selectDropdownOption(page, "#filter-gender-pref", /female identifying only/i);
 
     // Apply
     await applyFilters(page);
@@ -118,7 +73,7 @@ test.describe("Gender & Language Filters", () => {
     const dialog = await openFilterModal(page);
 
     // Select "Mixed (Co-ed)" from the household gender dropdown
-    await selectDropdownOption(page, dialog, "#filter-household-gender", /mixed/i);
+    await selectDropdownOption(page, "#filter-household-gender", /mixed/i);
 
     // Apply
     await applyFilters(page);
