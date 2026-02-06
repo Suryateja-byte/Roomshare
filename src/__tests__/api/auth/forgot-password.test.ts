@@ -140,7 +140,7 @@ describe('Forgot Password API', () => {
     expect(prisma.passwordResetToken.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         email: 'test@example.com',
-        token: expect.any(String),
+        tokenHash: expect.any(String),
         expires: expect.any(Date),
       }),
     })

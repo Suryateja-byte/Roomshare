@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { hashToken, isValidTokenFormat } from '@/lib/token-security';
 
 export async function GET(request: NextRequest) {
     // P1-1 FIX: Add rate limiting to prevent token brute-forcing
@@ -14,10 +15,15 @@ export async function GET(request: NextRequest) {
         if (!token) {
             return NextResponse.redirect(new URL('/?error=missing_token', request.url));
         }
+        if (!isValidTokenFormat(token)) {
+            return NextResponse.redirect(new URL('/?error=invalid_token', request.url));
+        }
+
+        const tokenHash = hashToken(token);
 
         // Find the verification token
         const verificationToken = await prisma.verificationToken.findUnique({
-            where: { token }
+            where: { tokenHash }
         });
 
         if (!verificationToken) {
@@ -28,7 +34,7 @@ export async function GET(request: NextRequest) {
         if (verificationToken.expires < new Date()) {
             // Delete expired token
             await prisma.verificationToken.delete({
-                where: { token }
+                where: { tokenHash }
             });
             // Redirect to dedicated expired token page for clear UX
             return NextResponse.redirect(new URL('/verify-expired', request.url));
@@ -51,7 +57,7 @@ export async function GET(request: NextRequest) {
 
         // Delete the used token
         await prisma.verificationToken.delete({
-            where: { token }
+            where: { tokenHash }
         });
 
         // Redirect to home with success message

@@ -15,6 +15,10 @@ jest.mock('@/lib/prisma', () => ({
   },
 }))
 
+jest.mock('@/lib/with-rate-limit', () => ({
+  withRateLimit: jest.fn(() => null),
+}))
+
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (data: unknown, init?: { status?: number }) => ({
@@ -35,7 +39,12 @@ jest.mock('next/server', () => ({
 
 import { GET } from '@/app/api/auth/verify-email/route'
 import { prisma } from '@/lib/prisma'
+import { hashToken } from '@/lib/token-security'
 import type { NextRequest } from 'next/server'
+
+const VALID_TOKEN = 'a'.repeat(64)
+const EXPIRED_TOKEN = 'b'.repeat(64)
+const INVALID_FORMAT_TOKEN = 'invalid-token'
 
 describe('Verify Email API', () => {
   beforeEach(() => {
@@ -51,7 +60,7 @@ describe('Verify Email API', () => {
 
   it('verifies email successfully with valid token', async () => {
     const validToken = {
-      token: 'valid-token',
+      tokenHash: hashToken(VALID_TOKEN),
       identifier: 'test@example.com',
       expires: new Date(Date.now() + 3600000),
     }
@@ -62,11 +71,14 @@ describe('Verify Email API', () => {
     ;(prisma.user.update as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.delete as jest.Mock).mockResolvedValue({})
 
-    const request = createRequest('valid-token')
+    const request = createRequest(VALID_TOKEN)
     const response = await GET(request)
 
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('verified=true')
+    expect(prisma.verificationToken.findUnique).toHaveBeenCalledWith({
+      where: { tokenHash: hashToken(VALID_TOKEN) },
+    })
   })
 
   it('redirects with error for missing token', async () => {
@@ -80,16 +92,17 @@ describe('Verify Email API', () => {
   it('redirects with error for invalid token', async () => {
     ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(null)
 
-    const request = createRequest('invalid-token')
+    const request = createRequest(INVALID_FORMAT_TOKEN)
     const response = await GET(request)
 
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('error=invalid_token')
+    expect(prisma.verificationToken.findUnique).not.toHaveBeenCalled()
   })
 
   it('redirects to expired page for expired token', async () => {
     const expiredToken = {
-      token: 'expired-token',
+      tokenHash: hashToken(EXPIRED_TOKEN),
       identifier: 'test@example.com',
       expires: new Date(Date.now() - 3600000),
     }
@@ -97,19 +110,19 @@ describe('Verify Email API', () => {
     ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(expiredToken)
     ;(prisma.verificationToken.delete as jest.Mock).mockResolvedValue({})
 
-    const request = createRequest('expired-token')
+    const request = createRequest(EXPIRED_TOKEN)
     const response = await GET(request)
 
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('verify-expired')
     expect(prisma.verificationToken.delete).toHaveBeenCalledWith({
-      where: { token: 'expired-token' },
+      where: { tokenHash: hashToken(EXPIRED_TOKEN) },
     })
   })
 
   it('redirects with error when user not found', async () => {
     const validToken = {
-      token: 'valid-token',
+      tokenHash: hashToken(VALID_TOKEN),
       identifier: 'nonexistent@example.com',
       expires: new Date(Date.now() + 3600000),
     }
@@ -117,7 +130,7 @@ describe('Verify Email API', () => {
     ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(validToken)
     ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(null)
 
-    const request = createRequest('valid-token')
+    const request = createRequest(VALID_TOKEN)
     const response = await GET(request)
 
     expect(response.status).toBe(307)
@@ -126,7 +139,7 @@ describe('Verify Email API', () => {
 
   it('updates user emailVerified timestamp', async () => {
     const validToken = {
-      token: 'valid-token',
+      tokenHash: hashToken(VALID_TOKEN),
       identifier: 'test@example.com',
       expires: new Date(Date.now() + 3600000),
     }
@@ -137,7 +150,7 @@ describe('Verify Email API', () => {
     ;(prisma.user.update as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.delete as jest.Mock).mockResolvedValue({})
 
-    const request = createRequest('valid-token')
+    const request = createRequest(VALID_TOKEN)
     await GET(request)
 
     expect(prisma.user.update).toHaveBeenCalledWith({
@@ -148,7 +161,7 @@ describe('Verify Email API', () => {
 
   it('deletes token after successful verification', async () => {
     const validToken = {
-      token: 'valid-token',
+      tokenHash: hashToken(VALID_TOKEN),
       identifier: 'test@example.com',
       expires: new Date(Date.now() + 3600000),
     }
@@ -159,18 +172,18 @@ describe('Verify Email API', () => {
     ;(prisma.user.update as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.delete as jest.Mock).mockResolvedValue({})
 
-    const request = createRequest('valid-token')
+    const request = createRequest(VALID_TOKEN)
     await GET(request)
 
     expect(prisma.verificationToken.delete).toHaveBeenCalledWith({
-      where: { token: 'valid-token' },
+      where: { tokenHash: hashToken(VALID_TOKEN) },
     })
   })
 
   it('handles database errors gracefully', async () => {
     ;(prisma.verificationToken.findUnique as jest.Mock).mockRejectedValue(new Error('DB Error'))
 
-    const request = createRequest('valid-token')
+    const request = createRequest(VALID_TOKEN)
     const response = await GET(request)
 
     expect(response.status).toBe(307)
@@ -179,7 +192,7 @@ describe('Verify Email API', () => {
 
   it('looks up user by email from token identifier', async () => {
     const validToken = {
-      token: 'valid-token',
+      tokenHash: hashToken(VALID_TOKEN),
       identifier: 'test@example.com',
       expires: new Date(Date.now() + 3600000),
     }
@@ -190,7 +203,7 @@ describe('Verify Email API', () => {
     ;(prisma.user.update as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.delete as jest.Mock).mockResolvedValue({})
 
-    const request = createRequest('valid-token')
+    const request = createRequest(VALID_TOKEN)
     await GET(request)
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
