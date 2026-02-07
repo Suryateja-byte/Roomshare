@@ -322,7 +322,7 @@ describe("Auth Edge Cases - Category A", () => {
       });
 
       const foundToken = await prisma.verificationToken.findUnique({
-        where: { token: "valid-token" },
+        where: { tokenHash: "valid-token" },
       });
 
       // Email matching should be case-insensitive
@@ -333,13 +333,13 @@ describe("Auth Edge Cases - Category A", () => {
       const mixedCaseEmail = "TeSt@ExAmPlE.CoM";
 
       (prisma.verificationToken.create as jest.Mock).mockResolvedValue({
-        token: "new-token",
+        tokenHash: "new-token-hash",
         identifier: mixedCaseEmail.toLowerCase(),
       });
 
       const token = await prisma.verificationToken.create({
         data: {
-          token: "new-token",
+          tokenHash: "new-token-hash",
           identifier: mixedCaseEmail.toLowerCase(),
           expires: new Date(),
         },
@@ -370,7 +370,7 @@ describe("Auth Edge Cases - Category A", () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(user);
 
       const foundToken = await prisma.passwordResetToken.findUnique({
-        where: { token: "reset-token" },
+        where: { tokenHash: "reset-token" },
       });
       // PasswordResetToken uses email, not userId - cast for test mocking
       const foundUser = await prisma.user.findUnique({
@@ -393,16 +393,16 @@ describe("Auth Edge Cases - Category A", () => {
       (prisma.passwordResetToken.delete as jest.Mock).mockResolvedValue({});
 
       const firstAttempt = await prisma.passwordResetToken.findUnique({
-        where: { token: "reset-token" },
+        where: { tokenHash: "reset-token" },
       });
       expect(firstAttempt).not.toBeNull();
 
       await prisma.passwordResetToken.delete({
-        where: { token: "reset-token" },
+        where: { tokenHash: "reset-token" },
       });
 
       const secondAttempt = await prisma.passwordResetToken.findUnique({
-        where: { token: "reset-token" },
+        where: { tokenHash: "reset-token" },
       });
       expect(secondAttempt).toBeNull();
     });
@@ -597,7 +597,7 @@ describe("Auth Edge Cases - Category A", () => {
       // Mock email change verification - in real impl would need custom fields
       const pendingEmailChange = {
         identifier: "user-123",
-        token: "change-token",
+        tokenHash: "change-token-hash",
         expires: new Date(Date.now() + 3600000),
       };
       // Extended mock with email change metadata
