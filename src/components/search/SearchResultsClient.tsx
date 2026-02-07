@@ -50,6 +50,7 @@ export function SearchResultsClient({
     initialNextCursor,
   );
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const isLoadingRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showTotalPrice, setShowTotalPrice] = useState(false);
 
@@ -114,8 +115,9 @@ export function SearchResultsClient({
   }
 
   const handleLoadMore = useCallback(async () => {
-    if (!nextCursor || isLoadingMore) return;
+    if (!nextCursor || isLoadingRef.current) return;
 
+    isLoadingRef.current = true;
     setIsLoadingMore(true);
     setLoadError(null);
     performance.mark('load-more-start');
@@ -139,9 +141,10 @@ export function SearchResultsClient({
         err instanceof Error ? err.message : "Failed to load more results",
       );
     } finally {
+      isLoadingRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [nextCursor, isLoadingMore]);
+  }, [nextCursor]);
 
   const total = initialTotal;
 

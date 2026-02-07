@@ -872,13 +872,13 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 genderPreference={genderPreference}
                 householdGender={householdGender}
                 onMoveInDateChange={(v: string) => setPending({ moveInDate: v })}
-                onLeaseDurationChange={(v: string) => setPending({ leaseDuration: v })}
+                onLeaseDurationChange={(v: string) => setPending({ leaseDuration: v === 'any' ? '' : v })}
                 onRoomTypeChange={(v: string) => setPending({ roomType: v === 'any' ? '' : v })}
                 onToggleAmenity={toggleAmenity}
                 onToggleHouseRule={toggleHouseRule}
                 onToggleLanguage={toggleLanguage}
-                onGenderPreferenceChange={(v: string) => setPending({ genderPreference: v })}
-                onHouseholdGenderChange={(v: string) => setPending({ householdGender: v })}
+                onGenderPreferenceChange={(v: string) => setPending({ genderPreference: v === 'any' ? '' : v })}
+                onHouseholdGenderChange={(v: string) => setPending({ householdGender: v === 'any' ? '' : v })}
                 languageSearch={languageSearch}
                 onLanguageSearchChange={setLanguageSearch}
                 filteredLanguages={filteredLanguages}

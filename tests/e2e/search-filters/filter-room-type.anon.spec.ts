@@ -17,13 +17,11 @@
 import {
   test,
   expect,
-  SF_BOUNDS,
   selectors,
   tags,
   searchResultsContainer,
-  SEARCH_URL,
-  boundsQS,
   waitForSearchReady,
+  gotoSearchWithFilters,
   getUrlParam,
 } from "../helpers";
 
@@ -36,9 +34,7 @@ test.describe("Room Type Filter", () => {
 
   // 1. Select room type via URL -> URL has roomType param
   test(`${tags.core} - room type param in URL is reflected on page load`, async ({ page }) => {
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
@@ -77,9 +73,7 @@ test.describe("Room Type Filter", () => {
   // 3. Select "All" tab -> roomType param removed from URL
   test(`${tags.core} - selecting All room type removes roomType from URL`, async ({ page }) => {
     // Start with a room type filter
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
@@ -109,9 +103,7 @@ test.describe("Room Type Filter", () => {
     const initialCount = await container.locator(selectors.listingCard).count();
 
     // Navigate with room type filter
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
     const filteredCount = await container.locator(selectors.listingCard).count();
     const hasEmptyState = await container.locator(selectors.emptyState).count() > 0;
@@ -123,9 +115,7 @@ test.describe("Room Type Filter", () => {
 
   // 5. Room type shown in filter chips
   test(`${tags.core} - room type displays as applied filter chip`, async ({ page }) => {
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
     const container = searchResultsContainer(page);
     const filtersRegion = container.locator('[aria-label="Applied filters"]');
@@ -143,17 +133,12 @@ test.describe("Room Type Filter", () => {
   test(`${tags.core} - clearing room type restores full results`, async ({ page }) => {
     await waitForSearchReady(page);
     const container = searchResultsContainer(page);
-    const initialCount = await container.locator(selectors.listingCard).count();
 
     // Apply room type filter
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
     // Clear by navigating back without the filter
-    await page.goto(SEARCH_URL);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await gotoSearchWithFilters(page, {});
 
     const restoredCount = await container.locator(selectors.listingCard).count();
 
@@ -177,13 +162,14 @@ test.describe("Room Type Filter", () => {
     const roomTypeSelect = dialog.locator("#filter-room-type");
     if (await roomTypeSelect.isVisible()) {
       await roomTypeSelect.click();
-      await page.waitForTimeout(300);
+      // Wait for Radix Select dropdown to render
+      await page.getByRole("listbox").waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
 
       // Select "Shared Room"
       const sharedOption = page.getByRole("option", { name: /shared room/i });
-      if (await sharedOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      if (await sharedOption.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await sharedOption.click();
-        await page.waitForTimeout(300);
+        await expect(roomTypeSelect).toContainText(/shared room/i);
 
         // Apply
         await page.locator('[data-testid="filter-modal-apply"]').click();
@@ -202,9 +188,7 @@ test.describe("Room Type Filter", () => {
   // 8. Room type alias resolves correctly via URL
   test(`${tags.core} - room type alias in URL resolves to canonical value`, async ({ page }) => {
     // Navigate with alias "private" instead of "Private Room"
-    await page.goto(`${SEARCH_URL}&roomType=private`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await gotoSearchWithFilters(page, { roomType: "private" });
 
     // Page should load without errors
     expect(await page.title()).toBeTruthy();

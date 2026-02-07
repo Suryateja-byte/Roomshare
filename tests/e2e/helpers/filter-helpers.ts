@@ -143,8 +143,9 @@ export async function expectNoUrlParam(
 // ---------------------------------------------------------------------------
 
 /**
- * Navigate to the search page and wait for content to attach.
- * Uses domcontentloaded + element attachment (NOT networkidle).
+ * Navigate to the search page and wait for content to attach + hydrate.
+ * Waits for domcontentloaded, element attachment, then networkidle
+ * to ensure React hydration completes before tests interact with buttons.
  */
 export async function waitForSearchReady(
   page: Page,
@@ -157,10 +158,14 @@ export async function waitForSearchReady(
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
+  // Wait for networkidle to ensure React hydration completes —
+  // without this, button clicks can fire before event handlers attach
+  await page.waitForLoadState("networkidle").catch(() => {});
 }
 
 /**
  * Navigate to a search URL with specific filter params and wait for readiness.
+ * Waits for element attachment + networkidle to ensure React hydration.
  */
 export async function gotoSearchWithFilters(
   page: Page,
@@ -173,6 +178,7 @@ export async function gotoSearchWithFilters(
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
+  await page.waitForLoadState("networkidle").catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -329,10 +335,18 @@ export async function selectDropdownOption(
   triggerId: string,
   optionLabel: RegExp,
 ): Promise<void> {
-  const trigger = page.locator(`[data-testid="${triggerId}"]`);
+  const selector = triggerId.startsWith("#") ? triggerId : `#${triggerId}`;
+  const trigger = page.locator(selector);
   await trigger.click();
-  const option = page.getByRole("option", { name: optionLabel });
+
+  // Scope to the Radix Select portal's listbox for reliable option selection
+  const listbox = page.getByRole("listbox");
+  await expect(listbox).toBeVisible({ timeout: 5_000 });
+  const option = listbox.getByRole("option", { name: optionLabel });
   await option.click();
+
+  // Wait for dropdown to close to confirm selection was processed
+  await expect(listbox).not.toBeVisible({ timeout: 5_000 });
 }
 
 // ---------------------------------------------------------------------------

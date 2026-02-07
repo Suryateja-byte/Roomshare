@@ -7,6 +7,7 @@
 
 import { getLanguageName } from "@/lib/languages";
 import { getPriceParam } from "@/lib/search-params";
+import { LEASE_DURATION_ALIASES, VALID_LEASE_DURATIONS } from "@/lib/filter-schema";
 
 /**
  * Represents a single filter chip that can be displayed and removed
@@ -118,14 +119,31 @@ export function urlToFilterChips(
     });
   }
 
-  // Move-in date
+  // Move-in date — validate before creating chip (mirrors server-side safeParseDate)
   const moveInDate = searchParams.get("moveInDate");
   if (moveInDate) {
-    chips.push({
-      id: "moveInDate",
-      label: `Move-in: ${formatDate(moveInDate)}`,
-      paramKey: "moveInDate",
-    });
+    const trimmed = moveInDate.trim();
+    let isValidDate = false;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const [y, m, d] = trimmed.split("-").map(Number);
+      const date = new Date(y, m - 1, d);
+      if (date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const maxDate = new Date();
+        maxDate.setFullYear(maxDate.getFullYear() + 2);
+        if (date >= today && date <= maxDate) {
+          isValidDate = true;
+        }
+      }
+    }
+    if (isValidDate) {
+      chips.push({
+        id: "moveInDate",
+        label: `Move-in: ${formatDate(trimmed)}`,
+        paramKey: "moveInDate",
+      });
+    }
   }
 
   // Room type
@@ -138,14 +156,19 @@ export function urlToFilterChips(
     });
   }
 
-  // Lease duration
+  // Lease duration — resolve aliases to canonical form
   const leaseDuration = searchParams.get("leaseDuration");
-  if (leaseDuration) {
-    chips.push({
-      id: "leaseDuration",
-      label: leaseDuration,
-      paramKey: "leaseDuration",
-    });
+  if (leaseDuration && leaseDuration !== "any") {
+    const lower = leaseDuration.toLowerCase();
+    const resolved = LEASE_DURATION_ALIASES[lower]
+      ?? (VALID_LEASE_DURATIONS as readonly string[]).find(v => v.toLowerCase() === lower);
+    if (resolved && resolved !== "any") {
+      chips.push({
+        id: "leaseDuration",
+        label: resolved,
+        paramKey: "leaseDuration",
+      });
+    }
   }
 
   // Amenities - one chip per amenity

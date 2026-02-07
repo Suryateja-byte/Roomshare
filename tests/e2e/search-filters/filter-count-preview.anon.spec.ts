@@ -17,7 +17,6 @@
 
 import { test, expect, tags } from "../helpers/test-utils";
 import {
-  SEARCH_URL,
   waitForSearchReady,
   filtersButton,
   filterDialog,
@@ -53,10 +52,7 @@ test.describe("Filter Count Preview", () => {
     // Toggle an amenity to make the filter state dirty
     await toggleAmenity(page, "Wifi");
 
-    // Wait for debounce (300ms) plus network round-trip
-    await page.waitForTimeout(500);
-
-    // The apply button should now show a count
+    // The apply button should now show a count (auto-retries until debounce + response completes)
     const apply = applyButton(page);
     await expect(apply).toBeVisible();
 
@@ -122,10 +118,7 @@ test.describe("Filter Count Preview", () => {
     // Toggle a filter to make dirty
     await toggleAmenity(page, "Parking");
 
-    // Wait for debounce + response
-    await page.waitForTimeout(500);
-
-    // The apply button should show "100+" text
+    // The apply button should show "100+" text (auto-retries until debounce + response completes)
     const apply = applyButton(page);
     await expect(apply).toContainText(/100\+/, { timeout: 10_000 });
   });
@@ -137,7 +130,9 @@ test.describe("Filter Count Preview", () => {
     // Navigate without bounds (only query text)
     await page.goto("/search?q=test");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    // Wait for page content to render (no bounds = no listing cards expected)
+    await page.locator('h3, [data-testid="search-results"]').first()
+      .waitFor({ state: "attached", timeout: 30_000 }).catch(() => {});
 
     // Open filter modal
     const btn = filtersButton(page);
@@ -150,19 +145,18 @@ test.describe("Filter Count Preview", () => {
 
     // Toggle a filter to trigger count evaluation
     await toggleAmenity(page, "Wifi");
-    await page.waitForTimeout(500);
 
     // The apply button should indicate the user needs to select a location
     const apply = applyButton(page);
     await expect(apply).toBeVisible();
 
-    // Check for disabled state or "Select a location" text
-    const buttonText = await apply.textContent();
-    const isDisabled = await apply.isDisabled().catch(() => false);
-
-    // Accept either: disabled button, or text indicating location needed
-    const showsLocationMessage = buttonText?.toLowerCase().includes("location") ?? false;
-    expect(isDisabled || showsLocationMessage).toBe(true);
+    // Wait for debounce to settle, then check for disabled state or "Select a location" text
+    await expect(async () => {
+      const buttonText = await apply.textContent();
+      const isDisabled = await apply.isDisabled().catch(() => false);
+      const showsLocationMessage = buttonText?.toLowerCase().includes("location") ?? false;
+      expect(isDisabled || showsLocationMessage).toBe(true);
+    }).toPass({ timeout: 5_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -196,15 +190,12 @@ test.describe("Filter Count Preview", () => {
     await parking.click();
     await furnished.click();
 
-    // Wait for the debounce window to expire plus the response
-    await page.waitForTimeout(800);
+    // Wait for the debounced response to arrive (auto-retries)
+    const apply = applyButton(page);
+    await expect(apply).toContainText(/7|listing/i, { timeout: 10_000 });
 
-    // The debounce should have coalesced the three changes into 1 request
+    // Now that the response has arrived, verify debounce coalesced requests
     // Allow for at most 2 requests (one initial + one debounced) but not 3
     expect(countRequestCount).toBeLessThanOrEqual(2);
-
-    // The final response should still show up in the button
-    const apply = applyButton(page);
-    await expect(apply).toContainText(/7|listing/i, { timeout: 5_000 });
   });
 });

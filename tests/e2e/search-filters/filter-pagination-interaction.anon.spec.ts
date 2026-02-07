@@ -10,10 +10,9 @@ import {
   expect,
   tags,
   searchResultsContainer,
-  buildSearchUrl,
   waitForSearchReady,
+  gotoSearchWithFilters,
   scopedCards,
-  rapidClick,
 } from "../helpers";
 import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 
@@ -27,7 +26,6 @@ test.describe("Filter + Pagination Interactions", () => {
     const mock = await setupPaginationMock(page, { totalLoadMoreItems: 24 });
 
     // Navigate to search page
-    await page.goto(buildSearchUrl({}));
     await waitForSearchReady(page);
 
     // Get initial card count (should be ~12-19 from seed data)
@@ -50,8 +48,7 @@ test.describe("Filter + Pagination Interactions", () => {
     expect(mock.loadMoreCallCount()).toBe(1);
 
     // Apply a filter (amenities=Wifi) - this should reset the cursor
-    await page.goto(buildSearchUrl({ amenities: "Wifi" }));
-    await waitForSearchReady(page);
+    await gotoSearchWithFilters(page, { amenities: "Wifi" });
 
     // After navigation with filter, component remounts with new key
     // The extra mock listings from before should be gone
@@ -76,7 +73,6 @@ test.describe("Filter + Pagination Interactions", () => {
     await setupPaginationMock(page, { totalLoadMoreItems: 24 });
 
     // Navigate to search page
-    await page.goto(buildSearchUrl({}));
     await waitForSearchReady(page);
 
     // Get initial card count
@@ -98,8 +94,7 @@ test.describe("Filter + Pagination Interactions", () => {
     expect(afterLoadMoreCount).toBeGreaterThan(initialCardCount);
 
     // Navigate with sort parameter - this should reset the cursor
-    await page.goto(buildSearchUrl({ sort: "price_asc" }));
-    await waitForSearchReady(page);
+    await gotoSearchWithFilters(page, { sort: "price_asc" });
 
     // After navigation with sort, component remounts
     // Card count should be back to initial level (12 or fewer from DB)
@@ -123,7 +118,6 @@ test.describe("Filter + Pagination Interactions", () => {
     await setupPaginationMock(page, { totalLoadMoreItems: 48 });
 
     // Navigate to search page
-    await page.goto(buildSearchUrl({}));
     await waitForSearchReady(page);
 
     const initialCardCount = await scopedCards(page).count();
@@ -141,9 +135,8 @@ test.describe("Filter + Pagination Interactions", () => {
     });
     const afterFirstLoadCount = await scopedCards(page).count();
 
-    // Navigate with filter change (amenities=Parking)
-    await page.goto(buildSearchUrl({ amenities: "Parking" }));
-    await waitForSearchReady(page);
+    // Navigate with filter change (amenities=Wifi — enough results for pagination)
+    await gotoSearchWithFilters(page, { amenities: "Wifi" });
 
     // After remount, page reloads with fresh SSR data
     const afterFilterCount = await scopedCards(page).count();
@@ -161,19 +154,15 @@ test.describe("Filter + Pagination Interactions", () => {
     expect(finalCardCount).toBeGreaterThan(afterFilterCount);
 
     // Verify no duplicate IDs (seenIdsRef was reset on remount)
-    // Get all listing IDs from cards
+    // Use the data-listing-id attribute rendered by ListingCard
     const cards = scopedCards(page);
     const cardCount = await cards.count();
     const listingIds = new Set<string>();
 
     for (let i = 0; i < cardCount; i++) {
-      const card = cards.nth(i);
-      const href = await card.locator("a").first().getAttribute("href");
-      if (href) {
-        const listingId = href.split("/listing/")[1]?.split("?")[0];
-        if (listingId) {
-          listingIds.add(listingId);
-        }
+      const listingId = await cards.nth(i).getAttribute("data-listing-id");
+      if (listingId) {
+        listingIds.add(listingId);
       }
     }
 
@@ -191,7 +180,6 @@ test.describe("Filter + Pagination Interactions", () => {
     });
 
     // Navigate to search page
-    await page.goto(buildSearchUrl({}));
     await waitForSearchReady(page);
 
     const initialCardCount = await scopedCards(page).count();
@@ -202,8 +190,26 @@ test.describe("Filter + Pagination Interactions", () => {
     });
     await expect(loadMoreButton).toBeVisible();
 
-    // Use rapidClick to click it 3 times quickly (50ms interval)
-    await rapidClick(loadMoreButton, 3, 50);
+    // Dispatch 3 rapid clicks via JS to bypass Playwright locator resolution.
+    // During loading, the button's aria-label changes to "Loading more results"
+    // which breaks getByRole matching. JS clicks bypass this entirely.
+    // The isLoadingRef guard should prevent all but the first from firing.
+    //
+    // IMPORTANT: SearchViewToggle renders children in TWO DOM containers
+    // (mobile + desktop). Scope querySelector to the visible container
+    // to avoid clicking the hidden mobile button on desktop viewports.
+    await page.evaluate(() => {
+      const isMobile = window.innerWidth < 768;
+      const containerSel = isMobile
+        ? '[data-testid="mobile-search-results-container"]'
+        : '[data-testid="search-results-container"]';
+      const btn = document.querySelector(`${containerSel} button[aria-busy]`);
+      if (btn instanceof HTMLElement) {
+        btn.click();
+        btn.click();
+        btn.click();
+      }
+    });
 
     // Wait for loading to complete (button re-enabled)
     await expect(loadMoreButton).toBeEnabled({ timeout: 10000 });
@@ -223,7 +229,6 @@ test.describe("Filter + Pagination Interactions", () => {
     await setupPaginationMock(page, { totalLoadMoreItems: 60 });
 
     // Navigate to search page
-    await page.goto(buildSearchUrl({}));
     await waitForSearchReady(page);
 
     const loadMoreButton = page.getByRole("button", {
@@ -235,9 +240,17 @@ test.describe("Filter + Pagination Interactions", () => {
     for (let i = 0; i < 4; i++) {
       await expect(loadMoreButton).toBeVisible();
       await loadMoreButton.click();
-      // Wait for button to be enabled again (loading complete)
-      await expect(loadMoreButton).toBeEnabled({ timeout: 10000 });
-      await page.waitForTimeout(300); // Small delay between clicks for stability
+      if (i < 3) {
+        // Wait for button to be enabled again (loading complete)
+        await expect(loadMoreButton).toBeEnabled({ timeout: 10000 });
+        await page.waitForTimeout(300); // Small delay between clicks for stability
+      } else {
+        // Final click may remove the button (cap reached) — wait for cap message instead
+        const capMsg = searchResultsContainer(page).locator(
+          "text=/Showing.*results.*Refine/i"
+        );
+        await expect(capMsg).toBeVisible({ timeout: 10000 });
+      }
     }
 
     // After reaching cap, verify cap message is visible
@@ -250,8 +263,7 @@ test.describe("Filter + Pagination Interactions", () => {
     await expect(loadMoreButton).not.toBeVisible();
 
     // Navigate with filter change (amenities=Wifi)
-    await page.goto(buildSearchUrl({ amenities: "Wifi" }));
-    await waitForSearchReady(page);
+    await gotoSearchWithFilters(page, { amenities: "Wifi" });
 
     // After remount, cap message should be gone
     await expect(capMessage).not.toBeVisible();

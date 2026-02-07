@@ -33,10 +33,19 @@ test.describe("Lease Duration Filter", () => {
 
   // 5.1: Select each lease duration option -> URL contains leaseDuration=<value>
   test(`${tags.core} - selecting each lease duration option updates URL`, async ({ page }) => {
-    for (const duration of LEASE_DURATIONS) {
-      await waitForSearchReady(page);
-      await openFilterModal(page);
+    // 5 iterations × ~12s each can exceed the default 60s timeout in slow environments
+    test.setTimeout(120_000);
+    await waitForSearchReady(page);
 
+    // Disable "Search as I move" to prevent map-triggered URL changes
+    // from resetting pending filter state while the modal is open
+    const searchAsIMove = page.getByRole("switch", { name: /search as i move/i });
+    if (await searchAsIMove.isChecked()) {
+      await searchAsIMove.click();
+    }
+
+    for (const duration of LEASE_DURATIONS) {
+      await openFilterModal(page);
       await selectDropdownOption(page, "filter-lease", new RegExp(`^${duration}$`, "i"));
       await applyFilters(page);
 
@@ -61,6 +70,8 @@ test.describe("Lease Duration Filter", () => {
 
     expect(getUrlParam(page, "leaseDuration")).toBe("6 months");
 
+    // Wait for map settle before opening modal
+    await page.waitForTimeout(1_000);
     await openFilterModal(page);
 
     // Select "Any" to clear the lease duration

@@ -49,7 +49,7 @@ test.describe("Filter Race Conditions", () => {
     await applyButton(page).click();
 
     // Wait for modal to close and URL to update
-    await expect(filterDialog(page)).not.toBeVisible();
+    await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
     await page.waitForURL(/amenities=Wifi/);
 
     // Verify URL contains amenities=Wifi
@@ -166,7 +166,7 @@ test.describe("Filter Race Conditions", () => {
     await rapidClick(applyButton(page), 2, 50);
 
     // Wait for modal to close
-    await expect(filterDialog(page)).not.toBeVisible();
+    await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
 
     // Wait for URL to update
     await page.waitForURL(/amenities=Wifi/);
@@ -176,7 +176,7 @@ test.describe("Filter Race Conditions", () => {
 
     // No error on page
     const errorMessage = page.getByText(/error|failed/i);
-    await expect(errorMessage).not.toBeVisible();
+    await expect(errorMessage).not.toBeVisible({ timeout: 10_000 });
 
     // Navigation count should be reasonable (not doubled from double-click)
     expect(getNavCount()).toBeLessThanOrEqual(4);
@@ -206,7 +206,7 @@ test.describe("Filter Race Conditions", () => {
     await rapidClick(loadMoreButton, 2, 50);
 
     // Wait for loading to complete
-    await expect(loadMoreButton).not.toHaveAttribute("aria-busy", "true");
+    await expect(loadMoreButton).not.toHaveAttribute("aria-busy", "true", { timeout: 10_000 });
 
     // Verify loadMoreCallCount is exactly 1 (isLoadingMore guard)
     expect(mock.loadMoreCallCount()).toBe(1);
@@ -234,8 +234,11 @@ test.describe("Filter Race Conditions", () => {
 
     // Apply filters
     await applyButton(page).click();
-    await expect(filterDialog(page)).not.toBeVisible();
+    await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
     await page.waitForURL(/amenities=Wifi/);
+
+    // Let apply navigation fully settle before next goto
+    await waitForUrlStable(page);
 
     // Immediately navigate with new bounds (simulating map pan)
     await page.goto(

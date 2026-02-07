@@ -18,28 +18,14 @@
 import {
   test,
   expect,
-  SF_BOUNDS,
-  selectors,
   tags,
-  SEARCH_URL,
-  boundsQS,
   waitForSearchReady,
+  gotoSearchWithFilters,
   filtersButton,
   filterDialog,
   applyButton,
   closeButton,
-  clearAllButton,
 } from "../helpers";
-import type { Page } from "@playwright/test";
-
-// ---------------------------------------------------------------------------
-// Domain-specific Helpers
-// ---------------------------------------------------------------------------
-
-/** Locate the Filters button with no active filters (exact match) */
-function filtersButtonExact(page: Page) {
-  return page.getByRole("button", { name: "Filters", exact: true });
-}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -126,9 +112,10 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     const roomTypeSelect = dialog.locator("#filter-room-type");
     if (await roomTypeSelect.isVisible()) {
       await roomTypeSelect.click();
-      // Select "Private Room" from the dropdown
+      // Wait for Radix Select dropdown to render
+      await page.getByRole("listbox").waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
       const privateOption = page.getByRole("option", { name: /private room/i });
-      if (await privateOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      if (await privateOption.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await privateOption.click();
       }
     }
@@ -155,7 +142,6 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     const wifiButton = dialog.getByRole("button", { name: /wifi/i }).first();
     if (await wifiButton.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await wifiButton.click();
-      await page.waitForTimeout(300);
     }
 
     // Close without applying
@@ -179,24 +165,21 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     }
 
     // After many tabs, focus should still be within the dialog (not on page behind)
-    const activeElement = await page.evaluate(() => {
-      const el = document.activeElement;
-      if (!el) return null;
-      // Check if active element is inside the dialog
-      const dialog = el.closest('[role="dialog"]');
-      return dialog !== null;
-    });
-
-    // Focus should be within the dialog due to FocusTrap
-    expect(activeElement).toBe(true);
+    // Allow focus state to settle after rapid Tab presses
+    await expect(async () => {
+      const isInsideDialog = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el) return false;
+        return el.closest('[role="dialog"]') !== null;
+      });
+      expect(isInsideDialog).toBe(true);
+    }).toPass({ timeout: 5_000 });
   });
 
   // 9. Filter state persists in modal when reopened
   test(`${tags.core} - filter state persists when modal is reopened`, async ({ page }) => {
     // Navigate with a pre-applied filter so it shows in the modal
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
     // Open the filter modal (button label includes count when filters active)
     await filtersButton(page).click();
@@ -248,9 +231,7 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   // 11. Active filter count badge shows in the header
   test(`${tags.core} - active filter count badge displays in modal header`, async ({ page }) => {
     // Navigate with filters applied
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await gotoSearchWithFilters(page, { roomType: "Private Room", amenities: "Wifi" });
 
     // Button label changes to "Filters (N active)" when filters are present
     await filtersButton(page).click();

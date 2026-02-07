@@ -19,10 +19,10 @@ import {
   tags,
   selectors,
   searchResultsContainer,
-  SEARCH_URL,
   VALID_AMENITIES,
   getUrlParam,
   waitForSearchReady,
+  gotoSearchWithFilters,
   openFilterModal,
   amenitiesGroup,
   toggleAmenity,
@@ -91,9 +91,7 @@ test.describe("Amenities Filter", () => {
   // 3. Deselect amenity -> removed from URL
   test(`${tags.core} - deselecting an amenity removes it from URL`, async ({ page }) => {
     // Start with Wifi and Parking applied
-    await page.goto(`${SEARCH_URL}&amenities=Wifi,Parking`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await gotoSearchWithFilters(page, { amenities: "Wifi,Parking" });
 
     await openFilterModal(page);
 
@@ -103,7 +101,6 @@ test.describe("Amenities Filter", () => {
 
     // Deselect Wifi
     await wifiBtn.click();
-    await page.waitForTimeout(300);
 
     // Wifi should no longer be pressed
     await expect(wifiBtn).toHaveAttribute("aria-pressed", "false");
@@ -132,9 +129,7 @@ test.describe("Amenities Filter", () => {
     const initialCount = await container.locator(selectors.listingCard).count();
 
     // Navigate with an amenity filter
-    await page.goto(`${SEARCH_URL}&amenities=Pool`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await gotoSearchWithFilters(page, { amenities: "Pool" });
 
     const filteredCount = await container.locator(selectors.listingCard).count();
     const hasEmptyState = await container.locator(selectors.emptyState).count() > 0;
@@ -146,9 +141,7 @@ test.describe("Amenities Filter", () => {
 
   // 5. Amenity chips display in applied filters
   test(`${tags.core} - amenity shows as chip in applied filters`, async ({ page }) => {
-    await page.goto(`${SEARCH_URL}&amenities=Wifi`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await gotoSearchWithFilters(page, { amenities: "Wifi" });
 
     const container = searchResultsContainer(page);
     const filtersRegion = container.locator('[aria-label="Applied filters"]');
@@ -165,14 +158,10 @@ test.describe("Amenities Filter", () => {
   // 6. Clear amenities restores results
   test(`${tags.core} - clearing all amenity filters restores results`, async ({ page }) => {
     // Start with amenity applied
-    await page.goto(`${SEARCH_URL}&amenities=Pool`);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await gotoSearchWithFilters(page, { amenities: "Pool" });
 
     // Navigate back without amenities
-    await page.goto(SEARCH_URL);
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await gotoSearchWithFilters(page, {});
 
     expect(getUrlParam(page, "amenities")).toBeNull();
     expect(await page.title()).toBeTruthy();

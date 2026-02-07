@@ -60,11 +60,14 @@ test.describe("Filter URL-UI Desync", () => {
     expect(currentUrl.searchParams.has("amenities")).toBe(false);
 
     // Verify applied filters region is either not visible or has no chips
-    const isRegionVisible = await filtersRegion.isVisible();
-    if (isRegionVisible) {
-      const chipCount = await filtersRegion.getByRole("button").count();
-      expect(chipCount).toBe(0);
-    }
+    // Use auto-retry since DOM may still be updating after goBack
+    await expect(async () => {
+      const isRegionVisible = await filtersRegion.isVisible();
+      if (isRegionVisible) {
+        const chipCount = await filtersRegion.getByRole("button").count();
+        expect(chipCount).toBe(0);
+      }
+    }).toPass({ timeout: 10_000 });
 
     // Verify if we reopen the filter modal, Wifi should NOT be pressed
     await openFilterModal(page);
