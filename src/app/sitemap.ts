@@ -2,6 +2,8 @@ import type { MetadataRoute } from 'next';
 import { prisma } from '@/lib/prisma';
 import { unstable_cache } from 'next/cache';
 
+export const dynamic = 'force-dynamic';
+
 const getCachedListings = unstable_cache(
   async () => {
     return prisma.listing.findMany({
