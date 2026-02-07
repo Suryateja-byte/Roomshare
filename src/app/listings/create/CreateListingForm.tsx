@@ -75,8 +75,8 @@ export default function CreateListingForm() {
     const [showDraftBanner, setShowDraftBanner] = useState(false);
     const [draftRestored, setDraftRestored] = useState(false);
     const [showPartialUploadDialog, setShowPartialUploadDialog] = useState(false);
-    const [pendingSubmit, setPendingSubmit] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
+    const isSubmittingRef = useRef(false);
 
     // Form field states for premium components
     const [description, setDescription] = useState('');
@@ -94,6 +94,8 @@ export default function CreateListingForm() {
     const [city, setCity] = useState('');
     const [state, setState] = useState('');
     const [zip, setZip] = useState('');
+    const [amenitiesValue, setAmenitiesValue] = useState('');
+    const [houseRulesValue, setHouseRulesValue] = useState('');
 
     const DESCRIPTION_MAX_LENGTH = 1000;
 
@@ -103,6 +105,7 @@ export default function CreateListingForm() {
         hasDraft,
         savedAt,
         saveData,
+        cancelSave,
         clearPersistedData,
         isHydrated
     } = useFormPersistence<ListingFormData>({ key: FORM_STORAGE_KEY });
@@ -139,11 +142,19 @@ export default function CreateListingForm() {
                 e.returnValue = 'You have unsaved changes. Your uploaded images will be lost if you leave.';
                 return e.returnValue;
             }
+
+            // Warn if any text fields have content
+            const hasContent = title || description || price || address || city || state || zip;
+            if (hasContent) {
+                e.preventDefault();
+                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                return e.returnValue;
+            }
         };
 
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [loading, uploadedImages]);
+    }, [loading, uploadedImages, title, description, price, address, city, state, zip]);
 
     // Show draft banner when we have a draft and haven't restored yet
     useEffect(() => {
@@ -171,6 +182,8 @@ export default function CreateListingForm() {
         setGenderPreference(persistedData.genderPreference || '');
         setHouseholdGender(persistedData.householdGender || '');
         setSelectedLanguages(persistedData.selectedLanguages || []);
+        setAmenitiesValue(persistedData.amenities || '');
+        setHouseRulesValue(persistedData.houseRules || '');
 
         // Restore images (they're already uploaded to Supabase)
         if (persistedData.images && persistedData.images.length > 0) {
@@ -196,8 +209,6 @@ export default function CreateListingForm() {
 
     // Collect current form data for saving
     const collectFormData = (): ListingFormData => {
-        const form = formRef.current;
-
         return {
             title,
             description,
@@ -207,8 +218,8 @@ export default function CreateListingForm() {
             city,
             state,
             zip,
-            amenities: form ? (form.elements.namedItem('amenities') as HTMLInputElement)?.value || '' : '',
-            houseRules: form ? (form.elements.namedItem('houseRules') as HTMLInputElement)?.value || '' : '',
+            amenities: amenitiesValue,
+            houseRules: houseRulesValue,
             moveInDate,
             leaseDuration,
             roomType,
@@ -232,7 +243,7 @@ export default function CreateListingForm() {
     useEffect(() => {
         if (!isHydrated || !draftRestored && hasDraft) return;
         handleFormChange();
-    }, [title, description, price, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, genderPreference, householdGender, selectedLanguages, uploadedImages]);
+    }, [title, description, price, totalSlots, address, city, state, zip, amenitiesValue, houseRulesValue, moveInDate, leaseDuration, roomType, genderPreference, householdGender, selectedLanguages, uploadedImages]);
 
     const toggleLanguage = (lang: string) => {
         setSelectedLanguages(prev =>
@@ -249,6 +260,10 @@ export default function CreateListingForm() {
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, forceSubmit = false) => {
         e.preventDefault();
+
+        // Synchronous double-submit guard
+        if (isSubmittingRef.current) return;
+
         setError('');
         setFieldErrors({});
 
@@ -271,6 +286,7 @@ export default function CreateListingForm() {
             return;
         }
 
+        isSubmittingRef.current = true;
         setLoading(true);
 
         const formData = new FormData(e.currentTarget);
@@ -279,14 +295,20 @@ export default function CreateListingForm() {
         // Get uploaded URLs (filter out any that failed to upload)
         const imageUrls = successfulImages.map(img => img.uploadedUrl as string);
 
+        // Generate idempotency key for this submission attempt
+        const idempotencyKey = crypto.randomUUID();
+
         try {
             const res = await fetch('/api/listings', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Idempotency-Key': idempotencyKey,
                 },
                 body: JSON.stringify({
                     ...data,
+                    amenities: amenitiesValue || undefined,
+                    houseRules: houseRulesValue || undefined,
                     images: imageUrls,
                     householdLanguages: selectedLanguages,
                     moveInDate: moveInDate || undefined,
@@ -300,24 +322,38 @@ export default function CreateListingForm() {
             if (!res.ok) {
                 const json = await res.json();
                 if (json.fields) {
-                    setFieldErrors(json.fields);
+                    const newFieldErrors = json.fields as Record<string, string>;
+                    setFieldErrors(newFieldErrors);
+                    // Focus the first field with an error
+                    const firstErrorKey = Object.keys(newFieldErrors)[0];
+                    if (firstErrorKey) {
+                        const element = document.getElementById(firstErrorKey);
+                        element?.focus();
+                    }
                 }
                 throw new Error(json.error || 'Failed to create listing');
             }
 
             const result = await res.json();
+            // Cancel pending debounced save to prevent it re-writing the draft
+            cancelSave();
             // Clear draft on successful submission
             clearPersistedData();
-            // Show success toast
+            // Show success toast with enough time to read before redirect
             toast.success('Listing published successfully!', {
-                description: 'Your listing is now live and visible to potential roommates.'
+                description: 'Your listing is now live and visible to potential roommates.',
+                duration: 5000,
             });
-            router.push(`/listings/${result.id}`);
+            // Slight delay so user sees the success toast before redirect
+            setTimeout(() => {
+                router.push(`/listings/${result.id}`);
+            }, 1000);
         } catch (err: any) {
             setError(err.message);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
             setLoading(false);
+            isSubmittingRef.current = false;
         }
     };
 
@@ -340,7 +376,7 @@ export default function CreateListingForm() {
     const FieldError = ({ field }: { field: string }) => {
         if (!fieldErrors[field]) return null;
         return (
-            <p className="text-red-500 dark:text-red-400 text-xs mt-1">
+            <p id={`${field}-error`} role="alert" className="text-red-500 dark:text-red-400 text-xs mt-1">
                 {fieldErrors[field]}
             </p>
         );
@@ -478,6 +514,8 @@ export default function CreateListingForm() {
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="e.g. Sun-drenched Loft in Arts District"
                             disabled={loading}
+                            aria-invalid={!!fieldErrors.title}
+                            aria-describedby={fieldErrors.title ? 'title-error' : undefined}
                             className={fieldErrors.title ? 'border-red-500 dark:border-red-500' : ''}
                         />
                         <FieldError field="title" />
@@ -493,6 +531,8 @@ export default function CreateListingForm() {
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             maxLength={DESCRIPTION_MAX_LENGTH}
+                            aria-invalid={!!fieldErrors.description}
+                            aria-describedby={fieldErrors.description ? 'description-error' : undefined}
                             className={`w-full bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:bg-white dark:focus:bg-zinc-800 border rounded-xl px-4 py-3 sm:py-3.5 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/10 focus:border-zinc-900 dark:focus:border-zinc-500 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed ${fieldErrors.description ? 'border-red-500 dark:border-red-500' : 'border-zinc-200 dark:border-zinc-700'}`}
                             placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
                             disabled={loading}
@@ -515,6 +555,8 @@ export default function CreateListingForm() {
                                 onChange={(e) => setPrice(e.target.value)}
                                 placeholder="2400"
                                 disabled={loading}
+                                aria-invalid={!!fieldErrors.price}
+                                aria-describedby={fieldErrors.price ? 'price-error' : undefined}
                                 className={fieldErrors.price ? 'border-red-500 dark:border-red-500' : ''}
                             />
                             <FieldError field="price" />
@@ -530,6 +572,8 @@ export default function CreateListingForm() {
                                 onChange={(e) => setTotalSlots(e.target.value)}
                                 placeholder="1"
                                 disabled={loading}
+                                aria-invalid={!!fieldErrors.totalSlots}
+                                aria-describedby={fieldErrors.totalSlots ? 'totalSlots-error' : undefined}
                                 className={fieldErrors.totalSlots ? 'border-red-500 dark:border-red-500' : ''}
                             />
                             <FieldError field="totalSlots" />
@@ -555,6 +599,8 @@ export default function CreateListingForm() {
                             onChange={(e) => setAddress(e.target.value)}
                             placeholder="123 Boulevard St"
                             disabled={loading}
+                            aria-invalid={!!fieldErrors.address}
+                            aria-describedby={fieldErrors.address ? 'address-error' : undefined}
                             className={fieldErrors.address ? 'border-red-500 dark:border-red-500' : ''}
                         />
                         <FieldError field="address" />
@@ -570,6 +616,8 @@ export default function CreateListingForm() {
                                 onChange={(e) => setCity(e.target.value)}
                                 placeholder="San Francisco"
                                 disabled={loading}
+                                aria-invalid={!!fieldErrors.city}
+                                aria-describedby={fieldErrors.city ? 'city-error' : undefined}
                                 className={fieldErrors.city ? 'border-red-500 dark:border-red-500' : ''}
                             />
                             <FieldError field="city" />
@@ -584,6 +632,8 @@ export default function CreateListingForm() {
                                 onChange={(e) => setState(e.target.value)}
                                 placeholder="CA"
                                 disabled={loading}
+                                aria-invalid={!!fieldErrors.state}
+                                aria-describedby={fieldErrors.state ? 'state-error' : undefined}
                                 className={fieldErrors.state ? 'border-red-500 dark:border-red-500' : ''}
                             />
                             <FieldError field="state" />
@@ -598,6 +648,8 @@ export default function CreateListingForm() {
                                 onChange={(e) => setZip(e.target.value)}
                                 placeholder="94103"
                                 disabled={loading}
+                                aria-invalid={!!fieldErrors.zip}
+                                aria-describedby={fieldErrors.zip ? 'zip-error' : undefined}
                                 className={fieldErrors.zip ? 'border-red-500 dark:border-red-500' : ''}
                             />
                             <FieldError field="zip" />
@@ -638,8 +690,12 @@ export default function CreateListingForm() {
                         <Input
                             id="amenities"
                             name="amenities"
+                            value={amenitiesValue}
+                            onChange={(e) => setAmenitiesValue(e.target.value)}
                             placeholder="Wifi, Gym, Washer/Dryer, Roof Deck..."
                             disabled={loading}
+                            aria-invalid={!!fieldErrors.amenities}
+                            aria-describedby={fieldErrors.amenities ? 'amenities-error' : undefined}
                             className={fieldErrors.amenities ? 'border-red-500 dark:border-red-500' : ''}
                         />
                         <FieldError field="amenities" />
@@ -667,9 +723,10 @@ export default function CreateListingForm() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="Month-to-month">Month-to-month</SelectItem>
+                                    <SelectItem value="3 months">3 months</SelectItem>
                                     <SelectItem value="6 months">6 months</SelectItem>
-                                    <SelectItem value="1 year">1 year</SelectItem>
-                                    <SelectItem value="1 year+">1 year+</SelectItem>
+                                    <SelectItem value="12 months">12 months</SelectItem>
+                                    <SelectItem value="Flexible">Flexible</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -777,8 +834,12 @@ export default function CreateListingForm() {
                         <Input
                             id="houseRules"
                             name="houseRules"
+                            value={houseRulesValue}
+                            onChange={(e) => setHouseRulesValue(e.target.value)}
                             placeholder="No smoking, quiet hours after 10pm, no pets..."
                             disabled={loading}
+                            aria-invalid={!!fieldErrors.houseRules}
+                            aria-describedby={fieldErrors.houseRules ? 'houseRules-error' : undefined}
                             className={fieldErrors.houseRules ? 'border-red-500 dark:border-red-500' : ''}
                         />
                         <FieldError field="houseRules" />

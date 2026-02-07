@@ -19,6 +19,7 @@ interface UseFormPersistenceResult<T> {
     hasDraft: boolean;
     savedAt: Date | null;
     saveData: (data: T) => void;
+    cancelSave: () => void;
     clearPersistedData: () => void;
     isHydrated: boolean;
 }
@@ -113,11 +114,17 @@ export function useFormPersistence<T>(
         }
     }, [key]);
 
+    // Cancel any pending debounced save (call before clearPersistedData on submit)
+    const cancelSave = useCallback(() => {
+        debouncedSave.cancel();
+    }, [debouncedSave]);
+
     return {
         persistedData,
         hasDraft: persistedData !== null,
         savedAt,
         saveData,
+        cancelSave,
         clearPersistedData,
         isHydrated
     };

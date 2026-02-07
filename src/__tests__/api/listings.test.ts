@@ -6,9 +6,13 @@ jest.mock('@/lib/prisma', () => ({
   prisma: {
     listing: {
       create: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
     location: {
       create: jest.fn(),
+    },
+    user: {
+      findUnique: jest.fn(),
     },
     $transaction: jest.fn(),
     $executeRaw: jest.fn(),
@@ -38,17 +42,56 @@ jest.mock('@/lib/logger', () => ({
     warn: jest.fn().mockResolvedValue(undefined),
     sync: {
       error: jest.fn(),
+      warn: jest.fn(),
     },
   },
 }))
 
+jest.mock('@/app/actions/suspension', () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+  checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
+}))
+
+jest.mock('@/lib/listing-language-guard', () => ({
+  checkListingLanguageCompliance: jest.fn().mockReturnValue({ allowed: true }),
+}))
+
+jest.mock('@/lib/languages', () => ({
+  isValidLanguageCode: jest.fn().mockReturnValue(true),
+}))
+
+jest.mock('@/lib/idempotency', () => ({
+  withIdempotency: jest.fn(),
+}))
+
+jest.mock('@/lib/search/search-doc-sync', () => ({
+  upsertSearchDocSync: jest.fn().mockResolvedValue(true),
+}))
+
+jest.mock('@/lib/search-alerts', () => ({
+  triggerInstantAlerts: jest.fn().mockResolvedValue({ sent: 0, errors: 0 }),
+}))
+
+jest.mock('@/lib/search/search-doc-dirty', () => ({
+  markListingDirty: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock('@/lib/schemas', () => {
+  const actual = jest.requireActual('@/lib/schemas')
+  return actual
+})
+
 jest.mock('next/server', () => ({
   NextResponse: {
-    json: (data: any, init?: { status?: number }) => {
+    json: (data: unknown, init?: { status?: number; headers?: Record<string, string> }) => {
+      const headersMap = new Map<string, string>()
+      if (init?.headers) {
+        Object.entries(init.headers).forEach(([k, v]) => headersMap.set(k, v))
+      }
       return {
         status: init?.status || 200,
         json: async () => data,
-        headers: new Map(),
+        headers: headersMap,
       }
     },
   },
@@ -59,6 +102,9 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { geocodeAddress } from '@/lib/geocoding'
 import { getListings } from '@/lib/data'
+import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension'
+import { upsertSearchDocSync } from '@/lib/search/search-doc-sync'
+import { triggerInstantAlerts } from '@/lib/search-alerts'
 
 describe('Listings API', () => {
   const mockSession = {
@@ -68,6 +114,10 @@ describe('Listings API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
+    ;(checkSuspension as jest.Mock).mockResolvedValue({ suspended: false })
+    ;(checkEmailVerified as jest.Mock).mockResolvedValue({ verified: true })
+    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'user-123' })
+    ;(prisma.listing.count as jest.Mock).mockResolvedValue(0)
   })
 
   describe('GET', () => {
@@ -107,15 +157,20 @@ describe('Listings API', () => {
 
   describe('POST', () => {
     const validBody = {
-      title: 'Cozy Room',
-      description: 'A nice place to stay',
+      title: 'Cozy Room in Downtown',
+      description: 'A nice place to stay with great amenities and city views',
       price: '800',
+      amenities: 'Wifi,AC',
+      houseRules: '',
       address: '123 Main St',
       city: 'San Francisco',
       state: 'CA',
       zip: '94102',
-      roomType: 'PRIVATE',
+      roomType: 'Private Room',
       totalSlots: '1',
+      images: [
+        'https://abc123.supabase.co/storage/v1/object/public/images/listings/user-123/test.jpg',
+      ],
     }
 
     it('returns 400 for missing required fields', async () => {
@@ -162,7 +217,6 @@ describe('Listings API', () => {
 
     it('returns 401 when not authenticated', async () => {
       ;(auth as jest.Mock).mockResolvedValue(null)
-      ;(geocodeAddress as jest.Mock).mockResolvedValue({ lat: 37.7749, lng: -122.4194 })
 
       const request = new Request('http://localhost/api/listings', {
         method: 'POST',
@@ -175,7 +229,16 @@ describe('Listings API', () => {
 
     it('creates listing successfully', async () => {
       ;(geocodeAddress as jest.Mock).mockResolvedValue({ lat: 37.7749, lng: -122.4194 })
-      const mockListing = { id: 'listing-new', title: 'Cozy Room' }
+      const mockListing = {
+        id: 'listing-new',
+        title: 'Cozy Room in Downtown',
+        description: 'A nice place to stay with great amenities and city views',
+        price: 800,
+        roomType: 'Private Room',
+        leaseDuration: null,
+        amenities: ['Wifi', 'AC'],
+        houseRules: [],
+      }
       ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
         const tx = {
           listing: { create: jest.fn().mockResolvedValue(mockListing) },
@@ -192,6 +255,8 @@ describe('Listings API', () => {
       const response = await POST(request)
 
       expect(response.status).toBe(201)
+      expect(upsertSearchDocSync).toHaveBeenCalledWith('listing-new')
+      expect(triggerInstantAlerts).toHaveBeenCalled()
     })
 
     it('handles database errors', async () => {
@@ -205,6 +270,75 @@ describe('Listings API', () => {
       const response = await POST(request)
 
       expect(response.status).toBe(500)
+    })
+
+    it('returns 403 when user is suspended', async () => {
+      ;(checkSuspension as jest.Mock).mockResolvedValue({
+        suspended: true,
+        error: 'Account suspended',
+      })
+
+      const request = new Request('http://localhost/api/listings', {
+        method: 'POST',
+        body: JSON.stringify(validBody),
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(403)
+    })
+
+    it('returns 403 when email not verified', async () => {
+      ;(checkEmailVerified as jest.Mock).mockResolvedValue({
+        verified: false,
+        error: 'Please verify your email',
+      })
+
+      const request = new Request('http://localhost/api/listings', {
+        method: 'POST',
+        body: JSON.stringify(validBody),
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(403)
+    })
+
+    it('returns 401 when user not found in database', async () => {
+      ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(null)
+
+      const request = new Request('http://localhost/api/listings', {
+        method: 'POST',
+        body: JSON.stringify(validBody),
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(401)
+    })
+
+    it('returns 400 when max listings exceeded', async () => {
+      ;(prisma.listing.count as jest.Mock).mockResolvedValue(10)
+
+      const request = new Request('http://localhost/api/listings', {
+        method: 'POST',
+        body: JSON.stringify(validBody),
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(400)
+      const data = await response.json()
+      expect(data.error).toContain('Maximum 10')
+    })
+
+    it('returns 400 for invalid JSON body', async () => {
+      const request = new Request('http://localhost/api/listings', {
+        method: 'POST',
+        body: 'not json{{{',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(400)
+      const data = await response.json()
+      expect(data.error).toBe('Invalid JSON body')
     })
   })
 })

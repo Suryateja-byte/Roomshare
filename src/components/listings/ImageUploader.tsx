@@ -178,12 +178,18 @@ export default function ImageUploader({
         }
     };
 
+    // Track current preview URLs via ref for cleanup on unmount
+    const imageUrlsRef = useRef<string[]>([]);
+    useEffect(() => {
+        imageUrlsRef.current = images.map(img => img.previewUrl).filter(Boolean);
+    }, [images]);
+
     // Cleanup ObjectURLs to avoid memory leaks
     useEffect(() => {
         return () => {
-            images.forEach(img => {
-                if (img.previewUrl && !img.uploadedUrl) {
-                    URL.revokeObjectURL(img.previewUrl);
+            imageUrlsRef.current.forEach(url => {
+                if (url.startsWith('blob:')) {
+                    URL.revokeObjectURL(url);
                 }
             });
         };
