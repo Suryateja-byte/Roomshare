@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
 
 /**
  * In-process rate limiter for degraded mode (DB errors).
@@ -142,7 +143,7 @@ export async function checkRateLimit(
       remaining: limit - 1,
       resetAt: expiresAt,
     };
-  } catch (error) {
+  } catch {
     // FAIL CLOSED: Deny by default on DB errors (security over availability)
     // Use degraded mode fallback for availability during transient DB blips
     console.error("[RateLimit] DB error (code: RL_DB_ERR)");
@@ -182,14 +183,19 @@ export const RATE_LIMITS = {
   verifyEmail: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
   resetPassword: { limit: 5, windowMs: 60 * 60 * 1000 }, // 5 per hour
   createListing: { limit: 5, windowMs: 24 * 60 * 60 * 1000 }, // 5 per day
+  updateListing: { limit: 20, windowMs: 24 * 60 * 60 * 1000 }, // 20 per day
+  deleteListing: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
   sendMessage: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100 per hour
   createReview: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
+  updateReview: { limit: 30, windowMs: 24 * 60 * 60 * 1000 }, // 30 per day
+  deleteReview: { limit: 30, windowMs: 24 * 60 * 60 * 1000 }, // 30 per day
   agent: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
   // P2 fixes: Rate limits for scraping protection and abuse prevention
   listingsRead: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100 per hour (scraping protection)
   unreadCount: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute (frequent polling)
   toggleFavorite: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
   createReport: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
+  uploadDelete: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
   // P0 fix: Search page rate limit to prevent DoS
   search: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
   // Nearby places search (Radar API)
@@ -197,6 +203,22 @@ export const RATE_LIMITS = {
   // P1-05: Rate limit for reviews GET endpoint
   getReviews: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
 } as const;
+
+function getFirstForwardedIp(forwardedFor: string | null): string | null {
+  if (!forwardedFor) return null;
+  const first = forwardedFor.split(",")[0]?.trim();
+  return first || null;
+}
+
+function getAnonymousFingerprint(headers: Headers): string {
+  const fingerprintSource = [
+    headers.get("user-agent") || "",
+    headers.get("accept-language") || "",
+    headers.get("sec-ch-ua") || "",
+  ].join("|");
+
+  return `anon-${crypto.createHash("sha256").update(fingerprintSource).digest("hex").slice(0, 16)}`;
+}
 
 /**
  * Get client IP from request headers (Vercel compatible)
@@ -212,14 +234,29 @@ export function getClientIP(request: Request): string {
     return realIP;
   }
 
-  // Fallback for non-Vercel environments (local dev only)
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded && process.env.NODE_ENV === "development") {
-    return forwarded.split(",")[0].trim();
+  const cloudflareIp = request.headers.get("cf-connecting-ip");
+  if (cloudflareIp) {
+    return cloudflareIp;
   }
 
-  // Fallback
-  return "unknown";
+  const trueClientIp = request.headers.get("true-client-ip");
+  if (trueClientIp) {
+    return trueClientIp;
+  }
+
+  // Proxy fallback for non-Vercel environments.
+  const forwarded = getFirstForwardedIp(request.headers.get("x-forwarded-for"));
+  const shouldTrustForwarded =
+    process.env.NODE_ENV === "development"
+    || process.env.TRUST_PROXY === "true"
+    || Boolean(request.headers.get("x-forwarded-proto"));
+
+  if (forwarded && shouldTrustForwarded) {
+    return forwarded;
+  }
+
+  // Last resort: deterministic anonymous fingerprint to avoid global "unknown" bucket.
+  return getAnonymousFingerprint(request.headers);
 }
 
 /**
@@ -236,12 +273,25 @@ export function getClientIPFromHeaders(headersList: Headers): string {
     return realIP;
   }
 
-  // Fallback for non-Vercel environments (local dev only)
-  const forwarded = headersList.get("x-forwarded-for");
-  if (forwarded && process.env.NODE_ENV === "development") {
-    return forwarded.split(",")[0].trim();
+  const cloudflareIp = headersList.get("cf-connecting-ip");
+  if (cloudflareIp) {
+    return cloudflareIp;
   }
 
-  // Fallback
-  return "unknown";
+  const trueClientIp = headersList.get("true-client-ip");
+  if (trueClientIp) {
+    return trueClientIp;
+  }
+
+  const forwarded = getFirstForwardedIp(headersList.get("x-forwarded-for"));
+  const shouldTrustForwarded =
+    process.env.NODE_ENV === "development"
+    || process.env.TRUST_PROXY === "true"
+    || Boolean(headersList.get("x-forwarded-proto"));
+
+  if (forwarded && shouldTrustForwarded) {
+    return forwarded;
+  }
+
+  return getAnonymousFingerprint(headersList);
 }
