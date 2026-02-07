@@ -5,10 +5,14 @@ import { auth } from '@/auth';
 import { getListings } from '@/lib/data';
 import { logger } from '@/lib/logger';
 import { withRateLimit } from '@/lib/with-rate-limit';
-import { householdLanguagesSchema } from '@/lib/schemas';
+import { createListingApiSchema } from '@/lib/schemas';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
+import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension';
+import { withIdempotency } from '@/lib/idempotency';
+import { upsertSearchDocSync } from '@/lib/search/search-doc-sync';
+import { triggerInstantAlerts } from '@/lib/search-alerts';
 
 const normalizeStringList = (value: unknown): string[] => {
     if (Array.isArray(value)) {
@@ -71,13 +75,21 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    // P1-3 FIX: Add rate limiting to prevent spam listings
+    // 1. Rate limiting (existing)
     const rateLimitResponse = await withRateLimit(request, { type: 'createListing' });
     if (rateLimitResponse) return rateLimitResponse;
 
     const startTime = Date.now();
     try {
-        // Get authenticated user before expensive operations (e.g., geocoding)
+        // 2. Parse JSON body with error handling (2H)
+        let body: Record<string, unknown>;
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+        }
+
+        // 3. Auth check
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
             await logger.warn('Unauthorized listing creation attempt', {
@@ -86,64 +98,102 @@ export async function POST(request: Request) {
             });
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-
         const userId = session.user.id;
-        const body = await request.json();
+
+        // 4. Suspension check (1B)
+        const suspension = await checkSuspension();
+        if (suspension.suspended) {
+            return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
+        }
+
+        // 5. Email verification check (1B)
+        const emailCheck = await checkEmailVerified();
+        if (!emailCheck.verified) {
+            return NextResponse.json({ error: emailCheck.error || 'Please verify your email' }, { status: 403 });
+        }
+
+        // 6. User existence check (1C)
+        const userExists = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true },
+        });
+        if (!userExists) {
+            return NextResponse.json(
+                { error: 'User account not found. Please sign out and sign in again.' },
+                { status: 401 },
+            );
+        }
+
         // Log only non-sensitive metadata, NOT the full request body
         await logger.info('Create listing request received', {
             route: '/api/listings',
             method: 'POST',
             hasTitle: !!body.title,
             hasAddress: !!body.address,
-            imageCount: body.images?.length || 0,
+            imageCount: Array.isArray(body.images) ? body.images.length : 0,
             userId: userId.slice(0, 8) + '...',
         });
 
-        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, images, householdLanguages, genderPreference, householdGender } = body;
+        // Pre-normalize array inputs to comma-separated strings for Zod schema compatibility.
+        // The base createListingSchema expects strings for amenities/houseRules and transforms them to arrays.
+        if (Array.isArray(body.amenities)) {
+            body.amenities = body.amenities.join(',');
+        }
+        if (Array.isArray(body.houseRules)) {
+            body.houseRules = body.houseRules.join(',');
+        }
 
-        // Basic validation
-        if (!title || !price || !address || !city || !state || !zip) {
-            await logger.warn('Create listing validation failed - missing fields', {
+        // 7. Zod validation (1A) — replaces manual field checks
+        const validatedFields = createListingApiSchema.safeParse(body);
+        if (!validatedFields.success) {
+            const fieldErrors: Record<string, string> = {};
+            validatedFields.error.issues.forEach((issue) => {
+                if (issue.path.length > 0) {
+                    fieldErrors[issue.path[0].toString()] = issue.message;
+                }
+            });
+            return NextResponse.json({ error: 'Validation failed', fields: fieldErrors }, { status: 400 });
+        }
+
+        const {
+            title, description, price, amenities, houseRules, totalSlots,
+            address, city, state, zip,
+            images, leaseDuration, roomType, genderPreference, householdGender,
+            householdLanguages, moveInDate,
+        } = validatedFields.data;
+
+        // 8. Language compliance check on title AND description (2G)
+        const titleCheck = checkListingLanguageCompliance(title);
+        if (!titleCheck.allowed) {
+            await logger.warn('Listing title failed compliance check', {
                 route: '/api/listings',
                 method: 'POST',
             });
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+            return NextResponse.json({ error: titleCheck.message }, { status: 400 });
         }
 
-        // Validate numeric fields
-        const priceNum = parseFloat(price);
-        const totalSlotsNum = parseInt(totalSlots);
-
-        if (isNaN(priceNum) || priceNum <= 0) {
-            return NextResponse.json({ error: 'Invalid price value' }, { status: 400 });
-        }
-
-        if (isNaN(totalSlotsNum) || totalSlotsNum <= 0) {
-            return NextResponse.json({ error: 'Invalid total slots value' }, { status: 400 });
-        }
-
-        // Validate language codes
-        if (householdLanguages && householdLanguages.length > 0) {
-            const langResult = householdLanguagesSchema.safeParse(householdLanguages);
-            if (!langResult.success) {
-                await logger.warn('Invalid language codes in listing creation', {
-                    route: '/api/listings',
-                    method: 'POST',
-                });
-                return NextResponse.json({ error: 'Invalid language codes' }, { status: 400 });
-            }
-        }
-
-        // Check description for discriminatory language patterns
         if (description) {
-            const complianceCheck = checkListingLanguageCompliance(description);
-            if (!complianceCheck.allowed) {
+            const descriptionCheck = checkListingLanguageCompliance(description);
+            if (!descriptionCheck.allowed) {
                 await logger.warn('Listing description failed compliance check', {
                     route: '/api/listings',
                     method: 'POST',
                 });
-                return NextResponse.json({ error: complianceCheck.message }, { status: 400 });
+                return NextResponse.json({ error: descriptionCheck.message }, { status: 400 });
             }
+        }
+
+        // 9. householdLanguages already validated by createListingApiSchema (includes householdLanguagesSchema)
+
+        // 10. Max listings per user check (2F)
+        const activeListingCount = await prisma.listing.count({
+            where: {
+                ownerId: userId,
+                status: { in: ['ACTIVE', 'PAUSED'] },
+            },
+        });
+        if (activeListingCount >= 10) {
+            return NextResponse.json({ error: 'Maximum 10 active listings per user' }, { status: 400 });
         }
 
         // Geocode address (log only city/state, not full address)
@@ -160,32 +210,30 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Could not geocode address' }, { status: 400 });
         }
 
-        const normalizedAmenities = normalizeStringList(amenities);
-        const normalizedHouseRules = normalizeStringList(houseRules);
+        // Build listing create data from validated fields
+        const listingCreateData = {
+            title,
+            description,
+            price,
+            images: images || [],
+            amenities,
+            houseRules,
+            householdLanguages: (householdLanguages || [])
+                .map((l: string) => l.trim().toLowerCase())
+                .filter(isValidLanguageCode),
+            genderPreference: genderPreference || null,
+            householdGender: householdGender || null,
+            leaseDuration: leaseDuration || null,
+            roomType: roomType || null,
+            totalSlots,
+            availableSlots: totalSlots,
+            moveInDate: moveInDate ? new Date(moveInDate) : null,
+            ownerId: userId,
+        };
 
-        // Transaction to create listing and location, then update with PostGIS data
-        const result = await prisma.$transaction(async (tx) => {
-            const listing = await tx.listing.create({
-                data: {
-                    title,
-                    description,
-                    price: priceNum,
-                    images: images || [],
-                    amenities: normalizedAmenities,
-                    houseRules: normalizedHouseRules,
-                    householdLanguages: Array.isArray(householdLanguages)
-                        ? householdLanguages.map((l: string) => l.trim().toLowerCase()).filter(isValidLanguageCode)
-                        : [],
-                    genderPreference: genderPreference || null,
-                    householdGender: householdGender || null,
-                    leaseDuration,
-                    roomType,
-                    totalSlots: totalSlotsNum,
-                    availableSlots: totalSlotsNum,
-                    moveInDate: moveInDate ? new Date(moveInDate) : null,
-                    ownerId: userId,
-                }
-            });
+        // Transaction logic: create listing + location + PostGIS update
+        const createListingInTx = async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
+            const listing = await tx.listing.create({ data: listingCreateData });
 
             const location = await tx.location.create({
                 data: {
@@ -194,39 +242,105 @@ export async function POST(request: Request) {
                     city,
                     state,
                     zip,
-                }
+                },
             });
 
             // Update with PostGIS geometry
             const point = `POINT(${coords.lng} ${coords.lat})`;
             await tx.$executeRaw`
-        UPDATE "Location"
-        SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
-        WHERE id = ${location.id}
-      `;
+                UPDATE "Location"
+                SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
+                WHERE id = ${location.id}
+            `;
 
             return listing;
-        });
+        };
+
+        // Side effects: search sync + instant alerts + dirty marker (fire AFTER transaction)
+        const fireSideEffects = async (listing: { id: string; title: string; description: string | null; price: number; roomType: string | null; leaseDuration: string | null; amenities: string[]; houseRules: string[] }) => {
+            // 15. Synchronous upsert search doc for immediate visibility (1D)
+            await upsertSearchDocSync(listing.id);
+
+            // 16. Fire-and-forget: trigger instant alerts (1E)
+            triggerInstantAlerts({
+                id: listing.id,
+                title: listing.title,
+                description: listing.description || '',
+                price: listing.price,
+                city,
+                state,
+                roomType: listing.roomType || null,
+                leaseDuration: listing.leaseDuration || null,
+                amenities: listing.amenities,
+                houseRules: listing.houseRules,
+            }).catch((err) => {
+                logger.sync.warn('Instant alerts trigger failed', {
+                    route: '/api/listings',
+                    method: 'POST',
+                    error: err instanceof Error ? err.message : 'Unknown error',
+                });
+            });
+
+            // 17. Fire-and-forget: mark listing dirty as backup
+            markListingDirty(listing.id, 'listing_created').catch((err) => {
+                logger.sync.warn('Failed to mark listing dirty', {
+                    route: '/api/listings',
+                    method: 'POST',
+                    listingId: listing.id,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        };
+
+        // 11. Check for idempotency key header (1F)
+        const idempotencyKey = request.headers.get('X-Idempotency-Key');
+        let result: Awaited<ReturnType<typeof createListingInTx>>;
+        let cached = false;
+
+        if (idempotencyKey) {
+            // 12. Idempotent path: wrap transaction in withIdempotency()
+            const idempResult = await withIdempotency(
+                idempotencyKey,
+                userId,
+                'createListing',
+                validatedFields.data, // request body for hash
+                createListingInTx,
+            );
+
+            if (!idempResult.success) {
+                return NextResponse.json({ error: idempResult.error }, { status: idempResult.status });
+            }
+
+            result = idempResult.result;
+            cached = idempResult.cached;
+
+            // Side effects only for non-cached results
+            if (!cached) {
+                await fireSideEffects(result);
+            }
+        } else {
+            // 13. Non-idempotent path: regular prisma.$transaction
+            result = await prisma.$transaction(createListingInTx);
+
+            // Side effects
+            await fireSideEffects(result);
+        }
 
         await logger.info('Listing created successfully', {
             route: '/api/listings',
             method: 'POST',
             listingId: result.id,
-            userId: userId.slice(0, 8) + '...', // Truncate for privacy
+            userId: userId.slice(0, 8) + '...',
+            cached,
             durationMs: Date.now() - startTime,
         });
 
-        // Fire-and-forget: mark listing dirty for search doc refresh
-        markListingDirty(result.id, 'listing_created').catch((err) => {
-            console.warn("[API] Failed to mark listing dirty", {
-                listingId: result.id,
-                error: err instanceof Error ? err.message : String(err)
-            });
-        });
-
-        // P2-1: Mutation responses must not be cached
+        // 18. Return 201 with no-cache headers
         const response = NextResponse.json(result, { status: 201 });
         response.headers.set('Cache-Control', 'no-store');
+        if (cached) {
+            response.headers.set('X-Idempotency-Replayed', 'true');
+        }
         return response;
 
     } catch (error) {

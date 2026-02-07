@@ -1,5 +1,6 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
@@ -9,6 +10,7 @@ import { checkSuspension, checkEmailVerified } from './suspension';
 import { logger } from '@/lib/logger';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
 import { upsertSearchDocSync } from '@/lib/search/search-doc-sync';
+import { checkServerComponentRateLimit } from '@/lib/with-rate-limit';
 
 // P1-15 FIX: Define proper type for listing data returned to client
 export type CreateListingData = {
@@ -32,7 +34,27 @@ export type CreateListingState = {
     data?: CreateListingData;
 };
 
+/**
+ * @deprecated Use POST /api/listings instead. This server action is no longer
+ * called by the create listing form but remains functional for backwards compatibility.
+ */
 export async function createListing(_prevState: CreateListingState, formData: FormData): Promise<CreateListingState> {
+    console.warn('[DEPRECATED] createListing server action called — use POST /api/listings instead');
+
+    // Rate limiting (defense-in-depth for deprecated action)
+    const headersList = await headers();
+    const rateLimitResult = await checkServerComponentRateLimit(
+        headersList,
+        "createListing",
+        "/actions/createListing"
+    );
+    if (!rateLimitResult.allowed) {
+        return {
+            success: false,
+            error: 'Too many requests. Please try again later.',
+        };
+    }
+
     // 1. Validate input using Zod
     const rawData = {
         title: formData.get('title'),
