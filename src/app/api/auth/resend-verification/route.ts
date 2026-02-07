@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { normalizeEmail } from '@/lib/normalize-email';
-import crypto from 'crypto';
+import { createTokenPair } from '@/lib/token-security';
 
 export async function POST(request: NextRequest) {
     // Rate limit: 3 resend requests per hour
@@ -44,14 +44,14 @@ export async function POST(request: NextRequest) {
             where: { identifier: user.email! }
         });
 
-        // Generate new verification token
-        const verificationToken = crypto.randomBytes(32).toString('hex');
+        // Generate new verification token (store only SHA-256 hash)
+        const { token: verificationToken, tokenHash: verificationTokenHash } = createTokenPair();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
         await prisma.verificationToken.create({
             data: {
                 identifier: user.email!,
-                token: verificationToken,
+                tokenHash: verificationTokenHash,
                 expires,
             },
         });
@@ -61,10 +61,16 @@ export async function POST(request: NextRequest) {
         const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
 
         // Send verification email
-        await sendNotificationEmail('emailVerification', user.email!, {
+        const emailResult = await sendNotificationEmail('emailVerification', user.email!, {
             userName: user.name || 'User',
             verificationUrl
         });
+        if (!emailResult.success) {
+            return NextResponse.json(
+                { error: 'Email service temporarily unavailable' },
+                { status: 503 }
+            );
+        }
 
         return NextResponse.json({
             message: 'Verification email sent successfully'

@@ -5,7 +5,7 @@
  * SECURITY: Implements automatic redaction of sensitive fields
  */
 
-import { getRequestContext } from './request-context';
+import * as requestContext from './request-context';
 import { headers } from 'next/headers';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -131,12 +131,18 @@ async function getRequestIdFromHeaders(): Promise<string | undefined> {
   }
 }
 
+function getContextSafely() {
+  return typeof requestContext.getRequestContext === 'function'
+    ? requestContext.getRequestContext()
+    : undefined;
+}
+
 async function formatLogEntry(
   level: LogLevel,
   message: string,
   meta?: Record<string, unknown>
 ): Promise<LogEntry> {
-  const context = getRequestContext();
+  const context = getContextSafely();
   const requestId = context?.requestId || await getRequestIdFromHeaders();
 
   // Redact sensitive data from metadata
@@ -208,7 +214,7 @@ async function log(level: LogLevel, message: string, meta?: Record<string, unkno
 function logSync(level: LogLevel, message: string, meta?: Record<string, unknown>): void {
   if (!shouldLog(level)) return;
 
-  const context = getRequestContext();
+  const context = getContextSafely();
   const safeMeta = meta ? redactSensitive(meta) as Record<string, unknown> : undefined;
 
   const entry: LogEntry = {

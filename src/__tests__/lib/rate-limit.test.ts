@@ -368,7 +368,7 @@ describe("rate-limit", () => {
 
       const ip = getClientIP(request);
 
-      expect(ip).toBe("unknown");
+      expect(ip).toMatch(/^anon-[a-f0-9]{16}$/);
     });
 
     it("trims whitespace from IP in development mode", () => {

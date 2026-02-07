@@ -11,7 +11,7 @@
 
 import '@/lib/mapbox-init'; // Must be first - initializes worker
 import Map, { Marker, Popup, Source, Layer, MapLayerMouseEvent, ViewStateChangeEvent, MapRef } from 'react-map-gl';
-import type { LayerProps, GeoJSONSource } from 'react-map-gl';
+import type { LayerProps, GeoJSONSource, MapSourceDataEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useState, useMemo, useRef, useEffect, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
@@ -52,6 +52,32 @@ interface MarkerPosition {
     listing: Listing;
     lat: number;
     lng: number;
+}
+
+interface ClusterFeatureProperties {
+    id: string;
+    title: string;
+    price: number;
+    availableSlots: number;
+    ownerId?: string;
+    images?: string;
+    lat: number;
+    lng: number;
+    tier?: "primary" | "mini";
+}
+
+function parseFeatureImages(rawImages: unknown): string[] {
+    if (typeof rawImages !== 'string' || rawImages.length === 0) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(rawImages);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter((item): item is string => typeof item === 'string');
+    } catch {
+        return [];
+    }
 }
 
 /**
@@ -315,7 +341,6 @@ export default function MapComponent({
     // --- Controlled vs Uncontrolled View State ---
     // When viewState prop is provided, map runs in controlled mode
     const isControlledViewState = controlledViewState !== undefined;
-    const [internalViewState, setInternalViewState] = useState<MapViewState | undefined>(undefined);
 
     // --- Controlled vs Uncontrolled Selection ---
     // When selectedListingId prop is provided, selection is controlled by parent
@@ -398,7 +423,7 @@ export default function MapComponent({
     // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
     const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     // Ref for sourcedata handler cleanup
-    const sourcedataHandlerRef = useRef<((e: any) => void) | null>(null);
+    const sourcedataHandlerRef = useRef<((e: MapSourceDataEvent) => void) | null>(null);
     // Guard against rapid cluster clicks causing multiple simultaneous flyTo calls
     const isClusterExpandingRef = useRef(false);
     // Debounce timer for updateUnclusteredListings to batch rapid moveEnd events
@@ -508,6 +533,15 @@ export default function MapComponent({
         }))
     }), [listings]);
 
+    // Avoid JSON.parse on every map move by reusing listing images keyed by listing id.
+    const imagesByListingId = useMemo(() => {
+        const imageLookup = new globalThis.Map<string, string[]>();
+        for (const listing of listings) {
+            imageLookup.set(listing.id, Array.isArray(listing.images) ? listing.images : []);
+        }
+        return imageLookup;
+    }, [listings]);
+
     // Handle cluster click to zoom in and expand
     const onClusterClick = useCallback((event: MapLayerMouseEvent) => {
         const feature = event.features?.[0];
@@ -569,19 +603,28 @@ export default function MapComponent({
             filter: ['!', ['has', 'point_count']]
         });
 
-        const unclustered = features.map((f: any) => ({
-            id: f.properties.id,
-            title: f.properties.title,
-            price: f.properties.price,
-            availableSlots: f.properties.availableSlots,
-            ownerId: f.properties.ownerId,
-            images: (() => { try { return JSON.parse(f.properties.images || '[]'); } catch { return []; } })(),
-            location: {
-                lat: f.properties.lat,
-                lng: f.properties.lng
-            },
-            tier: f.properties.tier
-        }));
+        const unclustered = features
+            .map((f) => {
+                const properties = (f.properties ?? {}) as Partial<ClusterFeatureProperties>;
+                const listingId = properties.id ?? '';
+                const images =
+                    imagesByListingId.get(listingId) ??
+                    parseFeatureImages(properties.images);
+                return {
+                    id: listingId,
+                    title: properties.title ?? '',
+                    price: Number(properties.price) || 0,
+                    availableSlots: Number(properties.availableSlots) || 0,
+                    ownerId: properties.ownerId,
+                    images,
+                    location: {
+                        lat: Number(properties.lat) || 0,
+                        lng: Number(properties.lng) || 0
+                    },
+                    tier: properties.tier
+                } satisfies Listing;
+            })
+            .filter((listing) => listing.id.length > 0);
 
         // Deduplicate by id
         const seen = new Set<string>();
@@ -602,7 +645,7 @@ export default function MapComponent({
         }
 
         setUnclusteredListings(unique);
-    }, [useClustering]);
+    }, [imagesByListingId, useClustering]);
 
     // Add small offsets to markers that share the same coordinates
     // When clustering, use unclustered listings; otherwise use all listings
@@ -919,7 +962,7 @@ export default function MapComponent({
                 }
             );
         }
-    }, [listings, searchParams, searchAsMove, setProgrammaticMove]);
+    }, [listings, searchParams, searchAsMove, setProgrammaticMove, disableAutoFit, isControlledViewState]);
 
     // Expose map ref and helpers for E2E testing
     useEffect(() => {
@@ -1008,7 +1051,7 @@ export default function MapComponent({
             (window as unknown as Record<string, unknown>).__roomshare = roomshare;
             roomshare.markerCount = listings.length;
         }
-    }, [listings, activeId, setActive, selectedListing]);
+    }, [listings, activeId, setActive, selectedListing, setSelectedListing]);
 
     // P0 FIX: Clear isSearching when transition completes, even if listings didn't change
     // This fixes the "loading forever" bug when panning to an area with identical results
@@ -1027,13 +1070,14 @@ export default function MapComponent({
             }, 500);
             return () => clearTimeout(timeout);
         }
-    }, [transitionContext?.isPending, isSearching]);
+    }, [transitionContext, transitionContext?.isPending, isSearching]);
 
     // Cleanup timers on unmount and mark component as unmounted
     useEffect(() => {
         // Reset mounted flag on (re)mount — required for React Strict Mode
         // which unmounts/remounts in development, leaving the ref as false
         isMountedRef.current = true;
+        const mapInstanceAtMount = mapRef.current;
         return () => {
             // P0 Issue #25: Mark unmounted to prevent stale state updates
             isMountedRef.current = false;
@@ -1059,9 +1103,9 @@ export default function MapComponent({
             // P1-FIX (#109): Clear cluster expansion flag on unmount
             isClusterExpandingRef.current = false;
             // Remove sourcedata listener
-            if (mapRef.current && sourcedataHandlerRef.current) {
+            if (mapInstanceAtMount && sourcedataHandlerRef.current) {
                 try {
-                    mapRef.current.getMap().off('sourcedata', sourcedataHandlerRef.current);
+                    mapInstanceAtMount.getMap().off('sourcedata', sourcedataHandlerRef.current);
                 } catch { /* map may already be destroyed */ }
             }
             // P2-FIX (#153): Clear refs to help garbage collection
@@ -1083,7 +1127,7 @@ export default function MapComponent({
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedListing]);
+    }, [selectedListing, setSelectedListing]);
 
     // Sync URL bounds to context and track for reset functionality
     useEffect(() => {
@@ -1235,7 +1279,7 @@ export default function MapComponent({
             setHasUserMoved(false);
             setBoundsDirty(false);
         });
-    }, [executeMapSearch, setSearchHandler, setResetHandler, setHasUserMoved, setBoundsDirty, setProgrammaticMove]);
+    }, [executeMapSearch, setSearchHandler, setResetHandler, setHasUserMoved, setBoundsDirty, setProgrammaticMove, isProgrammaticMoveRef]);
 
     // When a card's "Show on Map" button sets activeId, open popup and center map
     useEffect(() => {
@@ -1254,7 +1298,7 @@ export default function MapComponent({
             offset: [0, -150],
             duration: 400,
         });
-    }, [activeId, listings, setProgrammaticMove]);
+    }, [activeId, listings, setProgrammaticMove, isProgrammaticMoveRef, setSelectedListing]);
 
     // P1-FIX (#77): Wrap handleMoveEnd in useCallback to prevent stale closures.
     // Without this, the function captures state values at definition time which can become stale.
@@ -1292,11 +1336,6 @@ export default function MapComponent({
             bounds,
             isProgrammatic: isProgrammaticMoveRef.current,
         };
-
-        // Update internal view state for uncontrolled mode
-        if (!isControlledViewState) {
-            setInternalViewState(viewStateChangeEvent.viewState);
-        }
 
         // Fire onMoveEnd callback (controlled component API)
         onMoveEndProp?.(viewStateChangeEvent);
@@ -1379,8 +1418,6 @@ export default function MapComponent({
         setHasUserMoved,
         searchAsMove,
         setBoundsDirty,
-        executeMapSearch,
-        isControlledViewState,
         onMoveEndProp,
     ]);
 
@@ -1444,7 +1481,7 @@ export default function MapComponent({
             offset: [0, -150], // NEGATIVE Y pushes marker UP, centering popup below it
             duration: 400
         });
-    }, [setSelectedListing, setActive, requestScrollTo, setProgrammaticMove]);
+    }, [setSelectedListing, setActive, requestScrollTo, setProgrammaticMove, isProgrammaticMoveRef]);
 
     if (!token) {
         return (
@@ -1583,7 +1620,7 @@ export default function MapComponent({
                     // flyTo/zoom, tiles reload asynchronously and we need to re-query.
                     if (mapRef.current) {
                         const map = mapRef.current.getMap();
-                        const handler = (e: any) => {
+                        const handler = (e: MapSourceDataEvent) => {
                             if (e.sourceId !== 'listings' || !e.isSourceLoaded) return;
                             // CLUSTER FIX: During expansion, accept tile events (e.tile defined)
                             // Otherwise, only accept source-level events (!e.tile)
@@ -1703,7 +1740,7 @@ export default function MapComponent({
                         longitude={position.lng}
                         latitude={position.lat}
                         anchor="bottom"
-                        onClick={(e: any) => {
+                        onClick={(e) => {
                             e.originalEvent.stopPropagation();
                             handleMarkerClick(position.listing, { lng: position.lng, lat: position.lat });
                         }}

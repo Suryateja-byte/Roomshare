@@ -18,6 +18,10 @@ jest.mock("crypto", () => ({
   randomBytes: jest.fn().mockReturnValue({
     toString: jest.fn().mockReturnValue("mock-verification-token"),
   }),
+  createHash: jest.fn().mockReturnValue({
+    update: jest.fn().mockReturnThis(),
+    digest: jest.fn().mockReturnValue("mock-verification-token-hash"),
+  }),
 }));
 
 jest.mock("@/lib/with-rate-limit", () => ({

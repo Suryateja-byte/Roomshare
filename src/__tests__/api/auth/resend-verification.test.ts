@@ -61,7 +61,7 @@ describe('Resend Verification API', () => {
     ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
     ;(prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.create as jest.Mock).mockResolvedValue({})
-    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({})
+    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true })
 
     const request = createRequest()
     const response = await POST(request)
@@ -136,7 +136,7 @@ describe('Resend Verification API', () => {
     ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
     ;(prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.create as jest.Mock).mockResolvedValue({})
-    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({})
+    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true })
 
     const request = createRequest()
     await POST(request)
@@ -154,7 +154,7 @@ describe('Resend Verification API', () => {
     ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
     ;(prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.create as jest.Mock).mockResolvedValue({})
-    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({})
+    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true })
 
     const request = createRequest()
     await POST(request)
@@ -162,7 +162,7 @@ describe('Resend Verification API', () => {
     expect(prisma.verificationToken.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         identifier: 'test@example.com',
-        token: expect.any(String),
+        tokenHash: expect.any(String),
         expires: expect.any(Date),
       }),
     })
@@ -184,7 +184,7 @@ describe('Resend Verification API', () => {
     ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
     ;(prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.create as jest.Mock).mockResolvedValue({})
-    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({})
+    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true })
 
     const request = createRequest()
     await POST(request)
@@ -203,7 +203,7 @@ describe('Resend Verification API', () => {
     ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'user-123', email: 'test@example.com', emailVerified: null })
     ;(prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.create as jest.Mock).mockResolvedValue({})
-    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({})
+    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true })
 
     const request = createRequest()
     await POST(request)
@@ -246,13 +246,13 @@ describe('Resend Verification API', () => {
     ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
     ;(prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({})
     ;(prisma.verificationToken.create as jest.Mock).mockResolvedValue({})
-    ;(sendNotificationEmail as jest.Mock).mockRejectedValue(new Error('Email Error'))
+    ;(sendNotificationEmail as jest.Mock).mockResolvedValue({ success: false, error: 'Email Error' })
 
     const request = createRequest()
     const response = await POST(request)
     const data = await response.json()
 
-    expect(response.status).toBe(500)
-    expect(data.error).toBe('Failed to send verification email')
+    expect(response.status).toBe(503)
+    expect(data.error).toBe('Email service temporarily unavailable')
   })
 })

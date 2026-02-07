@@ -75,20 +75,22 @@ model User {
 
 model VerificationToken {
   identifier String
-  token      String   @unique
+  tokenHash  String   @unique @map("token_hash")
   expires    DateTime
 
-  @@unique([identifier, token])
+  @@unique([identifier, tokenHash])
+  @@index([expires])
 }
 
 model PasswordResetToken {
   id        String   @id @default(cuid())
   email     String
-  token     String   @unique
+  tokenHash String   @unique @map("token_hash")
   expires   DateTime
   createdAt DateTime @default(now())
 
-  @@unique([email, token])
+  @@unique([email, tokenHash])
+  @@index([expires])
 }
 
 model Listing {

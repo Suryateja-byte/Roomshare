@@ -2,6 +2,7 @@ import { prisma } from './prisma';
 import { sendNotificationEmail } from './email';
 import { Prisma } from '@prisma/client';
 import { buildSearchUrl, type SearchFilters } from './search-utils';
+import { logger } from './logger';
 
 // Type for new listing data used in instant alerts
 export interface NewListingForAlert {
@@ -32,6 +33,14 @@ const parseDateOnly = (value: string): Date => {
     const [year, month, day] = value.split('-').map(Number);
     return new Date(year, month - 1, day);
 };
+
+function isSearchAlertsEnabled(notificationPreferences: unknown): boolean {
+    if (!notificationPreferences || typeof notificationPreferences !== 'object') {
+        return true;
+    }
+    const prefs = notificationPreferences as { emailSearchAlerts?: unknown };
+    return prefs.emailSearchAlerts !== false;
+}
 
 export async function processSearchAlerts(): Promise<ProcessResult> {
     const result: ProcessResult = {
@@ -84,8 +93,7 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
 
             try {
                 // Check user notification preferences
-                const prefs = savedSearch.user.notificationPreferences as { emailSearchAlerts?: boolean } | null;
-                if (prefs?.emailSearchAlerts === false) {
+                if (!isSearchAlertsEnabled(savedSearch.user.notificationPreferences)) {
                     result.details.push(`Skipping ${savedSearch.id} - user disabled search alerts`);
                     continue;
                 }
@@ -106,10 +114,12 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
 
                 // Apply filters
                 if (filters.minPrice !== undefined) {
-                    whereClause.price = { ...whereClause.price as any, gte: filters.minPrice };
+                    const existingPriceFilter = (whereClause.price ?? {}) as Prisma.FloatFilter<'Listing'>;
+                    whereClause.price = { ...existingPriceFilter, gte: filters.minPrice };
                 }
                 if (filters.maxPrice !== undefined) {
-                    whereClause.price = { ...whereClause.price as any, lte: filters.maxPrice };
+                    const existingPriceFilter = (whereClause.price ?? {}) as Prisma.FloatFilter<'Listing'>;
+                    whereClause.price = { ...existingPriceFilter, lte: filters.maxPrice };
                 }
                 if (filters.roomType) {
                     whereClause.roomType = filters.roomType;
@@ -353,13 +363,15 @@ export async function triggerInstantAlerts(newListing: NewListingForAlert): Prom
             }
         });
 
-        console.log(`[INSTANT ALERTS] Found ${instantSearches.length} instant alert subscriptions`);
+        logger.sync.info('Instant alerts subscriptions loaded', {
+            action: 'triggerInstantAlerts',
+            subscriptions: instantSearches.length,
+        });
 
         for (const savedSearch of instantSearches) {
             try {
                 // Check user notification preferences
-                const prefs = savedSearch.user.notificationPreferences as { emailSearchAlerts?: boolean } | null;
-                if (prefs?.emailSearchAlerts === false) {
+                if (!isSearchAlertsEnabled(savedSearch.user.notificationPreferences)) {
                     continue;
                 }
 
@@ -374,7 +386,12 @@ export async function triggerInstantAlerts(newListing: NewListingForAlert): Prom
                     continue;
                 }
 
-                console.log(`[INSTANT ALERTS] Listing matches search "${savedSearch.name}" for user ${savedSearch.user.id}`);
+                logger.sync.debug('Instant alert matched listing to saved search', {
+                    action: 'triggerInstantAlerts',
+                    savedSearchId: savedSearch.id,
+                    userId: savedSearch.user.id,
+                    listingId: newListing.id,
+                });
 
                 // Send email notification
                 const emailResult = await sendNotificationEmail('searchAlert', savedSearch.user.email, {
@@ -385,7 +402,11 @@ export async function triggerInstantAlerts(newListing: NewListingForAlert): Prom
                 });
 
                 if (!emailResult.success) {
-                    console.error(`[INSTANT ALERTS] Email failed for ${savedSearch.id}: ${emailResult.error}`);
+                    logger.sync.warn('Instant alert email failed', {
+                        action: 'triggerInstantAlerts',
+                        savedSearchId: savedSearch.id,
+                        error: emailResult.error || 'unknown',
+                    });
                     errors++;
                     continue;
                 }
@@ -411,26 +432,49 @@ export async function triggerInstantAlerts(newListing: NewListingForAlert): Prom
 
                 // Log any partial failures for debugging
                 if (notificationResult.status === 'rejected') {
-                    console.error(`[INSTANT ALERTS] Notification creation failed for ${savedSearch.id}:`, notificationResult.reason);
+                    logger.sync.warn('Instant alert notification create failed', {
+                        action: 'triggerInstantAlerts',
+                        savedSearchId: savedSearch.id,
+                        error: String(notificationResult.reason),
+                    });
                 }
                 if (updateResult.status === 'rejected') {
-                    console.error(`[INSTANT ALERTS] lastAlertAt update failed for ${savedSearch.id}:`, updateResult.reason);
+                    logger.sync.warn('Instant alert lastAlertAt update failed', {
+                        action: 'triggerInstantAlerts',
+                        savedSearchId: savedSearch.id,
+                        error: String(updateResult.reason),
+                    });
                 }
 
                 sent++;
-                console.log(`[INSTANT ALERTS] Alert sent for search "${savedSearch.name}"`);
+                logger.sync.info('Instant alert sent', {
+                    action: 'triggerInstantAlerts',
+                    savedSearchId: savedSearch.id,
+                    listingId: newListing.id,
+                });
 
             } catch (error) {
-                console.error(`[INSTANT ALERTS] Error processing search ${savedSearch.id}:`, error);
+                logger.sync.error('Instant alert processing failed for saved search', {
+                    action: 'triggerInstantAlerts',
+                    savedSearchId: savedSearch.id,
+                    error: error instanceof Error ? error.message : String(error),
+                });
                 errors++;
             }
         }
 
     } catch (error) {
-        console.error('[INSTANT ALERTS] Fatal error:', error);
+        logger.sync.error('Instant alerts fatal error', {
+            action: 'triggerInstantAlerts',
+            error: error instanceof Error ? error.message : String(error),
+        });
         errors++;
     }
 
-    console.log(`[INSTANT ALERTS] Complete: ${sent} sent, ${errors} errors`);
+    logger.sync.info('Instant alerts processing complete', {
+        action: 'triggerInstantAlerts',
+        sent,
+        errors,
+    });
     return { sent, errors };
 }

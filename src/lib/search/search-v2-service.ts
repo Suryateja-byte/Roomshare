@@ -235,15 +235,19 @@ export async function executeSearchV2(
     let mapListings: MapListingData[];
     let mapTruncated: boolean | undefined;
     let mapTotalCandidates: number | undefined;
+    const warnings: string[] = [];
 
     if (listSettled.status === "fulfilled") {
       ({ listResult, nextCursor } = listSettled.value);
     } else {
-      console.error("[SearchV2] List query failed, returning empty results", {
+      logger.sync.error("[SearchV2] List query failed", {
         error: listSettled.reason instanceof Error ? listSettled.reason.message : "Unknown",
       });
-      listResult = { items: [], hasNextPage: false, hasPrevPage: false, total: 0, totalPages: 0, page: 1, limit: 20 };
-      nextCursor = null;
+      return {
+        response: null,
+        paginatedResult: null,
+        error: "Search temporarily unavailable",
+      };
     }
 
     if (mapSettled.status === "fulfilled") {
@@ -259,10 +263,11 @@ export async function executeSearchV2(
         mapListings = mapResult;
       }
     } else {
-      console.error("[SearchV2] Map query failed, returning empty map data", {
+      logger.sync.error("[SearchV2] Map query failed", {
         error: mapSettled.reason instanceof Error ? mapSettled.reason.message : "Unknown",
       });
       mapListings = [];
+      warnings.push("MAP_QUERY_FAILED");
     }
 
     // Determine mode based on mapListings count (not list total)
@@ -375,6 +380,7 @@ export async function executeSearchV2(
         queryHash,
         generatedAt: new Date().toISOString(),
         mode,
+        ...(warnings.length > 0 ? { warnings } : {}),
         // Debug fields (only when debugRank=1)
         ...(debugRank && rankerEnabled
           ? {

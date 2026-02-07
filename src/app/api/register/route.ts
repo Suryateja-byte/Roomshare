@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { normalizeEmail } from '@/lib/normalize-email';
-import crypto from 'crypto';
+import { createTokenPair } from '@/lib/token-security';
 
 const registerSchema = z.object({
     name: z.string().min(2),
@@ -58,14 +58,14 @@ export async function POST(request: Request) {
             },
         });
 
-        // Generate email verification token
-        const verificationToken = crypto.randomBytes(32).toString('hex');
+        // Generate email verification token (store only SHA-256 hash)
+        const { token: verificationToken, tokenHash: verificationTokenHash } = createTokenPair();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
         await prisma.verificationToken.create({
             data: {
                 identifier: email,
-                token: verificationToken,
+                tokenHash: verificationTokenHash,
                 expires,
             },
         });
@@ -74,16 +74,26 @@ export async function POST(request: Request) {
         const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
         const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
 
-        // Send welcome email with verification link (non-blocking)
-        sendNotificationEmail('welcomeEmail', email, {
+        const emailResult = await sendNotificationEmail('welcomeEmail', email, {
             userName: name,
             verificationUrl
-        }).catch(err => console.error('Failed to send welcome email:', err));
+        });
+        const verificationEmailSent = Boolean(emailResult?.success);
+        if (!verificationEmailSent) {
+            console.error('Failed to send welcome email:', emailResult?.error ?? 'Unknown email error');
+        }
 
         // Remove password from response
-        const { password: _, ...userWithoutPassword } = user;
+        const { password: userPasswordHash, ...userWithoutPassword } = user;
+        void userPasswordHash;
 
-        return NextResponse.json(userWithoutPassword, { status: 201 });
+        return NextResponse.json(
+            {
+                ...userWithoutPassword,
+                verificationEmailSent,
+            },
+            { status: 201 }
+        );
 
     } catch (error) {
         console.error('Registration error:', error);

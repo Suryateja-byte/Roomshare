@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { hashToken, isValidTokenFormat } from '@/lib/token-security';
 
 const resetPasswordSchema = z.object({
     token: z.string().min(1, 'Token is required'),
@@ -28,10 +29,18 @@ export async function POST(request: NextRequest) {
         }
 
         const { token, password } = result.data;
+        if (!isValidTokenFormat(token)) {
+            return NextResponse.json(
+                { error: 'Invalid or expired reset link' },
+                { status: 400 }
+            );
+        }
+
+        const tokenHash = hashToken(token);
 
         // Find the reset token
         const resetToken = await prisma.passwordResetToken.findUnique({
-            where: { token }
+            where: { tokenHash }
         });
 
         if (!resetToken) {
@@ -108,8 +117,15 @@ export async function GET(request: NextRequest) {
         );
     }
 
+    if (!isValidTokenFormat(token)) {
+        return NextResponse.json(
+            { valid: false, error: 'Invalid reset link' },
+            { status: 400 }
+        );
+    }
+
     const resetToken = await prisma.passwordResetToken.findUnique({
-        where: { token }
+        where: { tokenHash: hashToken(token) }
     });
 
     if (!resetToken) {

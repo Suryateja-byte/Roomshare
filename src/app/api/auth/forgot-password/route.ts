@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { normalizeEmail } from '@/lib/normalize-email';
+import { createTokenPair } from '@/lib/token-security';
 
 export async function POST(request: NextRequest) {
     // Rate limit: 3 password reset requests per hour per IP
     const rateLimitResponse = await withRateLimit(request, { type: 'forgotPassword' });
     if (rateLimitResponse) return rateLimitResponse;
+
+    if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
+        return NextResponse.json(
+            { error: 'Password reset is temporarily unavailable' },
+            { status: 503 }
+        );
+    }
 
     try {
         const { email } = await request.json();
@@ -39,8 +46,8 @@ export async function POST(request: NextRequest) {
             where: { email: normalizedEmail }
         });
 
-        // Generate a secure random token
-        const token = crypto.randomBytes(32).toString('hex');
+        // Generate reset token and store only SHA-256 hash
+        const { token, tokenHash } = createTokenPair();
 
         // Token expires in 1 hour
         const expires = new Date(Date.now() + 60 * 60 * 1000);
@@ -49,7 +56,7 @@ export async function POST(request: NextRequest) {
         await prisma.passwordResetToken.create({
             data: {
                 email: normalizedEmail,
-                token,
+                tokenHash,
                 expires
             }
         });
@@ -64,10 +71,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Send password reset email
-        await sendNotificationEmail('passwordReset', normalizedEmail, {
+        const emailResult = await sendNotificationEmail('passwordReset', normalizedEmail, {
             userName: user.name || 'User',
             resetLink: resetUrl
         });
+        if (!emailResult.success) {
+            console.error('Failed to send password reset email:', emailResult.error);
+        }
 
         return NextResponse.json({
             message: 'If an account with that email exists, a password reset link has been sent.',
