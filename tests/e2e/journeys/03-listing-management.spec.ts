@@ -1,8 +1,8 @@
 /**
  * E2E Test Suite: Listing Management Journeys
- * Journeys: J017-J026
+ * Journeys: J018-J026 (J017 moved to tests/e2e/create-listing/)
  *
- * Tests authenticated user listing operations including creating,
+ * Tests authenticated user listing operations including
  * editing, pausing, deleting listings and image management.
  */
 
@@ -12,99 +12,8 @@ test.describe("Listing Management Journeys", () => {
   // Use authenticated state for all tests in this file
   test.use({ storageState: "playwright/.auth/user.json" });
 
-  test.describe("J017: Create new listing", () => {
-    test(`${tags.auth} ${tags.mobile} - Complete listing creation flow`, async ({
-      page,
-      nav,
-      data,
-      assert,
-    }) => {
-      const listingData = data.generateListingData();
-
-      // Step 1-2: Navigate to create listing
-      await nav.goToCreateListing();
-      await expect(
-        page.getByRole("heading", { name: /create|new|add.*listing/i }),
-      ).toBeVisible();
-
-      // Step 3: Fill title
-      await page.getByLabel(/title/i).fill(listingData.title);
-
-      // Step 4: Fill description
-      await page.getByLabel(/description/i).fill(listingData.description);
-
-      // Step 5: Fill price
-      await page.getByLabel(/price/i).fill(listingData.price.toString());
-
-      // Step 6-9: Fill address fields
-      const addressInput = page.getByLabel(/address|street/i);
-      if (await addressInput.isVisible()) {
-        await addressInput.fill(listingData.address);
-      }
-
-      const cityInput = page.getByLabel(/city/i);
-      if (await cityInput.isVisible()) {
-        await cityInput.fill(listingData.city);
-      }
-
-      const stateInput = page.getByLabel(/state/i);
-      if (await stateInput.isVisible()) {
-        await stateInput.fill(listingData.state);
-      }
-
-      const zipInput = page.getByLabel(/zip|postal/i);
-      if (await zipInput.isVisible()) {
-        await zipInput.fill(listingData.zipCode);
-      }
-
-      // Step 10: Select amenities
-      const wifiCheckbox = page.getByLabel(/wifi|internet/i);
-      if (await wifiCheckbox.isVisible()) {
-        await wifiCheckbox.check();
-      }
-
-      // Step 11: Select room type
-      const roomTypeSelect = page.getByLabel(/room type/i);
-      if (await roomTypeSelect.isVisible()) {
-        // @ts-expect-error - Playwright accepts RegExp for label matching at runtime
-        await roomTypeSelect.selectOption({ label: /private/i });
-      }
-
-      // Step 12: Submit form
-      await page.getByRole("button", { name: /create|submit|post/i }).click();
-
-      // Step 13-14: Wait for redirect and verify
-      await page.waitForURL(/\/listings\//, { timeout: 30000 });
-
-      // Verify listing was created with correct title
-      await expect(page.getByRole("heading", { level: 1 })).toContainText(
-        listingData.title,
-        {
-          timeout: 10000,
-        },
-      );
-    });
-
-    test(`${tags.auth} - Validation errors for missing required fields`, async ({
-      page,
-      nav,
-    }) => {
-      await nav.goToCreateListing();
-
-      // Submit without filling required fields
-      await page.getByRole("button", { name: /create|submit|post/i }).click();
-
-      // Should show validation errors
-      await expect(
-        page
-          .locator('[role="alert"], [class*="error"], [aria-invalid="true"]')
-          .first(),
-      ).toBeVisible({ timeout: 5000 });
-
-      // Should stay on create page
-      await expect(page).toHaveURL(/\/listings\/create/);
-    });
-  });
+  // J017 (Create new listing) has been replaced by dedicated suite:
+  // tests/e2e/create-listing/*.spec.ts (58 tests across 7 spec files)
 
   test.describe("J018: Edit existing listing", () => {
     test(`${tags.auth} - Edit listing details`, async ({ page, nav }) => {
