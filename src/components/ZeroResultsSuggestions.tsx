@@ -63,7 +63,13 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
     };
 
     const handleClearAll = () => {
-        router.push('/search');
+        const params = new URLSearchParams();
+        for (const key of ['q', 'lat', 'lng', 'minLat', 'maxLat', 'minLng', 'maxLng', 'sort'] as const) {
+            const value = searchParams.get(key);
+            if (value) params.set(key, value);
+        }
+        const qs = params.toString();
+        router.push(`/search${qs ? `?${qs}` : ''}`);
     };
 
     if (suggestions.length === 0) {
@@ -96,7 +102,7 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
                     </Button>
                     <Button
                         variant="primary"
-                        onClick={() => router.push('/search')}
+                        onClick={handleClearAll}
                         className="gap-2"
                     >
                         <MapPin className="w-4 h-4" />

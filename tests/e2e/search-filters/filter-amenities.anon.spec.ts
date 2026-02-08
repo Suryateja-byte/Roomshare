@@ -39,6 +39,13 @@ test.describe("Amenities Filter", () => {
   // 1. Select amenity -> URL gets amenities param
   test(`${tags.core} - selecting an amenity and applying updates URL`, async ({ page }) => {
     await waitForSearchReady(page);
+
+    // Disable "Search as I move" to prevent map-triggered URL changes
+    const searchAsIMove = page.getByRole("switch", { name: /search as i move/i });
+    if (await searchAsIMove.isChecked()) {
+      await searchAsIMove.click();
+    }
+
     await openFilterModal(page);
 
     // Toggle Wifi amenity
@@ -124,6 +131,7 @@ test.describe("Amenities Filter", () => {
 
   // 4. Amenity filter narrows results
   test(`${tags.core} - amenity filter narrows visible results`, async ({ page }) => {
+    test.slow(); // 2 navigations on WSL2/NTFS
     await waitForSearchReady(page);
     const container = searchResultsContainer(page);
     const initialCount = await container.locator(selectors.listingCard).count();
@@ -157,6 +165,7 @@ test.describe("Amenities Filter", () => {
 
   // 6. Clear amenities restores results
   test(`${tags.core} - clearing all amenity filters restores results`, async ({ page }) => {
+    test.slow(); // 2 navigations on WSL2/NTFS
     // Start with amenity applied
     await gotoSearchWithFilters(page, { amenities: "Pool" });
 

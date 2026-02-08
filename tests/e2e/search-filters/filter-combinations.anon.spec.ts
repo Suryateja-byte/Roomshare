@@ -28,6 +28,7 @@ import {
   getUrlParam,
   getUrlParams,
   appliedFiltersRegion,
+  filtersButton,
 } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -110,7 +111,7 @@ test.describe("Filter Combinations", () => {
     await page.waitForTimeout(2_000);
 
     // Open filter modal and add an amenity
-    const filtersBtn = page.getByRole("button", { name: "Filters", exact: true });
+    const filtersBtn = filtersButton(page);
     await filtersBtn.click();
 
     const dialog = page.getByRole("dialog", { name: /filters/i });
@@ -200,7 +201,7 @@ test.describe("Filter Combinations", () => {
     await page.waitForTimeout(2_000);
 
     // Open filter modal and change a filter
-    const filtersBtn = page.getByRole("button", { name: "Filters", exact: true });
+    const filtersBtn = filtersButton(page);
     await filtersBtn.click();
 
     const dialog = page.getByRole("dialog", { name: /filters/i });
@@ -244,7 +245,7 @@ test.describe("Filter Combinations", () => {
     expect(getUrlParam(page, "maxLng")).toBeTruthy();
 
     // Apply additional filters via modal
-    const filtersBtn = page.getByRole("button", { name: "Filters", exact: true });
+    const filtersBtn = filtersButton(page);
     await filtersBtn.click();
 
     const dialog = page.getByRole("dialog", { name: /filters/i });
@@ -281,6 +282,7 @@ test.describe("Filter Combinations", () => {
 
   // 11. All sort options work with active filters
   test(`${tags.core} - all sort options work with active filters`, async ({ page }) => {
+    test.slow(); // 5 navigations in loop on WSL2/NTFS
     const sortOptions = ["recommended", "price_asc", "price_desc", "newest", "rating"];
 
     for (const sort of sortOptions) {

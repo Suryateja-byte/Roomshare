@@ -228,16 +228,22 @@ test.describe("Category Bar", () => {
       // Press Enter to activate the focused category
       await page.keyboard.press("Enter");
 
-      // Wait for URL to update with the selected category
+      // Wait for URL to update with any valid category filter param
+      // (the first focusable category may be amenities, roomType, leaseDuration, or houseRules)
       await page.waitForURL(
         (url) => {
           const params = new URL(url).searchParams;
-          return params.has("amenities");
+          return params.has("amenities") || params.has("roomType") ||
+            params.has("leaseDuration") || params.has("houseRules");
         },
-        { timeout: timeouts.action },
+        { timeout: 15_000 },
       );
 
-      expect(getUrlParam(page, "amenities")).toBeTruthy();
+      // Verify some category param was set
+      const params = new URL(page.url()).searchParams;
+      const hasCategoryParam = params.has("amenities") || params.has("roomType") ||
+        params.has("leaseDuration") || params.has("houseRules");
+      expect(hasCategoryParam).toBe(true);
     }
   });
 

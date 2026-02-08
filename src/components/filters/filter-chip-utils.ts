@@ -7,7 +7,7 @@
 
 import { getLanguageName } from "@/lib/languages";
 import { getPriceParam } from "@/lib/search-params";
-import { LEASE_DURATION_ALIASES, VALID_LEASE_DURATIONS } from "@/lib/filter-schema";
+import { LEASE_DURATION_ALIASES, VALID_LEASE_DURATIONS, VALID_AMENITIES, VALID_HOUSE_RULES, VALID_ROOM_TYPES } from "@/lib/filter-schema";
 
 /**
  * Represents a single filter chip that can be displayed and removed
@@ -146,14 +146,20 @@ export function urlToFilterChips(
     }
   }
 
-  // Room type
+  // Room type (validated against allowlist)
   const roomType = searchParams.get("roomType");
   if (roomType) {
-    chips.push({
-      id: "roomType",
-      label: roomType,
-      paramKey: "roomType",
-    });
+    const lower = roomType.toLowerCase();
+    const canonical = (VALID_ROOM_TYPES as readonly string[]).find(
+      (v) => v.toLowerCase() === lower
+    );
+    if (canonical && canonical !== "any") {
+      chips.push({
+        id: "roomType",
+        label: canonical,
+        paramKey: "roomType",
+      });
+    }
   }
 
   // Lease duration — resolve aliases to canonical form
@@ -171,45 +177,67 @@ export function urlToFilterChips(
     }
   }
 
-  // Amenities - one chip per amenity
+  // Amenities - one chip per amenity (validated + deduplicated)
   const amenities = searchParams.get("amenities");
   if (amenities) {
+    const seen = new Set<string>();
     const amenityList = amenities.split(",").filter(Boolean);
     for (const amenity of amenityList) {
-      chips.push({
-        id: `amenities:${amenity}`,
-        label: amenity,
-        paramKey: "amenities",
-        paramValue: amenity,
-      });
+      const lower = amenity.toLowerCase();
+      const canonical = (VALID_AMENITIES as readonly string[]).find(
+        (v) => v.toLowerCase() === lower
+      );
+      if (canonical && !seen.has(canonical)) {
+        seen.add(canonical);
+        chips.push({
+          id: `amenities:${canonical}`,
+          label: canonical,
+          paramKey: "amenities",
+          paramValue: canonical,
+        });
+      }
     }
   }
 
-  // House rules - one chip per rule
+  // House rules - one chip per rule (validated + deduplicated)
   const houseRules = searchParams.get("houseRules");
   if (houseRules) {
+    const seen = new Set<string>();
     const ruleList = houseRules.split(",").filter(Boolean);
     for (const rule of ruleList) {
-      chips.push({
-        id: `houseRules:${rule}`,
-        label: rule,
-        paramKey: "houseRules",
-        paramValue: rule,
-      });
+      const lower = rule.toLowerCase();
+      const canonical = (VALID_HOUSE_RULES as readonly string[]).find(
+        (v) => v.toLowerCase() === lower
+      );
+      if (canonical && !seen.has(canonical)) {
+        seen.add(canonical);
+        chips.push({
+          id: `houseRules:${canonical}`,
+          label: canonical,
+          paramKey: "houseRules",
+          paramValue: canonical,
+        });
+      }
     }
   }
 
-  // Languages - one chip per language, convert code to display name
+  // Languages - one chip per language (validated + deduplicated)
   const languages = searchParams.get("languages");
   if (languages) {
+    const seen = new Set<string>();
     const langList = languages.split(",").filter(Boolean);
     for (const lang of langList) {
-      chips.push({
-        id: `languages:${lang}`,
-        label: getLanguageName(lang),
-        paramKey: "languages",
-        paramValue: lang,
-      });
+      const displayName = getLanguageName(lang);
+      // Skip if getLanguageName returns the raw code (meaning it's not a recognized language)
+      if (displayName !== lang && !seen.has(lang)) {
+        seen.add(lang);
+        chips.push({
+          id: `languages:${lang}`,
+          label: displayName,
+          paramKey: "languages",
+          paramValue: lang,
+        });
+      }
     }
   }
 
@@ -223,34 +251,44 @@ export function urlToFilterChips(
     });
   }
 
-  // Gender preference filter
+  // Gender preference filter (validated)
   const genderPreference = searchParams.get("genderPreference");
   if (genderPreference && genderPreference !== "any") {
-    chips.push({
-      id: "genderPreference",
-      label:
-        genderPreference === "female"
-          ? "Female Only"
-          : genderPreference === "male"
-            ? "Male Only"
-            : genderPreference,
-      paramKey: "genderPreference",
-    });
+    const validGenderValues: Record<string, string> = {
+      female: "Female Only",
+      male: "Male Only",
+      female_only: "Female Only",
+      male_only: "Male Only",
+      no_preference: "No Preference",
+    };
+    const label = validGenderValues[genderPreference.toLowerCase()];
+    if (label) {
+      chips.push({
+        id: "genderPreference",
+        label,
+        paramKey: "genderPreference",
+      });
+    }
   }
 
-  // Household gender filter
+  // Household gender filter (validated)
   const householdGender = searchParams.get("householdGender");
   if (householdGender && householdGender !== "any") {
-    chips.push({
-      id: "householdGender",
-      label:
-        householdGender === "female"
-          ? "All Female"
-          : householdGender === "male"
-            ? "All Male"
-            : householdGender,
-      paramKey: "householdGender",
-    });
+    const validHouseholdValues: Record<string, string> = {
+      female: "All Female",
+      male: "All Male",
+      all_female: "All Female",
+      all_male: "All Male",
+      mixed: "Mixed",
+    };
+    const label = validHouseholdValues[householdGender.toLowerCase()];
+    if (label) {
+      chips.push({
+        id: "householdGender",
+        label,
+        paramKey: "householdGender",
+      });
+    }
   }
 
   return chips;

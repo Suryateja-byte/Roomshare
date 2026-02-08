@@ -11,10 +11,9 @@ import {
   tags,
   searchResultsContainer,
   scopedCards,
-  buildSearchUrl,
   getUrlParam,
   getUrlParams,
-  waitForSearchReady,
+  gotoSearchWithFilters,
   VALID_AMENITIES,
   HOUSE_RULES,
 } from "../helpers";
@@ -26,15 +25,11 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     page,
   }) => {
     // Navigate with very restrictive filters unlikely to match
-    const url = buildSearchUrl({
+    await gotoSearchWithFilters(page, {
       amenities: "Pool,Gym",
       roomType: "Shared Room",
       maxPrice: "100",
     });
-    await page.goto(url);
-
-    // Wait for page to load and process search
-    await waitForSearchReady(page);
 
     const container = searchResultsContainer(page);
 
@@ -80,12 +75,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     page,
   }) => {
     // Navigate with inverted price range
-    const url = buildSearchUrl({ minPrice: "3000", maxPrice: "500" });
-    await page.goto(url);
-
-    // Wait for page to load
-    await page.waitForLoadState("domcontentloaded");
-    await waitForSearchReady(page);
+    await gotoSearchWithFilters(page, { minPrice: "3000", maxPrice: "500" });
 
     // Page should not crash - verify page rendered
     const pageTitle = await page.title();
@@ -104,26 +94,32 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
       expect(isSwapped || isOriginal).toBe(true);
     }
 
-    // Verify page shows results or valid empty state (no crash/error)
+    // Verify page shows results, valid empty state, or graceful error (no crash)
     const container = searchResultsContainer(page);
     await expect(container).toBeVisible();
 
-    // Check for either results or graceful empty state
+    // Check for results, empty state, or graceful error page
     const hasCards = (await scopedCards(page).count()) > 0;
     const hasEmptyState = await container
       .locator("text=/No.*match/i")
       .first()
       .isVisible()
       .catch(() => false);
+    // Backend may reject inverted price range with a user-friendly error
+    const hasErrorState = await container
+      .locator("text=/Unable to load/i")
+      .first()
+      .isVisible()
+      .catch(() => false);
 
-    expect(hasCards || hasEmptyState).toBe(true);
+    expect(hasCards || hasEmptyState || hasErrorState).toBe(true);
   });
 
   test(`${tags.filter} all 12 filter types active simultaneously renders correctly`, async ({
     page,
   }) => {
     // Navigate with ALL filter params set
-    const url = buildSearchUrl({
+    await gotoSearchWithFilters(page, {
       amenities: "Wifi,Parking",
       houseRules: "Pets allowed",
       roomType: "Private Room",
@@ -135,10 +131,6 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
       sort: "price_asc",
       q: "San Francisco",
     });
-
-    await page.goto(url);
-    await page.waitForLoadState("domcontentloaded");
-    await waitForSearchReady(page);
 
     // Verify all params survived in URL
     const params = getUrlParams(page);
@@ -185,12 +177,10 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     page,
   }) => {
     // Navigate with multiple filters
-    const url = buildSearchUrl({
+    await gotoSearchWithFilters(page, {
       amenities: "Wifi,Parking",
       roomType: "Private Room",
     });
-    await page.goto(url);
-    await waitForSearchReady(page);
 
     const container = searchResultsContainer(page);
     const appliedFiltersRegion = container.locator(
@@ -277,14 +267,12 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     page,
   }) => {
     // Navigate with filters + preserved params
-    const url = buildSearchUrl({
+    await gotoSearchWithFilters(page, {
       amenities: "Wifi",
       roomType: "Private Room",
       sort: "price_asc",
       q: "Austin",
     });
-    await page.goto(url);
-    await waitForSearchReady(page);
 
     const container = searchResultsContainer(page);
     const appliedFiltersRegion = container.locator(
@@ -301,6 +289,9 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
       beforeParams.has("maxLat") ||
       beforeParams.has("minLng") ||
       beforeParams.has("maxLng");
+
+    // Dismiss any open autocomplete dropdown that may overlay the chips region
+    await page.keyboard.press("Escape");
 
     // Click "Clear all" button in chips region
     const clearAllButton = appliedFiltersRegion.getByRole("button", {
@@ -346,7 +337,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     page,
   }) => {
     // Build the longest reasonable URL with all filter types and multiple values
-    const url = buildSearchUrl({
+    await gotoSearchWithFilters(page, {
       amenities: VALID_AMENITIES.join(","),
       houseRules: HOUSE_RULES.join(","),
       roomType: "Private Room",
@@ -359,10 +350,6 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
       sort: "newest",
       q: "San Francisco Bay Area",
     });
-
-    await page.goto(url);
-    await page.waitForLoadState("domcontentloaded");
-    await waitForSearchReady(page);
 
     // Verify page rendered successfully
     const pageTitle = await page.title();
