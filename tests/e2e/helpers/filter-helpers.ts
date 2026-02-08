@@ -155,7 +155,7 @@ export async function waitForSearchReady(
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
+    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
   // Wait for networkidle to ensure React hydration completes —
@@ -175,7 +175,7 @@ export async function gotoSearchWithFilters(
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   await page
-    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
+    .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
   await page.waitForLoadState("networkidle").catch(() => {});

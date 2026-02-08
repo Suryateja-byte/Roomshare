@@ -45,7 +45,9 @@ export function RecommendedFilters() {
         const existing = searchParams.get('maxPrice');
         return !existing || Number(existing) > Number(s.value);
       }
-      return current !== s.value;
+      // For scalar single-select params (roomType, leaseDuration),
+      // hide if any value is already set for that param
+      return !current;
     }).slice(0, MAX_PILLS);
   }, [searchParams]);
 

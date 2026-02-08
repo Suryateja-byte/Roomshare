@@ -229,6 +229,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
   test(`${tags.filter} Hidden when results >= 5 or count === 0 (P1)`, async ({
     page,
   }) => {
+    test.slow(); // 2 navigations across test steps on WSL2/NTFS
     // Part A — enough results (>= 5)
     await test.step("Hidden when results >= 5", async () => {
       // Navigate to base search with just bounds — should return many results
@@ -272,6 +273,12 @@ test.describe("Near Matches & Low Results Guidance", () => {
       await page.goto(url);
 
       await page.waitForLoadState("domcontentloaded");
+      // Use broader selectors with longer timeout for WSL2/NTFS second navigation
+      await page
+        .locator(`a[href^="/listings/"], [data-testid="empty-state"], [class*="empty-state"], h1, h2, h3`)
+        .first()
+        .waitFor({ state: "attached", timeout: 60_000 });
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       const cardCount = await scopedCards(page).count();
 

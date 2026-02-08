@@ -23,6 +23,7 @@ import {
   waitForSearchReady,
   gotoSearchWithFilters,
   getUrlParam,
+  filtersButton,
 } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -97,6 +98,7 @@ test.describe("Room Type Filter", () => {
 
   // 4. Room type filter narrows results
   test(`${tags.core} - room type filter narrows visible results`, async ({ page }) => {
+    test.slow(); // 2 navigations on WSL2/NTFS
     await waitForSearchReady(page);
     const container = searchResultsContainer(page);
 
@@ -131,6 +133,7 @@ test.describe("Room Type Filter", () => {
 
   // 6. Clear room type filter restores all results
   test(`${tags.core} - clearing room type restores full results`, async ({ page }) => {
+    test.slow(); // 3 navigations on WSL2/NTFS
     await waitForSearchReady(page);
     const container = searchResultsContainer(page);
 
@@ -152,7 +155,7 @@ test.describe("Room Type Filter", () => {
     await waitForSearchReady(page);
 
     // Open filter modal
-    const filtersBtn = page.getByRole("button", { name: "Filters", exact: true });
+    const filtersBtn = filtersButton(page);
     await filtersBtn.click();
 
     const dialog = page.getByRole("dialog", { name: /filters/i });
@@ -204,6 +207,12 @@ test.describe("Room Type Filter", () => {
   // 9. Each room type option can be selected
   test(`${tags.core} - all room type options are selectable via tabs`, async ({ page }) => {
     await waitForSearchReady(page);
+
+    // Disable "Search as I move" to prevent map-triggered URL changes
+    const searchAsIMove = page.getByRole("switch", { name: /search as i move/i });
+    if (await searchAsIMove.isChecked()) {
+      await searchAsIMove.click();
+    }
 
     const roomTypes = [
       { name: /filter by private/i, param: "Private Room" },

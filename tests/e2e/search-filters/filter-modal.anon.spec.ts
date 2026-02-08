@@ -107,10 +107,11 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     await filtersButton(page).click();
     const dialog = filterDialog(page);
     await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Select a room type to create a pending filter change
     const roomTypeSelect = dialog.locator("#filter-room-type");
-    if (await roomTypeSelect.isVisible()) {
+    if (await roomTypeSelect.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await roomTypeSelect.click();
       // Wait for Radix Select dropdown to render
       await page.getByRole("listbox").waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
@@ -178,6 +179,7 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
 
   // 9. Filter state persists in modal when reopened
   test(`${tags.core} - filter state persists when modal is reopened`, async ({ page }) => {
+    test.slow(); // beforeEach nav + gotoSearchWithFilters on WSL2/NTFS
     // Navigate with a pre-applied filter so it shows in the modal
     await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
@@ -185,6 +187,7 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     await filtersButton(page).click();
     const dialog = filterDialog(page);
     await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Check that the room type select shows the pre-applied value
     const roomTypeText = dialog.locator("#filter-room-type");
@@ -230,6 +233,7 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
 
   // 11. Active filter count badge shows in the header
   test(`${tags.core} - active filter count badge displays in modal header`, async ({ page }) => {
+    test.slow(); // beforeEach nav + gotoSearchWithFilters on WSL2/NTFS
     // Navigate with filters applied
     await gotoSearchWithFilters(page, { roomType: "Private Room", amenities: "Wifi" });
 

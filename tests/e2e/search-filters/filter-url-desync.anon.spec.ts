@@ -29,6 +29,7 @@ test.describe("Filter URL-UI Desync", () => {
   test(`${tags.filter} Browser Back after applying filter via modal reverts URL and UI state`, async ({
     page,
   }) => {
+    test.slow(); // multiple navigations on WSL2/NTFS
     // Navigate and wait for search to be ready
     await waitForSearchReady(page);
 
@@ -80,6 +81,7 @@ test.describe("Filter URL-UI Desync", () => {
   test(`${tags.filter} Browser Forward after Back restores URL and UI state`, async ({
     page,
   }) => {
+    test.slow(); // multiple navigations on WSL2/NTFS
     // Navigate and wait for search to be ready
     await waitForSearchReady(page);
 
@@ -100,9 +102,14 @@ test.describe("Filter URL-UI Desync", () => {
       { timeout: 15_000 }
     );
 
+    // Wait for page to fully settle after goBack before going forward.
+    // Without this, Next.js router re-render may clear forward history.
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await waitForUrlStable(page);
+
     // Go forward - wait for amenities=Wifi to return
     await page.goForward();
-    await waitForUrlParam(page, "amenities", "Wifi");
+    await waitForUrlParam(page, "amenities", "Wifi", 30_000);
 
     // Verify URL has amenities=Wifi
     const currentUrl = new URL(page.url());
@@ -110,7 +117,7 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Verify Wifi chip is visible in applied filters
     const filtersRegion = appliedFiltersRegion(page);
-    await expect(filtersRegion.getByRole("button", { name: /Wifi/i })).toBeVisible();
+    await expect(filtersRegion.getByRole("button", { name: /Wifi/i })).toBeVisible({ timeout: 15_000 });
   });
 
   test(`${tags.filter} Manual URL edit with filter params syncs UI state`, async ({
@@ -201,6 +208,7 @@ test.describe("Filter URL-UI Desync", () => {
   test(`${tags.filter} Page refresh mid-filter-change preserves committed state only`, async ({
     page,
   }) => {
+    test.slow(); // page.goto + page.reload on WSL2/NTFS
     // Navigate to URL with Wifi amenity
     const urlWithWifi = buildSearchUrl({ amenities: "Wifi" });
     await page.goto(urlWithWifi);
@@ -227,6 +235,7 @@ test.describe("Filter URL-UI Desync", () => {
       .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
       .first()
       .waitFor({ state: "attached", timeout: 30_000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Verify URL still has amenities=Wifi (committed state preserved)
     const currentUrl = new URL(page.url());
@@ -254,6 +263,7 @@ test.describe("Filter URL-UI Desync", () => {
   test(`${tags.filter} Multiple filter changes push correct history entries`, async ({
     page,
   }) => {
+    test.slow(); // 3+ navigations on WSL2/NTFS
     // Navigate and wait for search to be ready
     await waitForSearchReady(page);
 

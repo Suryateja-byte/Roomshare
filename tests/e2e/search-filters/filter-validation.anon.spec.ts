@@ -102,7 +102,11 @@ test.describe("Filter Validation & Security", () => {
   test("17.3 - negative minPrice is clamped to 0 or ignored", async ({ page }) => {
     await page.goto(`${SEARCH_URL}&minPrice=-100`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page
+      .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
+      .first()
+      .waitFor({ state: "attached", timeout: 30_000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Page should render without crashing
     expect(await page.title()).toBeTruthy();
@@ -125,19 +129,17 @@ test.describe("Filter Validation & Security", () => {
 
   // 17.4: Zero price handled
   test("17.4 - zero price values are accepted as valid", async ({ page }) => {
+    test.slow(); // WSL2/NTFS compilation delay
     await page.goto(`${SEARCH_URL}&minPrice=0&maxPrice=0`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    // Wait for ANY visible content (cards, empty state, or headings from ZeroResultsSuggestions)
+    await page
+      .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
+      .first()
+      .waitFor({ state: "visible", timeout: 60_000 });
 
     // Page should render without errors (may show empty state)
     expect(await page.title()).toBeTruthy();
-
-    const container = searchResultsContainer(page);
-    const hasContent =
-      (await container.locator(selectors.listingCard).count()) > 0 ||
-      (await container.locator(selectors.emptyState).count()) > 0 ||
-      (await page.locator("h1, h2, h3").first().isVisible().catch(() => false));
-    expect(hasContent).toBe(true);
 
     // If a price chip exists, it should show $0 values (not negative or NaN)
     const region = appliedFiltersRegion(page);
@@ -153,7 +155,11 @@ test.describe("Filter Validation & Security", () => {
   test("17.5 - extremely large maxPrice is clamped to MAX_SAFE_PRICE", async ({ page }) => {
     await page.goto(`${SEARCH_URL}&maxPrice=999999999999`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page
+      .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
+      .first()
+      .waitFor({ state: "attached", timeout: 30_000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Page should not crash
     expect(await page.title()).toBeTruthy();
@@ -231,6 +237,7 @@ test.describe("Filter Validation & Security", () => {
 
   // 17.8: Max array items enforced
   test("17.8 - excessive amenity values are truncated to MAX_ARRAY_ITEMS", async ({ page }) => {
+    test.slow(); // WSL2/NTFS compilation delay
     // Generate 50 amenity values by repeating the valid set many times
     // Only valid values from the allowlist will be kept (9 unique amenities max)
     // But let's test with a mix of valid and garbage to ensure the cap works
@@ -242,7 +249,11 @@ test.describe("Filter Validation & Security", () => {
 
     await page.goto(`${SEARCH_URL}&amenities=${encodeURIComponent(manyAmenities)}`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    // Wait for ANY visible content (cards, empty state, or headings)
+    await page
+      .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
+      .first()
+      .waitFor({ state: "visible", timeout: 60_000 });
 
     // Page should not crash or hang
     expect(await page.title()).toBeTruthy();
@@ -265,13 +276,5 @@ test.describe("Filter Validation & Security", () => {
       const fakeCount = await fakeChip.count();
       expect(fakeCount).toBe(0);
     }
-
-    // Page renders normally
-    const container = searchResultsContainer(page);
-    const hasContent =
-      (await container.locator(selectors.listingCard).count()) > 0 ||
-      (await container.locator(selectors.emptyState).count()) > 0 ||
-      (await page.locator("h1, h2, h3").first().isVisible().catch(() => false));
-    expect(hasContent).toBe(true);
   });
 });

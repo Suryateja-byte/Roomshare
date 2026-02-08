@@ -9,6 +9,7 @@ import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
 import SuggestedSearches from "@/components/search/SuggestedSearches";
 import { fetchMoreListings } from "@/app/search/actions";
 import { TotalPriceToggle } from "@/components/search/TotalPriceToggle";
+import { clearAllFilters } from "@/components/filters/filter-chip-utils";
 import { SplitStayCard } from "@/components/search/SplitStayCard";
 import { findSplitStays } from "@/lib/search/split-stay";
 import type { ListingData, FilterSuggestion } from "@/lib/data";
@@ -184,7 +185,7 @@ export function SearchResultsClient({
             </div>
           ) : (
             <Link
-              href="/search"
+              href={`/search?${clearAllFilters(new URLSearchParams(searchParamsString))}`}
               className="mt-6 px-4 py-2.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white text-sm font-medium transition-colors touch-target"
             >
               Clear all filters
