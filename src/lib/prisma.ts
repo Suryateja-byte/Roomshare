@@ -5,6 +5,9 @@ const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined
 }
 
+const FALLBACK_DATABASE_URL =
+    'postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder?schema=public';
+
 // P2-15: Connection pool configuration for serverless environments
 // Vercel serverless functions have short lifecycles, so we need to optimize connection handling
 // - connection_limit: Max connections per function instance (keep low for serverless)
@@ -13,7 +16,14 @@ const globalForPrisma = globalThis as unknown as {
 // See: https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
 const getDatasourceUrl = () => {
     const baseUrl = process.env.DATABASE_URL;
-    if (!baseUrl) return baseUrl;
+    if (!baseUrl) {
+        if (process.env.NODE_ENV !== 'test') {
+            logger.sync.warn(
+                'DATABASE_URL is not configured. Prisma is using a placeholder datasource URL; DB operations will fail until DATABASE_URL is set.',
+            );
+        }
+        return FALLBACK_DATABASE_URL;
+    }
 
     // Only add connection params if not already present
     if (baseUrl.includes('connection_limit')) return baseUrl;
