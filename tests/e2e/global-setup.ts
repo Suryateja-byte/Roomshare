@@ -12,7 +12,10 @@ export default async function globalSetup() {
       stdio: 'inherit',
       timeout: 30000,
     });
+    console.log('[global-setup] E2E seed completed');
   } catch (e) {
-    console.warn('[global-setup] Seed failed (non-fatal):', (e as Error).message);
+    const message = e instanceof Error ? e.message : String(e);
+    console.error('[global-setup] Seed failed (fatal):', message);
+    throw new Error(`E2E seed failed: ${message}`);
   }
 }

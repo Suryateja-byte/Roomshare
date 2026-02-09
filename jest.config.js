@@ -37,7 +37,7 @@ const customJestConfig = {
       statements: 5,
     },
   },
-  forceExit: true,
+  forceExit: process.env.CI === "true",
   workerIdleMemoryLimit: "512MB",
   moduleDirectories: ["node_modules", "<rootDir>/"],
   testMatch: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)"],
