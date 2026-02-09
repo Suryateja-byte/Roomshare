@@ -9,9 +9,10 @@
 
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { A11Y_CONFIG } from '../helpers/test-utils';
 
-// WCAG 2.1 AA tags for axe-core
-const WCAG_AA_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+// Use shared WCAG 2.1 AA config
+const WCAG_AA_TAGS = [...A11Y_CONFIG.tags];
 
 // Known issues that are accepted (document why)
 const KNOWN_ISSUES: string[] = [

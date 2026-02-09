@@ -74,9 +74,9 @@ test.describe('Create Listing — Performance Tests', () => {
     // Read CLS from the page
     const cls = await page.evaluate(() => (window as any).__cls as number);
 
-    // Budget: 0.5 (relaxed — the form has dynamic content like draft banners
-    // and progress indicators that cause some layout shift on load)
-    expect(cls, `CLS was ${cls.toFixed(4)}, budget is 0.5`).toBeLessThan(0.5);
+    // Budget: 0.1 (WCAG/CWV target — draft banners and progress indicators
+    // should use reserved space to avoid layout shift)
+    expect(cls, `CLS was ${cls.toFixed(4)}, budget is 0.1`).toBeLessThan(0.1);
   });
 
   // ────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ test.describe('Create Listing — Performance Tests', () => {
     expect(value).toBe('TTI test');
 
     const tti = Date.now() - navStart;
-    expect(tti, `TTI was ${tti}ms, budget is 15000ms`).toBeLessThan(15000);
+    expect(tti, `TTI was ${tti}ms, budget is 5000ms`).toBeLessThan(5000);
   });
 
   test(`P-004: page load time under 5s ${tags.slow}`, async ({ page }) => {
@@ -114,6 +114,6 @@ test.describe('Create Listing — Performance Tests', () => {
     });
 
     expect(loadTime, 'Navigation timing should be available').toBeGreaterThan(0);
-    expect(loadTime, `Load time was ${loadTime.toFixed(0)}ms, budget is 15000ms`).toBeLessThan(15000);
+    expect(loadTime, `Load time was ${loadTime.toFixed(0)}ms, budget is 5000ms`).toBeLessThan(5000);
   });
 });

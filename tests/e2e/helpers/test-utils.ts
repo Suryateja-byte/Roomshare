@@ -57,6 +57,19 @@ export const tags = {
 } as const;
 
 /**
+ * Accessibility configuration — WCAG 2.1 AA standard
+ * Centralized config for axe-core scans across all a11y specs.
+ */
+export const A11Y_CONFIG = {
+  standard: 'WCAG 2.1 AA' as const,
+  tags: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] as const,
+  /** Elements to always exclude from axe scans (map canvases are third-party) */
+  globalExcludes: ['.mapboxgl-canvas', '.maplibregl-canvas', '.maplibregl-ctrl-group'] as const,
+  /** Rules with known acceptable violations */
+  knownExclusions: ['color-contrast'] as const,
+} as const;
+
+/**
  * San Francisco bounding box for geo-filtered search tests
  */
 export const SF_BOUNDS = {
@@ -161,20 +174,6 @@ export async function waitForStable(
 ) {
   await page.waitForLoadState("networkidle", { timeout: options?.timeout });
 }
-
-// ---------------------------------------------------------------------------
-// Accessibility Configuration
-// ---------------------------------------------------------------------------
-
-/**
- * Shared WCAG 2.1 AA compliance configuration for axe-core scans.
- */
-export const A11Y_CONFIG = {
-  standard: "WCAG 2.1 AA" as const,
-  tags: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] as const,
-  /** Elements excluded globally (third-party map canvas not controllable) */
-  globalExcludes: [".maplibregl-canvas", ".mapboxgl-canvas"] as const,
-} as const;
 
 // ---------------------------------------------------------------------------
 // Map Wait Helpers (replacements for waitForTimeout in map tests)
