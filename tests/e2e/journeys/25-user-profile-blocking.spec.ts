@@ -16,7 +16,7 @@ test.describe("J35: View Public User Profile", () => {
   }) => {
     // Step 1: Go to a listing
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     const container = searchResultsContainer(page);
     const cards = container.locator(selectors.listingCard);
@@ -24,7 +24,7 @@ test.describe("J35: View Public User Profile", () => {
 
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Find and click host name/link
     const hostLink = page
@@ -42,7 +42,7 @@ test.describe("J35: View Public User Profile", () => {
       await page.waitForURL(/\/users\//, { timeout: 10000 });
     } catch {
       // May already be on user page or redirected
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
     }
 
     // Step 3: Verify profile page
@@ -88,7 +88,7 @@ test.describe("J36: Block a User", () => {
 
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Navigate to user profile — find host link
     const hostLink = page
@@ -102,7 +102,7 @@ test.describe("J36: Block a User", () => {
     try {
       await page.waitForURL(/\/users\//, { timeout: 10000 });
     } catch {
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
     }
 
     // Step 3: Look for block button
@@ -114,14 +114,14 @@ test.describe("J36: Block a User", () => {
     test.skip(!canBlock, "No block button — skipping");
 
     await blockBtn.first().click();
-    await page.waitForTimeout(500);
+    await page.locator('[role="dialog"], [role="alertdialog"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     // Step 4: Confirm block — modal has "Block User" button
     const confirmBtn = page.getByRole("button", { name: /block user/i })
       .or(page.locator('[role="dialog"] button').filter({ hasText: /block/i }));
     if (await confirmBtn.first().isVisible().catch(() => false)) {
       await confirmBtn.first().click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
     }
 
     // Step 5: Verify block happened
@@ -133,11 +133,11 @@ test.describe("J36: Block a User", () => {
     // Clean up: unblock
     if (isBlocked) {
       await unblockBtn.click();
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('networkidle');
       const confirmUnblock = page.getByRole("button", { name: /confirm|yes|unblock/i }).first();
       if (await confirmUnblock.isVisible().catch(() => false)) {
         await confirmUnblock.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
       }
     }
   });
@@ -151,7 +151,7 @@ test.describe("J37: Edit Profile Fields", () => {
   }) => {
     // Step 1: Go to profile
     await nav.goToProfile();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     // Step 2: Click edit button or navigate to edit page directly
     const editBtn = page
@@ -163,11 +163,11 @@ test.describe("J37: Edit Profile Fields", () => {
     const canEdit = await editBtn.first().isVisible().catch(() => false);
     if (canEdit) {
       await editBtn.first().click();
-      await page.waitForTimeout(1500);
+      await page.waitForLoadState('networkidle');
     } else {
       // Fallback: navigate directly to edit page
       await page.goto("/profile/edit");
-      await page.waitForTimeout(1500);
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 3: Fill bio field
@@ -189,7 +189,7 @@ test.describe("J37: Edit Profile Fields", () => {
       .or(page.locator('button[type="submit"]'));
     if (await saveBtn.first().isVisible().catch(() => false)) {
       await saveBtn.first().click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
     }
 
     // Step 5: Verify changes persisted

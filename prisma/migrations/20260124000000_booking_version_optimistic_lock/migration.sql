@@ -3,7 +3,7 @@
 
 -- Add version column with default value of 1 for existing rows
 -- Safe: Non-locking ALTER, backward compatible (new column with default)
-ALTER TABLE "Booking" ADD COLUMN "version" INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 1;
 
 -- Rollback: ALTER TABLE "Booking" DROP COLUMN "version";
 -- Data Safety: Non-destructive, adds column with sensible default

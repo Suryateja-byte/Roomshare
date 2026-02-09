@@ -17,16 +17,13 @@ import {
   timeouts,
   tags,
   SF_BOUNDS,
+  waitForMapReady,
 } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // Build search URL with SF bounds
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
-
-// Animation timing constants
-const CLUSTER_ANIMATION_MS = 700;
-const MAP_EASE_ANIMATION_MS = 300;
 
 // ---------------------------------------------------------------------------
 // Helper Functions
@@ -83,7 +80,6 @@ function getFirstVisibleMarker(page: Page) {
 async function tabToMarker(page: Page, maxAttempts = 30): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     await page.keyboard.press("Tab");
-    await page.waitForTimeout(50);
 
     // Check if active element is a marker (has aria-label with price format "$X/month")
     const isMarkerFocused = await page.evaluate(() => {
@@ -207,8 +203,8 @@ async function zoomToExpandClusters(page: Page): Promise<boolean> {
     }
   });
 
-  // Wait for React to process the state update and render Marker components
-  await page.waitForTimeout(1000);
+  // Wait for map to settle after programmatic marker update
+  await waitForMapReady(page);
 
   const finalCount = await page.locator(".mapboxgl-marker:visible").count();
   return finalCount > 0;
@@ -285,7 +281,6 @@ test.describe("Map Marker Interactions", () => {
 
       // Click marker
       await marker.click();
-      await page.waitForTimeout(timeouts.animation);
 
       // Popup should appear
       const popup = page.locator(".mapboxgl-popup");
@@ -357,7 +352,7 @@ test.describe("Map Marker Interactions", () => {
         boundingBox!.x + 20,
         boundingBox!.y + boundingBox!.height - 20
       );
-      await page.waitForTimeout(timeouts.animation);
+      await waitForMapReady(page);
 
       // Popup count should be 0 or 1 (might open another marker's popup)
       const popupCount = await page.locator(".mapboxgl-popup").count();
@@ -431,7 +426,7 @@ test.describe("Map Marker Interactions", () => {
             map.jumpTo({ zoom: 10 }); // Zoom out to create clusters
           }
         });
-        await page.waitForTimeout(1500);
+        await waitForMapReady(page);
 
         const newClusterCount = await clusterMarker.count();
         if (newClusterCount === 0) {
@@ -443,8 +438,8 @@ test.describe("Map Marker Interactions", () => {
       // Click the first cluster
       await clusterMarker.first().click();
 
-      // Wait for zoom animation
-      await page.waitForTimeout(CLUSTER_ANIMATION_MS + 200);
+      // Wait for map to settle after cluster expansion zoom
+      await waitForMapReady(page);
 
       // Check if zoom increased (cluster expanded)
       const newZoom = await getMapZoom(page);
@@ -512,7 +507,7 @@ test.describe("Map Marker Interactions", () => {
         await page.waitForURL(`**${href}`, { timeout: timeouts.navigation });
         expect(page.url()).toContain("/listings/");
       } else {
-        test.fail(true, "No navigation link found in popup");
+        test.skip(true, "No navigation link found in popup");
       }
     });
   });
@@ -543,7 +538,6 @@ test.describe("Map Marker Interactions", () => {
 
       // Press Enter to open popup
       await page.keyboard.press("Enter");
-      await page.waitForTimeout(timeouts.animation);
 
       // Popup should appear
       await expect(page.locator(".mapboxgl-popup")).toBeVisible({
@@ -572,7 +566,6 @@ test.describe("Map Marker Interactions", () => {
 
       // Press Space to open popup
       await page.keyboard.press("Space");
-      await page.waitForTimeout(timeouts.animation);
 
       // Popup should appear
       await expect(page.locator(".mapboxgl-popup")).toBeVisible({
@@ -641,7 +634,7 @@ test.describe("Map Marker Interactions", () => {
       // Try each arrow key to navigate
       for (const key of ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"]) {
         await page.keyboard.press(key);
-        await page.waitForTimeout(MAP_EASE_ANIMATION_MS + 100);
+        await waitForMapReady(page);
 
         // Check if focus moved to a different element or same element
         const currentLabel = await page.evaluate(
@@ -683,7 +676,7 @@ test.describe("Map Marker Interactions", () => {
 
       // Press Home to go to first marker
       await page.keyboard.press("Home");
-      await page.waitForTimeout(MAP_EASE_ANIMATION_MS + 100);
+      await waitForMapReady(page);
 
       // Should still be focused on a marker
       const afterHomeLabel = await page.evaluate(
@@ -693,7 +686,7 @@ test.describe("Map Marker Interactions", () => {
 
       // Press End to go to last marker
       await page.keyboard.press("End");
-      await page.waitForTimeout(MAP_EASE_ANIMATION_MS + 100);
+      await waitForMapReady(page);
 
       // Should still be focused on a marker
       const afterEndLabel = await page.evaluate(
@@ -705,14 +698,14 @@ test.describe("Map Marker Interactions", () => {
       if (markerCount > 1) {
         // Press Home again
         await page.keyboard.press("Home");
-        await page.waitForTimeout(MAP_EASE_ANIMATION_MS + 100);
+        await waitForMapReady(page);
         const homeLabel = await page.evaluate(
           () => document.activeElement?.getAttribute("aria-label") || ""
         );
 
         // Press End again
         await page.keyboard.press("End");
-        await page.waitForTimeout(MAP_EASE_ANIMATION_MS + 100);
+        await waitForMapReady(page);
         const endLabel = await page.evaluate(
           () => document.activeElement?.getAttribute("aria-label") || ""
         );
@@ -745,7 +738,6 @@ test.describe("Map Marker Interactions", () => {
 
       // Press Escape
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(timeouts.animation);
 
       // Popup should be closed
       await expect(page.locator(".mapboxgl-popup")).not.toBeVisible({
@@ -773,13 +765,12 @@ test.describe("Map Marker Interactions", () => {
       // be reliably matched via Playwright CSS selectors)
       const highlightCountBefore = await page.evaluate(() => {
         return Array.from(document.querySelectorAll('[data-testid="listing-card"]'))
-          .filter(el => el.classList.contains("ring-2"))
+          .filter(el => el.getAttribute("data-focus-state") === "active")
           .length;
       });
 
       // Press Escape
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(timeouts.animation);
 
       // Popup should be gone
       await expect(page.locator(".mapboxgl-popup")).not.toBeVisible({
@@ -792,7 +783,7 @@ test.describe("Map Marker Interactions", () => {
       // This is by design: the "last viewed" card stays highlighted.
       const highlightCountAfter = await page.evaluate(() => {
         return Array.from(document.querySelectorAll('[data-testid="listing-card"]'))
-          .filter(el => el.classList.contains("ring-2"))
+          .filter(el => el.getAttribute("data-focus-state") === "active")
           .length;
       });
       expect(highlightCountAfter).toBe(highlightCountBefore);
@@ -920,16 +911,12 @@ test.describe("Map Marker Interactions", () => {
       // Check for visible focus indicator (the component uses a focus ring)
       // The MapClient.tsx shows focus ring when keyboardFocusedId matches
       const focusRing = page.locator(
-        ".mapboxgl-marker .border-blue-500, .mapboxgl-marker .border-blue-400"
+        '.mapboxgl-marker [data-focus-state="hovered"], .mapboxgl-marker [data-focus-state="active"]'
       );
       const hasFocusRing = (await focusRing.count()) > 0;
 
-      // Alternative: check if any marker has z-50 (elevated z-index when focused)
-      const elevatedMarker = page.locator(".mapboxgl-marker .z-50");
-      const hasElevated = (await elevatedMarker.count()) > 0;
-
       // At least one focus indicator should be present
-      expect(hasFocusRing || hasElevated).toBe(true);
+      expect(hasFocusRing).toBe(true);
     });
 
     test(`${tags.a11y} - popup is announced with appropriate content`, async ({

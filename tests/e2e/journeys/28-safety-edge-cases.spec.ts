@@ -19,7 +19,7 @@ test.describe("J45: Report a Listing", () => {
   }) => {
     // Step 1: Find a listing NOT owned by test user (report button only shows for non-owners)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     const container = searchResultsContainer(page);
     const cards = container.locator(selectors.listingCard);
@@ -28,7 +28,7 @@ test.describe("J45: Report a Listing", () => {
     // Step 2: Go to listing
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 3: Find report button (text is "Report this listing")
     const reportBtn = page
@@ -39,17 +39,17 @@ test.describe("J45: Report a Listing", () => {
     test.skip(!canReport, "No report button — skipping");
 
     await reportBtn.first().click();
-    await page.waitForTimeout(1500);
 
     // Step 4: Fill report form — ReportButton uses shadcn Dialog
     // The dialog content renders in a portal with data-state="open"
     const dialog = page.locator('[role="dialog"][data-state="open"]')
       .or(page.locator('[role="dialog"]').filter({ hasText: /report listing|report/i }));
+    await dialog.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     const dialogVisible = await dialog.first().isVisible().catch(() => false);
     if (!dialogVisible) {
       // Try clicking the report button again — may need a second click after hydration
       await reportBtn.first().click();
-      await page.waitForTimeout(1500);
+      await dialog.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
     const hasDialog = await dialog.first().isVisible().catch(() => false);
     test.skip(!hasDialog, "Report dialog did not open — skipping");
@@ -59,12 +59,11 @@ test.describe("J45: Report a Listing", () => {
     const selectTrigger = reportDialog.locator('[role="combobox"]').or(reportDialog.getByRole("combobox"));
     if (await selectTrigger.first().isVisible().catch(() => false)) {
       await selectTrigger.first().click();
-      await page.waitForTimeout(500);
+      await page.locator('[role="option"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       // Select "Spam" option from dropdown (options render in a portal outside dialog)
       const option = page.locator('[role="option"]').filter({ hasText: /spam|fraud|inappropriate/i }).first();
       if (await option.isVisible().catch(() => false)) {
         await option.click();
-        await page.waitForTimeout(500);
       }
     }
 
@@ -79,7 +78,7 @@ test.describe("J45: Report a Listing", () => {
       .or(reportDialog.getByRole("button", { name: /submit/i }));
     if (await submitBtn.first().isVisible().catch(() => false)) {
       await submitBtn.first().click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
     }
 
     // Step 6: Verify confirmation — ReportButton shows inline "Thank you" text
@@ -98,7 +97,7 @@ test.describe("J46: XSS Prevention", () => {
     // Step 1: Navigate to search with XSS payload in query
     const xssPayload = '<script>alert("xss")</script>';
     await nav.goToSearch({ q: xssPayload });
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     // Step 2: Verify the script tag is not executed
     // Check that no alert dialog appeared
@@ -106,7 +105,7 @@ test.describe("J46: XSS Prevention", () => {
     page.on("dialog", () => {
       alertFired = true;
     });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1000); // intentional: allow time for any injected script to execute
     expect(alertFired).toBeFalsy();
 
     // Step 3: If the query text is displayed, it should be escaped
@@ -127,7 +126,7 @@ test.describe("J47: Rate Limit Feedback", () => {
   }) => {
     // Step 1: Find a listing NOT owned by test user (action buttons only show for non-owners)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     const j47Container = searchResultsContainer(page);
     const cards = j47Container.locator(selectors.listingCard);
@@ -135,7 +134,7 @@ test.describe("J47: Rate Limit Feedback", () => {
 
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Find an action button (save, book, contact)
     const actionBtn = page
@@ -148,9 +147,8 @@ test.describe("J47: Rate Limit Feedback", () => {
     // Step 3: Rapid-click the button 5 times
     for (let i = 0; i < 5; i++) {
       await actionBtn.click().catch(() => {});
-      await page.waitForTimeout(100);
     }
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     // Step 4: Verify some feedback happened
     // Could be: button disabled, toast, error message, or just normal toggle behavior
@@ -173,7 +171,7 @@ test.describe("J48: Protected Route Redirects", () => {
     for (const route of protectedRoutes) {
       // Use a fresh context approach: just verify the page loads or redirects
       await page.goto(route);
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
 
       const currentUrl = page.url();
 
@@ -197,7 +195,7 @@ test.describe("J49: Offline Page", () => {
     page,
   }) => {
     await page.goto("/offline");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('domcontentloaded');
 
     // The offline page may or may not exist — verify the app handles it
     const currentUrl = page.url();
@@ -229,7 +227,7 @@ test.describe("J50: Cross-Page Navigation Chain", () => {
 
     // Step 2: Search page
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle');
     await expect(page.locator("body")).toBeVisible();
     expect(page.url()).toContain("/search");
 
@@ -244,17 +242,17 @@ test.describe("J50: Cross-Page Navigation Chain", () => {
 
     // Step 4: Bookings page
     await nav.goToBookings();
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle');
     await expect(page.locator("body")).toBeVisible();
 
     // Step 5: Messages page
     await nav.goToMessages();
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle');
     await expect(page.locator("body")).toBeVisible();
 
     // Step 6: Profile page
     await nav.goToProfile();
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle');
     await expect(page.locator("body")).toBeVisible();
 
     // All pages should have loaded without crashes

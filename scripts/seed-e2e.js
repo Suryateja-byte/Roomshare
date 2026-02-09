@@ -22,6 +22,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7599, lng: -122.4148,
     address: '2400 Mission St', city: 'San Francisco', state: 'CA', zip: '94110',
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Parking'],
+    houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
+    leaseDuration: '6 months',
   },
   {
     title: 'Spacious SOMA Shared',
@@ -30,6 +33,9 @@ const SF_LISTINGS = [
     roomType: 'Shared Room',
     lat: 37.7785, lng: -122.3950,
     address: '500 Howard St', city: 'San Francisco', state: 'CA', zip: '94105',
+    amenities: ['Wifi', 'AC', 'Gym', 'Kitchen'],
+    houseRules: ['No Smoking', 'Guests allowed'],
+    leaseDuration: 'Month-to-month',
   },
   {
     title: 'Cozy Sunset Studio',
@@ -38,6 +44,9 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7535, lng: -122.4950,
     address: '1800 Irving St', city: 'San Francisco', state: 'CA', zip: '94122',
+    amenities: ['Wifi', 'Furnished', 'Pool', 'Kitchen', 'Parking'],
+    houseRules: ['No Smoking', 'Pets allowed'],
+    leaseDuration: '12 months',
   },
   {
     title: 'Hayes Valley Private Suite',
@@ -46,6 +55,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7760, lng: -122.4240,
     address: '400 Hayes St', city: 'San Francisco', state: 'CA', zip: '94102',
+    amenities: ['Wifi', 'Furnished', 'AC', 'Washer', 'Dryer'],
+    houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
+    leaseDuration: '6 months',
   },
   {
     title: 'Richmond District Room',
@@ -54,6 +66,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7800, lng: -122.4700,
     address: '600 Clement St', city: 'San Francisco', state: 'CA', zip: '94118',
+    amenities: ['Wifi', 'Kitchen', 'Furnished'],
+    houseRules: ['Quiet Hours 10pm-8am', 'Guests allowed'],
+    leaseDuration: 'Month-to-month',
   },
   // Additional listings to ensure >12 results for pagination testing
   {
@@ -63,6 +78,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.8010, lng: -122.4370,
     address: '2100 Chestnut St', city: 'San Francisco', state: 'CA', zip: '94123',
+    amenities: ['Wifi', 'Parking', 'AC', 'Furnished'],
+    houseRules: ['No Smoking', 'Pets allowed'],
+    leaseDuration: '3 months',
   },
   {
     title: 'Noe Valley Garden Room',
@@ -71,6 +89,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7502, lng: -122.4337,
     address: '1200 Church St', city: 'San Francisco', state: 'CA', zip: '94114',
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Pool'],
+    houseRules: ['Pets allowed', 'Guests allowed'],
+    leaseDuration: '12 months',
   },
   {
     title: 'Potrero Hill Studio',
@@ -79,6 +100,9 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7615, lng: -122.4010,
     address: '800 18th St', city: 'San Francisco', state: 'CA', zip: '94107',
+    amenities: ['Wifi', 'Gym', 'AC', 'Parking', 'Kitchen'],
+    houseRules: ['No Smoking', 'Couples allowed'],
+    leaseDuration: '6 months',
   },
   {
     title: 'Inner Sunset Shared',
@@ -87,6 +111,9 @@ const SF_LISTINGS = [
     roomType: 'Shared Room',
     lat: 37.7620, lng: -122.4600,
     address: '900 Irving St', city: 'San Francisco', state: 'CA', zip: '94122',
+    amenities: ['Wifi', 'Kitchen'],
+    houseRules: ['Quiet Hours 10pm-8am'],
+    leaseDuration: 'Flexible',
   },
   {
     title: 'Dogpatch Loft',
@@ -95,6 +122,9 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7590, lng: -122.3880,
     address: '700 3rd St', city: 'San Francisco', state: 'CA', zip: '94107',
+    amenities: ['Wifi', 'Furnished', 'Pool', 'Gym', 'Parking', 'Kitchen'],
+    houseRules: ['Pets allowed', 'Couples allowed'],
+    leaseDuration: '12 months',
   },
   {
     title: 'Pacific Heights Room',
@@ -103,6 +133,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7930, lng: -122.4340,
     address: '2500 Fillmore St', city: 'San Francisco', state: 'CA', zip: '94115',
+    amenities: ['Wifi', 'Furnished', 'AC', 'Washer', 'Dryer', 'Parking'],
+    houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
+    leaseDuration: '6 months',
   },
   {
     title: 'Bernal Heights Cottage',
@@ -111,6 +144,9 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7450, lng: -122.4150,
     address: '300 Cortland Ave', city: 'San Francisco', state: 'CA', zip: '94110',
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Pool'],
+    houseRules: ['Pets allowed', 'Guests allowed'],
+    leaseDuration: 'Flexible',
   },
   {
     title: 'Castro Neighborhood Room',
@@ -119,6 +155,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7610, lng: -122.4350,
     address: '500 Castro St', city: 'San Francisco', state: 'CA', zip: '94114',
+    amenities: ['Wifi', 'AC', 'Kitchen', 'Gym'],
+    houseRules: ['Guests allowed', 'Couples allowed'],
+    leaseDuration: '3 months',
   },
   {
     title: 'North Beach Shared Space',
@@ -127,6 +166,9 @@ const SF_LISTINGS = [
     roomType: 'Shared Room',
     lat: 37.8010, lng: -122.4100,
     address: '400 Columbus Ave', city: 'San Francisco', state: 'CA', zip: '94133',
+    amenities: ['Wifi', 'Kitchen'],
+    houseRules: ['Smoking allowed', 'Guests allowed'],
+    leaseDuration: 'Month-to-month',
   },
   {
     title: 'Haight-Ashbury Suite',
@@ -135,6 +177,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7700, lng: -122.4480,
     address: '1600 Haight St', city: 'San Francisco', state: 'CA', zip: '94117',
+    amenities: ['Wifi', 'Furnished', 'Parking', 'Gym'],
+    houseRules: ['Pets allowed', 'Smoking allowed'],
+    leaseDuration: '6 months',
   },
   {
     title: 'Financial District Studio',
@@ -143,6 +188,9 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7940, lng: -122.4010,
     address: '100 Montgomery St', city: 'San Francisco', state: 'CA', zip: '94104',
+    amenities: ['Wifi', 'AC', 'Furnished', 'Kitchen', 'Parking'],
+    houseRules: ['No Smoking', 'Couples allowed'],
+    leaseDuration: '12 months',
   },
   {
     title: 'Japantown Shared Room',
@@ -151,6 +199,9 @@ const SF_LISTINGS = [
     roomType: 'Shared Room',
     lat: 37.7855, lng: -122.4300,
     address: '1700 Post St', city: 'San Francisco', state: 'CA', zip: '94115',
+    amenities: ['Wifi', 'Kitchen'],
+    houseRules: ['Quiet Hours 10pm-8am'],
+    leaseDuration: 'Flexible',
   },
   {
     title: 'Russian Hill Room',
@@ -159,6 +210,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.8020, lng: -122.4190,
     address: '1000 Lombard St', city: 'San Francisco', state: 'CA', zip: '94109',
+    amenities: ['Wifi', 'Furnished', 'AC', 'Kitchen'],
+    houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
+    leaseDuration: '6 months',
   },
   {
     title: 'SoMa Tech Room',
@@ -167,6 +221,9 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7730, lng: -122.4050,
     address: '200 Brannan St', city: 'San Francisco', state: 'CA', zip: '94107',
+    amenities: ['Wifi', 'Gym', 'Parking', 'Kitchen', 'AC'],
+    houseRules: ['No Smoking', 'Guests allowed'],
+    leaseDuration: '3 months',
   },
 ];
 
@@ -222,9 +279,10 @@ async function main() {
         description: data.description,
         price: data.price,
         roomType: data.roomType,
-        amenities: ['WiFi', 'Furnished', 'Kitchen Access'],
-        houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
+        amenities: data.amenities || ['Wifi', 'Furnished', 'Kitchen'],
+        houseRules: data.houseRules || ['No Smoking', 'Quiet Hours 10pm-8am'],
         householdLanguages: ['en'],
+        leaseDuration: data.leaseDuration || null,
         totalSlots: 2,
         availableSlots: 1,
         moveInDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -558,6 +616,68 @@ async function main() {
     console.log(`  ✓ AuditLog entries created`);
   } else {
     console.log(`  ⏭ AuditLog entries exist`);
+  }
+
+  // 12. Backfill listing_search_docs (denormalized search table)
+  // This table is created by migration 20260110000000_search_doc
+  // The facets API queries it with no fallback, so it MUST be populated
+  try {
+    // Check if the table exists
+    const tableExists = await prisma.$queryRaw`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'listing_search_docs'
+      ) AS "exists"
+    `;
+    if (tableExists[0]?.exists) {
+      // Truncate and repopulate from Listing + Location + Review joins
+      await prisma.$executeRawUnsafe(`DELETE FROM listing_search_docs`);
+
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO listing_search_docs (
+          id, owner_id, title, description, price, images,
+          amenities, house_rules, household_languages, primary_home_language,
+          lease_duration, room_type, move_in_date, total_slots, available_slots,
+          view_count, status, listing_created_at,
+          address, city, state, zip, location_geog, lat, lng,
+          avg_rating, review_count, recommended_score,
+          amenities_lower, house_rules_lower, household_languages_lower,
+          gender_preference, household_gender,
+          doc_created_at, doc_updated_at
+        )
+        SELECT
+          l.id, l."ownerId", l.title, l.description, l.price, l.images,
+          l.amenities, l."houseRules", l."household_languages", l."primary_home_language",
+          l."leaseDuration", l."roomType", l."moveInDate", l."totalSlots", l."availableSlots",
+          l."viewCount", l.status::text, l."createdAt",
+          loc.address, loc.city, loc.state, loc.zip,
+          loc.coords, ST_Y(loc.coords::geometry), ST_X(loc.coords::geometry),
+          COALESCE(AVG(r.rating), 0)::float,
+          COUNT(r.id)::int,
+          (COALESCE(AVG(r.rating), 0) * 20 + l."viewCount" * 0.1 + COUNT(r.id) * 5),
+          ARRAY(SELECT LOWER(unnest(l.amenities))),
+          ARRAY(SELECT LOWER(unnest(l."houseRules"))),
+          ARRAY(SELECT LOWER(unnest(l."household_languages"))),
+          l."genderPreference", l."householdGender",
+          NOW(), NOW()
+        FROM "Listing" l
+        JOIN "Location" loc ON l.id = loc."listingId"
+        LEFT JOIN "Review" r ON l.id = r."listingId"
+        WHERE loc.coords IS NOT NULL
+        GROUP BY l.id, loc.id
+      `);
+
+      // Count the inserted rows
+      const countResult = await prisma.$queryRaw`
+        SELECT COUNT(*)::int AS count FROM listing_search_docs
+      `;
+      console.log(`  ✓ listing_search_docs backfilled: ${countResult[0].count} rows`);
+    } else {
+      console.log('  ⚠ listing_search_docs table does not exist — skipping backfill (run prisma migrate deploy first)');
+    }
+  } catch (err) {
+    console.error('  ⚠ listing_search_docs backfill failed:', err.message);
+    // Non-fatal: tests may still partially work without it
   }
 
   console.log('✅ E2E seed complete.');

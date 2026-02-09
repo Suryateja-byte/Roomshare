@@ -60,8 +60,9 @@ test.describe("Nearby Places Layout", () => {
     await page.waitForLoadState("networkidle");
 
     // Check if map container exists and has proper dimensions
+    // TODO: add data-testid="map" to the Map component wrapper
     const mapContainer = page
-      .locator('.maplibregl-map, .mapboxgl-map, [class*="map"]')
+      .locator('.maplibregl-map, .mapboxgl-map')
       .first();
 
     if ((await mapContainer.count()) > 0) {
@@ -99,8 +100,9 @@ test.describe("Nearby Places Layout", () => {
     await page.waitForLoadState("networkidle");
 
     // Find the map section
+    // TODO: add data-testid="nearby-places" to the NearbyPlaces component if not present
     const nearbySection = page
-      .locator('[data-testid="nearby-places"], [class*="nearby"]')
+      .locator('[data-testid="nearby-places"]')
       .first();
 
     if ((await nearbySection.count()) > 0) {
@@ -114,7 +116,7 @@ test.describe("Nearby Places Layout", () => {
 
     // Check that map has minimum dimensions
     const mapContainer = page
-      .locator('.maplibregl-map, .mapboxgl-map, [class*="map"]')
+      .locator('.maplibregl-map, .mapboxgl-map')
       .first();
     if ((await mapContainer.count()) > 0) {
       const mapStyles = await mapContainer.evaluate((el) => {
@@ -142,15 +144,15 @@ test.describe("Nearby Places Layout", () => {
     await page.evaluate(() => {
       window.scrollBy(0, 300);
     });
-    await page.waitForTimeout(500);
 
     // Find sticky header
+    // TODO: add data-testid to sticky header component
     const stickyHeader = page
-      .locator('header, [class*="sticky"], [class*="fixed"]')
+      .locator('header, [style*="position: sticky"], [style*="position: fixed"]')
       .first();
     const mapControls = page
       .locator(
-        '.maplibregl-ctrl-top-right, .mapboxgl-ctrl-top-right, [class*="control"]',
+        '.maplibregl-ctrl-top-right, .mapboxgl-ctrl-top-right',
       )
       .first();
 
@@ -196,7 +198,6 @@ test.describe("Nearby Places Layout", () => {
       .first();
     if ((await categoryChip.count()) > 0) {
       await categoryChip.click();
-      await page.waitForTimeout(1000);
     }
 
     // Try to click on a marker to open popup
@@ -209,11 +210,10 @@ test.describe("Nearby Places Layout", () => {
       if (box) {
         // Click center of map
         await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-        await page.waitForTimeout(500);
 
         // Check popup z-index
         const popup = page.locator(
-          '.maplibregl-popup, .mapboxgl-popup, [class*="popup"]',
+          '.maplibregl-popup, .mapboxgl-popup',
         );
         if (await popup.isVisible().catch(() => false)) {
           const popupZ = await popup.evaluate((el) => {
@@ -256,9 +256,6 @@ test.describe("Nearby Places Layout", () => {
         await page.mouse.down();
         await page.mouse.move(startX + 50, startY + 50);
         await page.mouse.up();
-
-        // Map should have moved (no error thrown)
-        await page.waitForTimeout(300);
       }
     }
   });
@@ -275,13 +272,13 @@ test.describe("Nearby Places Layout", () => {
       .first();
     if ((await categoryChip.count()) > 0) {
       await categoryChip.click();
-      await page.waitForTimeout(1000);
     }
 
     // Find the results panel
+    // TODO: add data-testid="results-area" to the results panel component if not present
     const resultsPanel = page
       .locator(
-        '[data-testid="results-area"], [class*="results"], [class*="panel"]',
+        '[data-testid="results-area"]',
       )
       .first();
 
@@ -354,7 +351,6 @@ test.describe("Nearby Places Layout", () => {
 
       // Simulate orientation change by resizing viewport
       await page.setViewportSize({ width: 800, height: 600 });
-      await page.waitForTimeout(500);
 
       // Get new dimensions
       const newBox = await mapCanvas.boundingBox();
@@ -368,7 +364,6 @@ test.describe("Nearby Places Layout", () => {
 
       // Resize back to mobile portrait
       await page.setViewportSize({ width: 375, height: 667 });
-      await page.waitForTimeout(500);
 
       const mobileBox = await mapCanvas.boundingBox();
       if (mobileBox) {
@@ -400,7 +395,6 @@ test.describe("Nearby Places Layout", () => {
       .first();
     if ((await categoryChip.count()) > 0) {
       await categoryChip.click();
-      await page.waitForTimeout(1000);
     }
 
     // Check canvas resolution
@@ -456,7 +450,7 @@ test.describe("Nearby Places Mobile Layout", () => {
 
     // Find nearby section
     const nearbySection = page
-      .locator('[data-testid="nearby-places"], [class*="nearby"]')
+      .locator('[data-testid="nearby-places"]')
       .first();
 
     if ((await nearbySection.count()) > 0) {
@@ -469,8 +463,9 @@ test.describe("Nearby Places Mobile Layout", () => {
     }
 
     // Check that category chips wrap properly
+    // TODO: add data-testid="category-chips" to the chips container component
     const chipsContainer = page
-      .locator('[class*="chips"], [class*="categories"]')
+      .locator('[role="group"], [data-testid="category-chips"]')
       .first();
     if ((await chipsContainer.count()) > 0) {
       const containerBox = await chipsContainer.boundingBox();
@@ -508,21 +503,19 @@ test.describe("Nearby Places Mobile Layout", () => {
 
     if ((await mapToggle.count()) > 0) {
       await mapToggle.click();
-      await page.waitForTimeout(300);
 
       // Map should be visible
       const mapContainer = page
-        .locator('.maplibregl-map, .mapboxgl-map, [class*="map"]')
+        .locator('.maplibregl-map, .mapboxgl-map')
         .first();
       const mapVisible = await mapContainer.isVisible().catch(() => false);
 
       if ((await listToggle.count()) > 0) {
         await listToggle.click();
-        await page.waitForTimeout(300);
 
         // List should now be visible
         const resultsArea = page
-          .locator('[data-testid="results-area"], [class*="results"]')
+          .locator('[data-testid="results-area"]')
           .first();
         const resultsVisible = await resultsArea.isVisible().catch(() => true);
 
@@ -544,7 +537,6 @@ test.describe("Nearby Places Mobile Layout", () => {
     if ((await searchInput.count()) > 0) {
       // Focus the input
       await searchInput.focus();
-      await page.waitForTimeout(300);
 
       // Input should be visible (not scrolled out of view)
       await expect(searchInput).toBeVisible();
@@ -560,7 +552,6 @@ test.describe("Nearby Places Mobile Layout", () => {
 
       // Type in the input
       await searchInput.type("coffee");
-      await page.waitForTimeout(500);
 
       // Verify input value
       const inputValue = await searchInput.inputValue();

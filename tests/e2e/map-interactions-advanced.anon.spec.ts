@@ -20,7 +20,7 @@
  *   pnpm playwright test tests/e2e/map-interactions-advanced.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "./helpers";
+import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer, waitForMapReady } from "./helpers";
 import {
   waitForMapRef,
   isMapAvailable,
@@ -38,12 +38,6 @@ import type { Page } from "@playwright/test";
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
 
-/** Cluster zoom/animation settle time */
-const CLUSTER_ANIMATION_MS = 700;
-
-/** Map search debounce (600ms in Map.tsx handleMoveEnd) + buffer for URL update */
-const MAP_SEARCH_DEBOUNCE_BUFFER_MS = 1100;
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -55,7 +49,7 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   await page.waitForSelector("button", { timeout: 30_000 });
-  await page.waitForTimeout(3000);
+  await waitForMapReady(page);
 }
 
 /**
@@ -138,8 +132,8 @@ async function triggerMarkerUpdate(page: Page): Promise<void> {
     const updateMarkers = (window as any).__e2eUpdateMarkers;
     if (typeof updateMarkers === "function") updateMarkers();
   });
-  // Give React time to process state update and render
-  await page.waitForTimeout(1000);
+  // Wait for map to finish rendering after marker update
+  await waitForMapReady(page);
 }
 
 /**
@@ -165,7 +159,7 @@ async function simulateMapPan(
     await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 10 });
     await page.mouse.up();
 
-    await page.waitForTimeout(800);
+    await waitForMapReady(page);
     return true;
   } catch {
     return false;
@@ -237,7 +231,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       const zoomedOut = await jumpToZoom(page, 10);
       expect(zoomedOut).toBe(true);
       await triggerMarkerUpdate(page);
-      await page.waitForTimeout(CLUSTER_ANIMATION_MS);
+      await waitForMapReady(page);
 
       const markersAtZoom10 = await page
         .locator(".mapboxgl-marker:visible")
@@ -289,7 +283,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       const zoomedOut = await jumpToZoom(page, 10);
       expect(zoomedOut).toBe(true);
       await triggerMarkerUpdate(page);
-      await page.waitForTimeout(CLUSTER_ANIMATION_MS);
+      await waitForMapReady(page);
 
       // Find cluster markers (markers with numeric-only text like "2", "5")
       const clusterMarkers = page
@@ -311,8 +305,8 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       // Click the first cluster
       await clusterMarkers.first().click();
 
-      // Wait for cluster expansion animation
-      await page.waitForTimeout(CLUSTER_ANIMATION_MS + 200);
+      // Wait for cluster expansion animation to complete
+      await waitForMapReady(page);
 
       // After clicking a cluster, either zoom increased or marker count changed
       const zoomAfter = await getMapZoom(page);
@@ -396,7 +390,6 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         // No overlapping markers found -- click first marker and verify popup
         // shows either single listing or stacked format
         await markers.first().click();
-        await page.waitForTimeout(timeouts.animation);
 
         const popup = page.locator(".mapboxgl-popup");
         await expect(popup).toBeVisible({ timeout: timeouts.action });
@@ -421,7 +414,6 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
 
       // Click the overlapping marker
       await markers.nth(overlappingIndex).click();
-      await page.waitForTimeout(timeouts.animation);
 
       const popup = page.locator(".mapboxgl-popup");
       await expect(popup).toBeVisible({ timeout: timeouts.action });
@@ -472,7 +464,8 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       let foundStackedPopup = false;
       for (let i = 0; i < Math.min(markerCount, 10); i++) {
         await markers.nth(i).click();
-        await page.waitForTimeout(timeouts.animation);
+        // Wait for popup to appear before checking if it's a stacked popup
+        await page.locator(".mapboxgl-popup").waitFor({ state: 'visible', timeout: timeouts.action }).catch(() => {});
 
         const stackedPopup = page.locator('[data-testid="stacked-popup"]');
         if ((await stackedPopup.count()) > 0) {
@@ -489,7 +482,6 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
           const listingId = testId?.replace("stacked-popup-item-", "") ?? "";
 
           await firstItem.click();
-          await page.waitForTimeout(600); // Scroll animation
 
           // Popup should close after item click
           await expect(page.locator(".mapboxgl-popup")).not.toBeVisible({
@@ -510,7 +502,6 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
 
         // Close popup before trying next marker
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(200);
       }
 
       if (!foundStackedPopup) {
@@ -559,15 +550,15 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       // Change sort order via URL navigation (preserving bounds)
       await page.goto(`${SEARCH_URL}&sort=price_asc`);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await waitForMapReady(page);
 
       // Map canvas should still be visible (no unmount flash)
       const mapCanvas = page.locator(".mapboxgl-canvas:visible").first();
       await expect(mapCanvas).toBeVisible({ timeout: 5000 });
 
-      // Wait for markers to stabilize after sort change
+      // Wait for map to settle after sort change
       // PersistentMapWrapper's MAP_RELEVANT_KEYS excludes sort
-      await page.waitForTimeout(1000);
+      await waitForMapReady(page);
 
       // Re-expand clusters since page navigated
       const hasRefAfterSort = await waitForMapRef(page);
@@ -616,8 +607,9 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       await page.goto(`${SEARCH_URL}&sort=newest`);
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait past the 2s throttle in PersistentMapWrapper
-      await page.waitForTimeout(3000);
+      await waitForMapReady(page);
+      // Intentional wait: must exceed the 2s PersistentMapWrapper throttle to verify no delayed map-listings call fires
+      await page.waitForTimeout(2500);
 
       // PersistentMapWrapper filters out sort param from MAP_RELEVANT_KEYS,
       // so no additional /api/map-listings call should occur from the sort change.
@@ -702,8 +694,11 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         return;
       }
 
-      // Wait for debounce + replaceState URL update
-      await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_BUFFER_MS + 2000);
+      // Poll for debounced URL bounds update after pan
+      await expect.poll(
+        () => getUrlBounds(page.url()).minLng,
+        { timeout: 15_000, message: 'Waiting for URL bounds to update after pan' },
+      ).not.toBe(initialBounds.minLng);
 
       // Parse new URL bounds
       const newBounds = getUrlBounds(page.url());
@@ -765,7 +760,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       try {
         await page2.goto(sharedUrl);
         await page2.waitForLoadState("domcontentloaded");
-        await page2.waitForTimeout(3000);
+        await waitForMapReady(page2);
 
         const hasRef2 = await waitForMapRef(page2);
         if (!hasRef2) {

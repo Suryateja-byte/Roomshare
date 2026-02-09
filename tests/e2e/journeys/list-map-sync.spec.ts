@@ -176,19 +176,18 @@ test.describe("List ↔ Map Sync", () => {
 
     // Check that no markers have the highlight class initially
     const highlightedMarker = page.locator(
-      ".mapboxgl-marker .bg-blue-600.ring-2",
+      '.mapboxgl-marker [data-focus-state="active"]',
     );
     await expect(highlightedMarker).toHaveCount(0);
 
     // Hover the listing card
     await firstCard.hover();
-    await page.waitForTimeout(timeouts.animation);
 
     // The corresponding marker should now be highlighted (blue with ring)
     // Note: The marker may not have a direct data attribute, but should have
     // the highlight styling when the listing is hovered
     const anyHighlightedMarker = page.locator(
-      ".mapboxgl-marker .bg-blue-600.scale-110",
+      '.mapboxgl-marker [data-focus-state="hovered"]',
     );
 
     // May not have a marker visible if map is not showing this area
@@ -200,13 +199,11 @@ test.describe("List ↔ Map Sync", () => {
 
     // Move mouse away from card
     await page.mouse.move(0, 0);
-    await page.waitForTimeout(timeouts.animation);
 
     // Highlight should be removed
-    const remainingHighlighted = await page
-      .locator(".mapboxgl-marker .bg-blue-600.scale-110")
-      .count();
-    expect(remainingHighlighted).toBe(0);
+    await expect(
+      page.locator('.mapboxgl-marker [data-focus-state="hovered"]'),
+    ).toHaveCount(0, { timeout: timeouts.action });
   });
 
   test(`${tags.anon} - Listing card gets ring highlight when focused`, async ({
@@ -217,13 +214,12 @@ test.describe("List ↔ Map Sync", () => {
 
     // Initially no ring highlight
     const hasRingHighlight = await firstCard.evaluate((el) =>
-      el.classList.contains("ring-2"),
+      el.getAttribute("data-focus-state") === "active",
     );
     expect(hasRingHighlight).toBe(false);
 
     // Hover the card - should get focus ring
     await firstCard.hover();
-    await page.waitForTimeout(timeouts.animation);
 
     // The card may have the ring applied via isFocused state
     // Check for the ring-blue-500 class which indicates focus
@@ -256,7 +252,6 @@ test.describe("List ↔ Map Sync", () => {
 
     // Click the first marker
     await marker.click();
-    await page.waitForTimeout(timeouts.animation * 2);
 
     // The popup should appear (standard behavior)
     const popup = page.locator(".mapboxgl-popup");
@@ -266,7 +261,7 @@ test.describe("List ↔ Map Sync", () => {
     // the setSelected() call triggers scroll-to in the list view.
     // We verify by checking if a card has the selection/focus highlight.
     const highlightedCard = page.locator(
-      `${selectors.listingCard}.ring-2.ring-blue-500`,
+      `${selectors.listingCard}[data-focus-state="active"]`,
     );
     // Card may or may not be highlighted depending on whether it's a single or stacked marker
     const highlightedCount = await highlightedCard.count();
@@ -289,12 +284,11 @@ test.describe("List ↔ Map Sync", () => {
 
     // Hover the marker
     await marker.hover();
-    await page.waitForTimeout(timeouts.animation);
 
     // Check if any listing card has the focus ring (ring-blue-500)
     // This indicates the list-map sync is working in the marker→card direction
     const highlightedCard = page.locator(
-      `${selectors.listingCard}.ring-2.ring-blue-500`,
+      `${selectors.listingCard}[data-focus-state="active"]`,
     );
 
     // If the marker is for a single listing (not stacked), the card should be highlighted
@@ -304,7 +298,6 @@ test.describe("List ↔ Map Sync", () => {
 
     // Move away from marker
     await page.mouse.move(0, 0);
-    await page.waitForTimeout(timeouts.animation);
   });
 
   test(`${tags.anon} ${tags.a11y} - Keyboard navigation triggers card focus`, async ({
@@ -379,7 +372,7 @@ test.describe("List ↔ Map Sync", () => {
     // Click the marker
     await marker.click();
 
-    // Wait for scroll animation to complete (smooth scroll takes time)
+    // scroll animation settle — no event-based alternative for scroll burst detection
     await page.waitForTimeout(500);
 
     // Get the scroll burst count
@@ -420,7 +413,6 @@ test.describe("List ↔ Map Sync", () => {
 
     // Click the marker to activate a listing
     await marker.click();
-    await page.waitForTimeout(timeouts.animation);
 
     // Check for popup (confirms click worked)
     const popup = page.locator(".mapboxgl-popup");
@@ -428,7 +420,7 @@ test.describe("List ↔ Map Sync", () => {
 
     // Check if a card has the active ring immediately after click
     const highlightedCard = page.locator(
-      `${selectors.listingCard}.ring-2.ring-blue-500`,
+      `${selectors.listingCard}[data-focus-state="active"]`,
     );
     const initialCount = await highlightedCard.count();
 
@@ -438,8 +430,7 @@ test.describe("List ↔ Map Sync", () => {
       return;
     }
 
-    // CRITICAL: Wait MORE than 1 second (the old auto-clear timeout)
-    // If the ring disappears, the old setTimeout is still active
+    // deliberate delay: verifies active ring does NOT auto-clear after 1s (the old behavior)
     await page.waitForTimeout(1500);
 
     // The ring should STILL be present (activeId persists)
@@ -492,14 +483,14 @@ test.describe("List ↔ Map Sync", () => {
     await container.evaluate((el) => {
       el.scrollTop = el.scrollHeight;
     });
-    await page.waitForTimeout(100);
 
     // Instrument scroll detection
     await instrumentScrollBursts(page, containerSelector);
 
     // Click marker FIRST time
     await marker.click();
-    await page.waitForTimeout(600); // Wait for smooth scroll to complete
+    // scroll animation settle — needed before checking scroll burst count
+    await page.waitForTimeout(600);
 
     const firstBurstCount = await getScrollBurstCount(page);
 
@@ -511,13 +502,13 @@ test.describe("List ↔ Map Sync", () => {
     await container.evaluate((el) => {
       el.scrollTop = el.scrollHeight;
     });
-    await page.waitForTimeout(100);
 
     // Reset the counter for second click
     await resetScrollBurstCounter(page);
 
     // Click marker SECOND time (same marker)
     await marker.click();
+    // scroll animation settle — needed before checking scroll burst count
     await page.waitForTimeout(600);
 
     const secondBurstCount = await getScrollBurstCount(page);
@@ -577,13 +568,12 @@ test.describe("List ↔ Map Sync", () => {
     // Verify card gets highlight ring (React context state update + re-render)
     // Use longer timeout to let Playwright's auto-retry handle timing
     const highlightedCard = page.locator(
-      `[data-listing-id="${ids[0]}"].ring-2.ring-blue-500`,
+      `[data-listing-id="${ids[0]}"][data-focus-state="active"]`,
     );
     await expect(highlightedCard).toBeVisible({ timeout: 5000 });
 
     // Move mouse away
     await page.mouse.move(0, 0);
-    await page.waitForTimeout(timeouts.animation);
 
     // Ring should clear (hover state is temporary)
     await expect(highlightedCard).not.toBeVisible({ timeout: 1000 });
@@ -634,16 +624,16 @@ test.describe("List ↔ Map Sync", () => {
 
     // Card should have active ring (persistent)
     const activeCard = page.locator(
-      `[data-listing-id="${ids[0]}"].ring-2.ring-blue-500`,
+      `[data-listing-id="${ids[0]}"][data-focus-state="active"]`,
     );
     await expect(activeCard).toBeVisible({ timeout: 2000 });
 
-    // Verify single scroll burst occurred (no double-scroll)
+    // scroll animation settle — no event-based alternative for scroll burst detection
     await page.waitForTimeout(500);
     const burstCount = await getScrollBurstCount(page);
     expect(burstCount).toBeLessThanOrEqual(1);
 
-    // Active ring persists after 1.5s (no auto-clear)
+    // deliberate delay: verifies active ring does NOT auto-clear after 1s
     await page.waitForTimeout(1500);
     await expect(activeCard).toBeVisible();
 
@@ -837,7 +827,6 @@ test.describe("List ↔ Map Sync", () => {
     const marker = page.locator(".mapboxgl-marker:visible").first();
     await expect(marker).toBeVisible({ timeout: timeouts.action });
     await marker.click();
-    await page.waitForTimeout(timeouts.animation);
 
     // Popup should be visible
     const popup = page.locator(".mapboxgl-popup");
@@ -845,13 +834,12 @@ test.describe("List ↔ Map Sync", () => {
 
     // Check if a card has the active ring (may not if stacked marker)
     const highlightedCard = page.locator(
-      `${selectors.listingCard}.ring-2.ring-blue-500`,
+      `${selectors.listingCard}[data-focus-state="active"]`,
     );
     const hadActiveCard = (await highlightedCard.count()) > 0;
 
     // Press Escape to dismiss
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(timeouts.animation);
 
     // Popup should be closed
     await expect(popup).not.toBeVisible({ timeout: 1000 });
@@ -879,7 +867,6 @@ test.describe("List ↔ Map Sync", () => {
     const marker = page.locator(".mapboxgl-marker:visible").first();
     await expect(marker).toBeVisible({ timeout: timeouts.action });
     await marker.click();
-    await page.waitForTimeout(timeouts.animation);
 
     // Popup should be visible
     const popup = page.locator(".mapboxgl-popup");
@@ -895,7 +882,6 @@ test.describe("List ↔ Map Sync", () => {
       mapBoundingBox!.x + 20,
       mapBoundingBox!.y + mapBoundingBox!.height - 20,
     );
-    await page.waitForTimeout(timeouts.animation);
 
     // Popup should be closed (or still visible if we hit another marker)
     // We check if the original popup closed or a new one opened
@@ -933,13 +919,12 @@ test.describe("List ↔ Map Sync", () => {
     // Popup closes, card should be active
     await expect(mapboxPopup).not.toBeVisible({ timeout: 1000 });
     const activeCard = page.locator(
-      `[data-listing-id="${ids[0]}"].ring-2.ring-blue-500`,
+      `[data-listing-id="${ids[0]}"][data-focus-state="active"]`,
     );
     await expect(activeCard).toBeVisible({ timeout: 2000 });
 
     // Now press Escape - should clear the active selection
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(timeouts.animation);
 
     // Active ring should be cleared
     await expect(activeCard).not.toBeVisible({ timeout: 1000 });
@@ -964,7 +949,6 @@ test.describe("List ↔ Map Sync", () => {
     const marker = page.locator(".mapboxgl-marker:visible").first();
     await expect(marker).toBeVisible({ timeout: timeouts.action });
     await marker.click();
-    await page.waitForTimeout(timeouts.animation);
 
     // Popup should be visible
     const popup = page.locator(".mapboxgl-popup");

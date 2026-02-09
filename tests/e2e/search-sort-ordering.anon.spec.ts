@@ -29,7 +29,7 @@ const DESKTOP = '[data-testid="search-results-container"]';
 const MOBILE = '[data-testid="mobile-search-results-container"]';
 
 const CARDS = '[data-testid="listing-card"]';
-const PRICE = '.font-bold.text-xl';
+const PRICE = '[data-testid="listing-price"]';
 
 /** All sort options as defined in SortSelect.tsx */
 const SORT_OPTIONS = [

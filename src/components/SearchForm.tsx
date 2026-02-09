@@ -797,7 +797,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                 onClick={() => setShowFilters(true)}
                                 data-active={showFilters}
                                 aria-expanded={showFilters}
-                                aria-controls="search-filters"
+                                aria-controls={showFilters ? "search-filters" : undefined}
                                 aria-label={activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : 'Filters'}
                                 className="gap-1.5 rounded-lg"
                             >

@@ -973,10 +973,32 @@ export default function MapComponent({
         win.__e2eSetProgrammaticMove = setProgrammaticMove;
         win.__e2eUpdateMarkers = updateUnclusteredListings;
 
+        win.__e2eSimulateUserPan = (dx: number, dy: number) => {
+            const map = mapRef.current?.getMap();
+            if (!map) return false;
+            // Clear initial move guard so this moveend is treated as user interaction
+            isInitialMoveRef.current = false;
+            // Don't set isProgrammaticMoveRef — this simulates a user pan
+            map.panBy([dx, dy], { duration: 0 });
+            return true;
+        };
+
+        win.__e2eSimulateUserZoom = (zoomLevel: number) => {
+            const map = mapRef.current?.getMap();
+            if (!map) return false;
+            // Clear initial move guard so this moveend is treated as user interaction
+            isInitialMoveRef.current = false;
+            // Don't set isProgrammaticMoveRef — this simulates a user zoom
+            map.zoomTo(zoomLevel, { duration: 0 });
+            return true;
+        };
+
         return () => {
             delete win.__e2eMapRef;
             delete win.__e2eSetProgrammaticMove;
             delete win.__e2eUpdateMarkers;
+            delete win.__e2eSimulateUserPan;
+            delete win.__e2eSimulateUserZoom;
         };
     }, [isMapLoaded, setProgrammaticMove, updateUnclusteredListings]);
 
@@ -1607,6 +1629,17 @@ export default function MapComponent({
                     setIsMapLoaded(true);
                     updateUnclusteredListings();
 
+                    // A11y fix: Remove canvas from tab order to prevent keyboard trap.
+                    // The mapbox-gl canvas absorbs Tab key events when focused, trapping
+                    // keyboard navigation. Individual marker buttons (tabIndex=0) remain
+                    // tabbable since they are separate DOM elements overlaying the canvas.
+                    if (mapRef.current) {
+                        const canvas = mapRef.current.getMap().getCanvas();
+                        if (canvas) {
+                            canvas.tabIndex = -1;
+                        }
+                    }
+
                     // E2E testing hook: expose map ref and helpers for programmatic control
                     if (mapRef.current) {
                         const win = window as unknown as Record<string, unknown>;
@@ -1764,6 +1797,7 @@ export default function MapComponent({
                                 keyboardFocusedId === position.listing.id && "z-50"
                             )}
                             data-listing-id={position.listing.id}
+                            data-focus-state={hoveredId === position.listing.id ? "hovered" : activeId === position.listing.id ? "active" : hoveredId && hoveredId !== position.listing.id ? "dimmed" : "none"}
                             role="button"
                             tabIndex={0}
                             aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`}
@@ -2021,7 +2055,7 @@ export default function MapComponent({
                             : "bg-white text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
                     }`}
                 >
-                    <div className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-400" : "bg-zinc-300 dark:bg-zinc-600"}`} />
+                    <div data-testid="search-toggle-indicator" className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-400" : "bg-zinc-300 dark:bg-zinc-600"}`} />
                     Search as I move
                 </button>
             </div>

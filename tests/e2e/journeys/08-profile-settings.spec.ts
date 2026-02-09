@@ -200,11 +200,13 @@ test.describe('Profile & Settings Journeys', () => {
         const confirmPassword = page.getByLabel(/confirm.*password/i);
 
         if (await currentPassword.isVisible()) {
-          await currentPassword.fill('TestPassword123!');
-          await newPassword.fill('NewTestPassword123!');
+          const currentPwd = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
+          const newPwd = process.env.E2E_TEST_NEW_PASSWORD || 'NewTestPassword123!';
+          await currentPassword.fill(currentPwd);
+          await newPassword.fill(newPwd);
 
           if (await confirmPassword.isVisible()) {
-            await confirmPassword.fill('NewTestPassword123!');
+            await confirmPassword.fill(newPwd);
           }
 
           // Submit

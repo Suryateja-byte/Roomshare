@@ -16,16 +16,16 @@ import { test, expect, selectors, timeouts } from "../helpers";
 async function loginAsAdmin(page: import("@playwright/test").Page) {
   // Sign out current user first
   await page.goto("/api/auth/signout");
-  await page.waitForTimeout(1000);
+  await page.waitForLoadState('networkidle');
   // Click the signout confirmation if present
   const signOutBtn = page.getByRole("button", { name: /sign out/i });
   if (await signOutBtn.isVisible().catch(() => false)) {
     await signOutBtn.click();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
   }
 
   await page.goto("/login");
-  await page.waitForTimeout(1500);
+  await page.waitForLoadState('domcontentloaded');
 
   const emailField = page
     .getByLabel(/email/i)
@@ -40,13 +40,14 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
   if (!canLogin) return false;
 
   await emailField.first().fill("e2e-admin@roomshare.dev");
-  await passwordField.first().fill("TestPassword123!");
+  const adminPassword = process.env.E2E_ADMIN_PASSWORD || "TestPassword123!";
+  await passwordField.first().fill(adminPassword);
 
   const submitBtn = page
     .getByRole("button", { name: /log ?in|sign ?in|submit/i })
     .or(page.locator('button[type="submit"]'));
   await submitBtn.first().click();
-  await page.waitForTimeout(3000);
+  await page.waitForLoadState('networkidle');
 
   // Verify not still on login page
   const onLogin = page.url().includes("/login");
@@ -64,7 +65,7 @@ test.describe("J38: Admin Dashboard Overview", () => {
 
     // Step 2: Navigate to admin
     await page.goto("/admin");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     // Step 3: Verify admin page loaded (not redirected to login)
     const isAdmin = page.url().includes("/admin");
@@ -103,7 +104,7 @@ test.describe("J39: Admin Resolves Report", () => {
 
     // Step 1: Navigate to admin reports
     await page.goto("/admin/reports");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     const isAdminReports = page.url().includes("/admin");
     test.skip(!isAdminReports, "Redirected away — skipping");
@@ -117,7 +118,7 @@ test.describe("J39: Admin Resolves Report", () => {
 
     // Step 3: Click to view/resolve
     await reportRow.click();
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle');
 
     // Step 4: Look for resolve button
     const resolveBtn = page
@@ -132,7 +133,7 @@ test.describe("J39: Admin Resolves Report", () => {
       }
 
       await resolveBtn.click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
     }
 
     // Step 5: Verify
@@ -153,7 +154,7 @@ test.describe("J40: Admin Reviews Verification Request", () => {
 
     // Step 1: Navigate to verifications
     await page.goto("/admin/verifications");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     const isAdminPage = page.url().includes("/admin");
     test.skip(!isAdminPage, "Redirected away — skipping");
@@ -165,7 +166,7 @@ test.describe("J40: Admin Reviews Verification Request", () => {
 
     // Step 3: Click to review
     await pendingItem.click();
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle');
 
     // Step 4: Approve
     const approveBtn = page
@@ -174,7 +175,7 @@ test.describe("J40: Admin Reviews Verification Request", () => {
     const canApprove = await approveBtn.isVisible().catch(() => false);
     if (canApprove) {
       await approveBtn.click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
     }
 
     // Step 5: Verify
@@ -195,12 +196,12 @@ test.describe("J41: Admin Audit Log", () => {
 
     // Step 1: Navigate to audit log
     await page.goto("/admin/audit");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     // Try alternative paths
     if (!page.url().includes("/admin")) {
       await page.goto("/admin/audit-log");
-      await page.waitForTimeout(1500);
+      await page.waitForLoadState('networkidle');
     }
 
     const isAdminPage = page.url().includes("/admin");

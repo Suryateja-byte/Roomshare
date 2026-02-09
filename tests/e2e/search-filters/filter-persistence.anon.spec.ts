@@ -37,7 +37,7 @@ test.describe("Filter State Persistence", () => {
     const filterUrl = `${SEARCH_URL}&minPrice=700&amenities=Wifi&roomType=Private+Room`;
     await page.goto(filterUrl);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Verify params are present before reload
     expect(getUrlParam(page, "minPrice")).toBe("700");
@@ -47,7 +47,7 @@ test.describe("Filter State Persistence", () => {
     // Reload the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // URL params should be unchanged after reload
     expect(getUrlParam(page, "minPrice")).toBe("700");
@@ -75,7 +75,7 @@ test.describe("Filter State Persistence", () => {
     const filterUrl = `${SEARCH_URL}&minPrice=800&maxPrice=2000`;
     await page.goto(filterUrl);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Verify filters present
     expect(getUrlParam(page, "minPrice")).toBe("800");
@@ -90,7 +90,6 @@ test.describe("Filter State Persistence", () => {
       // Click the listing to navigate to the detail page
       await listingCard.click();
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2_000);
 
       // Verify we navigated away (URL should no longer be /search)
       const currentUrl = page.url();
@@ -100,7 +99,7 @@ test.describe("Filter State Persistence", () => {
         // Step 3: Press browser back
         await page.goBack();
         await page.waitForLoadState("domcontentloaded");
-        await page.waitForTimeout(3_000);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         // Filters should be restored in the URL
         expect(getUrlParam(page, "minPrice")).toBe("800");
@@ -113,12 +112,11 @@ test.describe("Filter State Persistence", () => {
       // No listing cards available — simulate forward/back with manual navigation
       await page.goto("/");
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(1_000);
 
       // Go back to the search page
       await page.goBack();
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(3_000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Filters should be restored
       expect(getUrlParam(page, "minPrice")).toBe("800");
@@ -134,7 +132,7 @@ test.describe("Filter State Persistence", () => {
     const deepLinkUrl = `${SEARCH_URL}&amenities=Wifi,Parking&roomType=Entire+Place&leaseDuration=12+months`;
     await page.goto(deepLinkUrl);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Verify URL params parsed correctly
     const amenities = getUrlParam(page, "amenities") ?? "";
@@ -192,7 +190,7 @@ test.describe("Filter State Persistence", () => {
     // Navigate with both sort and a price filter
     await page.goto(`${SEARCH_URL}&minPrice=500&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Verify both params exist
     expect(getUrlParam(page, "minPrice")).toBe("500");
@@ -229,7 +227,7 @@ test.describe("Filter State Persistence", () => {
       // Navigate with sort + amenity filter (more reliably creates a chip).
       await page.goto(`${SEARCH_URL}&amenities=Wifi&sort=price_asc`);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(3_000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       const regionRetry = appliedFiltersRegion(page);
       const retryVisible = await regionRetry.isVisible().catch(() => false);

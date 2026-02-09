@@ -14,7 +14,7 @@
  * Run with: pnpm playwright test tests/e2e/map-loading.anon.spec.ts --project=chromium-anon
  */
 
-import { test, expect, SF_BOUNDS, selectors, waitForMapMarkers, searchResultsContainer } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, waitForMapMarkers, searchResultsContainer, waitForMapReady } from "./helpers/test-utils";
 
 // Build URL query string from SF bounds
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -59,8 +59,7 @@ async function waitForSearchPage(page: import("@playwright/test").Page, url = SE
   await page.waitForLoadState("domcontentloaded");
   // Wait for any button to appear (indicates page is interactive)
   await page.waitForSelector("button", { timeout: 30_000 });
-  // Allow map to initialize (WebGL + tiles)
-  await page.waitForTimeout(3000);
+  await waitForMapReady(page);
 }
 
 /**
@@ -172,8 +171,8 @@ test.describe("1.2: Map displays markers for listings in bounds", () => {
   test("marker count matches E2E instrumentation", async ({ page }) => {
     await waitForSearchPage(page);
 
-    // Allow time for E2E instrumentation to update
-    await page.waitForTimeout(2000);
+    // Wait for map to settle and E2E instrumentation to update
+    await waitForMapReady(page);
 
     const e2eState = await getMapE2EState(page);
 
@@ -212,7 +211,7 @@ test.describe("1.3: Map persists across navigation", () => {
     // This should NOT remount the map component
     await page.goto(`${SEARCH_URL}&sort=newest`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Capture state after filter
     const afterState = await getMapE2EState(page);
@@ -246,7 +245,7 @@ test.describe("1.3: Map persists across navigation", () => {
       await sortButton.click();
     }
 
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     const afterState = await getMapE2EState(page);
     expect(afterState?.mapInitCount).toBe(initialState.mapInitCount);
@@ -272,7 +271,7 @@ test.describe("1.4: Map initializes to URL bounds", () => {
     // Wait for map to be ready
     const mapContainer = page.locator(selectors.map);
     await expect(mapContainer.first()).toBeVisible({ timeout: 15_000 });
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Get map center via Mapbox GL JS instance
     const mapCenter = await page.evaluate(() => {
@@ -339,7 +338,7 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForSelector("button", { timeout: 30_000 });
-    await page.waitForTimeout(3000);
+    await waitForMapReady(page);
 
     // Map should still load
     const mapContainer = page.locator(selectors.map);
@@ -359,7 +358,7 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
     // Navigate without bounds - will use server data
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(4000);
+    await waitForMapReady(page);
 
     // Check if map is visible - may not render without bounds in some cases
     const mapVisible = await isMapVisible(page);
@@ -401,7 +400,7 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
     // Use browse mode (no query) which should show all listings or SF default
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(4000);
+    await waitForMapReady(page);
 
     // Check if map is visible
     const mapVisible = await isMapVisible(page);

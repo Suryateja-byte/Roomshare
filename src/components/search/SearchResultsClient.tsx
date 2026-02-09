@@ -152,7 +152,7 @@ export function SearchResultsClient({
   return (
     <div id="search-results" tabIndex={-1}>
       {/* Screen reader announcement for search results */}
-      <div aria-live="polite" aria-atomic="true" className="sr-only">
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {hasConfirmedZeroResults
           ? `No listings found${query ? ` for "${query}"` : ""}`
           : total === null
@@ -209,6 +209,7 @@ export function SearchResultsClient({
             </div>
           )}
 
+          <h2 className="sr-only">Available listings</h2>
           <div role="feed" aria-label="Search results" className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
             {allListings.map((listing, index) => (
               <ListingCard

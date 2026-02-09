@@ -18,7 +18,7 @@
  * - Viewport validation works in both modes (client-side check)
  */
 
-import { test, expect, tags, timeouts } from "../helpers";
+import { test, expect, tags, timeouts, waitForMapReady, waitForDebounceAndResponse } from "../helpers";
 
 test.describe("Map Error Handling", () => {
   // Map tests run as anonymous user with desktop viewport
@@ -105,9 +105,6 @@ test.describe("Map Error Handling", () => {
         "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
       );
 
-      // Wait for the error to clear (debounce + state update)
-      await page.waitForTimeout(1000);
-
       // Check that error message is no longer visible
       const errorLocator = page.getByText(/Zoom in further to see listings/i);
       await expect(errorLocator).not.toBeVisible({ timeout: timeouts.action });
@@ -135,9 +132,6 @@ test.describe("Map Error Handling", () => {
       // Wait for hydration
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for debounce (2s) + fetch to complete
-      await page.waitForTimeout(3000);
-
       // The exact message is "Too many requests. Please wait a moment."
       await expect(page.getByText(/Too many requests/i).first()).toBeVisible({
         timeout: timeouts.action,
@@ -163,9 +157,6 @@ test.describe("Map Error Handling", () => {
 
       // Wait for hydration
       await page.waitForLoadState("domcontentloaded");
-
-      // Wait for debounce (2s) + fetch to complete
-      await page.waitForTimeout(3000);
 
       // The exact message is "Server error. Please try again."
       await expect(page.getByText(/Server error/i).first()).toBeVisible({
@@ -205,18 +196,12 @@ test.describe("Map Error Handling", () => {
       // Wait for hydration
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for debounce (2s) + fetch to complete
-      await page.waitForTimeout(3000);
-
       // Should show error banner - exact message is "Server error. Please try again."
       const errorBanner = page.getByText(/Server error/i).first();
       await expect(errorBanner).toBeVisible({ timeout: timeouts.action });
 
       // Click retry button
       await page.getByRole("button", { name: /retry/i }).click();
-
-      // Wait for retry fetch to complete
-      await page.waitForTimeout(1000);
 
       // Error should be cleared
       await expect(errorBanner).not.toBeVisible({ timeout: timeouts.action });
@@ -241,7 +226,7 @@ test.describe("Map Error Handling", () => {
 
       // Wait for initial load
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(1000); // Let React hydrate
+      await waitForMapReady(page);
 
       // Simulate a few URL changes (as if map was panned)
       const boundsSequence = [
@@ -258,12 +243,10 @@ test.describe("Map Error Handling", () => {
           maxLat: bounds.maxLat.toString(),
         });
         await page.goto(`/search?${params.toString()}`);
-        // Small delay between navigations
-        await page.waitForTimeout(500);
       }
 
-      // Wait for any pending fetches to complete (2s debounce + network time)
-      await page.waitForTimeout(4000);
+      // Wait for any pending fetches to settle
+      await waitForMapReady(page);
 
       // Filter out expected errors (e.g., aborted requests, hydration warnings, env validation, etc.)
       const unexpectedErrors = consoleErrors.filter(
@@ -333,8 +316,7 @@ test.describe("Map Error Handling", () => {
 
       // Wait for initial load and API call
       await page.waitForLoadState("domcontentloaded");
-      // Wait for debounce (2s) + fetch
-      await page.waitForTimeout(3000);
+      await waitForDebounceAndResponse(page, { debounceMs: 2000, responsePattern: '/api/map-listings' });
 
       // Step 2: Verify initial API call was made with correct bounds
       expect(mapListingRequests.length).toBeGreaterThanOrEqual(1);
@@ -358,8 +340,7 @@ test.describe("Map Error Handling", () => {
         `/search?minLng=${pannedBounds.minLng}&maxLng=${pannedBounds.maxLng}&minLat=${pannedBounds.minLat}&maxLat=${pannedBounds.maxLat}`,
       );
 
-      // Wait for debounce (2s) + fetch
-      await page.waitForTimeout(3000);
+      await waitForDebounceAndResponse(page, { debounceMs: 2000, responsePattern: '/api/map-listings' });
 
       // Step 5: Verify new API request was made with updated bounds
       expect(mapListingRequests.length).toBeGreaterThan(requestCountBeforePan);
@@ -391,7 +372,6 @@ test.describe("Map Error Handling", () => {
         "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
       );
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(500); // Let hydration complete
 
       // Capture initial request count
       const initialRequestCount = mapListingRequests.length;
@@ -413,12 +393,12 @@ test.describe("Map Error Handling", () => {
           maxLat: bounds.maxLat.toString(),
         });
         await page.goto(`/search?${params.toString()}`);
-        // 200ms delay - faster than 2s debounce
+        // deliberate sub-debounce delay for rapid pan test
         await page.waitForTimeout(200);
       }
 
-      // Wait for debounce to settle (2s) + network time
-      await page.waitForTimeout(4000);
+      // Wait for debounce to settle and final response
+      await waitForDebounceAndResponse(page, { debounceMs: 2000, responsePattern: '/api/map-listings' });
 
       // Count new requests after rapid pans
       const newRequestCount = mapListingRequests.length - initialRequestCount;

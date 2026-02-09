@@ -15,7 +15,7 @@
  * Debug: pnpm playwright test tests/e2e/map-pan-zoom.spec.ts --project=chromium --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, waitForMapReady } from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -28,7 +28,7 @@ async function waitForSearchPage(page: import("@playwright/test").Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
   await page.waitForSelector("button", { timeout: 30_000 });
-  await page.waitForTimeout(3000);
+  await waitForMapReady(page);
 }
 
 // Helper: check if map is available (WebGL loaded)
@@ -86,8 +86,8 @@ test.describe("2.1: Pan map with mouse drag", () => {
     await page.mouse.move(centerX + dragDistance, centerY + dragDistance, { steps: 10 });
     await page.mouse.up();
 
-    // Wait for debounce + URL update
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
+    // Wait for map to settle after pan
+    await waitForMapReady(page);
 
     // Get new URL bounds
     const newBounds = getUrlBounds(page.url());
@@ -127,7 +127,6 @@ test.describe("2.1: Pan map with mouse drag", () => {
     const isOn = (await searchToggle.getAttribute("aria-checked")) === "true";
     if (isOn) {
       await searchToggle.click();
-      await page.waitForTimeout(300);
     }
 
     const mapBox = await getMapBoundingBox(page);
@@ -145,8 +144,8 @@ test.describe("2.1: Pan map with mouse drag", () => {
     await page.mouse.move(centerX + 100, centerY + 50, { steps: 10 });
     await page.mouse.up();
 
-    // Wait for banner to appear
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
+    // Wait for map to settle after pan
+    await waitForMapReady(page);
 
     // Look for "Search this area" or similar banner
     const searchAreaButton = page.locator("button").filter({ hasText: /search this area|search here/i });
@@ -187,8 +186,8 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     // Scroll to zoom in (negative deltaY = zoom in on most maps)
     await page.mouse.wheel(0, -300);
 
-    // Wait for zoom animation + debounce
-    await page.waitForTimeout(1500);
+    // Wait for map to settle after zoom
+    await waitForMapReady(page);
 
     // Get new URL bounds
     const newBounds = getUrlBounds(page.url());
@@ -221,8 +220,8 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     // Scroll to zoom out (positive deltaY = zoom out on most maps)
     await page.mouse.wheel(0, 300);
 
-    // Wait for zoom animation + debounce
-    await page.waitForTimeout(1500);
+    // Wait for map to settle after zoom
+    await waitForMapReady(page);
 
     // Verify page is still functional
     expect(await page.locator("body").isVisible()).toBe(true);
@@ -251,8 +250,8 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     await page.mouse.move(centerX, centerY);
     await page.mouse.wheel(0, -500);
 
-    // Wait for zoom and re-render
-    await page.waitForTimeout(2000);
+    // Wait for map to settle after zoom
+    await waitForMapReady(page);
 
     const newMarkerCount = await page.locator(selectors.mapMarker).count();
 
@@ -277,7 +276,7 @@ test.describe("2.3: Zoom with touch pinch on mobile", () => {
   test("touch interactions are enabled on mobile viewport", async ({ page }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await waitForMapReady(page);
 
     if (!(await isMapAvailable(page))) {
       test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
@@ -306,7 +305,7 @@ test.describe("2.3: Zoom with touch pinch on mobile", () => {
   test("pinch-to-zoom gesture is supported (simulated via double-tap)", async ({ page }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await waitForMapReady(page);
 
     if (!(await isMapAvailable(page))) {
       test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
@@ -328,11 +327,11 @@ test.describe("2.3: Zoom with touch pinch on mobile", () => {
 
     // Double-tap to zoom (common mobile gesture)
     await page.touchscreen.tap(centerX, centerY);
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(100); // double-tap inter-tap delay required for gesture recognition
     await page.touchscreen.tap(centerX, centerY);
 
-    // Wait for zoom animation
-    await page.waitForTimeout(1500);
+    // Wait for map to settle after zoom
+    await waitForMapReady(page);
 
     // Verify page is still functional
     expect(await page.locator("body").isVisible()).toBe(true);
@@ -365,8 +364,8 @@ test.describe("2.4: Double-click to zoom in", () => {
     const centerY = mapBox.y + mapBox.height / 2;
     await page.mouse.dblclick(centerX, centerY);
 
-    // Wait for zoom animation + URL update
-    await page.waitForTimeout(1500);
+    // Wait for map to settle after zoom
+    await waitForMapReady(page);
 
     // Get new URL bounds
     const newBounds = getUrlBounds(page.url());
@@ -404,9 +403,9 @@ test.describe("2.4: Double-click to zoom in", () => {
     const centerY = mapBox.y + mapBox.height / 2;
 
     await page.mouse.dblclick(centerX, centerY);
-    await page.waitForTimeout(500);
+    await waitForMapReady(page);
     await page.mouse.dblclick(centerX, centerY);
-    await page.waitForTimeout(500);
+    await waitForMapReady(page);
 
     // Filter benign console errors
     const realErrors = consoleErrors.filter(
@@ -455,7 +454,6 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
       const isOn = (await searchToggle.getAttribute("aria-checked")) === "true";
       if (isOn) {
         await searchToggle.click();
-        await page.waitForTimeout(300);
       }
     }
 
@@ -478,11 +476,11 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
       await page.mouse.down();
       await page.mouse.move(centerX + 30 * (i + 1), centerY + 20 * (i + 1), { steps: 5 });
       await page.mouse.up();
-      await page.waitForTimeout(100); // Small delay between drags (less than debounce)
+      await page.waitForTimeout(100); // sub-debounce delay between rapid drags to test batching
     }
 
-    // Wait for debounce period plus buffer
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
+    // Wait for debounce to fire and map to settle
+    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500); // debounce wait: measuring that rapid drags are batched
 
     // Verify debouncing: should have at most 1-2 calls despite 3 rapid movements
     // (Multiple calls might occur if movements span debounce boundaries)
@@ -514,7 +512,6 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
       const isOn = (await searchToggle.getAttribute("aria-checked")) === "true";
       if (isOn) {
         await searchToggle.click();
-        await page.waitForTimeout(300);
       }
     }
 
@@ -535,8 +532,8 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
 
     panEndTime = Date.now();
 
-    // Wait for API call
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
+    // Wait for debounce to fire so we can measure timing
+    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500); // debounce wait: measuring API call timing relative to pan end
 
     // If API was called, verify it was after debounce period
     if (apiCallTime && panEndTime) {
@@ -580,11 +577,11 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
       await page.mouse.down();
       await page.mouse.move(centerX + 20 * (i + 1), centerY + 10 * (i + 1), { steps: 3 });
       await page.mouse.up();
-      await page.waitForTimeout(50);
+      await page.waitForTimeout(50); // sub-debounce delay between rapid drags
     }
 
-    // Wait for final URL update
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 1000);
+    // Wait for debounce to fire and URL to update
+    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 1000); // debounce wait: verifying URL updates are batched
 
     // Verify page is functional
     expect(await page.locator("body").isVisible()).toBe(true);
@@ -622,26 +619,26 @@ test.describe("General: Map interaction stability", () => {
     await page.mouse.down();
     await page.mouse.move(centerX + 50, centerY + 30, { steps: 5 });
     await page.mouse.up();
-    await page.waitForTimeout(300);
+    await waitForMapReady(page);
 
     // Zoom in
     await page.mouse.wheel(0, -200);
-    await page.waitForTimeout(500);
+    await waitForMapReady(page);
 
     // Pan again
     await page.mouse.move(centerX, centerY);
     await page.mouse.down();
     await page.mouse.move(centerX - 40, centerY + 20, { steps: 5 });
     await page.mouse.up();
-    await page.waitForTimeout(300);
+    await waitForMapReady(page);
 
     // Zoom out
     await page.mouse.wheel(0, 200);
-    await page.waitForTimeout(500);
+    await waitForMapReady(page);
 
     // Double-click zoom
     await page.mouse.dblclick(centerX, centerY);
-    await page.waitForTimeout(1000);
+    await waitForMapReady(page);
 
     // Filter benign console errors
     const realErrors = consoleErrors.filter(

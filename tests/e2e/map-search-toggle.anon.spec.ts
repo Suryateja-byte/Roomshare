@@ -19,7 +19,7 @@
  *   pnpm playwright test tests/e2e/map-search-toggle.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, waitForMapReady, waitForDebounceAndResponse } from "./helpers/test-utils";
 import type { Page, Route } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -56,8 +56,8 @@ async function waitForSearchPage(page: Page) {
   await page.waitForLoadState("domcontentloaded");
   // Wait for toggle to be visible (indicates map UI is ready)
   await page.waitForSelector(toggleSelectors.searchAsMoveToggle, { timeout: 30_000 });
-  // Give map time to initialize
-  await page.waitForTimeout(2000);
+  // Wait for map to be fully loaded and idle
+  await waitForMapReady(page);
 }
 
 /**
@@ -133,8 +133,8 @@ async function simulateMapPanAndVerify(page: Page, deltaX = 100, deltaY = 50): P
     await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 10 });
     await page.mouse.up();
 
-    // Wait for moveend event and state updates
-    await page.waitForTimeout(800);
+    // Wait for map to finish moving and settle
+    await waitForMapReady(page);
 
     // Check if the map actually moved by looking for the banner or checking state
     // The banner only appears when hasUserMoved && boundsDirty && !searchAsMove
@@ -199,7 +199,7 @@ test.describe("4.x: Search as I move toggle", () => {
       await expect(searchAreaBtn).not.toBeVisible();
 
       // The green indicator dot should be visible when toggle is ON
-      const greenDot = toggle.locator(".bg-green-400");
+      const greenDot = toggle.locator('[data-testid="search-toggle-indicator"]');
       await expect(greenDot).toBeVisible();
     });
 
@@ -239,7 +239,7 @@ test.describe("4.x: Search as I move toggle", () => {
       }
 
       // Wait for debounce + API response
-      await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
+      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
 
       // Banner should now be visible with "Search this area" button
       await expect(searchAreaBtn).toBeVisible({ timeout: 5000 });
@@ -275,19 +275,15 @@ test.describe("4.x: Search as I move toggle", () => {
       }
 
       // Wait for banner to appear
-      await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
+      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
       await expect(searchAreaBtn).toBeVisible({ timeout: 5000 });
 
       // Click "Search this area" button
       await searchAreaBtn.click();
 
-      // URL should change to reflect new bounds
-      await page.waitForTimeout(1000);
-      const newUrl = page.url();
-
       // URL should have changed (bounds should be different)
-      expect(newUrl).not.toBe(initialUrl);
+      await expect.poll(() => page.url(), { timeout: 5000 }).not.toBe(initialUrl);
 
       // Banner should disappear after search triggered
       await expect(searchAreaBtn).not.toBeVisible({ timeout: 5000 });
@@ -320,15 +316,15 @@ test.describe("4.x: Search as I move toggle", () => {
       }
 
       // Wait for banner
-      await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
+      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
       const resetBtn = page.locator(toggleSelectors.resetMapBtn);
       await expect(resetBtn).toBeVisible({ timeout: 5000 });
 
       // Click reset button
       await resetBtn.click();
 
-      // Wait for map to animate back
-      await page.waitForTimeout(1500);
+      // Wait for map to finish animating back to original bounds
+      await waitForMapReady(page);
 
       // Banner should disappear
       await expect(resetBtn).not.toBeVisible({ timeout: 5000 });
@@ -380,8 +376,8 @@ test.describe("4.x: Search as I move toggle", () => {
         return;
       }
 
-      // Wait for request to be made (debounce + some buffer)
-      await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 300);
+      // Wait for debounced request to be made
+      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
 
       // Verify at least one request was made
       expect(requestTimestamps.length).toBeGreaterThanOrEqual(1);
@@ -430,7 +426,7 @@ test.describe("4.x: Search as I move toggle", () => {
       }
 
       // Wait for debounce + API response
-      await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
+      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
 
       const requestsAfterFirstPan = requestCount;
       expect(requestsAfterFirstPan).toBeGreaterThanOrEqual(1);
@@ -441,10 +437,12 @@ test.describe("4.x: Search as I move toggle", () => {
 
       // Pan back to original position (or close to it)
       await simulateMapPanAndVerify(page, -100, -50);
+      // debounce wait: subsequent pans may use cached response, no API call expected
       await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
 
       // Pan to the same location as before (cache should hit)
       await simulateMapPanAndVerify(page, 100, 50);
+      // debounce wait: cache hit expected, no API call to await
       await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
 
       // Should NOT have made excessive API calls (within 30s cache window)
@@ -499,16 +497,19 @@ test.describe("4.x: Search as I move toggle", () => {
         test.skip(true, "Map pan did not trigger state change (WebGL may not be working)");
         return;
       }
-      await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100); // Let first request start
+      // debounce wait: let debounce timer fire so first request starts
+      await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100);
 
       await simulateMapPanAndVerify(page, 50, 25); // Second pan
+      // debounce wait: let debounce timer fire so second request starts
       await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100);
 
       await simulateMapPanAndVerify(page, 50, 25); // Third pan
+      // debounce wait: let debounce timer fire so third request starts
       await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100);
 
-      // Wait for all requests to settle
-      await page.waitForTimeout(2000);
+      // Wait for all in-flight requests to settle
+      await page.waitForLoadState('networkidle');
 
       // Only the last request should complete successfully
       // Earlier requests should have been aborted
@@ -585,8 +586,8 @@ test.describe("4.x: Search as I move toggle", () => {
         return;
       }
 
-      // Wait for banner
-      await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
+      // Wait for debounce + API response
+      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
       await expect(searchAreaBtn).toBeVisible({ timeout: 5000 });
 

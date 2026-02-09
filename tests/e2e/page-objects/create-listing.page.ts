@@ -102,15 +102,15 @@ export class CreateListingPage {
     this.submitButton = page.getByRole('button', { name: /create|submit|publish/i });
     this.form = page.locator('form');
 
-    // State — error banner has specific Tailwind classes
-    this.errorBanner = page.locator('.bg-red-50, .bg-red-900\\/20');
+    // State — error banner uses role="alert" and data-testid
+    this.errorBanner = page.locator('[data-testid="form-error-banner"]');
     this.draftBanner = page.getByText('You have an unsaved draft');
     this.resumeDraftButton = page.getByRole('button', { name: 'Resume Draft' });
     this.startFreshButton = page.getByRole('button', { name: 'Start Fresh' });
     this.autoSaveIndicator = page.getByText(/Draft saved/);
 
     // Progress
-    this.progressSection = page.locator('.mb-8').first();
+    this.progressSection = page.locator('[data-testid="progress-steps"]');
     this.progressText = page.getByText(/sections? complete|Ready to publish/);
 
     // Partial upload confirmation
@@ -321,8 +321,9 @@ export class CreateListingPage {
   // ── Progress Indicator ──
 
   async getCompletedStepCount(): Promise<number> {
-    // Completed step circles: w-10 h-10 rounded-full with bg-green-50 (light) or bg-green-900 (dark)
-    const greenSteps = this.page.locator('.w-10.h-10.rounded-full.bg-green-50, .w-10.h-10.rounded-full[class*="bg-green-900"]');
+    // TODO: add data-step-complete attribute to step circles in CreateListingForm
+    // Completed step circles show a Check icon (green background with checkmark)
+    const greenSteps = this.page.locator('[data-testid="progress-steps"] .w-10.h-10.rounded-full.bg-green-50, [data-testid="progress-steps"] .w-10.h-10.rounded-full[class*="bg-green-900"]');
     return greenSteps.count();
   }
 

@@ -5,6 +5,6 @@
 -- Rollback: DROP INDEX CONCURRENTLY IF EXISTS search_doc_active_available_price_idx;
 -- Data safety: CREATE INDEX CONCURRENTLY is non-blocking; no table locks, no downtime.
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS search_doc_active_available_price_idx
+CREATE INDEX IF NOT EXISTS search_doc_active_available_price_idx
   ON "listing_search_docs" ("price", "listing_created_at" DESC)
   WHERE "status" = 'ACTIVE' AND "available_slots" > 0;

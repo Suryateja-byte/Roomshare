@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -125,6 +126,13 @@ export function FilterModal({
   isCountLoading,
   boundsRequired,
 }: FilterModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isOpen]);
+
   if (!isOpen || typeof document === 'undefined') {
     return null;
   }

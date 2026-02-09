@@ -78,9 +78,10 @@ test.describe('Authentication Journeys', () => {
       await page.getByLabel(/email/i).fill(creds.email);
 
       const passwordInputs = page.locator('input[type="password"]');
-      await passwordInputs.first().fill('TestPassword123!');
+      const testPassword = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
+      await passwordInputs.first().fill(testPassword);
       if ((await passwordInputs.count()) > 1) {
-        await passwordInputs.nth(1).fill('TestPassword123!');
+        await passwordInputs.nth(1).fill(testPassword);
       }
 
       const termsCheckbox = page.getByLabel(/terms|agree/i);

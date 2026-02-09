@@ -21,16 +21,27 @@ export {
   timeouts,
   tags,
   SF_BOUNDS,
+  A11Y_CONFIG,
   waitForStable,
   waitForMapMarkers,
+  waitForMapReady,
+  waitForDebounceAndResponse,
   takeScreenshot,
   logStep,
   searchResultsContainer,
   scopedCards,
 } from "./test-utils";
 
+// Map-list sync helpers (polling-based assertions)
+export {
+  pollForMarkers,
+  pollForUrlParam,
+  pollForUrlParamPresent,
+  pollForCardCount,
+} from "./sync-helpers";
+
 // Individual helpers for direct import if needed
-export { authHelpers } from "./auth-helpers";
+export { authHelpers, MOCK_SESSION_TOKEN } from "./auth-helpers";
 export { navigationHelpers } from "./navigation-helpers";
 export { networkHelpers, type NetworkCondition } from "./network-helpers";
 export { assertionHelpers } from "./assertions";

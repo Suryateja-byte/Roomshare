@@ -400,7 +400,7 @@ export default function CreateListingForm() {
     return (
         <>
             {/* Step Progress Indicator */}
-            <div className="mb-8">
+            <div data-testid="progress-steps" className="mb-8">
                 <div className="flex items-center justify-between">
                     {FORM_SECTIONS.map((section, index) => {
                         const Icon = section.icon;
@@ -484,7 +484,7 @@ export default function CreateListingForm() {
             )}
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-4 rounded-xl mb-8 text-sm">
+                <div role="alert" data-testid="form-error-banner" className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-4 rounded-xl mb-8 text-sm">
                     {error}
                 </div>
             )}

@@ -291,6 +291,7 @@ export default function MobileBottomSheet({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-30 bg-black pointer-events-none md:hidden"
+            data-testid="sheet-overlay"
             aria-hidden="true"
           />
         )}
@@ -383,7 +384,7 @@ export default function MobileBottomSheet({
 
           {/* Header content */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+            <span data-testid="sheet-header-text" className="text-sm font-semibold text-zinc-900 dark:text-white">
               {headerText || "Search results"}
             </span>
             {isCollapsed && (

@@ -10,6 +10,7 @@
  */
 
 import { test, expect, tags, timeouts, SF_BOUNDS, selectors } from "./helpers/test-utils";
+import { waitForMapReady, pollForMarkers } from "./helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -48,14 +49,6 @@ test.describe("Map Error States and Accessibility", () => {
     }
   });
 
-  // Helper: wait for map to be interactive
-  async function waitForMapReady(page: import("@playwright/test").Page, timeout = timeouts.navigation) {
-    await page.waitForLoadState("domcontentloaded");
-    // Wait for "Hide map" button which indicates map container is mounted
-    const hideMapButton = page.getByRole("button", { name: /hide map/i });
-    await expect(hideMapButton).toBeVisible({ timeout });
-  }
-
   // Helper: wait for map error banner
   async function waitForMapError(
     page: import("@playwright/test").Page,
@@ -90,9 +83,6 @@ test.describe("Map Error States and Accessibility", () => {
       // Search with a query that will return no results
       await page.goto(`/search?q=xyznonexistentlisting123456789&${boundsQS}`);
       await page.waitForLoadState("domcontentloaded");
-
-      // Wait for the search to complete
-      await page.waitForTimeout(3000);
 
       // Should show empty state or "no results" message
       const emptyState = page.locator(selectors.emptyState);
@@ -178,8 +168,8 @@ test.describe("Map Error States and Accessibility", () => {
       const hideMapButton = page.getByRole("button", { name: /hide map/i });
       await expect(hideMapButton).toBeVisible({ timeout: timeouts.navigation });
 
-      // Wait for any loading to complete
-      await page.waitForTimeout(2000);
+      // Wait for map to be ready before checking for messages
+      await waitForMapReady(page);
 
       // Check for error/info message about zooming in or clamped bounds
       const zoomMessage = page.getByText(/Zoom in|Zoomed in to show results/i);
@@ -220,12 +210,11 @@ test.describe("Map Error States and Accessibility", () => {
       // Try to interact with map controls
       const hideMapBtn = page.getByRole("button", { name: /hide map/i });
       await hideMapBtn.click();
-      await page.waitForTimeout(500);
 
       const showMapBtn = page.getByRole("button", { name: /show map/i });
       if (await showMapBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         await showMapBtn.click();
-        await page.waitForTimeout(500);
+        await expect(hideMapBtn).toBeVisible({ timeout: 2000 });
       }
 
       // Filter out expected/benign errors
@@ -262,8 +251,8 @@ test.describe("Map Error States and Accessibility", () => {
         '[role="region"][aria-label="Interactive map showing listing locations"]'
       );
 
-      // Wait a bit for map to fully render
-      await page.waitForTimeout(2000);
+      // Wait for map to fully render
+      await waitForMapReady(page);
 
       // Check if map container with proper ARIA exists
       const mapContainer = page.locator('.mapboxgl-map').first();
@@ -296,8 +285,8 @@ test.describe("Map Error States and Accessibility", () => {
       await page.goto(SEARCH_URL);
       await waitForMapReady(page);
 
-      // Wait for listings to potentially load
-      await page.waitForTimeout(3000);
+      // Wait for markers to potentially load
+      await pollForMarkers(page, 1).catch(() => {});
 
       // Check for screen reader announcement div (sr-only with role="status")
       const srAnnouncement = page.locator('.sr-only[role="status"][aria-live="polite"]');
@@ -318,8 +307,8 @@ test.describe("Map Error States and Accessibility", () => {
       await page.goto(SEARCH_URL);
       await waitForMapReady(page);
 
-      // Wait for potential markers
-      await page.waitForTimeout(3000);
+      // Wait for markers to load
+      await pollForMarkers(page, 1).catch(() => {});
 
       // Check if markers are present
       const markers = page.locator(".mapboxgl-marker");
@@ -336,7 +325,6 @@ test.describe("Map Error States and Accessibility", () => {
 
       // Press Enter or Space to activate
       await page.keyboard.press("Enter");
-      await page.waitForTimeout(500);
 
       // Check if popup appeared
       const popup = page.locator(".mapboxgl-popup");
@@ -348,18 +336,19 @@ test.describe("Map Error States and Accessibility", () => {
 
         // Try to tab through popup
         await page.keyboard.press("Tab");
-        await page.waitForTimeout(200);
 
         // Escape should close popup
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(500);
+        await expect(popup).not.toBeVisible({ timeout: 2000 });
       }
     });
 
     test(`${tags.anon} ${tags.a11y} 11.4 - Focus management on popup open`, async ({ page }) => {
       await page.goto(SEARCH_URL);
       await waitForMapReady(page);
-      await page.waitForTimeout(3000);
+
+      // Wait for markers to load
+      await pollForMarkers(page, 1).catch(() => {});
 
       // Check for markers
       const markers = page.locator(".mapboxgl-marker");
@@ -372,7 +361,6 @@ test.describe("Map Error States and Accessibility", () => {
 
       // Click a marker to open popup
       await markers.first().click();
-      await page.waitForTimeout(500);
 
       // Check if popup is visible
       const popup = page.locator(".mapboxgl-popup");
@@ -462,15 +450,23 @@ test.describe("Map Error States and Accessibility", () => {
 
         // Test arrow key navigation
         const initialValue = await dragHandle.first().getAttribute("aria-valuenow");
+        const initialNum = parseInt(initialValue || "1", 10);
 
         // Press ArrowUp to expand
         await page.keyboard.press("ArrowUp");
-        await page.waitForTimeout(500);
+
+        // Wait for the value to update after ArrowUp
+        if (initialNum < 2) {
+          await expect.poll(
+            async () => {
+              const val = await dragHandle.first().getAttribute("aria-valuenow");
+              return parseInt(val || "1", 10);
+            },
+            { timeout: 2000 }
+          ).toBeGreaterThan(initialNum);
+        }
 
         const afterUpValue = await dragHandle.first().getAttribute("aria-valuenow");
-
-        // Value should have increased (expanded)
-        const initialNum = parseInt(initialValue || "1", 10);
         const afterUpNum = parseInt(afterUpValue || "1", 10);
 
         if (initialNum < 2) {
@@ -479,11 +475,15 @@ test.describe("Map Error States and Accessibility", () => {
 
         // Test Escape key to collapse
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(500);
 
-        // Should collapse to half position (1) or stay at current
-        const afterEscapeValue = await dragHandle.first().getAttribute("aria-valuenow");
-        expect(parseInt(afterEscapeValue || "1", 10)).toBeLessThanOrEqual(afterUpNum);
+        // Wait for value to settle after collapse
+        await expect.poll(
+          async () => {
+            const val = await dragHandle.first().getAttribute("aria-valuenow");
+            return parseInt(val || "1", 10);
+          },
+          { timeout: 2000 }
+        ).toBeLessThanOrEqual(afterUpNum);
       });
     });
   });

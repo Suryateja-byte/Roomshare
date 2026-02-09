@@ -53,7 +53,6 @@ test.describe("Search A11y: Keyboard Navigation", () => {
 
     for (let i = 0; i < 25; i++) {
       await page.keyboard.press("Tab");
-      await page.waitForTimeout(50);
 
       const info = await page.evaluate(() => {
         const el = document.activeElement;
@@ -104,7 +103,6 @@ test.describe("Search A11y: Keyboard Navigation", () => {
 
     for (let i = 0; i < 30; i++) {
       await page.keyboard.press("Tab");
-      await page.waitForTimeout(50);
 
       const isListingLink = await page.evaluate(() => {
         const el = document.activeElement;
@@ -191,7 +189,6 @@ test.describe("Search A11y: Keyboard Navigation", () => {
     if (isVisible) {
       // Activate skip link
       await page.keyboard.press("Enter");
-      await page.waitForTimeout(300);
 
       // Focus should move to main content area
       const mainContent = page.locator("#main-content");
@@ -205,22 +202,19 @@ test.describe("Search A11y: Keyboard Navigation", () => {
 
   // 6. Focus returns to search area after filter modal close
   test("6. focus returns after filter modal close", { tag: [tags.a11y] }, async ({ page }) => {
-    // Find and click the Filters button
-    const filtersButton = page.locator(
-      'button[aria-controls="search-filters"], button:has-text("Filters")',
-    ).first();
+    // Find and click the Filters button (use getByRole to avoid matching room type filter pills)
+    const filtersButton = page.getByRole("button", { name: /^Filters/ });
 
     if (await filtersButton.isVisible().catch(() => false)) {
+      await page.waitForLoadState("networkidle").catch(() => {});
       await filtersButton.click();
-      await page.waitForTimeout(300);
 
       // Filter modal should be open
       const modal = page.locator('[role="dialog"][aria-modal="true"]');
-      await expect(modal).toBeVisible({ timeout: 5000 });
+      await expect(modal).toBeVisible({ timeout: 10_000 });
 
       // Close modal with Escape
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(300);
 
       // Modal should be closed
       await expect(modal).not.toBeVisible();
@@ -240,33 +234,30 @@ test.describe("Search A11y: Keyboard Navigation", () => {
 
     if (await sortTrigger.isVisible().catch(() => false)) {
       await sortTrigger.click();
-      await page.waitForTimeout(200);
 
       // Dropdown content should be open
       const dropdown = page.locator('[role="listbox"]');
-      const isOpen = await dropdown.isVisible().catch(() => false);
+      const isOpen = await dropdown.isVisible({ timeout: 3_000 }).catch(() => false);
 
       if (isOpen) {
         // Escape should close it
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(200);
         await expect(dropdown).not.toBeVisible();
       }
     }
 
     // Test with filter modal
     const filtersButton = page.locator(
-      'button[aria-controls="search-filters"], button:has-text("Filters")',
+      'button[aria-controls="search-filters"], button[aria-label*="Filter"], button:has-text("Filters")',
     ).first();
 
     if (await filtersButton.isVisible().catch(() => false)) {
+      await page.waitForLoadState("networkidle").catch(() => {});
       await filtersButton.click();
-      await page.waitForTimeout(300);
 
       const modal = page.locator('[role="dialog"][aria-modal="true"]');
-      if (await modal.isVisible().catch(() => false)) {
+      if (await modal.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(300);
         await expect(modal).not.toBeVisible();
       }
     }
@@ -277,6 +268,11 @@ test.describe("Search A11y: Keyboard Navigation", () => {
     // Tab through a large number of times and verify:
     // 1. Focus keeps moving (not stuck on one element)
     // 2. Focus eventually wraps back to the beginning
+    //
+    // Element identification uses bounding box position + tag + id to
+    // distinguish elements that share the same tag (e.g., many map marker
+    // buttons). Without positional info, all <button> elements without IDs
+    // would look identical, causing false "keyboard trap" positives.
 
     const MAX_TABS = 60;
     const focusedElements: string[] = [];
@@ -285,14 +281,17 @@ test.describe("Search A11y: Keyboard Navigation", () => {
 
     for (let i = 0; i < MAX_TABS; i++) {
       await page.keyboard.press("Tab");
-      await page.waitForTimeout(30);
 
       const currentElement = await page.evaluate(() => {
         const el = document.activeElement;
         if (!el) return "null";
         const id = el.id ? `#${el.id}` : "";
         const tag = el.tagName.toLowerCase();
-        return `${tag}${id}`;
+        // Include bounding rect to distinguish elements with same tag/no-id
+        // (e.g., map marker buttons which are all <button> without IDs)
+        const rect = el.getBoundingClientRect();
+        const pos = `@${Math.round(rect.x)},${Math.round(rect.y)}`;
+        return `${tag}${id}${pos}`;
       });
 
       focusedElements.push(currentElement);

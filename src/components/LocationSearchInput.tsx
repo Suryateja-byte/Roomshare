@@ -426,7 +426,7 @@ export default function LocationSearchInput({
           // ARIA combobox attributes for screen reader accessibility
           role="combobox"
           aria-expanded={isPopupOpen}
-          aria-controls={`${listboxId}-listbox`}
+          aria-controls={isPopupOpen ? `${listboxId}-listbox` : undefined}
           aria-activedescendant={
             showSuggestions && selectedIndex >= 0
               ? `${listboxId}-option-${selectedIndex}`

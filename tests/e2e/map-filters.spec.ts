@@ -20,8 +20,10 @@ import {
   selectors,
   tags,
   waitForMapMarkers,
+  waitForMapReady,
   searchResultsContainer,
 } from "./helpers/test-utils";
+import { pollForUrlParam, pollForUrlParamPresent } from "./helpers/sync-helpers";
 import type { Page } from "@playwright/test";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -42,8 +44,8 @@ async function waitForSearchPageReady(page: Page) {
     .locator(selectors.listingCard)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  // Allow time for map markers to render
-  await page.waitForTimeout(2000);
+  // Wait for map to be fully loaded and idle
+  await waitForMapReady(page);
 }
 
 /**
@@ -125,7 +127,7 @@ async function applyMaxPriceFilter(page: Page, maxPrice: number) {
   }
 
   // Wait for URL to update with filter params
-  await page.waitForTimeout(1000);
+  await pollForUrlParamPresent(page, "maxPrice");
 }
 
 /**
@@ -134,7 +136,7 @@ async function applyMaxPriceFilter(page: Page, maxPrice: number) {
 async function navigateWithRoomTypeFilter(page: Page, roomType: string) {
   await page.goto(`${SEARCH_URL}&roomType=${encodeURIComponent(roomType)}`);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForTimeout(2000);
+  await waitForMapReady(page);
 }
 
 /**
@@ -157,7 +159,7 @@ async function clearAllFilters(page: Page) {
       },
       { timeout: 10_000 }
     );
-    await page.waitForTimeout(1000);
+    await waitForMapReady(page);
   }
 }
 
@@ -175,19 +177,17 @@ async function changeSortOption(page: Page, sortValue: string) {
 
   if (sortVisible) {
     await sortTrigger.first().click();
-    await page.waitForTimeout(300);
 
-    // Click the sort option
+    // Click the sort option (Playwright auto-waits for actionability)
     const sortOption = page.getByRole("option", { name: new RegExp(sortValue, "i") })
       .or(page.locator(`button:has-text("${sortValue}")`))
       .or(page.locator(`[data-value="${sortValue}"]`));
 
+    await sortOption.first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
     if (await sortOption.first().isVisible()) {
       await sortOption.first().click();
     }
   }
-
-  await page.waitForTimeout(500);
 }
 
 /**
@@ -240,8 +240,8 @@ test.describe("Map + Filter Interactions", () => {
       // Apply a filter that should reduce results (Private Room filter)
       await navigateWithRoomTypeFilter(page, "Private Room");
 
-      // Wait for markers to update
-      await page.waitForTimeout(2000);
+      // Wait for map to settle after filter navigation
+      await waitForMapReady(page);
 
       // Get new marker count
       const filteredMarkerCount = await getMarkerCount(page);
@@ -274,7 +274,7 @@ test.describe("Map + Filter Interactions", () => {
       // Apply a restrictive max price filter
       await page.goto(`${SEARCH_URL}&maxPrice=500`);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await waitForMapReady(page);
 
       // Get new marker count
       const filteredMarkerCount = await getMarkerCount(page);
@@ -302,8 +302,8 @@ test.describe("Map + Filter Interactions", () => {
       // Apply a filter
       await navigateWithRoomTypeFilter(page, "Private Room");
 
-      // Wait for filter to apply
-      await page.waitForTimeout(2000);
+      // Wait for map to settle after filter
+      await waitForMapReady(page);
 
       // Map should still exist (not reinitialized)
       const afterFilterMapId = await getMapInstanceId(page);
@@ -365,7 +365,7 @@ test.describe("Map + Filter Interactions", () => {
       // Navigate with multiple filters
       await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await waitForMapReady(page);
 
       // Check for applied filters region
       const filtersRegion = page.locator('[aria-label="Applied filters"]');
@@ -381,7 +381,9 @@ test.describe("Map + Filter Interactions", () => {
       const roomTypeChip = filtersRegion.locator('button:has-text("Private Room")');
       if (await roomTypeChip.count() > 0) {
         await roomTypeChip.click();
-        await page.waitForTimeout(1000);
+
+        // Wait for roomType param to be removed from URL
+        await pollForUrlParam(page, "roomType", null);
 
         // Verify roomType is removed but amenities remain
         const url = new URL(page.url());
@@ -420,7 +422,7 @@ test.describe("Map + Filter Interactions", () => {
       currentUrl.searchParams.set("sort", "price_asc");
       await page.goto(currentUrl.toString());
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await waitForMapReady(page);
 
       // Map should still exist
       const afterSortMapId = await getMapInstanceId(page);
@@ -471,7 +473,7 @@ test.describe("Map + Filter Interactions", () => {
       currentUrl.searchParams.set("sort", "price_asc");
       await page.goto(currentUrl.toString());
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await waitForMapReady(page);
 
       // Get new listing order
       const sortedPrices = await getListingPrices();
@@ -517,12 +519,11 @@ test.describe("Map + Filter Interactions", () => {
         const currentUrl = new URL(page.url());
         currentUrl.searchParams.set("sort", sort);
         await page.goto(currentUrl.toString(), { waitUntil: "commit" });
-        await page.waitForTimeout(300); // Brief pause between changes
       }
 
       // Wait for the final navigation to settle
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(3000);
+      await waitForMapReady(page);
 
       // Get final request count
       const finalRequestCount = tracker.getCount();
@@ -546,7 +547,7 @@ test.describe("Map + Filter Interactions", () => {
       // Apply both filter and sort via URL
       await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=price_asc`);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await waitForMapReady(page);
 
       // Verify URL params
       const url = new URL(page.url());
@@ -582,12 +583,12 @@ test.describe("Map + Filter Interactions", () => {
 
       // Map should still be interactive (can zoom)
       await map.click();
-      await page.waitForTimeout(500);
+      await waitForMapReady(page);
 
       // Try scrolling to zoom (if supported)
       await map.hover();
       await page.mouse.wheel(0, -100);
-      await page.waitForTimeout(500);
+      await waitForMapReady(page);
 
       // Map should still be visible and functional
       await expect(map).toBeVisible();
@@ -605,11 +606,11 @@ test.describe("Map + Filter Interactions", () => {
 
       // Apply filter
       await navigateWithRoomTypeFilter(page, "Private Room");
-      await page.waitForTimeout(1000);
+      await waitForMapReady(page);
 
       // Clear filter
       await clearAllFilters(page);
-      await page.waitForTimeout(1000);
+      await waitForMapReady(page);
 
       // Filter known benign errors
       const realErrors = consoleErrors.filter(

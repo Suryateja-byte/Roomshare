@@ -7,6 +7,7 @@
  */
 
 import { test, expect, SF_BOUNDS, timeouts } from "./helpers/test-utils";
+import { waitForSheetAnimation } from "./helpers/mobile-helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -38,9 +39,6 @@ test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
     // Wait for listings to load first
     const listings = page.locator('a[href^="/listings/c"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
-
-    // Allow UI to stabilize
-    await page.waitForTimeout(1000);
 
     // The floating toggle button should be visible
     const toggleBtn = page.locator(toggleSelectors.floatingToggle).first();
@@ -82,7 +80,6 @@ test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
   test("toggle button has proper ARIA label", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
-    await page.waitForTimeout(1000);
 
     // Button should have one of the expected aria-labels
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
@@ -98,7 +95,6 @@ test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
   test("toggle button remains visible during scroll", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
-    await page.waitForTimeout(1000);
 
     const toggleBtn = page.locator(toggleSelectors.floatingToggle).first();
     await expect(toggleBtn).toBeVisible({ timeout: timeouts.action });
@@ -113,7 +109,6 @@ test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
         scrollable.scrollTop = 200;
       }
     });
-    await page.waitForTimeout(500);
 
     // Toggle should still be visible and in approximately same viewport position (fixed)
     await expect(toggleBtn).toBeVisible();
@@ -130,7 +125,6 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
   test("toggle switches from list to map view", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
-    await page.waitForTimeout(1000);
 
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
 
@@ -138,7 +132,6 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
     if (await showMapBtn.isVisible().catch(() => false)) {
       // Click to switch to map view
       await showMapBtn.click();
-      await page.waitForTimeout(800);
 
       // After clicking, button should now show "Show list"
       const showListBtn = page.locator(toggleSelectors.showListButton);
@@ -157,20 +150,18 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
   test("toggle switches from map to list view", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
-    await page.waitForTimeout(1000);
 
     // First ensure we're in map view (click Show map if available)
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
     if (await showMapBtn.isVisible().catch(() => false)) {
       await showMapBtn.click();
-      await page.waitForTimeout(800);
+      await expect(page.locator(toggleSelectors.showListButton)).toBeVisible({ timeout: timeouts.action });
     }
 
     // Now should be in map view with "Show list" button
     const showListBtn = page.locator(toggleSelectors.showListButton);
     if (await showListBtn.isVisible().catch(() => false)) {
       await showListBtn.click();
-      await page.waitForTimeout(800);
 
       // After clicking, should show "Show map" again
       await expect(showMapBtn).toBeVisible({ timeout: timeouts.action });
@@ -188,7 +179,6 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
   test("toggle button label changes after each click", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
-    await page.waitForTimeout(1000);
 
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
     const showListBtn = page.locator(toggleSelectors.showListButton);
@@ -202,7 +192,6 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
     if (initialShowMap) {
       // Click to show map
       await showMapBtn.click();
-      await page.waitForTimeout(800);
 
       // Should now show "Show list"
       await expect(showListBtn).toBeVisible({ timeout: timeouts.action });
@@ -210,7 +199,6 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
 
       // Click again to show list
       await showListBtn.click();
-      await page.waitForTimeout(800);
 
       // Should now show "Show map" again
       await expect(showMapBtn).toBeVisible({ timeout: timeouts.action });
@@ -218,7 +206,6 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
     } else if (initialShowList) {
       // Starting in map view - click to show list
       await showListBtn.click();
-      await page.waitForTimeout(800);
 
       // Should now show "Show map"
       await expect(showMapBtn).toBeVisible({ timeout: timeouts.action });
@@ -226,7 +213,6 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
 
       // Click again to show map
       await showMapBtn.click();
-      await page.waitForTimeout(800);
 
       // Should now show "Show list" again
       await expect(showListBtn).toBeVisible({ timeout: timeouts.action });
@@ -237,7 +223,6 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
   test("bottom sheet collapses when switching to map view", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
-    await page.waitForTimeout(1000);
 
     const bottomSheet = page.locator(toggleSelectors.bottomSheet);
     const sheetVisible = await bottomSheet.isVisible({ timeout: 5000 }).catch(() => false);
@@ -255,7 +240,7 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
     if (await showMapBtn.isVisible().catch(() => false)) {
       await showMapBtn.click();
-      await page.waitForTimeout(800);
+      await waitForSheetAnimation(page);
 
       // Sheet should be collapsed (smaller height or moved down)
       const afterBox = await bottomSheet.boundingBox();
@@ -274,7 +259,6 @@ test.describe("Mobile Floating Toggle — Accessibility", () => {
   test("toggle button is keyboard accessible", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
-    await page.waitForTimeout(1000);
 
     const toggleBtn = page.locator(toggleSelectors.floatingToggle).first();
     await expect(toggleBtn).toBeVisible({ timeout: timeouts.action });
@@ -287,7 +271,6 @@ test.describe("Mobile Floating Toggle — Accessibility", () => {
     const showMapVisible = await page.locator(toggleSelectors.showMapButton).isVisible().catch(() => false);
 
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(800);
 
     // State should have changed
     if (showMapVisible) {
@@ -300,7 +283,6 @@ test.describe("Mobile Floating Toggle — Accessibility", () => {
   test("toggle button has visual feedback on press", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
-    await page.waitForTimeout(1000);
 
     const toggleBtn = page.locator(toggleSelectors.floatingToggle).first();
     if (await toggleBtn.isVisible().catch(() => false)) {

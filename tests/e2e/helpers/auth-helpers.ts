@@ -1,6 +1,12 @@
 import { Page, expect } from '@playwright/test';
 
 /**
+ * Centralized mock session token for route-level auth mocking.
+ * Use this instead of hardcoding 'mock-session-token' in specs.
+ */
+export const MOCK_SESSION_TOKEN = 'mock-session-token';
+
+/**
  * Authentication helper functions
  */
 export const authHelpers = {

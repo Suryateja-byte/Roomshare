@@ -88,7 +88,7 @@ test.describe("Search A11y: Landmarks & Semantic Structure", () => {
     const loadingWrapper = page.locator('[aria-busy]');
     // After page loads, aria-busy should be "false" or not present
     // We simply verify the feed role exists and the wrapper exists in DOM
-    const feed = page.locator('[role="feed"]');
+    const feed = page.locator('[role="feed"]').first();
     await expect(feed).toBeAttached();
 
     // The SearchResultsLoadingWrapper parent should have aria-busy attribute
@@ -151,7 +151,7 @@ test.describe("Search A11y: Landmarks & Semantic Structure", () => {
 
     // Search results heading should exist
     // page.tsx renders: <h1 id="search-results-heading">
-    const searchHeading = page.locator("#search-results-heading");
+    const searchHeading = page.locator("#search-results-heading").first();
     await expect(searchHeading).toBeAttached();
 
     // Check for skipped heading levels among visible headings

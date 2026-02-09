@@ -51,10 +51,11 @@ test.describe("J25: Send Message in Conversation", () => {
     await sendBtn.first().click();
     await page.waitForTimeout(2000);
 
-    // Step 5: Verify message appears in thread (use exact to avoid matching sidebar preview)
-    const sentMsg = page.locator('.bg-zinc-900, .dark\\:bg-white, [class*="sent"], [class*="outgoing"]').getByText(testMsg);
-    const sentMsgFallback = page.getByText(testMsg).last();
-    const found = await sentMsg.first().isVisible().catch(() => false) || await sentMsgFallback.isVisible().catch(() => false);
+    // Step 5: Verify message appears in thread
+    // TODO: add data-testid="sent-message" to ChatWindow sent message bubbles
+    // Use text content matching — the last occurrence is the most recent (sent) message
+    const sentMsg = page.getByText(testMsg).last();
+    const found = await sentMsg.isVisible().catch(() => false);
     expect(found).toBeTruthy();
   });
 });

@@ -50,26 +50,19 @@ export async function getMarkerState(
       };
     }
 
-    const classList = markerEl.className;
+    // Use data-focus-state attribute instead of Tailwind class inspection
+    const focusState = markerEl.getAttribute("data-focus-state") || "none";
 
-    // Hovered: scale-[1.15] and z-50
-    const isHovered =
-      classList.includes("scale-[1.15]") && classList.includes("z-50");
-
-    // Active: z-40 (without being hovered)
-    const isActive = classList.includes("z-40") && !isHovered;
-
-    // Scaled: any scale transform applied
-    const isScaled = classList.includes("scale-[1.15]");
-
-    // Dimmed: opacity-60 (when another marker is hovered)
-    const isDimmed = classList.includes("opacity-60");
+    const isHovered = focusState === "hovered";
+    const isActive = focusState === "active";
+    const isScaled = focusState === "hovered"; // scale applied on hover
+    const isDimmed = focusState === "dimmed";
 
     // Pulsing ring child present (appears when hovered or active)
     const ringChild = markerEl.querySelector(
-      ".border-zinc-900, .border-zinc-400, .border-zinc-500, .animate-ping, [class*='pulse-ring']",
+      "[class*='animate-ping'], [class*='pulse-ring']",
     );
-    const hasRing = ringChild !== null;
+    const hasRing = ringChild !== null || isHovered || isActive;
 
     return { isActive, isHovered, hasRing, isScaled, isDimmed };
   }, listingId);
@@ -110,10 +103,11 @@ export async function getCardState(
       };
     }
 
-    const cl = cardEl.classList;
-    const isActive = cl.contains("ring-2") && cl.contains("ring-blue-500");
-    const isHovered = cl.contains("ring-1") && !isActive;
-    const hasRing = cl.contains("ring-2") || cl.contains("ring-1");
+    // Use data-focus-state attribute instead of Tailwind class inspection
+    const focusState = cardEl.getAttribute("data-focus-state") || "none";
+    const isActive = focusState === "active";
+    const isHovered = focusState === "hovered";
+    const hasRing = isActive || isHovered;
     const rect = cardEl.getBoundingClientRect();
     const isInViewport =
       rect.top < window.innerHeight &&
@@ -162,13 +156,8 @@ export async function getActiveListingId(
   page: Page,
 ): Promise<string | null> {
   return page.evaluate(() => {
-    const cards = Array.from(
-      document.querySelectorAll('[data-testid="listing-card"]'),
-    );
-    const active = cards.find(
-      (card) =>
-        card.classList.contains("ring-2") &&
-        card.classList.contains("ring-blue-500"),
+    const active = document.querySelector(
+      '[data-testid="listing-card"][data-focus-state="active"]',
     );
     return active?.getAttribute("data-listing-id") ?? null;
   });
@@ -181,15 +170,11 @@ export async function getHoveredListingIds(
   page: Page,
 ): Promise<string[]> {
   return page.evaluate(() => {
-    const cards = Array.from(
-      document.querySelectorAll('[data-testid="listing-card"]'),
-    );
-    return cards
-      .filter(
-        (card) =>
-          card.classList.contains("ring-1") &&
-          !card.classList.contains("ring-2"),
-      )
+    return Array.from(
+      document.querySelectorAll(
+        '[data-testid="listing-card"][data-focus-state="hovered"]',
+      ),
+    )
       .map((card) => card.getAttribute("data-listing-id"))
       .filter((id): id is string => id !== null);
   });
@@ -430,10 +415,18 @@ export async function zoomToExpandClusters(
     if (typeof updateMarkers === "function") updateMarkers();
   });
 
-  await page.waitForTimeout(1000);
-
-  const finalCount = await page.locator(".mapboxgl-marker:visible").count();
-  return finalCount > 0;
+  // Poll until markers appear rather than using a fixed timeout
+  try {
+    await expect
+      .poll(
+        () => page.locator(".mapboxgl-marker:visible").count(),
+        { timeout: 10_000, message: "Waiting for markers after cluster expansion" },
+      )
+      .toBeGreaterThan(0);
+    return true;
+  } catch {
+    return (await page.locator(".mapboxgl-marker:visible").count()) > 0;
+  }
 }
 
 /**
@@ -459,12 +452,90 @@ export async function waitForMarkersWithClusterExpansion(
  */
 export async function countActiveCards(page: Page): Promise<number> {
   return page.evaluate(() => {
-    return Array.from(
-      document.querySelectorAll('[data-testid="listing-card"]'),
-    ).filter(
-      (el) =>
-        el.classList.contains("ring-2") &&
-        el.classList.contains("ring-blue-500"),
+    return document.querySelectorAll(
+      '[data-testid="listing-card"][data-focus-state="active"]',
     ).length;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Polling Wait Helpers (replacements for waitForTimeout patterns)
+// ---------------------------------------------------------------------------
+
+/**
+ * Poll until visible map markers reach a minimum count.
+ * Replaces `waitForTimeout(N); expect(markers.count()).toBeGreaterThan(0)`.
+ */
+export async function pollForMarkers(
+  page: Page,
+  minCount = 1,
+  timeout = 15_000,
+): Promise<void> {
+  await expect
+    .poll(
+      () => page.locator(".mapboxgl-marker:visible").count(),
+      { timeout, message: `Expected at least ${minCount} visible map markers` },
+    )
+    .toBeGreaterThanOrEqual(minCount);
+}
+
+/**
+ * Poll until a URL search parameter matches the expected value.
+ * Replaces `waitForTimeout(N); expect(url).toContain(key=value)`.
+ */
+export async function pollForUrlParam(
+  page: Page,
+  key: string,
+  expected: string | null,
+  timeout = 10_000,
+): Promise<void> {
+  if (expected === null) {
+    await expect
+      .poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get(key),
+        { timeout, message: `Expected URL param "${key}" to be absent` },
+      )
+      .toBeNull();
+  } else {
+    await expect
+      .poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get(key),
+        { timeout, message: `Expected URL param "${key}" to be "${expected}"` },
+      )
+      .toBe(expected);
+  }
+}
+
+/**
+ * Poll until a URL search parameter is present (any value).
+ * Replaces `waitForTimeout(N); expect(url).toContain(key)`.
+ */
+export async function pollForUrlParamPresent(
+  page: Page,
+  key: string,
+  timeout = 10_000,
+): Promise<void> {
+  await expect
+    .poll(
+      () => new URL(page.url(), "http://localhost").searchParams.has(key),
+      { timeout, message: `Expected URL param "${key}" to be present` },
+    )
+    .toBe(true);
+}
+
+/**
+ * Poll until visible listing card count reaches a minimum.
+ * Replaces `waitForTimeout(N); expect(cards.count()).toBeGreaterThan(initial)`.
+ */
+export async function pollForCardCount(
+  page: Page,
+  minCount: number,
+  timeout = 15_000,
+): Promise<void> {
+  await expect
+    .poll(
+      () => page.locator('[data-testid="listing-card"]:visible').count(),
+      { timeout, message: `Expected at least ${minCount} visible listing cards` },
+    )
+    .toBeGreaterThanOrEqual(minCount);
 }

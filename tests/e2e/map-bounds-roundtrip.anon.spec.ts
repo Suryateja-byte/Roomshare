@@ -19,7 +19,7 @@
  * Debug: pnpm playwright test tests/e2e/map-bounds-roundtrip.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, waitForMapReady } from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -28,9 +28,6 @@ import type { Page } from "@playwright/test";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
-
-// Debounce for map search (600ms in Map.tsx handleMoveEnd)
-const MAP_SEARCH_DEBOUNCE_MS = 600;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -43,7 +40,7 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   await page.waitForSelector("button", { timeout: 30_000 });
-  await page.waitForTimeout(3000);
+  await waitForMapReady(page);
 }
 
 /**
@@ -159,7 +156,7 @@ async function simulateMapPan(
     await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 10 });
     await page.mouse.up();
 
-    await page.waitForTimeout(800);
+    await waitForMapReady(page);
     return true;
   } catch {
     return false;
@@ -231,8 +228,12 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
       return;
     }
 
-    // Wait for debounce + replaceState
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 2500);
+    // Wait for URL bounds to update after debounce
+    await page.waitForFunction(
+      (prev) => window.location.href !== prev,
+      page.url(),
+      { timeout: 15_000 },
+    ).catch(() => {});
 
     const newBounds = getUrlBounds(page.url());
 
@@ -263,7 +264,11 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
       return;
     }
 
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 2500);
+    await page.waitForFunction(
+      (prev) => window.location.href !== prev,
+      page.url(),
+      { timeout: 15_000 },
+    ).catch(() => {});
 
     const url = new URL(page.url(), "http://localhost");
     const boundsParams = ["minLat", "maxLat", "minLng", "maxLng"];
@@ -312,8 +317,12 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
       return;
     }
 
-    // Wait for URL update
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 2500);
+    // Wait for URL to update after debounce
+    await page.waitForFunction(
+      (prev) => window.location.href !== prev,
+      page.url(),
+      { timeout: 15_000 },
+    ).catch(() => {});
 
     // History length should NOT have increased (replaceState, not pushState)
     const afterHistoryLength = await page.evaluate(() => window.history.length);
@@ -375,7 +384,7 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     // Navigate to search without any bounds params
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(4000);
+    await waitForMapReady(page);
 
     // Page should load without errors
     expect(await page.locator("body").isVisible()).toBe(true);
@@ -411,7 +420,7 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     // Navigate with invalid bounds (NaN, Infinity, inverted)
     await page.goto("/search?minLat=NaN&maxLat=Infinity&minLng=-999&maxLng=999");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState("networkidle");
 
     // Page should not crash
     expect(await page.locator("body").isVisible()).toBe(true);
@@ -455,8 +464,12 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
       return;
     }
 
-    // Wait for URL to update
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 2500);
+    // Wait for URL to update after debounce
+    await page.waitForFunction(
+      (prev) => window.location.href !== prev,
+      page.url(),
+      { timeout: 15_000 },
+    ).catch(() => {});
 
     // Read new bounds from URL
     const boundsAfterPan = getUrlBounds(page.url());
@@ -468,7 +481,7 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     // Refresh the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await waitForMapReady(page);
 
     // Read bounds from URL after refresh
     const boundsAfterRefresh = getUrlBounds(page.url());
@@ -515,7 +528,7 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
     // Apply a filter via URL navigation (preserving bounds)
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Bounds should still be in URL
     const afterFilterBounds = getUrlBounds(page.url());
@@ -538,7 +551,7 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
     // Change sort order (sort is excluded from MAP_RELEVANT_KEYS)
     await page.goto(`${SEARCH_URL}&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Bounds should still be present and unchanged
     const afterSortBounds = getUrlBounds(page.url());
@@ -565,7 +578,7 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
     // Start with a filter applied
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await waitForMapReady(page);
 
     const initialUrl = new URL(page.url(), "http://localhost");
     const initialFilter = initialUrl.searchParams.get("roomType");
@@ -578,7 +591,11 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
       return;
     }
 
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 2500);
+    await page.waitForFunction(
+      (prev) => window.location.href !== prev,
+      page.url(),
+      { timeout: 15_000 },
+    ).catch(() => {});
 
     const afterPanUrl = new URL(page.url(), "http://localhost");
     const afterPanFilter = afterPanUrl.searchParams.get("roomType");

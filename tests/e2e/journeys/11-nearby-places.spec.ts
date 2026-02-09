@@ -14,7 +14,7 @@
  * @see Plan Category H - Playwright E2E Tests (15 tests)
  */
 
-import { test, expect, tags, timeouts, selectors } from '../helpers';
+import { test, expect, tags, timeouts, selectors, waitForDebounceAndResponse, MOCK_SESSION_TOKEN } from '../helpers';
 
 /**
  * Mock data for Nearby Places API responses
@@ -132,7 +132,7 @@ test.describe('Nearby Places Feature', () => {
       await page.context().addCookies([
         {
           name: 'next-auth.session-token',
-          value: 'mock-session-token',
+          value: MOCK_SESSION_TOKEN,
           domain: 'localhost',
           path: '/',
         },
@@ -169,7 +169,7 @@ test.describe('Nearby Places Feature', () => {
       await page.context().addCookies([
         {
           name: 'next-auth.session-token',
-          value: 'mock-session-token',
+          value: MOCK_SESSION_TOKEN,
           domain: 'localhost',
           path: '/',
         },
@@ -239,8 +239,8 @@ test.describe('Nearby Places Feature', () => {
         const radiusButtons = radiusSelector.locator('button');
         await radiusButtons.nth(1).click(); // Click a different radius
 
-        // Wait a bit for debounce and new API call
-        await page.waitForTimeout(timeouts.debounce + 100);
+        // Wait for debounce and API response
+        await waitForDebounceAndResponse(page, { responsePattern: '/api/nearby' });
 
         // Should have made additional API call
         expect(apiCallCount).toBeGreaterThanOrEqual(1);
@@ -258,7 +258,7 @@ test.describe('Nearby Places Feature', () => {
       await page.context().addCookies([
         {
           name: 'next-auth.session-token',
-          value: 'mock-session-token',
+          value: MOCK_SESSION_TOKEN,
           domain: 'localhost',
           path: '/',
         },
@@ -290,8 +290,8 @@ test.describe('Nearby Places Feature', () => {
       if (await searchInput.isVisible()) {
         await searchInput.fill('coffee');
 
-        // Wait for debounce
-        await page.waitForTimeout(timeouts.debounce + 100);
+        // Wait for debounce and API response
+        await waitForDebounceAndResponse(page, { responsePattern: '/api/nearby' });
 
         // API should have been called
         expect(apiCallCount).toBeGreaterThanOrEqual(1);
@@ -309,7 +309,7 @@ test.describe('Nearby Places Feature', () => {
       await page.context().addCookies([
         {
           name: 'next-auth.session-token',
-          value: 'mock-session-token',
+          value: MOCK_SESSION_TOKEN,
           domain: 'localhost',
           path: '/',
         },
@@ -330,12 +330,9 @@ test.describe('Nearby Places Feature', () => {
       // Check for map container
       const mapContainer = page.locator(nearbySelectors.map);
       if (await mapContainer.isVisible()) {
-        // Wait for markers to render
-        await page.waitForTimeout(1000);
-
-        // Check for markers
+        // Check for markers (auto-retry until visible)
         const markers = page.locator(nearbySelectors.mapMarker);
-        // At minimum, there should be the listing marker
+        await expect(markers.first()).toBeVisible({ timeout: timeouts.action });
         expect(await markers.count()).toBeGreaterThanOrEqual(1);
       }
     });
@@ -356,9 +353,6 @@ test.describe('Nearby Places Feature', () => {
       // The marker should have a highlight class or visual change
       const mapContainer = page.locator(nearbySelectors.map);
       if (await mapContainer.isVisible()) {
-        // Wait for highlight animation
-        await page.waitForTimeout(300);
-
         // Check for highlighted marker class
         const highlightedMarker = page.locator(
           '.maplibregl-marker.highlighted, [data-highlighted="true"]'
@@ -382,7 +376,7 @@ test.describe('Nearby Places Feature', () => {
       await page.context().addCookies([
         {
           name: 'next-auth.session-token',
-          value: 'mock-session-token',
+          value: MOCK_SESSION_TOKEN,
           domain: 'localhost',
           path: '/',
         },
@@ -429,7 +423,7 @@ test.describe('Nearby Places Feature', () => {
       await page.context().addCookies([
         {
           name: 'next-auth.session-token',
-          value: 'mock-session-token',
+          value: MOCK_SESSION_TOKEN,
           domain: 'localhost',
           path: '/',
         },
@@ -450,7 +444,6 @@ test.describe('Nearby Places Feature', () => {
       if (await viewToggle.isVisible()) {
         // Click to toggle view
         await viewToggle.click();
-        await page.waitForTimeout(300);
 
         // View should change (either map becomes prominent or list)
         const map = page.locator(nearbySelectors.map);
@@ -463,7 +456,6 @@ test.describe('Nearby Places Feature', () => {
 
         // Toggle back
         await viewToggle.click();
-        await page.waitForTimeout(300);
       }
     });
   });
@@ -478,7 +470,7 @@ test.describe('Nearby Places Feature', () => {
       await page.context().addCookies([
         {
           name: 'next-auth.session-token',
-          value: 'mock-session-token',
+          value: MOCK_SESSION_TOKEN,
           domain: 'localhost',
           path: '/',
         },
@@ -492,16 +484,10 @@ test.describe('Nearby Places Feature', () => {
       if (await firstChip.isVisible()) {
         await firstChip.click();
 
-        // Wait for empty state
-        await page.waitForTimeout(500);
-
+        // Wait for empty state to render
         const emptyState = page.locator(nearbySelectors.emptyState);
         const noResults = page.locator('text=/no places|no results|nothing found/i');
-
-        // Should show empty message
-        const hasEmptyState = await emptyState.isVisible();
-        const hasNoResultsText = await noResults.isVisible();
-        expect(hasEmptyState || hasNoResultsText).toBe(true);
+        await expect(emptyState.or(noResults)).toBeVisible({ timeout: timeouts.action });
       }
     });
 
@@ -511,7 +497,7 @@ test.describe('Nearby Places Feature', () => {
       await page.context().addCookies([
         {
           name: 'next-auth.session-token',
-          value: 'mock-session-token',
+          value: MOCK_SESSION_TOKEN,
           domain: 'localhost',
           path: '/',
         },
@@ -525,16 +511,10 @@ test.describe('Nearby Places Feature', () => {
       if (await firstChip.isVisible()) {
         await firstChip.click();
 
-        // Wait for error
-        await page.waitForTimeout(500);
-
+        // Wait for error to render
         const errorMessage = page.locator(nearbySelectors.errorMessage);
         const errorText = page.locator('text=/error|failed|something went wrong/i');
-
-        // Should show error message
-        const hasError = await errorMessage.isVisible();
-        const hasErrorText = await errorText.isVisible();
-        expect(hasError || hasErrorText).toBe(true);
+        await expect(errorMessage.or(errorText)).toBeVisible({ timeout: timeouts.action });
       }
     });
   });
@@ -549,7 +529,7 @@ test.describe('Nearby Places Feature', () => {
       await page.context().addCookies([
         {
           name: 'next-auth.session-token',
-          value: 'mock-session-token',
+          value: MOCK_SESSION_TOKEN,
           domain: 'localhost',
           path: '/',
         },
@@ -572,8 +552,8 @@ test.describe('Nearby Places Feature', () => {
         // Press Enter to activate
         await page.keyboard.press('Enter');
 
-        // Should trigger search (wait for loading or results)
-        await page.waitForTimeout(timeouts.debounce + 100);
+        // Wait for debounce and API response
+        await waitForDebounceAndResponse(page, { responsePattern: '/api/nearby' });
 
         // Navigate to next chip with Tab
         await page.keyboard.press('Tab');

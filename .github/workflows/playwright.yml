@@ -1,7 +1,7 @@
 # =============================================================================
 # Playwright E2E Tests — Sharded for Speed
 # =============================================================================
-# Splits tests across 4 parallel runners, then merges results into one report.
+# Splits tests across 6 parallel runners, then merges results into one report.
 #
 # How sharding works:
 #   Playwright's --shard=X/Y flag divides the full test file list into Y equal
@@ -28,18 +28,18 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Job 1: Run tests across 4 shards in parallel
+  # Job 1: Run tests across 6 shards in parallel
   # ---------------------------------------------------------------------------
   playwright-tests:
-    name: "Shard ${{ matrix.shardIndex }}/4"
+    name: "Shard ${{ matrix.shardIndex }}/6"
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
     strategy:
       fail-fast: false # Let all shards finish so the merged report is complete
       matrix:
-        shardIndex: [1, 2, 3, 4]
-        shardTotal: [4]
+        shardIndex: [1, 2, 3, 4, 5, 6]
+        shardTotal: [6]
 
     services:
       db:
@@ -97,11 +97,11 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
 
       - name: Install Playwright system deps (cache hit)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium firefox webkit
 
       - name: Clean Next.js locks
         run: rm -rf .next/dev/lock 2>/dev/null || true
@@ -117,10 +117,12 @@ jobs:
           pnpm exec playwright test \
             --shard="${SHARD_INDEX}/${SHARD_TOTAL}" \
             --reporter=blob \
-            --workers=2 \
+            --workers=4 \
             --project=chromium \
             --project=chromium-anon \
-            --project="Mobile Chrome"
+            --project="Mobile Chrome" \
+            --project=firefox-anon \
+            --project=webkit-anon
 
       # Upload blob report even on failure/cancellation so merged report is complete
       - name: Upload blob report

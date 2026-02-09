@@ -128,8 +128,23 @@ export async function setSheetSnap(
   const presses = Math.abs(diff);
 
   for (let i = 0; i < presses; i++) {
+    const prevSnap = await getSheetSnapIndex(page);
     await page.keyboard.press(key);
-    if (i < presses - 1) await page.waitForTimeout(100);
+    if (i < presses - 1) {
+      // Wait for data-snap-current to update before next press
+      await page
+        .waitForFunction(
+          ({ sel, prev }: { sel: string; prev: number }) => {
+            const el = document.querySelector(sel);
+            if (!el) return true;
+            const curr = parseInt(el.getAttribute("data-snap-current") ?? "-1", 10);
+            return curr !== prev;
+          },
+          { sel: mobileSelectors.snapContent, prev: prevSnap },
+          { timeout: 3000 },
+        )
+        .catch(() => {});
+    }
   }
 
   await waitForSheetAnimation(page);
@@ -137,11 +152,30 @@ export async function setSheetSnap(
 
 /**
  * Wait for framer-motion spring animation to complete.
- * The spring config uses stiffness=400, damping=30, mass=0.8 which
- * settles in roughly 400-500ms. We use 600ms for safety margin.
+ * Polls the sheet's computed height until it stabilizes (two consecutive
+ * readings within 2px tolerance), indicating the spring has settled.
+ * Falls back to a short timeout if the sheet element isn't found.
  */
 export async function waitForSheetAnimation(page: Page): Promise<void> {
-  await page.waitForTimeout(600);
+  const sel = mobileSelectors.bottomSheet;
+  try {
+    await page.waitForFunction(
+      (s: string) => {
+        const el = document.querySelector(s);
+        if (!el) return true; // nothing to wait for
+        const w = window as any;
+        const prev = w.__sheetAnimH as number | undefined;
+        const curr = parseFloat(window.getComputedStyle(el).height);
+        w.__sheetAnimH = curr;
+        if (prev === undefined) return false; // need at least 2 samples
+        return Math.abs(curr - prev) < 2; // settled when delta < 2px
+      },
+      sel,
+      { timeout: 5000, polling: 100 },
+    );
+  } catch {
+    // If polling times out, the animation is likely done anyway
+  }
 }
 
 /**

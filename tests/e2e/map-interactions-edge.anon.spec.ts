@@ -15,7 +15,7 @@
  * Debug: pnpm playwright test tests/e2e/map-interactions-edge.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, tags, timeouts, SF_BOUNDS, selectors, searchResultsContainer } from "./helpers/test-utils";
+import { test, expect, tags, timeouts, SF_BOUNDS, selectors, searchResultsContainer, waitForMapReady } from "./helpers/test-utils";
 import { waitForMapRef, isMapAvailable } from "./helpers/sync-helpers";
 import type { Page } from "@playwright/test";
 
@@ -60,17 +60,7 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   await page.waitForSelector("button", { timeout: timeouts.navigation });
-  // Allow map to initialize (WebGL + tiles)
-  await page.waitForTimeout(3000);
-}
-
-/**
- * Wait for the "Hide map" button, indicating map panel is mounted.
- */
-async function waitForMapReady(page: Page, timeout = timeouts.navigation) {
-  await page.waitForLoadState("domcontentloaded");
-  const hideMapButton = page.getByRole("button", { name: /hide map/i });
-  await expect(hideMapButton).toBeVisible({ timeout });
+  await waitForMapReady(page);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +104,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       // Step 1: Navigate to homepage (no map)
       await page.goto("/");
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle");
 
       // Check that no mapbox-gl chunk was loaded on the homepage
       const homepageMapboxChunks = homepageChunks.filter(
@@ -145,7 +135,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
 
       await page.goto(SEARCH_URL);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(3000);
+      await waitForMapReady(page);
 
       // Verify that mapbox-gl chunk OR canvas (proof of Mapbox) is present on search page
       const mapCanvas = page.locator(".mapboxgl-canvas");
@@ -211,7 +201,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       }
 
       // Wait for page to fully load
-      await page.waitForTimeout(cdpThrottled ? 8000 : 4000);
+      await waitForMapReady(page, cdpThrottled ? 30_000 : 15_000);
 
       // Reset network conditions
       if (cdpThrottled) {
@@ -268,7 +258,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
 
       await page.goto(SEARCH_URL);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(3000);
+      await waitForMapReady(page);
 
       // Check if map is currently available
       const mapAvailable = await isMapAvailable(page);
@@ -320,7 +310,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       });
 
       if (errorInjected) {
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState("networkidle");
 
         // Check if fallback appeared after map removal
         const fallbackText = page.getByText("Map unavailable");
@@ -375,7 +365,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for the page to process the error
-      await page.waitForTimeout(4000);
+      await page.waitForLoadState("networkidle");
 
       // Look for an error banner with role="alert"
       const alertBanner = page.getByRole("alert");
@@ -617,9 +607,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         return;
       }
 
-      // Wait for markers to appear
+      // Wait for map to settle before checking markers
       const markers = page.locator(".mapboxgl-marker");
-      await page.waitForTimeout(2000);
+      await waitForMapReady(page);
       const markerCount = await markers.count();
 
       if (markerCount === 0) {
@@ -742,10 +732,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       const isToggleOn = await toggle.first().getAttribute("aria-checked");
       if (isToggleOn === "true") {
         await toggle.first().click();
-        await page.waitForTimeout(500);
-        // Verify it is now OFF
-        const nowOff = await toggle.first().getAttribute("aria-checked");
-        expect(nowOff).toBe("false");
+        await expect(toggle.first()).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
       }
 
       // Pan the map far from Mission District using programmatic move
@@ -777,8 +764,8 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         return;
       }
 
-      // Wait for state update and potential conflict detection
-      await page.waitForTimeout(2000);
+      // Wait for map to settle and potential conflict detection
+      await waitForMapReady(page);
 
       // Look for conflict banner or warning
       // The location conflict banner is distinct from the regular "Search this area" banner.

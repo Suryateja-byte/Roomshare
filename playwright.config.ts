@@ -33,6 +33,7 @@ export default defineConfig({
     ['list'],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['json', { outputFile: 'test-results/results.json' }],
+    ['@currents/playwright'],
   ],
 
   /* Shared settings for all the projects below */
@@ -124,6 +125,22 @@ export default defineConfig({
       testMatch: /.*\.anon\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
+      },
+    },
+
+    /* Cross-browser anon tests — critical 8 specs only */
+    {
+      name: 'firefox-anon',
+      testMatch: /search-p0-smoke\.anon|filter-modal\.anon|filter-price\.anon|filter-reset\.anon|search-sort-ordering\.anon|search-a11y\.anon|mobile-ux\.anon|mobile-toggle\.anon/,
+      use: {
+        ...devices['Desktop Firefox'],
+      },
+    },
+    {
+      name: 'webkit-anon',
+      testMatch: /search-p0-smoke\.anon|filter-modal\.anon|filter-price\.anon|filter-reset\.anon|search-sort-ordering\.anon|search-a11y\.anon|mobile-ux\.anon|mobile-toggle\.anon/,
+      use: {
+        ...devices['Desktop Safari'],
       },
     },
   ],

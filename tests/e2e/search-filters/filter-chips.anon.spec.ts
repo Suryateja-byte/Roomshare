@@ -39,7 +39,7 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - active filters display as chips in applied filters region`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     await expect(region).toBeVisible({ timeout: 10_000 });
@@ -56,7 +56,7 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - clicking chip remove button removes the filter from URL`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -85,7 +85,7 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - clear all button removes all filter params from URL`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi,Parking&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -119,7 +119,7 @@ test.describe("Active Filter Chips", () => {
     // Start with one filter
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -131,7 +131,7 @@ test.describe("Active Filter Chips", () => {
     // Navigate with a different filter
     await page.goto(`${SEARCH_URL}&amenities=Furnished`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Private Room chip should be gone, Furnished should appear
     await expect(region.locator("text=/Private Room/i").first()).not.toBeVisible({ timeout: 10_000 });
@@ -142,7 +142,7 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - chips display human-readable labels`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&maxPrice=2000&amenities=Wifi,AC`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -167,7 +167,7 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - removing a chip triggers URL navigation`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&amenities=Wifi,Parking`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -200,7 +200,7 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - no chips region when no filters are applied`, async ({ page }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // The applied filters region should not be visible (component returns null)
     const region = appliedFiltersRegion(page);
@@ -212,7 +212,7 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - combined price shows as single chip when both min and max set`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -238,7 +238,7 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - removing price chip clears both min and max from URL`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -268,7 +268,7 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - clear all preserves non-filter params (bounds, sort)`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);

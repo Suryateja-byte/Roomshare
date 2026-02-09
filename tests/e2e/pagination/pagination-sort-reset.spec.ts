@@ -40,7 +40,7 @@ const SEARCH_URL = `/search?${boundsQS}`;
 const sel = {
   card: '[data-testid="listing-card"]',
   loadMoreBtn: 'button:has-text("Show more places")',
-  price: ".font-bold.text-xl",
+  price: '[data-testid="listing-price"]',
 } as const;
 
 // ---------------------------------------------------------------------------

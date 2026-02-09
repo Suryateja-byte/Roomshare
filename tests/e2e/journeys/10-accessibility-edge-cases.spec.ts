@@ -23,7 +23,6 @@ test.describe('Accessibility Journeys', () => {
       // Tab through multiple elements
       for (let i = 0; i < 5; i++) {
         await page.keyboard.press('Tab');
-        await page.waitForTimeout(100);
 
         // Each focused element should be visible
         const currentFocused = page.locator(':focus');
@@ -64,14 +63,15 @@ test.describe('Accessibility Journeys', () => {
 
       // Tab to password
       await page.keyboard.press('Tab');
-      await page.keyboard.type('password123');
+      const testPassword = process.env.E2E_TEST_PASSWORD || 'password123';
+      await page.keyboard.type(testPassword);
 
       // Tab to submit and press Enter
       await page.keyboard.press('Tab');
       await page.keyboard.press('Enter');
 
       // Form should submit
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('domcontentloaded');
     });
   });
 
@@ -233,7 +233,7 @@ test.describe('Edge Case Journeys', () => {
 
       // Try to navigate
       await page.getByRole('link', { name: /search|listing/i }).first().click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
 
       // Should show offline indicator or error
       const offlineIndicator = page.getByText(/offline|connection|network/i);
@@ -275,7 +275,6 @@ test.describe('Edge Case Journeys', () => {
 
         if (await readMore.isVisible()) {
           await readMore.click();
-          await page.waitForTimeout(500);
         }
       }
     });
@@ -286,7 +285,8 @@ test.describe('Edge Case Journeys', () => {
       await page.goto('/login');
 
       await page.getByLabel(/email/i).fill('test@example.com');
-      await page.getByLabel(/password/i).fill('TestPassword123!');
+      const loginPassword = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
+      await page.getByLabel(/password/i).fill(loginPassword);
 
       const submitButton = page.getByRole('button', { name: /log in|sign in/i });
 
@@ -295,7 +295,7 @@ test.describe('Edge Case Journeys', () => {
       await submitButton.click();
 
       // Should handle gracefully (button disabled or single request)
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('domcontentloaded');
 
       // No error should occur from double submit
     });
@@ -394,8 +394,7 @@ test.describe('Edge Case Journeys', () => {
       if (await searchInput.isVisible()) {
         await searchInput.fill('<script>alert("xss")</script>');
         await page.keyboard.press('Enter');
-
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('domcontentloaded');
 
         // Script should not execute (page should still be functional)
         const alertDialog = page.locator('[role="alertdialog"]');
@@ -414,8 +413,7 @@ test.describe('Edge Case Journeys', () => {
       await page.getByLabel(/password/i).fill("' OR '1'='1");
 
       await page.getByRole('button', { name: /log in/i }).click();
-
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('domcontentloaded');
 
       // Should show validation error, not log in
       const loggedIn = await page.locator('[data-testid="user-menu"]').isVisible().catch(() => false);
@@ -449,9 +447,7 @@ test.describe('Edge Case Journeys', () => {
       // Scroll through page multiple times
       for (let i = 0; i < 3; i++) {
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        await page.waitForTimeout(500);
         await page.evaluate(() => window.scrollTo(0, 0));
-        await page.waitForTimeout(500);
       }
 
       // Page should remain functional
@@ -486,7 +482,6 @@ test.describe('Edge Case Journeys', () => {
 
       if (await saveButton.isVisible()) {
         await saveButton.click();
-        await page.waitForTimeout(1000);
 
         // Step 5: Go to saved listings
         await nav.goToSaved();
@@ -499,7 +494,6 @@ test.describe('Edge Case Journeys', () => {
 
         if (await unsaveButton.isVisible()) {
           await unsaveButton.click();
-          await page.waitForTimeout(1000);
         }
       }
 

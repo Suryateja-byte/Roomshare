@@ -39,7 +39,7 @@ export const dataHelpers = {
     return {
       name: `Test User ${prefix.substring(0, 8)}`,
       email: `test-${prefix}@example.com`,
-      password: 'TestPassword123!',
+      password: process.env.E2E_TEST_PASSWORD || 'TestPassword123!',
       bio: `I am a test user. ${prefix}`,
       phone: '555-0100',
       ...overrides,

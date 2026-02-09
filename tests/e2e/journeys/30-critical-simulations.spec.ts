@@ -107,7 +107,6 @@ test.describe('30 Critical User Journey Simulations', () => {
     const menuToggle = page.locator('button[aria-label*="menu" i], [data-testid="mobile-menu"]').first();
     if (await menuToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
       await menuToggle.click();
-      await page.waitForTimeout(300);
 
       const navLinks = page.locator('nav a, [role="menuitem"]');
       expect(await navLinks.count()).toBeGreaterThan(0);
@@ -159,7 +158,6 @@ test.describe('30 Critical User Journey Simulations', () => {
     const clearBtn = page.getByRole('button', { name: /clear|reset/i }).first();
     if (await clearBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await clearBtn.click();
-      await page.waitForTimeout(500);
     }
   });
 
@@ -225,7 +223,7 @@ test.describe('30 Critical User Journey Simulations', () => {
       const nextBtn = page.locator(selectors.nextPage);
       if (await nextBtn.isEnabled()) {
         await nextBtn.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
         expect(page.url()).toMatch(/page=|offset=/);
       }
     }
@@ -235,7 +233,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/search?q=xyznonexistentlocation12345&minPrice=99999');
     await page.waitForLoadState('domcontentloaded');
     // Wait for the search to actually complete
-    await page.waitForTimeout(3000);
+    await waitForSearchReady(page);
 
     await expect(page.locator('#main-content')).toBeVisible();
     const bodyText = await page.locator('#main-content').textContent();
@@ -254,18 +252,19 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 60000 });
 
     await page.getByLabel(/email/i).fill('nonexistent@fake.com');
-    await page.locator('input[name="password"]').fill('WrongPassword123!');
+    const wrongPassword = process.env.E2E_TEST_WRONG_PASSWORD || 'WrongPassword123!';
+  await page.locator('input[name="password"]').fill(wrongPassword);
     await page.getByRole('button', { name: /sign in|log in|login/i }).click();
 
     // Should show error or stay on login page
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     expect(page.url()).toContain('/login');
   });
 
   test('S12: Protected route access without auth — redirect to login', async ({ page }) => {
     await page.context().clearCookies();
     await page.goto('/bookings');
-    await page.waitForTimeout(5000);
+    await page.waitForLoadState('networkidle');
 
     const url = page.url();
     const isProtected = url.includes('/login') || url.includes('/api/auth');
@@ -276,7 +275,7 @@ test.describe('30 Critical User Journey Simulations', () => {
   test('S13: Protected route — messages page requires auth', async ({ page }) => {
     await page.context().clearCookies();
     await page.goto('/messages');
-    await page.waitForTimeout(5000);
+    await page.waitForLoadState('networkidle');
 
     const url = page.url();
     const redirectedToLogin = url.includes('/login') || url.includes('/api/auth');
@@ -292,7 +291,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     const submitBtn = page.getByRole('button', { name: /sign up|register|create/i });
     if (await submitBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
       await submitBtn.click();
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('networkidle');
       expect(page.url()).toContain('/signup');
     }
   });
@@ -320,7 +319,6 @@ test.describe('30 Critical User Journey Simulations', () => {
       const nextArrow = page.locator('button[aria-label*="next" i], [data-testid="carousel-next"]').first();
       if (await nextArrow.isVisible({ timeout: 2000 }).catch(() => false)) {
         await nextArrow.click();
-        await page.waitForTimeout(300);
       }
     }
     expect(imgCount).toBeGreaterThanOrEqual(0);
@@ -375,14 +373,13 @@ test.describe('30 Critical User Journey Simulations', () => {
     const shareBtn = page.locator('button[aria-label*="share" i], [data-testid="share"]').first();
     if (await shareBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await shareBtn.click();
-      await page.waitForTimeout(500);
     }
   });
 
   test('S19: Invalid listing ID — 404 handling', async ({ page }) => {
     await page.goto('/listings/nonexistent-fake-id-12345');
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
 
     const pageText = await page.locator('body').textContent();
     const has404 = /not found|404|doesn't exist|no longer available/i.test(pageText || '');
@@ -416,7 +413,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     const favBtn = page.locator('button[aria-label*="save" i], button[aria-label*="favorite" i], [data-testid*="favorite"], [data-testid*="save"]').first();
     if (await favBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await favBtn.click();
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -468,7 +465,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     await expect(page).toHaveURL(/\/listings\//);
 
     await page.goBack();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('domcontentloaded');
     await expect(page).toHaveURL(/\/search/);
   });
 
@@ -483,7 +480,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
 
     const realErrors = errors.filter(e => !e.includes('hydration') && !e.includes('ResizeObserver'));
     expect(realErrors.length).toBe(0);
@@ -502,7 +499,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     const criticalPages = ['/', '/search', '/login', '/signup'];
     for (const url of criticalPages) {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('networkidle');
     }
 
     if (errors.length > 0) {
@@ -534,14 +531,23 @@ test.describe('30 Critical User Journey Simulations', () => {
 
     if (await darkModeToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
       await darkModeToggle.click();
-      await page.waitForTimeout(500);
+      // Wait for dark mode class to apply
+      await page.waitForFunction(
+        () => document.documentElement.classList.contains('dark') ||
+              (document.documentElement.getAttribute('data-theme') || '').includes('dark'),
+        { timeout: 3000 }
+      ).catch(() => {});
 
       const htmlClass = await page.locator('html').getAttribute('class') || '';
       const htmlData = await page.locator('html').getAttribute('data-theme') || '';
       const isDark = htmlClass.includes('dark') || htmlData.includes('dark');
 
       await darkModeToggle.click();
-      await page.waitForTimeout(500);
+      // Wait for theme to toggle back
+      await page.waitForFunction(
+        () => !document.documentElement.classList.contains('dark'),
+        { timeout: 3000 }
+      ).catch(() => {});
 
       expect(isDark).toBeTruthy();
     }

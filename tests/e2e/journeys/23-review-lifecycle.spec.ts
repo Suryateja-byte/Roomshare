@@ -16,7 +16,7 @@ test.describe("J28: Write a Review", () => {
   }) => {
     // Step 1: Find a listing NOT owned by test user (reviewer's listing)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForTimeout(2000);
+    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "Reviewer listing not found — skipping");
@@ -24,7 +24,7 @@ test.describe("J28: Write a Review", () => {
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState("domcontentloaded");
 
     // Step 3: Scroll to reviews section
     const reviewSection = page
@@ -51,7 +51,6 @@ test.describe("J28: Write a Review", () => {
     // Click 5th star for 5-star rating
     if (hasStars) {
       await starButtons.nth(4).click();
-      await page.waitForTimeout(300);
     }
 
     // Fill comment
@@ -63,7 +62,7 @@ test.describe("J28: Write a Review", () => {
     const submitBtn = page.getByRole("button", { name: /post review|submit|save/i }).first();
     if (await submitBtn.isVisible().catch(() => false)) {
       await submitBtn.click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("domcontentloaded");
     }
 
     // Step 6: Verify review appeared or toast
@@ -85,7 +84,7 @@ test.describe("J29: Host Responds to Review", () => {
       q: "Sunny Mission Room",
       bounds: SF_BOUNDS,
     });
-    await page.waitForTimeout(2000);
+    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     const count = await cards.count();
@@ -94,7 +93,7 @@ test.describe("J29: Host Responds to Review", () => {
     // Step 2: Go to the listing
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState("domcontentloaded");
 
     // Step 3: Look for reviews section and a respond button
     const respondBtn = page
@@ -105,7 +104,6 @@ test.describe("J29: Host Responds to Review", () => {
     test.skip(!canRespond, "No respond button — may not be own listing or no reviews");
 
     await respondBtn.first().click();
-    await page.waitForTimeout(500);
 
     // Step 4: Type response
     const responseField = page.locator("textarea").last();
@@ -116,7 +114,7 @@ test.describe("J29: Host Responds to Review", () => {
     const submitBtn = page.getByRole("button", { name: /submit|post|save|send/i }).first();
     if (await submitBtn.isVisible().catch(() => false)) {
       await submitBtn.click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("domcontentloaded");
     }
 
     // Step 5: Verify response appeared
@@ -138,7 +136,7 @@ test.describe("J30: Review Summary Display", () => {
       q: "Sunny Mission Room",
       bounds: SF_BOUNDS,
     });
-    await page.waitForTimeout(2000);
+    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "Listing not found — skipping");
@@ -146,7 +144,7 @@ test.describe("J30: Review Summary Display", () => {
     // Step 2: Open listing
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState("domcontentloaded");
 
     // Step 3: Look for review-related content
     const reviewIndicator = page

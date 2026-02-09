@@ -19,7 +19,7 @@
  * Debug: pnpm playwright test tests/e2e/map-persistence.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, timeouts, waitForMapReady } from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -40,8 +40,7 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   await page.waitForSelector("button", { timeout: 30_000 });
-  // Allow map to initialize (WebGL + tiles + React effects)
-  await page.waitForTimeout(3000);
+  await waitForMapReady(page);
 }
 
 /**
@@ -134,7 +133,7 @@ async function isMapContainerVisible(page: Page): Promise<boolean> {
 async function navigateWithFilter(page: Page, paramKey: string, paramValue: string) {
   await page.goto(`${SEARCH_URL}&${paramKey}=${encodeURIComponent(paramValue)}`);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForTimeout(2000);
+  await waitForMapReady(page);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +258,7 @@ test.describe("Map persistence: Map survives changes", () => {
     // Change sort order via URL
     await page.goto(`${SEARCH_URL}&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Instance should be the same
     const afterState = await getMapE2EState(page);
@@ -292,7 +291,7 @@ test.describe("Map persistence: Map survives changes", () => {
     // Change search query
     await page.goto(`${SEARCH_URL}&q=Mission+District`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     const afterState = await getMapE2EState(page);
 
@@ -366,7 +365,7 @@ test.describe("Map persistence: Map state recovery", () => {
     // Refresh the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await waitForMapReady(page);
 
     // Map should still be visible
     expect(await isMapContainerVisible(page)).toBe(true);
@@ -408,7 +407,7 @@ test.describe("Map persistence: Map state recovery", () => {
 
     await listingLink.click();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState("networkidle");
 
     // Should be on a listing page now
     expect(page.url()).toContain("/listings/");
@@ -416,7 +415,7 @@ test.describe("Map persistence: Map state recovery", () => {
     // Go back
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await waitForMapReady(page);
 
     // Map should still be visible
     expect(await isMapContainerVisible(page)).toBe(true);
@@ -442,14 +441,14 @@ test.describe("Map persistence: Map state recovery", () => {
     // Apply filter 2
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
     const state2 = await getMapE2EState(page);
     expect(state2?.mapInstanceId).toBe(initialState.mapInstanceId);
 
     // Apply filter 3
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&maxPrice=2000&amenities=Wifi`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
     const state3 = await getMapE2EState(page);
     expect(state3?.mapInstanceId).toBe(initialState.mapInstanceId);
 

@@ -33,16 +33,16 @@ async function waitForResults(page: import("@playwright/test").Page) {
 
 /** Open the filter modal and return the dialog locator */
 async function openFilterModal(page: import("@playwright/test").Page) {
-  const filtersButton = page.locator(
-    'button[aria-controls="search-filters"], button:has-text("Filters")',
-  ).first();
+  // Use getByRole to reliably target the "Filters" button (not room type filter pills)
+  const filtersButton = page.getByRole("button", { name: /^Filters/ });
 
+  await page.waitForLoadState("networkidle").catch(() => {});
   await expect(filtersButton).toBeVisible({ timeout: timeouts.action });
   await filtersButton.click();
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
 
   const modal = page.locator('[role="dialog"][aria-modal="true"]');
-  await expect(modal).toBeVisible({ timeout: 5000 });
+  await expect(modal).toBeVisible({ timeout: 10_000 });
   return modal;
 }
 
@@ -138,18 +138,17 @@ test.describe("Search A11y: Filter Modal Accessibility", () => {
   // 5. Focus returns to trigger button when modal closed
   test("5. focus returns to trigger button when modal closed", { tag: [tags.a11y] }, async ({ page }) => {
     // Remember the filters button
-    const filtersButton = page.locator(
-      'button[aria-controls="search-filters"], button:has-text("Filters")',
-    ).first();
+    const filtersButton = page.getByRole("button", { name: /^Filters/ });
 
     await expect(filtersButton).toBeVisible();
 
     // Open modal
+    await page.waitForLoadState("networkidle").catch(() => {});
     await filtersButton.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     const modal = page.locator('[role="dialog"][aria-modal="true"]');
-    await expect(modal).toBeVisible();
+    await expect(modal).toBeVisible({ timeout: 10_000 });
 
     // Close with the close button (X button with aria-label="Close filters")
     const closeButton = modal.locator('button[aria-label="Close filters"]');

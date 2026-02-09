@@ -12,7 +12,7 @@
  *   pnpm playwright test tests/e2e/map-features.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, searchResultsContainer } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, searchResultsContainer, waitForMapReady } from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -22,7 +22,7 @@ async function waitForSearchPage(page: import("@playwright/test").Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
   await page.waitForSelector("button", { timeout: 30_000 });
-  await page.waitForTimeout(3000);
+  await waitForMapReady(page);
 }
 
 // Helper: check if map controls rendered (depends on WebGL/map load)
@@ -101,8 +101,6 @@ test.describe("1.3: Synchronized highlighting", () => {
       // Just verify it exists in DOM without crashing
     }
 
-    await page.waitForTimeout(500);
-
     // Page still functional
     expect(await page.locator("body").isVisible()).toBe(true);
   });
@@ -120,7 +118,7 @@ test.describe("1.5: Boundary polygons", () => {
 
     await page.goto(`/search?q=Mission+District&${boundsQS}`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await waitForMapReady(page);
 
     const realErrors = consoleErrors.filter(
       (e) =>
@@ -153,13 +151,13 @@ test.describe("Map controls (requires WebGL)", () => {
   test("drop pin button toggles to cancel state", async ({ page }) => {
     const dropPinBtn = page.locator('button').filter({ hasText: /Drop pin/i }).first();
     await dropPinBtn.click();
-    await page.waitForTimeout(500);
+    await page.locator('button').filter({ hasText: /Cancel/i }).first().waitFor({ timeout: 5_000 });
 
     const cancelBtn = page.locator('button').filter({ hasText: /Cancel/i });
     expect(await cancelBtn.count()).toBeGreaterThanOrEqual(1);
 
     await cancelBtn.first().click();
-    await page.waitForTimeout(500);
+    await page.locator('button').filter({ hasText: /Drop pin/i }).first().waitFor({ timeout: 5_000 });
     expect(await page.locator('button').filter({ hasText: /Drop pin/i }).count()).toBeGreaterThanOrEqual(1);
   });
 
@@ -173,10 +171,8 @@ test.describe("Map controls (requires WebGL)", () => {
 
     await expect(transitBtn).toHaveAttribute("aria-pressed", "false");
     await transitBtn.click();
-    await page.waitForTimeout(300);
     await expect(transitBtn).toHaveAttribute("aria-pressed", "true");
     await transitBtn.click();
-    await page.waitForTimeout(300);
     await expect(transitBtn).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -185,7 +181,6 @@ test.describe("Map controls (requires WebGL)", () => {
     if ((await poiMasterBtn.count()) === 0) return;
 
     await poiMasterBtn.click();
-    await page.waitForTimeout(300);
 
     const transitBtn = page.locator('button[aria-pressed]').filter({ hasText: /Transit/i }).first();
     const parksBtn = page.locator('button[aria-pressed]').filter({ hasText: /Parks/i }).first();
@@ -207,20 +202,23 @@ test.describe("Map controls (requires WebGL)", () => {
   test("clicking satellite persists to sessionStorage", async ({ page }) => {
     const satBtn = page.locator('button').filter({ hasText: /Satellite/i }).first();
     await satBtn.click();
-    await page.waitForTimeout(1000);
-
-    const stored = await page.evaluate(() => sessionStorage.getItem("roomshare-map-style"));
-    expect(stored).toBe("satellite");
+    await expect.poll(
+      () => page.evaluate(() => sessionStorage.getItem("roomshare-map-style")),
+      { timeout: 5_000 },
+    ).toBe("satellite");
   });
 
   test("map style persists across navigation", async ({ page }) => {
     const satBtn = page.locator('button').filter({ hasText: /Satellite/i }).first();
     await satBtn.click();
-    await page.waitForTimeout(500);
+    await expect.poll(
+      () => page.evaluate(() => sessionStorage.getItem("roomshare-map-style")),
+      { timeout: 5_000 },
+    ).toBe("satellite");
 
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     const stored = await page.evaluate(() => sessionStorage.getItem("roomshare-map-style"));
     expect(stored).toBe("satellite");
@@ -231,7 +229,7 @@ test.describe("Map controls (requires WebGL)", () => {
     const dropPinBtn = page.locator('button').filter({ hasText: /Drop pin/i }).first();
     await dropPinBtn.focus();
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(500);
+    await page.locator('button').filter({ hasText: /Cancel/i }).first().waitFor({ timeout: 5_000 });
 
     const cancelBtn = page.locator('button').filter({ hasText: /Cancel/i });
     expect(await cancelBtn.count()).toBeGreaterThanOrEqual(1);

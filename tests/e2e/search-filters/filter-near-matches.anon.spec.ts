@@ -273,11 +273,11 @@ test.describe("Near Matches & Low Results Guidance", () => {
       await page.goto(url);
 
       await page.waitForLoadState("domcontentloaded");
-      // Use broader selectors with longer timeout for WSL2/NTFS second navigation
+      // Wait for either listing cards or the zero-results heading to appear
       await page
-        .locator(`a[href^="/listings/"], [data-testid="empty-state"], [class*="empty-state"], h1, h2, h3`)
+        .locator('text=/No.*match|No listing/i').or(page.locator('a[href^="/listings/"]'))
         .first()
-        .waitFor({ state: "attached", timeout: 60_000 });
+        .waitFor({ state: "attached", timeout: 30_000 });
       await page.waitForLoadState("networkidle").catch(() => {});
 
       const cardCount = await scopedCards(page).count();
@@ -289,12 +289,12 @@ test.describe("Near Matches & Low Results Guidance", () => {
         );
         await expect(guidancePanel).not.toBeVisible();
 
-        // Instead, "No matches found" or "No exact matches" text should be visible
+        // Instead, "No matches found" or "No exact matches" heading should be visible
         // (from ZeroResultsSuggestions component)
-        const zeroResultsText = searchResultsContainer(page).locator(
-          'text=/No.*match|No listing/i'
-        );
-        await expect(zeroResultsText).toBeVisible({ timeout: 10_000 });
+        const zeroResultsHeading = searchResultsContainer(page).locator(
+          'h2:has-text("No matches found"), h3:has-text("No listings found"), h3:has-text("No exact matches")'
+        ).first();
+        await expect(zeroResultsHeading).toBeVisible({ timeout: 10_000 });
       } else {
         console.log(
           `Note: Expected 0 results but got ${cardCount} — skipping zero results check`

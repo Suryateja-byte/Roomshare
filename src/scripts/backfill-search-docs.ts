@@ -66,6 +66,8 @@ interface ListingWithData {
   viewCount: number;
   status: string;
   createdAt: Date;
+  genderPreference: string | null;
+  householdGender: string | null;
   // Location data
   address: string;
   city: string;
@@ -106,6 +108,8 @@ async function fetchListingsWithData(
       l."viewCount" as "viewCount",
       l.status::text as status,
       l."createdAt" as "createdAt",
+      l."genderPreference" as "genderPreference",
+      l."householdGender" as "householdGender",
       loc.address,
       loc.city,
       loc.state,
@@ -223,6 +227,7 @@ async function upsertSearchDocsBatch(
         address, city, state, zip, location_geog, lat, lng,
         avg_rating, review_count, recommended_score,
         amenities_lower, house_rules_lower, household_languages_lower,
+        gender_preference, household_gender,
         doc_created_at, doc_updated_at
       ) VALUES (
         ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
@@ -234,6 +239,7 @@ async function upsertSearchDocsBatch(
         ${listing.lat}, ${listing.lng},
         ${listing.avgRating}, ${listing.reviewCount}, ${recommendedScore},
         ${amenitiesLower}, ${houseRulesLower}, ${householdLanguagesLower},
+        ${listing.genderPreference}, ${listing.householdGender},
         NOW(), NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -267,6 +273,8 @@ async function upsertSearchDocsBatch(
         amenities_lower = EXCLUDED.amenities_lower,
         house_rules_lower = EXCLUDED.house_rules_lower,
         household_languages_lower = EXCLUDED.household_languages_lower,
+        gender_preference = EXCLUDED.gender_preference,
+        household_gender = EXCLUDED.household_gender,
         doc_updated_at = NOW()
     `;
 

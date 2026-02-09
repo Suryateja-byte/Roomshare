@@ -14,8 +14,8 @@
 --   - The UPDATE to clear global deletedAt only affects rows with non-null deletedAt
 --   - No downtime required
 
--- CreateTable
-CREATE TABLE "ConversationDeletion" (
+-- CreateTable (idempotent: skip if table already exists from a prior partial apply)
+CREATE TABLE IF NOT EXISTS "ConversationDeletion" (
     "id" TEXT NOT NULL,
     "conversationId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -25,16 +25,21 @@ CREATE TABLE "ConversationDeletion" (
 );
 
 -- CreateIndex (unique constraint for upsert)
-CREATE UNIQUE INDEX "ConversationDeletion_conversationId_userId_key" ON "ConversationDeletion"("conversationId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "ConversationDeletion_conversationId_userId_key" ON "ConversationDeletion"("conversationId", "userId");
 
 -- CreateIndex (for filtering by user)
-CREATE INDEX "ConversationDeletion_userId_idx" ON "ConversationDeletion"("userId");
+CREATE INDEX IF NOT EXISTS "ConversationDeletion_userId_idx" ON "ConversationDeletion"("userId");
 
--- AddForeignKey
-ALTER TABLE "ConversationDeletion" ADD CONSTRAINT "ConversationDeletion_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (idempotent: skip if constraint already exists)
+DO $$ BEGIN
+  ALTER TABLE "ConversationDeletion" ADD CONSTRAINT "ConversationDeletion_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- AddForeignKey
-ALTER TABLE "ConversationDeletion" ADD CONSTRAINT "ConversationDeletion_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "ConversationDeletion" ADD CONSTRAINT "ConversationDeletion_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Backfill: For globally-deleted conversations, create per-user deletion records
 -- for ALL participants so the conversation remains hidden for everyone.

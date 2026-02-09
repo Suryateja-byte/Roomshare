@@ -118,7 +118,7 @@ test.describe("Search P0 Smoke Suite", () => {
     // All visible prices should be <= $1,000
     // Prices are rendered as "$800", "$1,000", etc. in the card
     const priceTexts = await container
-      .locator('[data-testid="listing-card"] .font-bold.text-xl')
+      .locator('[data-testid="listing-card"] [data-testid="listing-price"]')
       .allTextContents();
 
     for (const priceText of priceTexts) {
@@ -223,7 +223,7 @@ test.describe("Search P0 Smoke Suite", () => {
     const updatedCards = container.locator('[data-testid="listing-card"]');
     await expect(updatedCards.first()).toBeAttached({ timeout: 15_000 });
 
-    const priceElements = container.locator('[data-testid="listing-card"] .font-bold.text-xl');
+    const priceElements = container.locator('[data-testid="listing-card"] [data-testid="listing-price"]');
     const priceCount = await priceElements.count();
 
     if (priceCount >= 2) {

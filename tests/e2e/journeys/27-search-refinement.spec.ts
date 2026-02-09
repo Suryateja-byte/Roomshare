@@ -20,7 +20,7 @@ test.describe("J42: Filter Refinement Chain", () => {
       maxPrice: 1500,
       bounds: SF_BOUNDS,
     });
-    await page.waitForTimeout(2000);
+    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
 
     const url1 = page.url();
     expect(url1).toContain("minPrice");
@@ -38,7 +38,7 @@ test.describe("J42: Filter Refinement Chain", () => {
       roomType: "Private Room",
       bounds: SF_BOUNDS,
     });
-    await page.waitForTimeout(2000);
+    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
 
     const url2 = page.url();
     expect(url2).toContain("roomType");
@@ -53,7 +53,7 @@ test.describe("J42: Filter Refinement Chain", () => {
 
     // Step 3: Refresh and verify filters persist
     await page.reload();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("domcontentloaded");
 
     const url3 = page.url();
     expect(url3).toContain("minPrice");
@@ -73,7 +73,7 @@ test.describe("J43: Search → Detail → Back Preserves State", () => {
       maxPrice: 2000,
       bounds: SF_BOUNDS,
     });
-    await page.waitForTimeout(2000);
+    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
 
     const searchUrl = page.url();
     expect(searchUrl).toContain("minPrice");
@@ -86,11 +86,10 @@ test.describe("J43: Search → Detail → Back Preserves State", () => {
     // Step 2: Click a listing
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
-    await page.waitForTimeout(1000);
 
     // Step 3: Go back
     await page.goBack();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("domcontentloaded");
 
     // Step 4: Verify URL still has filters
     const backUrl = page.url();
@@ -113,7 +112,7 @@ test.describe("J44: Recently Viewed Tracking", () => {
   }) => {
     // Step 1: Search for listings
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForTimeout(2000);
+    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
 
     const j44Container = searchResultsContainer(page);
     const cards = j44Container.locator(selectors.listingCard);
@@ -124,19 +123,17 @@ test.describe("J44: Recently Viewed Tracking", () => {
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
     const title1 = await page.locator("main h1, main h2").first().textContent().catch(() => "");
-    await page.waitForTimeout(500);
 
     // Step 3: Go back and visit second listing
     await page.goBack();
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState("domcontentloaded");
     await nav.clickListingCard(1);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
     const title2 = await page.locator("main h1, main h2").first().textContent().catch(() => "");
-    await page.waitForTimeout(500);
 
     // Step 4: Check recently viewed page if it exists
     await page.goto("/recently-viewed");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("domcontentloaded");
 
     // The page may not exist (404) — that's ok
     const is404 = page.url().includes("404") || page.url().includes("/search") || page.url() === page.url();

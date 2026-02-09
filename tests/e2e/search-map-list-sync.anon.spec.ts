@@ -25,6 +25,7 @@ import {
   tags,
   SF_BOUNDS,
   waitForMapMarkers,
+  waitForMapReady,
   searchResultsContainer,
 } from "./helpers";
 import {
@@ -97,7 +98,6 @@ async function getNthMarkerIdOrNull(
 async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
   const marker = page.locator(".mapboxgl-marker:visible").nth(index);
   await marker.click();
-  await page.waitForTimeout(timeouts.animation);
 }
 
 /**
@@ -106,7 +106,6 @@ async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
 async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
   const marker = page.locator(".mapboxgl-marker:visible").nth(index);
   await marker.hover();
-  await page.waitForTimeout(timeouts.animation);
 }
 
 /**
@@ -177,17 +176,15 @@ test.describe("Map-List Synchronization", () => {
         );
         if (container) container.scrollTop = container.scrollHeight;
       });
-      await page.waitForTimeout(200);
 
       // Click the marker
       await clickMarkerByIndex(page, 0);
 
-      // Wait for smooth scroll to complete
-      await page.waitForTimeout(800);
-
-      // Card should be in viewport after scroll
-      const inViewport = await isCardInViewport(page, listingId);
-      expect(inViewport).toBe(true);
+      // Wait for smooth scroll to complete by polling card viewport position
+      await expect.poll(
+        () => isCardInViewport(page, listingId),
+        { timeout: 5000 },
+      ).toBe(true);
     });
 
     test("1.3 - Click different marker -> previous card loses highlight, new card highlighted", async ({
@@ -273,7 +270,6 @@ test.describe("Map-List Synchronization", () => {
         // Fallback: press Escape (only closes popup, not activeId)
         await page.keyboard.press("Escape");
       }
-      await page.waitForTimeout(timeouts.animation);
 
       // Popup should be gone
       await expect(popup).not.toBeVisible({ timeout: 2000 });
@@ -458,7 +454,7 @@ test.describe("Map-List Synchronization", () => {
         )
         .first();
       await hoverCard.hover();
-      await page.waitForTimeout(timeouts.animation);
+      await waitForCardHover(page, hoverId, timeouts.action);
 
       // Active card should still have ring-2
       const activeCardState = await getCardState(page, activeId);
@@ -494,7 +490,12 @@ test.describe("Map-List Synchronization", () => {
         )
         .first();
       await card.hover();
-      await page.waitForTimeout(timeouts.animation);
+
+      // Wait for hover event to propagate, then verify active takes precedence
+      await expect.poll(
+        async () => (await getCardState(page, listingId)).isActive,
+        { timeout: timeouts.action },
+      ).toBe(true);
 
       // Card should have ring-2 (active takes precedence over hover)
       // ListingCard.tsx: isActive && "ring-2 ring-blue-500 ring-offset-2"
@@ -521,7 +522,6 @@ test.describe("Map-List Synchronization", () => {
 
       // Click bottom-left corner of map (least likely to have markers)
       await page.mouse.click(box!.x + 10, box!.y + box!.height - 10);
-      await page.waitForTimeout(timeouts.animation);
 
       // After background click, the popup closes (setSelectedListing(null))
       // Note: activeId may or may not be cleared depending on implementation
@@ -588,8 +588,9 @@ test.describe("Map-List Synchronization", () => {
         timeout: timeouts.navigation,
       });
 
-      // Wait for any loading to settle
-      await page.waitForTimeout(1500);
+      // Wait for map and network to settle after filter change
+      await waitForMapReady(page);
+      await page.waitForLoadState("networkidle");
 
       // Cards should have updated (may be fewer due to filter)
       const filteredCardCount = await page
@@ -624,7 +625,10 @@ test.describe("Map-List Synchronization", () => {
       await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
         timeout: timeouts.navigation,
       });
-      await page.waitForTimeout(1000);
+
+      // Wait for map and network to settle after sort change
+      await waitForMapReady(page);
+      await page.waitForLoadState("networkidle");
 
       const sortedCardIds = await getAllCardListingIds(page);
 
@@ -674,8 +678,9 @@ test.describe("Map-List Synchronization", () => {
 
       if (!moved) test.skip(true, "Could not pan map");
 
-      // Wait for debounced search to fire (500ms debounce + fetch time)
-      await page.waitForTimeout(2000);
+      // Wait for map to settle after pan, then for markers to load
+      await waitForMapReady(page);
+      await page.waitForLoadState("networkidle");
 
       // Page should still have markers and cards
       const newMarkerCount = await page
@@ -720,22 +725,15 @@ test.describe("Map-List Synchronization", () => {
           window.scrollTo(0, document.body.scrollHeight);
         }
       });
-      await page.waitForTimeout(300);
-
-      // Verify card is now offscreen
-      const wasInView = await isCardInViewport(page, listingId);
-      // Card may or may not be in viewport depending on list length
-      // Either way, clicking the marker should scroll it in
 
       // Click the marker
       await clickMarkerByIndex(page, 0);
 
-      // Wait for smooth scroll animation
-      await page.waitForTimeout(800);
-
-      // Card should now be in viewport
-      const isNowInView = await isCardInViewport(page, listingId);
-      expect(isNowInView).toBe(true);
+      // Wait for smooth scroll to bring card into viewport
+      await expect.poll(
+        () => isCardInViewport(page, listingId),
+        { timeout: 5000 },
+      ).toBe(true);
     });
 
     test("5.2 - Rapid marker clicks -> only last clicked card is highlighted", async ({
@@ -762,8 +760,8 @@ test.describe("Map-List Synchronization", () => {
       await m1.click({ delay: 0 });
       await m2.click({ delay: 0 });
 
-      // Wait for state to settle
-      await page.waitForTimeout(500);
+      // Wait for the last clicked card to become active
+      await waitForCardHighlight(page, id2!);
 
       // Only the LAST clicked card should have the active ring
       const activeId = await getActiveListingId(page);
@@ -807,7 +805,7 @@ test.describe("Map-List Synchronization", () => {
           }
         });
       });
-      await page.waitForTimeout(500);
+      await waitForMapReady(page);
 
       // Card highlight should still be present after zoom
       const cardState = await getCardState(page, listingId!);
@@ -853,7 +851,9 @@ test.describe("Map-List Synchronization", () => {
 
       // Click the marker
       await clickMarkerByIndex(page, 0);
-      await page.waitForTimeout(800);
+
+      // Wait for card highlight to appear after marker click
+      await waitForCardHighlight(page, listingId!);
 
       // Card should be highlighted
       const cardState = await getCardState(page, listingId!);
@@ -868,7 +868,7 @@ test.describe("Map-List Synchronization", () => {
   // =========================================================================
 
   test.describe("Group 6: Visual State Verification", () => {
-    test("6.1 - Active card has ring-2 ring-blue-500 ring-offset-2 classes", async ({
+    test("6.1 - Active card has data-focus-state='active'", async ({
       page,
     }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
@@ -877,25 +877,18 @@ test.describe("Map-List Synchronization", () => {
       await clickMarkerByIndex(page, 0);
       await waitForCardHighlight(page, listingId);
 
-      // Verify exact CSS classes via evaluate
-      const classes = await page.evaluate((id) => {
+      // Verify focus state via data attribute
+      const focusState = await page.evaluate((id) => {
         const card = document.querySelector(
           `[data-testid="listing-card"][data-listing-id="${id}"]`,
         );
-        if (!card) return { ring2: false, blue500: false, offset2: false };
-        return {
-          ring2: card.classList.contains("ring-2"),
-          blue500: card.classList.contains("ring-blue-500"),
-          offset2: card.classList.contains("ring-offset-2"),
-        };
+        return card?.getAttribute("data-focus-state") ?? "none";
       }, listingId);
 
-      expect(classes.ring2).toBe(true);
-      expect(classes.blue500).toBe(true);
-      expect(classes.offset2).toBe(true);
+      expect(focusState).toBe("active");
     });
 
-    test("6.2 - Hovered card has ring-1 ring-blue-200 classes", async ({
+    test("6.2 - Hovered card has data-focus-state='hovered'", async ({
       page,
     }) => {
       if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
@@ -917,24 +910,17 @@ test.describe("Map-List Synchronization", () => {
         )
         .first();
       await card.hover();
-      await page.waitForTimeout(timeouts.animation);
+      await waitForCardHover(page, cardId!, timeouts.action);
 
-      // Verify hover classes
-      const classes = await page.evaluate((id) => {
+      // Verify hover state via data attribute
+      const focusState = await page.evaluate((id) => {
         const c = document.querySelector(
           `[data-testid="listing-card"][data-listing-id="${id}"]`,
         );
-        if (!c) return { ring1: false, blue200: false, shadowMd: false };
-        return {
-          ring1: c.classList.contains("ring-1"),
-          blue200: c.classList.contains("ring-blue-200"),
-          shadowMd: c.classList.contains("shadow-md"),
-        };
+        return c?.getAttribute("data-focus-state") ?? "none";
       }, cardId!);
 
-      expect(classes.ring1).toBe(true);
-      expect(classes.blue200).toBe(true);
-      expect(classes.shadowMd).toBe(true);
+      expect(focusState).toBe("hovered");
     });
 
     test("6.3 - Marker z-index changes on hover/active", async ({ page }) => {
@@ -974,7 +960,7 @@ test.describe("Map-List Synchronization", () => {
       // Click marker to set active
       const markerIndex = markerIds.indexOf(targetId);
       await clickMarkerByIndex(page, markerIndex);
-      await page.waitForTimeout(timeouts.animation);
+      await waitForCardHighlight(page, targetId);
 
       // Marker should have z-40 when active (not hovered)
       const activeState = await getMarkerState(page, targetId);
@@ -1039,17 +1025,23 @@ test.describe("Map-List Synchronization", () => {
         )
         .first();
 
-      // Hover card1 -> card2 -> card1 -> card2 -> away
+      // Hover card1 -> card2 -> card1 -> card2 -> away (rapid transitions)
       await card1.hover();
-      await page.waitForTimeout(100);
       await card2.hover();
-      await page.waitForTimeout(100);
       await card1.hover();
-      await page.waitForTimeout(100);
       await card2.hover();
-      await page.waitForTimeout(100);
       await page.mouse.move(0, 0);
-      await page.waitForTimeout(300);
+
+      // Wait for all class mutations to settle
+      await expect.poll(
+        async () => {
+          const counts = await page.evaluate(
+            () => (window as any).__transitionCounts as Record<string, number>,
+          );
+          return Object.values(counts).every((c) => c > 0);
+        },
+        { timeout: 5000 },
+      ).toBe(true);
 
       // Check transition counts - should be reasonable (not excessive flickering)
       const counts = await page.evaluate(
@@ -1111,7 +1103,7 @@ test.describe("Map-List Synchronization", () => {
       await clickMarkerByIndex(page, 0);
       await waitForCardHighlight(page, listingId);
 
-      // Wait 1.5 seconds (old implementation had setTimeout auto-clear)
+      // Intentional delay: verifying ring persists after 1.5s (old impl had auto-clear)
       await page.waitForTimeout(1500);
 
       // Ring should STILL be present
@@ -1133,7 +1125,6 @@ test.describe("Map-List Synchronization", () => {
 
       // Press Escape
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(timeouts.animation);
 
       // Popup gone
       await expect(popup).not.toBeVisible({ timeout: 2000 });
@@ -1175,12 +1166,12 @@ test.describe("Map-List Synchronization", () => {
       });
 
       await m0.hover();
-      await page.waitForTimeout(50); // Much faster than 300ms debounce
+      await page.waitForTimeout(50); // debounce test: intentionally faster than 300ms debounce
       await m1.hover();
-      await page.waitForTimeout(50);
+      await page.waitForTimeout(50); // debounce test: intentionally faster than 300ms debounce
       await m2.hover();
 
-      // Wait for debounce to fire (300ms + some buffer)
+      // debounce wait: allow 300ms debounce timer to fire + buffer
       await page.waitForTimeout(500);
 
       // The scroll container should have received at most 1 scroll event
@@ -1213,11 +1204,11 @@ test.describe("Map-List Synchronization", () => {
 
       // Hover marker (sets focusSource to "map")
       await hoverMarkerByIndex(page, 0);
-      await page.waitForTimeout(100);
 
       // The card should get hover highlight from the map's setHovered
       // But the card's onMouseEnter should NOT fire back because
       // focusSource === "map" guard prevents the loop
+      await waitForCardHover(page, listingId!, timeouts.action);
       const hoveredIds = await getHoveredListingIds(page);
 
       // This is hard to assert directly, but we verify no infinite loop
@@ -1226,7 +1217,6 @@ test.describe("Map-List Synchronization", () => {
 
       // Move away to clean up
       await page.mouse.move(0, 0);
-      await page.waitForTimeout(400);
     });
 
     test("Clicking 'Show on map' button sets activeId on card", async ({
@@ -1245,7 +1235,6 @@ test.describe("Map-List Synchronization", () => {
       }
 
       await showOnMapBtn.click();
-      await page.waitForTimeout(timeouts.animation);
 
       // Card should now have active ring (setActive was called)
       await waitForCardHighlight(page, cardId!, timeouts.action);

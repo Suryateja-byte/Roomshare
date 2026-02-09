@@ -22,7 +22,7 @@
  *   pnpm playwright test tests/e2e/map-interactions.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, timeouts, waitForMapReady } from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 import {
   getCardState,
@@ -68,8 +68,7 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   await page.waitForSelector(sel.searchAsMoveToggle, { timeout: 30_000 });
-  // Allow map time to initialize
-  await page.waitForTimeout(2000);
+  await waitForMapReady(page);
 }
 
 /**
@@ -141,8 +140,8 @@ async function simulateMapPan(
     await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 10 });
     await page.mouse.up();
 
-    // Wait for moveend + state propagation
-    await page.waitForTimeout(800);
+    // Wait for map to settle after pan
+    await waitForMapReady(page);
     return true;
   } catch {
     return false;
@@ -231,21 +230,21 @@ test.describe("1.x: Map + List Scroll Sync", () => {
       // Also scroll the window in case the list is in the main flow
       window.scrollTo(0, document.body.scrollHeight);
     });
-    await page.waitForTimeout(300);
 
     // Click the first marker
     const firstMarker = page.locator(".mapboxgl-marker:visible").first();
     await firstMarker.click();
 
-    // Wait for scroll animation (600ms) + buffer
-    await page.waitForTimeout(800);
+    // Poll for card to become active and scrolled into viewport
+    await expect.poll(
+      async () => (await getCardState(page, listingId)).isActive,
+      { timeout: 5000 },
+    ).toBe(true);
 
-    // Assert: card with matching ID is visible in viewport and has active highlight
-    const cardState = await getCardState(page, listingId);
-    expect(cardState.isActive).toBe(true);
-
-    const inViewport = await isCardInViewport(page, listingId);
-    expect(inViewport).toBe(true);
+    await expect.poll(
+      async () => isCardInViewport(page, listingId),
+      { timeout: 5000 },
+    ).toBe(true);
   });
 
   test("1.2 - Marker hover triggers debounced scroll (P1)", async ({ page }) => {
@@ -274,13 +273,12 @@ test.describe("1.x: Map + List Scroll Sync", () => {
       }
       window.scrollTo(0, document.body.scrollHeight);
     });
-    await page.waitForTimeout(300);
 
     // Hover over the first marker (pointerenter, mouse pointer type)
     const firstMarker = page.locator(".mapboxgl-marker:visible").first();
     await firstMarker.hover();
 
-    // Wait for hover scroll debounce (300ms) + scroll animation + buffer
+    // debounce wait: hover scroll fires after HOVER_SCROLL_DEBOUNCE_MS, then scroll animation needs to complete
     await page.waitForTimeout(HOVER_SCROLL_DEBOUNCE_MS + 600);
 
     // Card should be scrolled into the viewport (or near it)
@@ -295,7 +293,6 @@ test.describe("1.x: Map + List Scroll Sync", () => {
 
     // Move mouse away within short window to verify no jank
     await page.mouse.move(0, 0);
-    await page.waitForTimeout(100);
   });
 
   test("1.3 - Card highlight persists after popup close (P1)", async ({ page }) => {
@@ -317,9 +314,8 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     // Click marker to open popup and set activeId
     const firstMarker = page.locator(".mapboxgl-marker:visible").first();
     await firstMarker.click();
-    await page.waitForTimeout(500);
 
-    // Verify card has ring-2 active highlight
+    // Verify card has ring-2 active highlight (waitForCardHighlight polls internally)
     await waitForCardHighlight(page, listingId, timeouts.action);
 
     // Popup should be visible
@@ -329,7 +325,6 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     // Close popup via Escape key
     if (popupVisible) {
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(300);
 
       // Popup should be closed
       await expect(popup).not.toBeVisible({ timeout: 3000 });
@@ -372,11 +367,11 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
       return;
     }
 
-    // Wait for debounce (600ms) + URL update propagation + fetch buffer
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 2000);
-
-    // URL bounds should have CHANGED (numeric comparison, not void)
-    expect(boundsChanged(initialUrl, page.url())).toBe(true);
+    // Poll for URL bounds to change after debounce fires
+    await expect.poll(
+      () => boundsChanged(initialUrl, page.url()),
+      { timeout: MAP_SEARCH_DEBOUNCE_MS + 5000 },
+    ).toBe(true);
 
     // Page should still be on /search
     expect(new URL(page.url(), "http://localhost").pathname).toBe("/search");
@@ -426,12 +421,14 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
       await page.mouse.move(startX + 40 * (i + 1), startY + 20, { steps: 5 });
       await page.mouse.up();
 
-      // Less than debounce interval between pans
+      // debounce wait: intentionally less than debounce interval to test coalescing
       await page.waitForTimeout(80);
     }
 
-    // Wait for debounce + URL update to settle
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 2500);
+    // Wait for map to settle after rapid pans, then let debounce fire
+    await waitForMapReady(page);
+    // debounce wait: allow the final debounce cycle to complete and URL to update
+    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500);
 
     // Collect URL change count
     const changeCount = await page.evaluate(() => {
@@ -476,9 +473,8 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     }
 
     // Wait for banner to appear with count
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500);
     const searchAreaBtn = page.locator(sel.searchThisAreaBtn);
-    await expect(searchAreaBtn).toBeVisible({ timeout: 5000 });
+    await expect(searchAreaBtn).toBeVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 5000 });
 
     // Banner should show the mocked count
     await expect(searchAreaBtn).toContainText("15");
@@ -488,9 +484,6 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
 
     // Click "Search this area"
     await searchAreaBtn.click();
-
-    // Wait for URL change + listing refresh
-    await page.waitForTimeout(2000);
 
     // Banner should disappear after click
     await expect(searchAreaBtn).not.toBeVisible({ timeout: 5000 });
@@ -530,15 +523,14 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     }
 
     // Wait for banner
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500);
     const resetBtn = page.locator(sel.resetMapBtn);
-    await expect(resetBtn).toBeVisible({ timeout: 5000 });
+    await expect(resetBtn).toBeVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 5000 });
 
     // Click reset button
     await resetBtn.click();
 
-    // Wait for fly-back animation (1500ms) + buffer
-    await page.waitForTimeout(2000);
+    // Wait for map fly-back animation to settle
+    await waitForMapReady(page);
 
     // Banner should disappear
     await expect(resetBtn).not.toBeVisible({ timeout: 5000 });
@@ -572,9 +564,9 @@ test.describe("4.x: Map Persistence Across Filter Changes", () => {
     // Apply a price filter by navigating to the same URL with additional param
     await page.goto(`${SEARCH_URL}&minPrice=500`);
 
-    // Wait for page to update
+    // Wait for page and map to be ready after navigation
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Map canvas should STILL be visible (no unmount/remount flash)
     await expect(canvas.first()).toBeVisible();
@@ -615,7 +607,7 @@ test.describe("4.x: Map Persistence Across Filter Changes", () => {
     const urlWithNewQuery = `/search?q=Sunset+District&${boundsQS}`;
     await page.goto(urlWithNewQuery);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Map canvas should remain visible throughout
     // (PersistentMapWrapper in layout persists the map across navigations)

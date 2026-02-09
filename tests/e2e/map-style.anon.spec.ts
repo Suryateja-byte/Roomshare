@@ -14,7 +14,7 @@
  *   pnpm playwright test tests/e2e/map-style.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, timeouts } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, timeouts, waitForMapReady } from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -36,8 +36,8 @@ async function waitForSearchPage(page: import("@playwright/test").Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
   await page.waitForSelector("button", { timeout: timeouts.navigation });
-  // Allow time for map and controls to initialize
-  await page.waitForTimeout(3000);
+  // Wait for map and controls to initialize
+  await waitForMapReady(page);
 }
 
 // Helper: check if map style controls are rendered (depends on WebGL/map load)
@@ -49,6 +49,17 @@ async function mapStyleControlsAvailable(page: import("@playwright/test").Page):
 // Helper: clear sessionStorage before test to ensure clean state
 async function clearMapStyleStorage(page: import("@playwright/test").Page) {
   await page.evaluate((key) => sessionStorage.removeItem(key), SESSION_STORAGE_KEY);
+}
+
+// Helper: poll sessionStorage until it matches the expected value
+async function expectSessionStorage(
+  page: import("@playwright/test").Page,
+  expectedValue: string,
+) {
+  await expect.poll(
+    () => page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY),
+    { timeout: 5000 },
+  ).toBe(expectedValue);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,28 +121,19 @@ test.describe("9.2: Map style sessionStorage persistence", () => {
   test("clicking Standard persists 'standard' to sessionStorage", async ({ page }) => {
     const standardBtn = getStyleButton(page, "Standard");
     await standardBtn.click();
-    await page.waitForTimeout(500);
-
-    const stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("standard");
+    await expectSessionStorage(page, "standard");
   });
 
   test("clicking Satellite persists 'satellite' to sessionStorage", async ({ page }) => {
     const satelliteBtn = getStyleButton(page, "Satellite");
     await satelliteBtn.click();
-    await page.waitForTimeout(500);
-
-    const stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("satellite");
+    await expectSessionStorage(page, "satellite");
   });
 
   test("clicking Transit persists 'transit' to sessionStorage", async ({ page }) => {
     const transitBtn = getStyleButton(page, "Transit");
     await transitBtn.click();
-    await page.waitForTimeout(500);
-
-    const stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("transit");
+    await expectSessionStorage(page, "transit");
   });
 
   test("switching styles updates sessionStorage value", async ({ page }) => {
@@ -141,21 +143,15 @@ test.describe("9.2: Map style sessionStorage persistence", () => {
 
     // Start with standard
     await standardBtn.click();
-    await page.waitForTimeout(300);
-    let stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("standard");
+    await expectSessionStorage(page, "standard");
 
     // Switch to satellite
     await satelliteBtn.click();
-    await page.waitForTimeout(300);
-    stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("satellite");
+    await expectSessionStorage(page, "satellite");
 
     // Switch to transit
     await transitBtn.click();
-    await page.waitForTimeout(300);
-    stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("transit");
+    await expectSessionStorage(page, "transit");
   });
 });
 
@@ -175,20 +171,15 @@ test.describe("9.3: Map style persistence across navigation", () => {
     await clearMapStyleStorage(page);
     const satelliteBtn = getStyleButton(page, "Satellite");
     await satelliteBtn.click();
-    await page.waitForTimeout(500);
-
-    // Verify it was stored
-    let stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("satellite");
+    await expectSessionStorage(page, "satellite");
 
     // Reload the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Verify sessionStorage still has the value after reload
-    stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("satellite");
+    await expectSessionStorage(page, "satellite");
   });
 
   test("transit style persists after navigating to search page", async ({ page }) => {
@@ -196,16 +187,15 @@ test.describe("9.3: Map style persistence across navigation", () => {
     await clearMapStyleStorage(page);
     const transitBtn = getStyleButton(page, "Transit");
     await transitBtn.click();
-    await page.waitForTimeout(500);
+    await expectSessionStorage(page, "transit");
 
     // Navigate away and back to search
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Verify sessionStorage retained the value
-    const stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("transit");
+    await expectSessionStorage(page, "transit");
   });
 
   test("standard style persists across multiple navigations", async ({ page }) => {
@@ -213,25 +203,23 @@ test.describe("9.3: Map style persistence across navigation", () => {
     await clearMapStyleStorage(page);
     const standardBtn = getStyleButton(page, "Standard");
     await standardBtn.click();
-    await page.waitForTimeout(500);
+    await expectSessionStorage(page, "standard");
 
     // Navigate to a different search URL
     await page.goto(`/search?q=San+Francisco&${boundsQS}`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Verify sessionStorage retained the value
-    let stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("standard");
+    await expectSessionStorage(page, "standard");
 
     // Navigate back to original search URL
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await waitForMapReady(page);
 
     // Verify style is still persisted
-    stored = await page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored).toBe("standard");
+    await expectSessionStorage(page, "standard");
   });
 
   test("sessionStorage value does not persist in new browser context (session isolation)", async ({
@@ -242,7 +230,7 @@ test.describe("9.3: Map style persistence across navigation", () => {
     const page1 = await context1.newPage();
     await page1.goto(SEARCH_URL);
     await page1.waitForLoadState("domcontentloaded");
-    await page1.waitForTimeout(3000);
+    await waitForMapReady(page1);
 
     // Check if controls are available in this context
     if (!(await mapStyleControlsAvailable(page1))) {
@@ -254,10 +242,7 @@ test.describe("9.3: Map style persistence across navigation", () => {
     // Set satellite style in first context
     const satelliteBtn = getStyleButton(page1, "Satellite");
     await satelliteBtn.click();
-    await page1.waitForTimeout(500);
-
-    const stored1 = await page1.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
-    expect(stored1).toBe("satellite");
+    await expectSessionStorage(page1, "satellite");
 
     await context1.close();
 
@@ -266,7 +251,7 @@ test.describe("9.3: Map style persistence across navigation", () => {
     const page2 = await context2.newPage();
     await page2.goto(SEARCH_URL);
     await page2.waitForLoadState("domcontentloaded");
-    await page2.waitForTimeout(2000);
+    await waitForMapReady(page2);
 
     // In new session, sessionStorage should be empty
     const stored2 = await page2.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
