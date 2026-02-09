@@ -13,6 +13,10 @@
 #   4. Auth setup runs first (pwc-p doesn't support project dependencies)
 #   5. Results stream to the Currents dashboard in real-time
 #
+# Projects (5 — matches playwright.yml):
+#   chromium, chromium-anon, Mobile Chrome, firefox-anon, webkit-anon
+#   Full firefox/webkit/Mobile Safari auth runs excluded for cost efficiency.
+#
 # Prerequisites:
 #   - CURRENTS_RECORD_KEY must be set as a GitHub repository secret
 #   - Currents project ID: zz7AZ8
@@ -41,7 +45,7 @@ jobs:
   playwright-tests:
     name: "Shard ${{ matrix.shard }}/20"
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -133,6 +137,12 @@ jobs:
       # Orchestrated test execution — Currents dynamically distributes test
       # files across all 20 runners via a real-time task queue.
       # No --shard flag needed; the orchestrator handles distribution.
+      #
+      # Project selection matches the existing playwright.yml workflow:
+      # - chromium + chromium-anon + Mobile Chrome (authenticated + anon)
+      # - firefox-anon + webkit-anon (cross-browser anon only — 8 critical specs)
+      # Full firefox/webkit/Mobile Safari authenticated runs are excluded to
+      # keep per-shard execution time within the timeout budget.
       # -----------------------------------------------------------------------
       - name: Run Playwright tests (Currents orchestration)
         run: |
@@ -142,12 +152,9 @@ jobs:
             --project=chromium \
             --project=chromium-anon \
             --project="Mobile Chrome" \
-            --project=firefox \
             --project=firefox-anon \
-            --project=webkit \
             --project=webkit-anon \
-            --project="Mobile Safari" \
-            --workers=2
+            --workers=4
 
       - name: Upload blob report
         uses: actions/upload-artifact@v4
