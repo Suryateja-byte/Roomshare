@@ -33,7 +33,7 @@ export default defineConfig({
     ['list'],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['json', { outputFile: 'test-results/results.json' }],
-    ['@currents/playwright'],
+    ...(process.env.CURRENTS_PROJECT_ID ? [['@currents/playwright'] as const] : []),
   ],
 
   /* Shared settings for all the projects below */

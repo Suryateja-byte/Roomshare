@@ -87,6 +87,7 @@ function createMockMapInstance() {
     triggerRepaint: jest.fn(),
     resize: jest.fn(),
     loaded: jest.fn(() => true),
+    getCanvas: jest.fn(() => ({ tabIndex: 0 })),
   };
 }
 
