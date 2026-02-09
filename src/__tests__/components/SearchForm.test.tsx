@@ -651,11 +651,18 @@ describe('SearchForm', () => {
       expect(searchButton).toHaveAttribute('aria-busy', 'true')
     })
 
-    it('filter panel has aria-controls/aria-expanded', () => {
+    it('filter panel has aria-controls/aria-expanded', async () => {
       render(<SearchForm />)
 
       const filtersButton = screen.getByRole('button', { name: /filters/i })
       expect(filtersButton).toHaveAttribute('aria-expanded', 'false')
+      // aria-controls is only set when the modal is open (valid ARIA pattern)
+      expect(filtersButton).not.toHaveAttribute('aria-controls')
+
+      // Open the filter modal — aria-controls should now be set
+      await user.click(filtersButton)
+      jest.runAllTimers()
+      expect(filtersButton).toHaveAttribute('aria-expanded', 'true')
       expect(filtersButton).toHaveAttribute('aria-controls', 'search-filters')
     })
   })
