@@ -23,7 +23,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
 
   /* Retry on CI only */
-  retries: process.env.CI ? 2 : 1,
+  retries: process.env.CI ? 2 : 0,
 
   /* Limit workers to prevent overwhelming dev server */
   workers: process.env.CI ? 1 : 3,
@@ -131,7 +131,7 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: {
     // Clean Next.js lockfile before starting to avoid WSL/NTFS permission issues
-    command: 'rm -rf .next/dev/lock 2>/dev/null; npm run dev',
+    command: 'pnpm run clean:next-locks && pnpm run dev',
     // Wait for ready endpoint (checks database connectivity)
     url: 'http://localhost:3000/api/health/ready',
     // Reuse existing server locally for faster iteration, fresh in CI
