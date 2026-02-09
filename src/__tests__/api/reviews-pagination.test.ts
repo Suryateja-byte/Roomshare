@@ -24,6 +24,9 @@ jest.mock('@/lib/prisma', () => ({
     listing: {
       findUnique: jest.fn(),
     },
+    notification: {
+      create: jest.fn(),
+    },
   },
 }));
 
@@ -35,8 +38,8 @@ jest.mock('@/app/actions/suspension', () => ({
   checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
 }));
 
-jest.mock('@/app/actions/notifications', () => ({
-  createNotification: jest.fn().mockResolvedValue({}),
+jest.mock('@/lib/notifications', () => ({
+  createInternalNotification: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('@/lib/email', () => ({

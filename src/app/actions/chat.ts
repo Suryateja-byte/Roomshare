@@ -4,6 +4,14 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { checkSuspension, checkEmailVerified } from './suspension';
 import { logger } from '@/lib/logger';
+import { z } from 'zod';
+import { createInternalNotification } from '@/lib/notifications';
+import { sendNotificationEmailWithPreference } from '@/lib/email';
+
+const sendMessageSchema = z.object({
+    conversationId: z.string().trim().min(1).max(100),
+    content: z.string().trim().min(1).max(2000),
+});
 
 export async function startConversation(listingId: string) {
     const session = await auth();
@@ -79,6 +87,12 @@ export async function sendMessage(conversationId: string, content: string) {
         return { error: suspension.error || 'Account suspended' };
     }
 
+    const parsed = sendMessageSchema.safeParse({ conversationId, content });
+    if (!parsed.success) {
+        return { error: 'Invalid message payload' };
+    }
+    const { conversationId: safeConversationId, content: safeContent } = parsed.data;
+
     // Check if email is verified (soft enforcement - only block unverified users)
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
@@ -91,7 +105,7 @@ export async function sendMessage(conversationId: string, content: string) {
 
     // Get conversation with participants for notification
     const conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
+        where: { id: safeConversationId },
         include: {
             participants: {
                 select: { id: true, name: true, email: true }
@@ -121,8 +135,8 @@ export async function sendMessage(conversationId: string, content: string) {
 
     const message = await prisma.message.create({
         data: {
-            content,
-            conversationId,
+            content: safeContent,
+            conversationId: safeConversationId,
             senderId: session.user.id,
         },
     });
@@ -130,12 +144,12 @@ export async function sendMessage(conversationId: string, content: string) {
     // Resurrect conversation for all users + update timestamp
     await Promise.all([
         prisma.conversation.update({
-            where: { id: conversationId },
+            where: { id: safeConversationId },
             data: { updatedAt: new Date() },
         }),
         // New message resurrects conversation for everyone
         prisma.conversationDeletion.deleteMany({
-            where: { conversationId },
+            where: { conversationId: safeConversationId },
         }),
     ]);
 
@@ -145,19 +159,15 @@ export async function sendMessage(conversationId: string, content: string) {
         select: { name: true }
     });
 
-    // Create notification for recipient(s) and send email
-    const { createNotification } = await import('./notifications');
-    const { sendNotificationEmailWithPreference } = await import('@/lib/email');
-
     for (const participant of conversation.participants) {
         if (participant.id !== session.user.id) {
             // Create in-app notification
-            await createNotification({
+            await createInternalNotification({
                 userId: participant.id,
                 type: 'NEW_MESSAGE',
                 title: 'New Message',
-                message: `${sender?.name || 'Someone'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
-                link: `/messages/${conversationId}`
+                message: `${sender?.name || 'Someone'}: ${safeContent.substring(0, 50)}${safeContent.length > 50 ? '...' : ''}`,
+                link: `/messages/${safeConversationId}`
             });
 
             // Send email (respecting user preferences)
@@ -165,8 +175,8 @@ export async function sendMessage(conversationId: string, content: string) {
                 await sendNotificationEmailWithPreference('newMessage', participant.id, participant.email, {
                     recipientName: participant.name || 'User',
                     senderName: sender?.name || 'Someone',
-                    messagePreview: content,
-                    conversationId
+                    messagePreview: safeContent,
+                    conversationId: safeConversationId
                 });
             }
         }

@@ -22,12 +22,19 @@ jest.mock('next/server', () => ({
   },
 }))
 
+jest.mock('next/headers', () => ({
+  headers: jest.fn(async () => ({
+    get: (key: string) => (key === 'x-dev-verify-key' ? 'test-secret' : null),
+  })),
+}))
+
 import { GET } from '@/app/api/verify/route'
 import { prisma } from '@/lib/prisma'
 
 describe('Verify API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    process.env.NEXTAUTH_SECRET = 'test-secret'
   })
 
   describe('GET', () => {

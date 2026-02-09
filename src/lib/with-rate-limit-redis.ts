@@ -1,8 +1,8 @@
 /**
  * Redis-backed rate limiting wrapper for API routes.
  *
- * Uses Upstash Redis for distributed rate limiting with fail-closed behavior.
- * On Redis errors in production, requests are denied to prevent abuse.
+ * Uses Upstash Redis for distributed rate limiting with in-memory fallback.
+ * On Redis errors, requests are limited by a local fallback limiter.
  */
 
 import { NextResponse } from "next/server";
@@ -38,7 +38,7 @@ const RATE_LIMIT_CONFIGS: Record<
 /**
  * Wrapper function to add Redis-backed rate limiting to API route handlers.
  *
- * FAIL-CLOSED: On Redis errors in production, returns 429 to prevent abuse.
+ * Uses fallback-limited behavior when Redis is unavailable.
  *
  * @example
  * export async function GET(request: Request) {

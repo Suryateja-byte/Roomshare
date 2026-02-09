@@ -285,13 +285,8 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
     !process.env.UPSTASH_REDIS_REST_URL ||
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
-    // Skip rate limiting in development without Redis
-    if (process.env.NODE_ENV === "development") {
-      return { success: true };
-    }
-    // In production, fail closed (deny requests if Redis not configured)
-    console.error("[RateLimit] Redis not configured in production");
-    return { success: false, retryAfter: 60 };
+    console.warn("[RateLimit] Redis not configured, using in-memory fallback");
+    return checkInMemoryRateLimits("chat", ip);
   }
 
   try {
@@ -356,13 +351,8 @@ export async function checkMetricsRateLimit(
     !process.env.UPSTASH_REDIS_REST_URL ||
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
-    // Skip rate limiting in development without Redis
-    if (process.env.NODE_ENV === "development") {
-      return { success: true };
-    }
-    // In production, fail closed
-    console.error("[RateLimit] Redis not configured in production");
-    return { success: false, retryAfter: 60 };
+    console.warn("[RateLimit] Redis not configured, using in-memory fallback");
+    return checkInMemoryRateLimits("metrics", ip);
   }
 
   try {
@@ -425,13 +415,8 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
     !process.env.UPSTASH_REDIS_REST_URL ||
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
-    // Skip rate limiting in development without Redis
-    if (process.env.NODE_ENV === "development") {
-      return { success: true };
-    }
-    // In production, fail closed
-    console.error("[RateLimit] Redis not configured in production");
-    return { success: false, retryAfter: 60 };
+    console.warn("[RateLimit] Redis not configured, using in-memory fallback");
+    return checkInMemoryRateLimits("map", ip);
   }
 
   try {
@@ -496,13 +481,8 @@ export async function checkSearchCountRateLimit(
     !process.env.UPSTASH_REDIS_REST_URL ||
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
-    // Skip rate limiting in development without Redis
-    if (process.env.NODE_ENV === "development") {
-      return { success: true };
-    }
-    // In production, fail closed
-    console.error("[RateLimit] Redis not configured in production");
-    return { success: false, retryAfter: 60 };
+    console.warn("[RateLimit] Redis not configured, using in-memory fallback");
+    return checkInMemoryRateLimits("searchCount", ip);
   }
 
   try {

@@ -34,8 +34,8 @@ jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
 }))
 
-jest.mock('@/app/actions/notifications', () => ({
-  createNotification: jest.fn(),
+jest.mock('@/lib/notifications', () => ({
+  createInternalNotification: jest.fn(),
 }))
 
 jest.mock('@/lib/email', () => ({
@@ -50,7 +50,7 @@ import { createBooking } from '@/app/actions/booking'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { revalidatePath } from 'next/cache'
-import { createNotification } from '@/app/actions/notifications'
+import { createInternalNotification } from '@/lib/notifications'
 import { sendNotificationEmailWithPreference } from '@/lib/email'
 
 describe('createBooking', () => {
@@ -127,7 +127,7 @@ describe('createBooking', () => {
         }
         return callback(tx)
       })
-      ; (createNotification as jest.Mock).mockResolvedValue({ success: true })
+      ; (createInternalNotification as jest.Mock).mockResolvedValue({ success: true })
       ; (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({ success: true })
   })
 
@@ -186,7 +186,7 @@ describe('createBooking', () => {
     it('creates in-app notification for host', async () => {
       await createBooking('listing-123', futureStart, futureEnd, 800)
 
-      expect(createNotification).toHaveBeenCalledWith({
+      expect(createInternalNotification).toHaveBeenCalledWith({
         userId: 'owner-123',
         type: 'BOOKING_REQUEST',
         title: 'New Booking Request',

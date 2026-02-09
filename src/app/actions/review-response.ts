@@ -5,6 +5,10 @@ import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { sendNotificationEmail } from '@/lib/email';
 import { logger } from '@/lib/logger';
+import { z } from 'zod';
+
+const responseContentSchema = z.string().trim().min(1).max(2000);
+const idSchema = z.string().trim().min(1).max(100);
 
 export async function createReviewResponse(reviewId: string, content: string) {
     const session = await auth();
@@ -12,10 +16,18 @@ export async function createReviewResponse(reviewId: string, content: string) {
         return { error: 'Unauthorized' };
     }
 
+    const reviewIdParse = idSchema.safeParse(reviewId);
+    const contentParse = responseContentSchema.safeParse(content);
+    if (!reviewIdParse.success || !contentParse.success) {
+        return { error: 'Invalid input' };
+    }
+    const safeReviewId = reviewIdParse.data;
+    const safeContent = contentParse.data;
+
     try {
         // Get the review with listing info
         const review = await prisma.review.findUnique({
-            where: { id: reviewId },
+            where: { id: safeReviewId },
             include: {
                 listing: {
                     select: {
@@ -45,7 +57,7 @@ export async function createReviewResponse(reviewId: string, content: string) {
 
         // Check if response already exists
         const existingResponse = await prisma.reviewResponse.findUnique({
-            where: { reviewId }
+            where: { reviewId: safeReviewId }
         });
 
         if (existingResponse) {
@@ -55,8 +67,8 @@ export async function createReviewResponse(reviewId: string, content: string) {
         // Create the response
         const response = await prisma.reviewResponse.create({
             data: {
-                reviewId,
-                content
+                reviewId: safeReviewId,
+                content: safeContent
             }
         });
 
@@ -72,7 +84,7 @@ export async function createReviewResponse(reviewId: string, content: string) {
                 reviewerName: review.author.name || 'User',
                 hostName: host?.name || 'Host',
                 listingTitle: review.listing.title,
-                responsePreview: content,
+                responsePreview: safeContent,
                 listingId: review.listing.id
             });
         }
@@ -96,10 +108,18 @@ export async function updateReviewResponse(responseId: string, content: string) 
         return { error: 'Unauthorized' };
     }
 
+    const responseIdParse = idSchema.safeParse(responseId);
+    const contentParse = responseContentSchema.safeParse(content);
+    if (!responseIdParse.success || !contentParse.success) {
+        return { error: 'Invalid input' };
+    }
+    const safeResponseId = responseIdParse.data;
+    const safeContent = contentParse.data;
+
     try {
         // Get the response with review and listing info
         const response = await prisma.reviewResponse.findUnique({
-            where: { id: responseId },
+            where: { id: safeResponseId },
             include: {
                 review: {
                     include: {
@@ -125,9 +145,9 @@ export async function updateReviewResponse(responseId: string, content: string) 
 
         // Update the response
         await prisma.reviewResponse.update({
-            where: { id: responseId },
+            where: { id: safeResponseId },
             data: {
-                content,
+                content: safeContent,
                 updatedAt: new Date()
             }
         });
@@ -151,10 +171,16 @@ export async function deleteReviewResponse(responseId: string) {
         return { error: 'Unauthorized' };
     }
 
+    const responseIdParse = idSchema.safeParse(responseId);
+    if (!responseIdParse.success) {
+        return { error: 'Invalid input' };
+    }
+    const safeResponseId = responseIdParse.data;
+
     try {
         // Get the response with listing info
         const response = await prisma.reviewResponse.findUnique({
-            where: { id: responseId },
+            where: { id: safeResponseId },
             include: {
                 review: {
                     include: {
@@ -179,7 +205,7 @@ export async function deleteReviewResponse(responseId: string) {
         }
 
         await prisma.reviewResponse.delete({
-            where: { id: responseId }
+            where: { id: safeResponseId }
         });
 
         revalidatePath(`/listings/${response.review.listing.id}`);

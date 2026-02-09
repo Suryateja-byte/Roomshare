@@ -7,6 +7,8 @@ import { householdLanguagesSchema } from '@/lib/schemas';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
+import { withRateLimit } from '@/lib/with-rate-limit';
+import { z } from 'zod';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -33,10 +35,36 @@ const normalizeStringList = (value: unknown): string[] => {
     return [];
 };
 
+const updateListingSchema = z.object({
+    title: z.string().trim().min(1).max(150),
+    description: z.string().trim().min(1).max(5000),
+    price: z.coerce.number().positive(),
+    amenities: z.union([z.array(z.string()), z.string()]).optional().default([]),
+    houseRules: z.union([z.array(z.string()), z.string()]).optional().default([]),
+    totalSlots: z.coerce.number().int().min(1).max(100),
+    address: z.string().trim().min(1).max(200),
+    city: z.string().trim().min(1).max(100),
+    state: z.string().trim().min(1).max(100),
+    zip: z.string().trim().min(1).max(20),
+    moveInDate: z.union([
+        z.string().trim().refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Invalid date format' }),
+        z.null(),
+    ]).optional(),
+    leaseDuration: z.string().trim().max(100).nullable().optional(),
+    roomType: z.string().trim().max(100).nullable().optional(),
+    householdLanguages: z.array(z.string().trim().toLowerCase()).max(20).optional(),
+    genderPreference: z.string().trim().max(50).nullable().optional(),
+    householdGender: z.string().trim().max(50).nullable().optional(),
+    images: z.array(z.string().trim().url().max(2048)).max(20).optional(),
+});
+
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const rateLimitResponse = await withRateLimit(request, { type: 'deleteListing' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
@@ -143,6 +171,9 @@ export async function PATCH(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const rateLimitResponse = await withRateLimit(request, { type: 'updateListing' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
@@ -150,9 +181,43 @@ export async function PATCH(
         }
 
         const { id } = await params;
-        const body = await request.json();
+        let rawBody: unknown;
+        try {
+            rawBody = await request.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+        }
 
-        const { title, description, price, amenities, houseRules, totalSlots, address, city, state, zip, moveInDate, leaseDuration, roomType, householdLanguages, genderPreference, householdGender, images } = body;
+        const parsed = updateListingSchema.safeParse(rawBody);
+        if (!parsed.success) {
+            return NextResponse.json(
+                {
+                    error: 'Invalid request payload',
+                    details: parsed.error.flatten().fieldErrors,
+                },
+                { status: 400 }
+            );
+        }
+
+        const {
+            title,
+            description,
+            price,
+            amenities,
+            houseRules,
+            totalSlots,
+            address,
+            city,
+            state,
+            zip,
+            moveInDate,
+            leaseDuration,
+            roomType,
+            householdLanguages,
+            genderPreference,
+            householdGender,
+            images,
+        } = parsed.data;
 
         // Check listing exists and user is the owner
         const listing = await prisma.listing.findUnique({
@@ -184,18 +249,6 @@ export async function PATCH(
             }
         }
 
-        // Validate numeric fields
-        const priceNum = parseFloat(price);
-        const totalSlotsNum = parseInt(totalSlots);
-
-        if (isNaN(priceNum) || priceNum <= 0) {
-            return NextResponse.json({ error: 'Invalid price value' }, { status: 400 });
-        }
-
-        if (isNaN(totalSlotsNum) || totalSlotsNum <= 0) {
-            return NextResponse.json({ error: 'Invalid total slots value' }, { status: 400 });
-        }
-
         // Check if address changed
         const addressChanged = listing.location &&
             (listing.location.address !== address ||
@@ -225,7 +278,7 @@ export async function PATCH(
                 data: {
                     title,
                     description,
-                    price: priceNum,
+                    price,
                     amenities: normalizedAmenities,
                     houseRules: normalizedHouseRules,
                     householdLanguages: Array.isArray(householdLanguages)
@@ -235,8 +288,8 @@ export async function PATCH(
                     householdGender: householdGender || null,
                     leaseDuration: leaseDuration || null,
                     roomType: roomType || null,
-                    totalSlots: totalSlotsNum,
-                    availableSlots: Math.max(0, Math.min(listing.availableSlots + (totalSlotsNum - listing.totalSlots), totalSlotsNum)),
+                    totalSlots,
+                    availableSlots: Math.max(0, Math.min(listing.availableSlots + (totalSlots - listing.totalSlots), totalSlots)),
                     moveInDate: moveInDate ? new Date(moveInDate) : null,
                     ...(Array.isArray(images) && { images }),
                 }

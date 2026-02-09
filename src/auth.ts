@@ -40,6 +40,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 userId: user.id,
                 provider: account.provider,
             });
+
+            // Minimize token retention: this app does not call provider APIs after sign-in.
+            // Clearing OAuth tokens reduces impact if database records are exposed.
+            try {
+                await prisma.account.updateMany({
+                    where: {
+                        userId: user.id,
+                        provider: account.provider,
+                        providerAccountId: account.providerAccountId,
+                    },
+                    data: {
+                        access_token: null,
+                        refresh_token: null,
+                        id_token: null,
+                    },
+                });
+            } catch (error) {
+                logger.sync.warn("Failed to clear OAuth tokens after link", {
+                    userId: user.id,
+                    provider: account.provider,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
         },
     },
     // Note: In NextAuth v5 (Auth.js), account linking is handled by the adapter

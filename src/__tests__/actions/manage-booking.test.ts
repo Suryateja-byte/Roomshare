@@ -31,8 +31,8 @@ jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
 }));
 
-jest.mock("@/app/actions/notifications", () => ({
-  createNotification: jest.fn(),
+jest.mock("@/lib/notifications", () => ({
+  createInternalNotification: jest.fn(),
 }));
 
 jest.mock("@/lib/email", () => ({
@@ -82,7 +82,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
-import { createNotification } from "@/app/actions/notifications";
+import { createInternalNotification } from "@/lib/notifications";
 import { sendNotificationEmailWithPreference } from "@/lib/email";
 import { checkSuspension } from "@/app/actions/suspension";
 import { validateTransition } from "@/lib/booking-state-machine";
@@ -145,7 +145,7 @@ describe("manage-booking actions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
-    (createNotification as jest.Mock).mockResolvedValue({ success: true });
+    (createInternalNotification as jest.Mock).mockResolvedValue({ success: true });
     (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
       success: true,
     });
@@ -377,7 +377,7 @@ describe("manage-booking actions", () => {
 
         await updateBookingStatus("booking-123", "ACCEPTED");
 
-        expect(createNotification).toHaveBeenCalledWith({
+        expect(createInternalNotification).toHaveBeenCalledWith({
           userId: "tenant-123",
           type: "BOOKING_ACCEPTED",
           title: "Booking Accepted!",
@@ -468,7 +468,7 @@ describe("manage-booking actions", () => {
       it("creates notification for tenant on rejection", async () => {
         await updateBookingStatus("booking-123", "REJECTED");
 
-        expect(createNotification).toHaveBeenCalledWith({
+        expect(createInternalNotification).toHaveBeenCalledWith({
           userId: "tenant-123",
           type: "BOOKING_REJECTED",
           title: "Booking Not Accepted",
@@ -546,7 +546,7 @@ describe("manage-booking actions", () => {
 
         await updateBookingStatus("booking-123", "CANCELLED");
 
-        expect(createNotification).toHaveBeenCalledWith({
+        expect(createInternalNotification).toHaveBeenCalledWith({
           userId: "owner-123",
           type: "BOOKING_CANCELLED",
           title: "Booking Cancelled",

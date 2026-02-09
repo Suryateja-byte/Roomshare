@@ -51,6 +51,8 @@ const READ_ONLY_PUBLIC_ENDPOINTS = [
   '/api/listings',
 ];
 
+const LIVE_SUSPENSION_CHECK_TIMEOUT_MS = 1500;
+
 /**
  * Check if a pathname is a public route that doesn't need suspension check.
  * Public routes are accessible to everyone, including suspended users.
@@ -103,6 +105,59 @@ function isProtectedRoute(pathname: string): boolean {
   return isProtectedApi || isProtectedPage;
 }
 
+function buildSuspensionBlockedResponse(): NextResponse {
+  return NextResponse.json(
+    {
+      error: 'Account suspended',
+      code: 'ACCOUNT_SUSPENDED',
+    },
+    {
+      status: 403,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+}
+
+/**
+ * Check current suspension status from the database via internal API.
+ * This reduces edge-token staleness for recently suspended users.
+ */
+async function getLiveSuspensionStatus(
+  request: NextRequest,
+  userId: string
+): Promise<boolean | undefined> {
+  const secret = process.env.SUSPENSION_CHECK_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) return undefined;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), LIVE_SUSPENSION_CHECK_TIMEOUT_MS);
+
+    const url = new URL('/api/auth/suspension-status', request.nextUrl.origin);
+    url.searchParams.set('userId', userId);
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'x-suspension-check-secret': secret,
+      },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) return undefined;
+
+    const data = await response.json() as { isSuspended?: boolean };
+    return data.isSuspended === true;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Check if a suspended user should be blocked from accessing a route.
  *
@@ -129,12 +184,7 @@ export async function checkSuspension(request: NextRequest): Promise<NextRespons
     return null;
   }
 
-  // Not suspended - allow access
-  if (!token.isSuspended) {
-    return null;
-  }
-
-  // Suspended user - check if this is a protected route
+  // Only enforce suspension rules on protected routes
   if (!isProtectedRoute(pathname)) {
     return null;
   }
@@ -144,19 +194,23 @@ export async function checkSuspension(request: NextRequest): Promise<NextRespons
     return null;
   }
 
-  // Block suspended user from protected route
-  return NextResponse.json(
-    {
-      error: 'Account suspended',
-      code: 'ACCOUNT_SUSPENDED',
-    },
-    {
-      status: 403,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  );
+  // Fast path: token already marked suspended
+  if (token.isSuspended === true) {
+    return buildSuspensionBlockedResponse();
+  }
+
+  // Live check: catch newly suspended users before token refresh.
+  const userId = typeof token.sub === 'string' ? token.sub : undefined;
+  if (!userId) {
+    return null;
+  }
+
+  const liveSuspended = await getLiveSuspensionStatus(request, userId);
+  if (liveSuspended) {
+    return buildSuspensionBlockedResponse();
+  }
+
+  return null;
 }
 
 /**

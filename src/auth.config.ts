@@ -7,7 +7,7 @@ export const authConfig = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 14 * 24 * 60 * 60, // 14 days (aligned with src/auth.ts)
     updateAge: 24 * 60 * 60, // Refresh token once per day
   },
   callbacks: {

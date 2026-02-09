@@ -7,6 +7,7 @@ import type { SearchFilters } from '@/lib/search-utils';
 import { validateSearchFilters } from '@/lib/search-params';
 import type { Prisma } from '@prisma/client';
 import { logger } from '@/lib/logger';
+import { z } from 'zod';
 
 type AlertFrequency = 'INSTANT' | 'DAILY' | 'WEEKLY';
 
@@ -17,6 +18,8 @@ interface SaveSearchInput {
     alertFrequency?: AlertFrequency;
 }
 
+const savedSearchNameSchema = z.string().trim().min(1).max(100);
+
 export async function saveSearch(input: SaveSearchInput) {
     const session = await auth();
     if (!session?.user?.id) {
@@ -24,6 +27,11 @@ export async function saveSearch(input: SaveSearchInput) {
     }
 
     try {
+        const nameValidation = savedSearchNameSchema.safeParse(input.name);
+        if (!nameValidation.success) {
+            return { error: 'Invalid search name' };
+        }
+
         // Check if user already has 10 saved searches (limit)
         const existingCount = await prisma.savedSearch.count({
             where: { userId: session.user.id }
@@ -39,7 +47,7 @@ export async function saveSearch(input: SaveSearchInput) {
         const savedSearch = await prisma.savedSearch.create({
             data: {
                 userId: session.user.id,
-                name: input.name,
+                name: nameValidation.data,
                 query: validatedFilters.query,
                 filters: validatedFilters as Prisma.InputJsonValue,
                 alertEnabled: input.alertEnabled ?? true,
@@ -145,12 +153,17 @@ export async function updateSavedSearchName(searchId: string, name: string) {
     }
 
     try {
+        const nameValidation = savedSearchNameSchema.safeParse(name);
+        if (!nameValidation.success) {
+            return { error: 'Invalid search name' };
+        }
+
         await prisma.savedSearch.update({
             where: {
                 id: searchId,
                 userId: session.user.id
             },
-            data: { name }
+            data: { name: nameValidation.data }
         });
 
         revalidatePath('/saved-searches');
