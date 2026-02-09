@@ -6,11 +6,8 @@ import { logger } from '@/lib/logger';
 import {
     createInternalNotification,
     type CreateNotificationInput,
-    type NotificationType,
 } from '@/lib/notifications';
 import { prisma } from '@/lib/prisma';
-
-export type { NotificationType };
 
 export async function createNotification(input: CreateNotificationInput) {
     const session = await auth();
