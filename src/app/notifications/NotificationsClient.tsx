@@ -21,8 +21,8 @@ import {
     deleteNotification,
     deleteAllNotifications,
     getMoreNotifications,
-    NotificationType
 } from '@/app/actions/notifications';
+import type { NotificationType } from '@/lib/notifications';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import {

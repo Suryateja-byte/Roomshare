@@ -17,8 +17,8 @@ import {
     getNotifications,
     markNotificationAsRead,
     markAllNotificationsAsRead,
-    NotificationType
 } from '@/app/actions/notifications';
+import type { NotificationType } from '@/lib/notifications';
 import { Button } from '@/components/ui/button';
 
 interface Notification {

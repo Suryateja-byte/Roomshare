@@ -130,6 +130,10 @@ describe('Listings API IDOR Protection', () => {
           description: 'Hacked description',
           price: '1',
           totalSlots: '1',
+          address: '123 Main St',
+          city: 'San Francisco',
+          state: 'CA',
+          zip: '94102',
         }),
       });
 
@@ -190,6 +194,10 @@ describe('Listings API IDOR Protection', () => {
           description: 'Test',
           price: '1000',
           totalSlots: '1',
+          address: '123 Main St',
+          city: 'San Francisco',
+          state: 'CA',
+          zip: '94102',
         }),
       });
 
@@ -212,6 +220,10 @@ describe('Listings API IDOR Protection', () => {
           description: 'Test',
           price: '1000',
           totalSlots: '1',
+          address: '123 Main St',
+          city: 'San Francisco',
+          state: 'CA',
+          zip: '94102',
         }),
       });
 
@@ -331,6 +343,10 @@ describe('Listings API IDOR Protection', () => {
           description: 'Test',
           price: '1000',
           totalSlots: '1',
+          address: '123 Main St',
+          city: 'San Francisco',
+          state: 'CA',
+          zip: '94102',
         }),
       });
 
@@ -354,6 +370,10 @@ describe('Listings API IDOR Protection', () => {
           description: 'Test',
           price: '1000',
           totalSlots: '1',
+          address: '123 Main St',
+          city: 'San Francisco',
+          state: 'CA',
+          zip: '94102',
         }),
       });
 
