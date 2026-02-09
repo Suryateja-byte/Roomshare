@@ -206,6 +206,9 @@ jobs:
       GOOGLE_CLIENT_ID: test-google-client-id
       GOOGLE_CLIENT_SECRET: test-google-client-secret
       AUTH_TRUST_HOST: 'true'
+      E2E_BASE_URL: http://localhost:3000
+      E2E_TEST_EMAIL: test@example.com
+      E2E_TEST_PASSWORD: TestPassword123!
       CI: true
     steps:
       - uses: actions/checkout@v4
