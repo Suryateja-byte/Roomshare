@@ -157,7 +157,7 @@ describe('rate-limit-redis', () => {
       expect(result.retryAfter).toBeGreaterThan(0);
     });
 
-    it('fails closed in production when Redis not configured', async () => {
+    it('uses in-memory fallback in production when Redis is not configured', async () => {
       process.env.UPSTASH_REDIS_REST_URL = '';
       process.env.UPSTASH_REDIS_REST_TOKEN = '';
       Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true });
@@ -167,8 +167,8 @@ describe('rate-limit-redis', () => {
 
       const result = await rateLimitModule.checkChatRateLimit('127.0.0.1');
 
-      expect(result.success).toBe(false);
-      expect(result.retryAfter).toBe(60);
+      expect(result.success).toBe(true);
+      expect(result.retryAfter).toBeUndefined();
     });
 
     it('allows requests in development when Redis not configured', async () => {

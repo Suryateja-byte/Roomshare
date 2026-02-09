@@ -82,8 +82,8 @@ jest.mock('@/lib/email', () => ({
   sendNotificationEmailWithPreference: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/app/actions/notifications', () => ({
-  createNotification: jest.fn().mockResolvedValue({ success: true }),
+jest.mock('@/lib/notifications', () => ({
+  createInternalNotification: jest.fn().mockResolvedValue({ success: true }),
 }));
 
 jest.mock('@/app/actions/suspension', () => ({

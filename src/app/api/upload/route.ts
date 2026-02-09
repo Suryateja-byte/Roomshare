@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createClient } from '@supabase/supabase-js';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { z } from 'zod';
 
 // Initialize Supabase client with service role for storage operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -38,6 +39,10 @@ const MIME_TO_EXTENSION: Record<string, string> = {
     'image/gif': 'gif',
     'image/webp': 'webp',
 };
+
+const deleteUploadSchema = z.object({
+    path: z.string().trim().min(1).max(500),
+});
 
 export async function POST(request: NextRequest) {
     // P1-6 FIX: Add rate limiting to prevent storage abuse
@@ -180,6 +185,9 @@ export async function POST(request: NextRequest) {
 
 // Delete uploaded image
 export async function DELETE(request: NextRequest) {
+    const rateLimitResponse = await withRateLimit(request, { type: 'uploadDelete' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session?.user?.id) {
@@ -195,7 +203,22 @@ export async function DELETE(request: NextRequest) {
 
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-        const { path } = await request.json();
+        let rawBody: unknown;
+        try {
+            rawBody = await request.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+        }
+
+        const parsed = deleteUploadSchema.safeParse(rawBody);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: 'Invalid request payload', details: parsed.error.flatten().fieldErrors },
+                { status: 400 }
+            );
+        }
+
+        const { path } = parsed.data;
 
         if (!path) {
             return NextResponse.json({ error: 'No path provided' }, { status: 400 });

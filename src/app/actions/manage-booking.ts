@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
-import { createNotification } from './notifications';
+import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from './suspension';
 import { logger } from '@/lib/logger';
@@ -160,7 +160,7 @@ export async function updateBookingStatus(
             }
 
             // Notify tenant of acceptance (outside transaction for performance)
-            await createNotification({
+            await createInternalNotification({
                 userId: booking.tenant.id,
                 type: 'BOOKING_ACCEPTED',
                 title: 'Booking Accepted!',
@@ -208,7 +208,7 @@ export async function updateBookingStatus(
                 : '';
 
             // Notify tenant of rejection
-            await createNotification({
+            await createInternalNotification({
                 userId: booking.tenant.id,
                 type: 'BOOKING_REJECTED',
                 title: 'Booking Not Accepted',
@@ -285,7 +285,7 @@ export async function updateBookingStatus(
 
 
             // Notify host of cancellation
-            await createNotification({
+            await createInternalNotification({
                 userId: booking.listing.ownerId,
                 type: 'BOOKING_CANCELLED',
                 title: 'Booking Cancelled',

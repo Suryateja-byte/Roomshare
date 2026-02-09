@@ -147,10 +147,17 @@ export function registerShutdownHandlers(): void {
     process.exit(1);
   });
 
-  // Handle unhandled promise rejections - log but don't exit
-  process.on('unhandledRejection', (reason) => {
+  // Handle unhandled promise rejections - fail fast after graceful shutdown.
+  // Ignore benign disconnect-style errors.
+  process.on('unhandledRejection', async (reason) => {
+    const code = (reason as NodeJS.ErrnoException | undefined)?.code;
+    if (code === 'ECONNRESET' || code === 'ECONNABORTED' || code === 'EPIPE') {
+      return;
+    }
+
     console.error('[Shutdown] Unhandled rejection:', reason);
-    // Don't exit for unhandled rejections - just log
+    await performShutdown('unhandledRejection');
+    process.exit(1);
   });
 
   console.log('[Shutdown] Handlers registered for: SIGTERM, SIGINT, SIGUSR2');

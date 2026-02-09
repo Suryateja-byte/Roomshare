@@ -17,12 +17,13 @@ const FALLBACK_DATABASE_URL =
 const getDatasourceUrl = () => {
     const baseUrl = process.env.DATABASE_URL;
     if (!baseUrl) {
-        if (process.env.NODE_ENV !== 'test') {
-            logger.sync.warn(
-                'DATABASE_URL is not configured. Prisma is using a placeholder datasource URL; DB operations will fail until DATABASE_URL is set.',
-            );
+        if (process.env.NODE_ENV === 'test') {
+            return FALLBACK_DATABASE_URL;
         }
-        return FALLBACK_DATABASE_URL;
+
+        const message = 'DATABASE_URL is not configured. Refusing to start Prisma outside test environment.';
+        logger.sync.error(message);
+        throw new Error(message);
     }
 
     // Only add connection params if not already present

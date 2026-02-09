@@ -52,8 +52,8 @@ jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
 }));
 
-jest.mock('@/app/actions/notifications', () => ({
-  createNotification: jest.fn(),
+jest.mock('@/lib/notifications', () => ({
+  createInternalNotification: jest.fn(),
 }));
 
 jest.mock('@/lib/email', () => ({
@@ -82,7 +82,7 @@ jest.mock('@/lib/logger', () => ({
 import { createBooking } from '@/app/actions/booking';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
-import { createNotification } from '@/app/actions/notifications';
+import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { Prisma } from '@prisma/client';
 
@@ -135,7 +135,7 @@ describe('Booking Race Condition Prevention', () => {
       isSuspended: false,
       emailVerified: new Date(),
     });
-    (createNotification as jest.Mock).mockResolvedValue({ success: true });
+    (createInternalNotification as jest.Mock).mockResolvedValue({ success: true });
     (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({ success: true });
   });
 

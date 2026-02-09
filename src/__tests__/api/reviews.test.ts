@@ -40,8 +40,8 @@ jest.mock('@/auth', () => ({
   auth: jest.fn(),
 }))
 
-jest.mock('@/app/actions/notifications', () => ({
-  createNotification: jest.fn(),
+jest.mock('@/lib/notifications', () => ({
+  createInternalNotification: jest.fn(),
 }))
 
 jest.mock('@/lib/email', () => ({
@@ -56,7 +56,7 @@ jest.mock('@/lib/with-rate-limit', () => ({
 import { POST, GET } from '@/app/api/reviews/route'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
-import { createNotification } from '@/app/actions/notifications'
+import { createInternalNotification } from '@/lib/notifications'
 import { sendNotificationEmailWithPreference } from '@/lib/email'
 
 describe('/api/reviews', () => {
@@ -233,7 +233,7 @@ describe('/api/reviews', () => {
         // Wait for fire-and-forget notification to execute
         await flushPromises()
 
-        expect(createNotification).toHaveBeenCalledWith({
+        expect(createInternalNotification).toHaveBeenCalledWith({
           userId: 'owner-456',
           type: 'NEW_REVIEW',
           title: 'New Review',
@@ -280,7 +280,7 @@ describe('/api/reviews', () => {
         // Wait for fire-and-forget notification to complete
         await flushPromises()
 
-        expect(createNotification).not.toHaveBeenCalled()
+        expect(createInternalNotification).not.toHaveBeenCalled()
         expect(sendNotificationEmailWithPreference).not.toHaveBeenCalled()
       })
     })

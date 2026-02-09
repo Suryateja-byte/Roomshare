@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
-import { createNotification } from '@/app/actions/notifications';
+import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from '@/app/actions/suspension';
 import { withRateLimit } from '@/lib/with-rate-limit';
@@ -155,7 +155,7 @@ export async function POST(request: Request) {
 
                     if (listing && listing.ownerId !== session.user.id) {
                         // Create in-app notification
-                        await createNotification({
+                        await createInternalNotification({
                             userId: listing.ownerId,
                             type: 'NEW_REVIEW',
                             title: 'New Review',
@@ -267,6 +267,9 @@ export async function GET(request: Request) {
 
 // Update a review (only the author can update their own review)
 export async function PUT(request: Request) {
+    const rateLimitResponse = await withRateLimit(request, { type: 'updateReview' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
@@ -338,6 +341,9 @@ export async function PUT(request: Request) {
 
 // Delete a review (only the author can delete their own review)
 export async function DELETE(request: Request) {
+    const rateLimitResponse = await withRateLimit(request, { type: 'deleteReview' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {

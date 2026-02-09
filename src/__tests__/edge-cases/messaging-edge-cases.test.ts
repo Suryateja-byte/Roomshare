@@ -47,8 +47,8 @@ jest.mock("@/app/actions/block", () => ({
   checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
 }));
 
-jest.mock("@/app/actions/notifications", () => ({
-  createNotification: jest.fn().mockResolvedValue({ success: true }),
+jest.mock("@/lib/notifications", () => ({
+  createInternalNotification: jest.fn().mockResolvedValue({ success: true }),
 }));
 
 jest.mock("@/lib/email", () => ({

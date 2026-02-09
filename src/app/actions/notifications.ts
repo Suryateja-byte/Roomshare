@@ -1,49 +1,36 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { logger } from '@/lib/logger';
+import {
+    createInternalNotification,
+    type CreateNotificationInput,
+    type NotificationType,
+} from '@/lib/notifications';
+import { prisma } from '@/lib/prisma';
 
-export type NotificationType =
-    | 'BOOKING_REQUEST'
-    | 'BOOKING_ACCEPTED'
-    | 'BOOKING_REJECTED'
-    | 'BOOKING_CANCELLED'
-    | 'NEW_MESSAGE'
-    | 'NEW_REVIEW'
-    | 'LISTING_SAVED'
-    | 'SEARCH_ALERT';
-
-interface CreateNotificationInput {
-    userId: string;
-    type: NotificationType;
-    title: string;
-    message: string;
-    link?: string;
-}
+export type { NotificationType };
 
 export async function createNotification(input: CreateNotificationInput) {
-    try {
-        await prisma.notification.create({
-            data: {
-                userId: input.userId,
-                type: input.type,
-                title: input.title,
-                message: input.message,
-                link: input.link
-            }
-        });
-        return { success: true };
-    } catch (error) {
-        logger.sync.error('Failed to create notification', {
-            action: 'createNotification',
-            userId: input.userId,
-            type: input.type,
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return { error: 'Failed to create notification' };
+    const session = await auth();
+    if (!session?.user?.id) {
+        return { success: false, error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
+
+    // Only admins or users creating notifications for themselves can use this public server action.
+    // Internal business flows should call createInternalNotification() directly.
+    if (!session.user.isAdmin && session.user.id !== input.userId) {
+        logger.sync.warn('Blocked unauthorized notification creation attempt', {
+            action: 'createNotification',
+            actorUserId: session.user.id,
+            targetUserId: input.userId,
+            type: input.type,
+        });
+        return { success: false, error: 'Forbidden' };
+    }
+
+    return createInternalNotification(input);
 }
 
 export async function getNotifications(limit = 20) {

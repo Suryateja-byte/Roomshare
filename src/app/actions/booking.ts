@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
-import { createNotification } from './notifications';
+import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { createBookingSchema } from '@/lib/schemas';
 import { z } from 'zod';
@@ -208,10 +208,10 @@ async function runBookingSideEffects(
     endDate: Date
 ): Promise<void> {
     // Create in-app notification for host
-    await createNotification({
-        userId: result.listingOwnerId,
-        type: 'BOOKING_REQUEST',
-        title: 'New Booking Request',
+    await createInternalNotification({
+      userId: result.listingOwnerId,
+      type: 'BOOKING_REQUEST',
+      title: 'New Booking Request',
         message: `${result.tenantName || 'Someone'} requested to book "${result.listingTitle}"`,
         link: '/bookings'
     });

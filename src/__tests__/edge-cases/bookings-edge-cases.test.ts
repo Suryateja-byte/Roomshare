@@ -41,8 +41,8 @@ jest.mock("@/auth", () => ({
   auth: jest.fn(),
 }));
 
-jest.mock("@/app/actions/notifications", () => ({
-  createNotification: jest.fn().mockResolvedValue({ success: true }),
+jest.mock("@/lib/notifications", () => ({
+  createInternalNotification: jest.fn().mockResolvedValue({ success: true }),
 }));
 
 jest.mock("@/lib/email", () => ({
