@@ -58,7 +58,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
   test("J21: Combined price + amenity + lease filters reflect in URL", async ({ page, nav }) => {
     test.slow(); // Complex filter interactions need extra time under load
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Set price range — wait for inputs to be ready under load
@@ -213,7 +213,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
     expect(url1.searchParams.get("minPrice")).toBe("600");
 
     // Click clear all (filter bar or modal)
-    const clearBtn = page.locator('[data-testid="filter-bar-clear-all"]')
+    const clearBtn = page.locator('[data-testid="filter-modal-clear-all"]')
       .or(page.getByRole("button", { name: /clear all/i }));
 
     if (await clearBtn.first().isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -373,7 +373,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   test(`${tags.a11y} J32: Escape key closes the filter modal`, async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
     const modal = await openFilterModal(page);
@@ -721,7 +721,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
     test.slow(); // Viewport tests under load need extra time
     await page.setViewportSize({ width: 768, height: 1024 });
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Search form should be visible
