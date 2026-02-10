@@ -91,8 +91,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma client and run migrations
-        run: pnpm exec prisma generate && pnpm exec prisma migrate deploy
+      - name: Generate Prisma client and push schema
+        run: pnpm exec prisma generate && pnpm exec prisma db push --skip-generate
+
+      - name: Apply search_doc SQL migrations
+        env:
+          PGPASSWORD: password
+        run: |
+          for f in \
+            prisma/migrations/20260110000000_search_doc/migration.sql \
+            prisma/migrations/20260116000000_search_doc_fts/migration.sql \
+            prisma/migrations/20260121000000_search_doc_lower_indexes/migration.sql \
+            prisma/migrations/20260131000000_search_doc_composite_indexes/migration.sql \
+            prisma/migrations/20260208000000_search_doc_gender_columns/migration.sql; do
+            echo "Applying $f ..."
+            psql -h localhost -p 5433 -U postgres -d roomshare -f "$f"
+          done
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
