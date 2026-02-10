@@ -214,8 +214,9 @@ test.describe("20 Critical Search Page Journeys", () => {
     const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await firstCard.waitFor({ state: "attached", timeout: 15000 });
 
-    // Get href and navigate directly (card may be in scroll container reported as hidden)
-    const href = await firstCard.getAttribute("href");
+    // Get href from the <a> link inside the listing card div
+    const cardLink = firstCard.locator('a[href^="/listings/"]').first();
+    const href = await cardLink.getAttribute("href");
     expect(href).toBeTruthy();
 
     // Navigate to the listing page
@@ -236,7 +237,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     // Click a listing
     const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
     await firstCard.waitFor({ state: "attached", timeout: 10000 });
-    const href = await firstCard.getAttribute("href");
+    const cardLink = firstCard.locator('a[href^="/listings/"]').first();
+    const href = await cardLink.getAttribute("href");
     if (href) {
       await page.goto(href);
       await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });

@@ -109,7 +109,7 @@ export function assertionHelpers(page: Page) {
         .or(page.locator('[data-testid="user-menu"]'))
         .or(page.locator('[aria-label*="user"]'));
 
-      await expect(userMenu).toBeVisible({ timeout: 10000 });
+      await expect(userMenu.first()).toBeVisible({ timeout: 15000 });
     },
 
     /**
@@ -120,7 +120,7 @@ export function assertionHelpers(page: Page) {
         .getByRole('link', { name: /log ?in|sign ?in/i })
         .or(page.locator('a[href*="/login"]'));
 
-      await expect(loginButton).toBeVisible({ timeout: 10000 });
+      await expect(loginButton.first()).toBeVisible({ timeout: 15000 });
     },
 
     /**

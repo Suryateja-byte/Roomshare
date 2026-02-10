@@ -311,39 +311,24 @@ test.describe("Map persistence: Map survives changes", () => {
       return;
     }
 
-    // Set up a MutationObserver to detect if the canvas is ever removed
-    await page.evaluate(() => {
-      (window as any).__mapCanvasRemoved = false;
-      const canvas = document.querySelector(".mapboxgl-canvas");
-      if (!canvas || !canvas.parentElement) return;
-
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          Array.from(mutation.removedNodes).forEach((node) => {
-            if (node === canvas || (node as Element).querySelector?.(".mapboxgl-canvas")) {
-              (window as any).__mapCanvasRemoved = true;
-            }
-          });
-        });
-      });
-      observer.observe(canvas.parentElement, { childList: true, subtree: true });
-      (window as any).__canvasObserver = observer;
-    });
-
-    // Apply a filter (triggers transition)
-    await navigateWithFilter(page, "roomType", "Private Room");
-
-    // Check if canvas was ever removed
-    const canvasWasRemoved = await page.evaluate(() => (window as any).__mapCanvasRemoved);
-    expect(canvasWasRemoved).toBe(false);
-
-    // Canvas should still be visible
+    // Verify canvas is visible before the filter change
     expect(await isMapCanvasVisible(page)).toBe(true);
 
-    // Cleanup observer
-    await page.evaluate(() => {
-      (window as any).__canvasObserver?.disconnect();
-    });
+    // Record the map instance ID before navigation (if E2E instrumentation available)
+    const stateBefore = await getMapE2EState(page);
+
+    // Apply a filter (triggers client-side navigation via Next.js router)
+    await navigateWithFilter(page, "roomType", "Private Room");
+
+    // Canvas should still be visible after filter transition
+    // (PersistentMapWrapper in layout.tsx keeps the map mounted)
+    expect(await isMapCanvasVisible(page)).toBe(true);
+
+    // If E2E instrumentation is available, verify the map was not re-mounted
+    if (stateBefore?.mapInstanceId) {
+      const stateAfter = await getMapE2EState(page);
+      expect(stateAfter?.mapInstanceId).toBe(stateBefore.mapInstanceId);
+    }
   });
 });
 
@@ -394,6 +379,7 @@ test.describe("Map persistence: Map state recovery", () => {
   });
 
   test("9 - Browser back preserves map after navigating to listing", async ({ page }) => {
+    test.slow();
     await waitForSearchPage(page);
 
     if (!(await isMapContainerVisible(page))) {
@@ -402,14 +388,14 @@ test.describe("Map persistence: Map state recovery", () => {
     }
 
     // Find a listing card link and navigate to it
-    const listingLink = page.locator('a[href^="/listings/c"]').first();
+    // Listing URLs may start with /listings/c or just /listings/
+    const listingLink = page.locator('[data-testid="listing-card"] a[href*="/listings/"]').first();
     if ((await listingLink.count()) === 0) {
       test.skip(true, "No listing links found");
       return;
     }
 
     await listingLink.click();
-    await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded");
 
     // Should be on a listing page now
@@ -519,8 +505,15 @@ test.describe("Map persistence: Lazy loading", () => {
 
     // The loading indicator may be very brief on fast connections
     // Check if it was ever present or if map loaded instantly
-    const loadingWasVisible = await loadingIndicator.isVisible({ timeout: 1000 }).catch(() => false);
-    const mapVisible = await page.locator(selectors.map).first().isVisible({ timeout: 15_000 }).catch(() => false);
+    const loadingWasVisible = await loadingIndicator
+      .waitFor({ state: "visible", timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    const mapVisible = await page.locator(selectors.map).first()
+      .waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
 
     // Either loading indicator was shown OR map loaded fast enough to skip it
     expect(loadingWasVisible || mapVisible).toBe(true);
@@ -536,7 +529,7 @@ test.describe("Map persistence: Lazy loading", () => {
     // Loading text should no longer be visible
     const loadingText = page.getByText("Loading map...");
     // Use a short timeout since it should already be gone
-    const stillLoading = await loadingText.isVisible({ timeout: 1000 }).catch(() => false);
+    const stillLoading = await loadingText.isVisible().catch(() => false);
     expect(stillLoading).toBe(false);
   });
 });

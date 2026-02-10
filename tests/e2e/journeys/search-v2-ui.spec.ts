@@ -5,7 +5,7 @@
  * - List items populate from v2 response
  * - Map renders markers/clusters from v2 geojson/pins
  */
-import { test, expect, tags, SF_BOUNDS } from "../helpers";
+import { test, expect, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 test.describe("Search V2 UI Integration", () => {
   test.beforeEach(async () => {
@@ -29,8 +29,8 @@ test.describe("Search V2 UI Integration", () => {
       .first();
     await expect(heading).toBeVisible({ timeout: 30000 });
 
-    // Check for listing cards - they're links to /listings/ URLs
-    const cards = page.locator('a[href^="/listings/"]');
+    // Check for listing cards
+    const cards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
 
     // Wait for cards or empty state to appear
     const cardOrEmptyState = cards

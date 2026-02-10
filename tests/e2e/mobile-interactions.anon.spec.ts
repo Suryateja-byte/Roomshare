@@ -812,7 +812,7 @@ test.describe("Mobile Bottom Sheet - Overlay", () => {
 
     // At half position, no overlay
     expect(await getSheetSnapIndex(page)).toBe(1);
-    let overlay = page.locator('[data-testid="sheet-overlay"]');
+    const overlay = page.locator('[data-testid="sheet-overlay"]');
     let overlayVisible = await overlay.isVisible().catch(() => false);
     expect(overlayVisible).toBeFalsy();
 
@@ -824,15 +824,11 @@ test.describe("Mobile Bottom Sheet - Overlay", () => {
     await waitForSheetAnimation(page);
 
     // Overlay should now be visible with opacity
-    overlay = page.locator('[data-testid="sheet-overlay"]');
-    overlayVisible = await overlay.isVisible().catch(() => false);
-
-    // The overlay uses AnimatePresence so it may take a moment
-    if (!overlayVisible) {
-      // Retry after additional animation settle time
-      await waitForSheetAnimation(page);
-      overlayVisible = await overlay.isVisible().catch(() => false);
-    }
+    // Use waitFor with timeout to handle AnimatePresence animation delay
+    overlayVisible = await overlay
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
 
     // Overlay should be present when expanded
     expect(overlayVisible).toBeTruthy();
@@ -841,9 +837,8 @@ test.describe("Mobile Bottom Sheet - Overlay", () => {
     await setSheetSnap(page, 1);
     await waitForSheetAnimation(page);
 
-    // Overlay should be gone
-    overlayVisible = await overlay.isVisible().catch(() => false);
-    expect(overlayVisible).toBeFalsy();
+    // Overlay should be gone (wait for AnimatePresence exit animation)
+    await expect(overlay).not.toBeVisible({ timeout: 5_000 });
   });
 });
 

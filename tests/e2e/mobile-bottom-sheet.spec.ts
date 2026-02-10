@@ -23,7 +23,7 @@ const selectors = {
   bottomSheet: '[role="region"][aria-label="Search results"]',
   bottomSheetHandle: '[role="slider"][aria-label="Results panel size"]',
   mapContainer: '[data-testid="map"], .mapboxgl-map',
-  listingCard: 'a[href^="/listings/c"]',
+  listingCard: '[data-testid="listing-card"]',
   expandButton: 'button[aria-label="Expand results"]',
   collapseButton: 'button[aria-label="Collapse results"]',
   minimizeButton: 'button[aria-label="Minimize results panel"]',
@@ -79,7 +79,7 @@ async function getSnapIndex(
 async function waitForSheetAnimation(
   page: import("@playwright/test").Page,
 ): Promise<void> {
-  await page.waitForTimeout(600); // Spring animation duration
+  await page.waitForTimeout(1000); // Spring animation duration (extra buffer for CI)
 }
 
 /**

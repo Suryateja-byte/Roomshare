@@ -109,7 +109,7 @@ test.describe("Move-In Date Filter", () => {
         const moveInDate = new URL(url).searchParams.get("moveInDate");
         return moveInDate !== null && /^\d{4}-\d{2}-\d{2}$/.test(moveInDate);
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     const moveInDate = getUrlParam(page, "moveInDate");

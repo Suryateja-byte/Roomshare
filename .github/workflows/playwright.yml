@@ -75,6 +75,8 @@ jobs:
       NODE_OPTIONS: '--max-old-space-size=4096'
       CI: 'true'
       NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
+      GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
+      GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
 
     steps:
       - uses: actions/checkout@v4

@@ -169,17 +169,19 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     // The sort component is SSR-rendered alongside the heading; without this
     // wait, the check can fire before Next.js streaming delivers the content.
     const resultsHeading = page.locator("#search-results-heading").first();
-    const zeroResults = page.locator('h2:has-text("No matches found")').first();
+    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")').first();
     await expect(resultsHeading.or(zeroResults)).toBeVisible({ timeout: timeouts.navigation });
 
     // Sort should display "Recommended" (the default), not "hacked"
+    // SortSelect needs hydration (mounted state) before aria-label appears
     const sortLabel = page.locator('text="Recommended"');
     const mobileSortBtn = page.locator('button[aria-label="Sort: Recommended"]');
-    const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
-    const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
 
-    // At least one should show the default sort
-    expect(desktopVisible || mobileVisible).toBe(true);
+    await expect(async () => {
+      const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
+      const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
+      expect(desktopVisible || mobileVisible).toBe(true);
+    }).toPass({ timeout: 30_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -211,17 +213,19 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     // Wait for search results heading to render (sort component is in the same section).
     // This ensures SSR streaming has delivered the full search results block.
     const resultsHeading = page.locator("#search-results-heading").first();
-    const zeroResults = page.locator('h2:has-text("No matches found")').first();
+    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")').first();
     await expect(resultsHeading.or(zeroResults)).toBeVisible({ timeout: timeouts.navigation });
 
     // The page should behave as if no q, sort, or maxPrice were set
-    // Sort should default to "Recommended"
+    // Sort should default to "Recommended" (needs hydration via mounted state)
     const sortLabel = page.locator('text="Recommended"');
     const mobileSortBtn = page.locator('button[aria-label="Sort: Recommended"]');
-    const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
-    const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
 
-    expect(desktopVisible || mobileVisible).toBe(true);
+    await expect(async () => {
+      const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
+      const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
+      expect(desktopVisible || mobileVisible).toBe(true);
+    }).toPass({ timeout: 30_000 });
   });
 
   // -------------------------------------------------------------------------

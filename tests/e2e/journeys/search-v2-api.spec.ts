@@ -381,8 +381,7 @@ test.describe("Search API v2 Endpoint", () => {
       await expect(heading).toBeVisible({ timeout: 30000 });
 
       // Check for listing cards in the results (scoped to visible container)
-      // Note: data-testid="listing-card-{id}" uses dynamic suffix, so use prefix selector
-      const listingCards = searchResultsContainer(page).locator('[data-testid^="listing-card-"]');
+      const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
 
       // Wait for at least one card to appear (or empty state)
       const cardOrEmptyState = listingCards

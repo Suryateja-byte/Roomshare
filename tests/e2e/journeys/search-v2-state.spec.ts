@@ -60,7 +60,7 @@ test.describe("V2 State Reset on Bounds-Required Path", () => {
     // Also verify the "Loading map..." placeholder is gone
     const mapLoadingText = page.getByText("Loading map...");
     // If visible, it should disappear quickly (not stuck)
-    const isMapLoading = await mapLoadingText.isVisible();
+    const isMapLoading = await mapLoadingText.isVisible().catch(() => false);
     if (isMapLoading) {
       // If somehow still loading, it should resolve within action timeout
       await expect(mapLoadingText).not.toBeVisible({ timeout: timeouts.action });

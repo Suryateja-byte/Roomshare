@@ -39,6 +39,8 @@ jobs:
       E2E_BASE_URL: http://localhost:3000
       E2E_TEST_EMAIL: test@example.com
       E2E_TEST_PASSWORD: TestPassword123!
+      GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
+      GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
     steps:
       - uses: actions/checkout@v4
 

@@ -43,8 +43,8 @@ async function assertUrlExcludesParams(page: Page, keys: string[]) {
 async function waitForSearchContent(page: Page) {
   const container = searchResultsContainer(page);
   const cards = container.locator('[data-testid="listing-card"]');
-  const zeroResults = page.locator('h2:has-text("No matches found")');
-  await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
+  const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+  await expect(cards.first().or(zeroResults.first())).toBeAttached({ timeout: 30_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -98,12 +98,15 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
     // Verify URL has sort param
     await assertUrlParams(page, { sort: "price_asc" });
 
-    // Verify the sort label is visible
+    // Verify the sort label is visible (wait for hydration of Radix/sort control)
+    // SortSelect has a `mounted` state - SSR placeholder renders first
     const sortLabel = page.locator('text="Price: Low to High"');
     const mobileSortBtn = page.locator('button[aria-label="Sort: Price: Low to High"]');
-    const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
-    const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
-    expect(desktopVisible || mobileVisible).toBe(true);
+    await expect(async () => {
+      const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
+      const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
+      expect(desktopVisible || mobileVisible).toBe(true);
+    }).toPass({ timeout: 30_000 });
 
     // Refresh
     await page.reload();
@@ -112,12 +115,14 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
     // Sort param should persist
     await assertUrlParams(page, { sort: "price_asc" });
 
-    // Sort label should still be visible
+    // Sort label should still be visible after reload (wait for hydration again)
     const sortLabelAfter = page.locator('text="Price: Low to High"');
     const mobileSortBtnAfter = page.locator('button[aria-label="Sort: Price: Low to High"]');
-    const desktopVisibleAfter = await sortLabelAfter.first().isVisible().catch(() => false);
-    const mobileVisibleAfter = await mobileSortBtnAfter.isVisible().catch(() => false);
-    expect(desktopVisibleAfter || mobileVisibleAfter).toBe(true);
+    await expect(async () => {
+      const desktopVisibleAfter = await sortLabelAfter.first().isVisible().catch(() => false);
+      const mobileVisibleAfter = await mobileSortBtnAfter.isVisible().catch(() => false);
+      expect(desktopVisibleAfter || mobileVisibleAfter).toBe(true);
+    }).toPass({ timeout: 30_000 });
   });
 
   // -------------------------------------------------------------------------

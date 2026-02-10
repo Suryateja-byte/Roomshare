@@ -110,7 +110,7 @@ export async function waitForMapMarkers(
  * Common test timeouts
  */
 export const timeouts = {
-  action: 15_000,
+  action: 30_000,
   navigation: 30_000,
   animation: 500,
   debounce: 350,

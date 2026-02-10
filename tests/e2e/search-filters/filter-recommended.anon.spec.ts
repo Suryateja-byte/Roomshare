@@ -94,7 +94,7 @@ test.describe("Recommended Filters", () => {
         const amenities = new URL(url).searchParams.get("amenities") ?? "";
         return amenities.includes("Furnished");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     // URL should contain the amenity
@@ -144,7 +144,7 @@ test.describe("Recommended Filters", () => {
         const amenities = new URL(url).searchParams.get("amenities") ?? "";
         return amenities.includes("Wifi");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     // Pagination params should be reset

@@ -244,17 +244,27 @@ test.describe("Price Range Filter", () => {
   test(`${tags.core} - price slider in modal adjusts pending price`, async ({ page }) => {
     await waitForSearchReady(page);
 
-    // Open filter modal
-    const filtersBtn = page.getByRole("button", { name: "Filters", exact: true });
+    // Open filter modal using retry-click pattern for hydration race
+    const filtersBtn = page.getByRole("button", { name: /^Filters/ });
+    await expect(filtersBtn).toBeVisible({ timeout: 15_000 });
     await filtersBtn.click();
 
     const dialog = page.getByRole("dialog", { name: /filters/i });
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    const dialogVisible = await dialog
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!dialogVisible) {
+      // Retry: hydration or dynamic import may not have been ready
+      await filtersBtn.click();
+      await expect(dialog).toBeVisible({ timeout: 15_000 });
+    }
 
     // Find the price range slider
     const priceSlider = page.locator('[aria-label="Price range"]');
 
-    if (await priceSlider.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    if (await priceSlider.isVisible({ timeout: 5_000 }).catch(() => false)) {
       // Adjust the max price thumb via keyboard
       const maxThumb = page.locator('[aria-label="Maximum price"]');
       if (await maxThumb.count() > 0) {
@@ -270,7 +280,7 @@ test.describe("Price Range Filter", () => {
       await applyBtn.click();
 
       // Modal should close
-      await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+      await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
       // URL may have maxPrice now (depending on slider position)
       // At minimum, page should not crash

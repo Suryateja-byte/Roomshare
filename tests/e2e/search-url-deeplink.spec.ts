@@ -42,8 +42,9 @@ async function assertUrlExcludesParams(page: Page, keys: string[]) {
 async function waitForSearchContent(page: Page) {
   const container = searchResultsContainer(page);
   const cards = container.locator('[data-testid="listing-card"]');
-  const zeroResults = container.locator('h2:has-text("No matches found")');
-  await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
+  // ZeroResultsSuggestions uses h3 "No exact matches", older UI might use h2 "No matches found"
+  const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+  await expect(cards.first().or(zeroResults.first())).toBeAttached({ timeout: 30_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -122,20 +123,26 @@ test.describe("Search URL Deep Links (P0)", () => {
   // 4. Deep link with sort
   // -------------------------------------------------------------------------
   test("4: deep link with sort=price_asc reflects in sort control", async ({ page }) => {
+    test.slow();
     await page.goto(buildSearchUrl({ sort: "price_asc" }));
     await waitForSearchContent(page);
 
     await assertUrlParams(page, { sort: "price_asc" });
 
     // Sort label should show "Price: Low to High" on desktop,
-    // or the mobile sort button label should reflect the sort
-    const sortLabel = page.locator('text="Price: Low to High"');
+    // or the mobile sort button label should reflect the sort.
+    // Wait for the sort control to hydrate (Radix UI mounts after useEffect).
+    // SortSelect has a `mounted` state - SSR placeholder renders first without aria-label.
+    const container = searchResultsContainer(page);
+    const sortLabel = container.locator('text="Price: Low to High"');
     const mobileSortBtn = page.locator('button[aria-label="Sort: Price: Low to High"]');
 
-    const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
-    const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
-
-    expect(desktopVisible || mobileVisible).toBe(true);
+    // Use a retry assertion since the sort control may take time to hydrate
+    await expect(async () => {
+      const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
+      const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
+      expect(desktopVisible || mobileVisible).toBe(true);
+    }).toPass({ timeout: 30_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -208,6 +215,7 @@ test.describe("Search URL Deep Links (P0)", () => {
   // 8. Deep link shared URL - second context sees same results pattern
   // -------------------------------------------------------------------------
   test("8: shared URL produces same results pattern in separate context", async ({ browser }) => {
+    test.slow();
     const sharedUrl = buildSearchUrl({ q: "room", maxPrice: "2000", sort: "price_asc" });
 
     // Open in first context
@@ -216,13 +224,16 @@ test.describe("Search URL Deep Links (P0)", () => {
     await page1.goto(sharedUrl);
     await page1.waitForLoadState("domcontentloaded");
 
-    // Collect result info from first context
+    // Wait for search to fully settle (cards or zero-results)
     const cards1 = page1.locator('[data-testid="listing-card"]');
+    const zeroResults1 = page1.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
     try {
-      await cards1.first().waitFor({ state: "attached", timeout: 30_000 });
+      await cards1.first().or(zeroResults1.first()).waitFor({ state: "attached", timeout: 30_000 });
     } catch {
       // Zero results is also valid
     }
+    // Wait a bit for hydration to complete before counting
+    await page1.waitForLoadState("networkidle").catch(() => {});
     const count1 = await cards1.count();
 
     // Open in second context (simulating share)
@@ -232,11 +243,13 @@ test.describe("Search URL Deep Links (P0)", () => {
     await page2.waitForLoadState("domcontentloaded");
 
     const cards2 = page2.locator('[data-testid="listing-card"]');
+    const zeroResults2 = page2.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
     try {
-      await cards2.first().waitFor({ state: "attached", timeout: 30_000 });
+      await cards2.first().or(zeroResults2.first()).waitFor({ state: "attached", timeout: 30_000 });
     } catch {
       // Zero results is also valid
     }
+    await page2.waitForLoadState("networkidle").catch(() => {});
     const count2 = await cards2.count();
 
     // Both contexts should produce the same result count

@@ -61,8 +61,8 @@ async function waitForCards(page: Page) {
 async function waitForResults(page: Page) {
   const container = page.locator(DESKTOP);
   const cards = container.locator(CARDS);
-  const zeroResults = container.locator('h2:has-text("No matches found")');
-  await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
+  const zeroResults = container.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+  await expect(cards.first().or(zeroResults.first())).toBeAttached({ timeout: 30_000 });
   return { cards, zeroResults };
 }
 
@@ -93,8 +93,8 @@ async function waitForMobileCards(page: Page) {
 async function waitForMobileResults(page: Page) {
   const container = page.locator(MOBILE);
   const cards = container.locator(CARDS);
-  const zeroResults = container.locator('h2:has-text("No matches found")');
-  await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
+  const zeroResults = container.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+  await expect(cards.first().or(zeroResults.first())).toBeAttached({ timeout: 30_000 });
   return { cards, zeroResults };
 }
 
@@ -105,13 +105,47 @@ async function waitForMobileResults(page: Page) {
  * the real button (with `aria-label="Sort: ..."`) after a `useEffect` sets
  * `mounted = true`.  Cards can appear before that effect fires, so
  * `waitForMobileCards` alone is not enough.
+ *
+ * WebKit is significantly slower at hydration and layout recalculation after
+ * viewport changes, so we use a generous timeout.
  */
 async function waitForMobileSortButton(page: Page): Promise<Locator> {
   const sortBtn = page
     .locator(MOBILE)
     .locator('button[aria-label^="Sort:"]');
-  await expect(sortBtn).toBeVisible({ timeout: 15_000 });
+  await expect(sortBtn).toBeVisible({ timeout: 30_000 });
   return sortBtn;
+}
+
+/**
+ * Navigate to a URL in mobile Group 4 tests with WebKit-safe stabilization.
+ *
+ * WebKit under Desktop Safari device descriptor is slower to recalculate
+ * layout after `test.use({ viewport })` overrides. This helper:
+ * 1. Explicitly sets the viewport size before navigation (belt-and-suspenders)
+ * 2. Navigates to the URL
+ * 3. Waits for the mobile results container to be attached
+ * 4. On WebKit, adds an extra wait for layout to settle
+ */
+async function mobileNavigate(
+  page: Page,
+  url: string,
+  browserName: string,
+): Promise<void> {
+  // Belt-and-suspenders: explicitly set mobile viewport before navigation.
+  // test.use({ viewport }) should handle this, but WebKit can be unreliable
+  // when the project device descriptor (Desktop Safari) sets a desktop viewport.
+  await page.setViewportSize({ width: 393, height: 852 });
+
+  await page.goto(url);
+
+  if (browserName === "webkit") {
+    // WebKit needs extra time after navigation for layout recalculation
+    // when transitioning from a desktop device descriptor viewport to mobile.
+    await page.waitForTimeout(1_000);
+  }
+
+  await waitForMobileCards(page);
 }
 
 // ---------------------------------------------------------------------------
@@ -560,9 +594,9 @@ test.describe("Group 4: Mobile Sort", () => {
 
   test("4.1 mobile sort button is visible, desktop dropdown is hidden", async ({
     page,
+    browserName,
   }) => {
-    await page.goto(SEARCH_URL);
-    await waitForMobileCards(page);
+    await mobileNavigate(page, SEARCH_URL, browserName);
 
     // Wait for SortSelect hydration — the aria-label only appears after mount
     const sortBtn = await waitForMobileSortButton(page);
@@ -577,16 +611,16 @@ test.describe("Group 4: Mobile Sort", () => {
 
   test("4.2 tap sort button opens bottom sheet with all options", async ({
     page,
+    browserName,
   }) => {
-    await page.goto(SEARCH_URL);
-    await waitForMobileCards(page);
+    await mobileNavigate(page, SEARCH_URL, browserName);
 
     const sortBtn = await waitForMobileSortButton(page);
     await sortBtn.click();
 
     // Sheet heading (rendered via fixed portal, page-level selector is fine)
     const sheetHeading = page.locator("h3").filter({ hasText: "Sort by" });
-    await expect(sheetHeading).toBeVisible({ timeout: 5_000 });
+    await expect(sheetHeading).toBeVisible({ timeout: 10_000 });
 
     // All 5 sort options should be visible as buttons inside the sheet.
     // Exclude role="combobox" (Radix Select trigger) to avoid strict-mode
@@ -601,15 +635,15 @@ test.describe("Group 4: Mobile Sort", () => {
 
   test("4.3 select option in sheet updates URL and closes sheet", async ({
     page,
+    browserName,
   }) => {
-    await page.goto(SEARCH_URL);
-    await waitForMobileCards(page);
+    await mobileNavigate(page, SEARCH_URL, browserName);
 
     const sortBtn = await waitForMobileSortButton(page);
     await sortBtn.click();
 
     const sheetHeading = page.locator("h3").filter({ hasText: "Sort by" });
-    await expect(sheetHeading).toBeVisible({ timeout: 5_000 });
+    await expect(sheetHeading).toBeVisible({ timeout: 10_000 });
 
     // Select "Price: Low to High"
     await page
@@ -621,12 +655,14 @@ test.describe("Group 4: Mobile Sort", () => {
     await expect(page).toHaveURL(/sort=price_asc/, { timeout: 15_000 });
 
     // Sheet should close
-    await expect(sheetHeading).not.toBeVisible({ timeout: 5_000 });
+    await expect(sheetHeading).not.toBeVisible({ timeout: 10_000 });
   });
 
-  test("4.4 current sort shown in mobile button label", async ({ page }) => {
-    await page.goto(`/search?sort=price_desc&${boundsQS}`);
-    await waitForMobileCards(page);
+  test("4.4 current sort shown in mobile button label", async ({
+    page,
+    browserName,
+  }) => {
+    await mobileNavigate(page, `/search?sort=price_desc&${boundsQS}`, browserName);
 
     const sortBtn = await waitForMobileSortButton(page);
 
@@ -638,15 +674,15 @@ test.describe("Group 4: Mobile Sort", () => {
 
   test("4.5 sheet can be closed without selecting (backdrop tap)", async ({
     page,
+    browserName,
   }) => {
-    await page.goto(SEARCH_URL);
-    await waitForMobileCards(page);
+    await mobileNavigate(page, SEARCH_URL, browserName);
 
     const sortBtn = await waitForMobileSortButton(page);
     await sortBtn.click();
 
     const sheetHeading = page.locator("h3").filter({ hasText: "Sort by" });
-    await expect(sheetHeading).toBeVisible({ timeout: 5_000 });
+    await expect(sheetHeading).toBeVisible({ timeout: 10_000 });
 
     // Click the backdrop overlay via evaluate to avoid coordinate issues
     // across viewports and touch emulation.  The backdrop is the first
@@ -658,7 +694,7 @@ test.describe("Group 4: Mobile Sort", () => {
       if (backdrop) backdrop.click();
     });
 
-    await expect(sheetHeading).not.toBeVisible({ timeout: 5_000 });
+    await expect(sheetHeading).not.toBeVisible({ timeout: 10_000 });
 
     // URL should NOT have changed
     expect(page.url()).not.toContain("sort=");

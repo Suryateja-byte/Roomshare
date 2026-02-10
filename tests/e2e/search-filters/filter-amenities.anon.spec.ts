@@ -68,7 +68,7 @@ test.describe("Amenities Filter", () => {
         const amenities = new URL(url).searchParams.get("amenities");
         return amenities !== null && amenities.includes("Wifi");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     expect(getUrlParam(page, "amenities")).toContain("Wifi");
@@ -91,7 +91,7 @@ test.describe("Amenities Filter", () => {
         const amenities = new URL(url).searchParams.get("amenities");
         return amenities !== null && amenities.includes("Wifi") && amenities.includes("Parking");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     const amenities = getUrlParam(page, "amenities") ?? "";
@@ -125,7 +125,7 @@ test.describe("Amenities Filter", () => {
         const amenities = new URL(url).searchParams.get("amenities") ?? "";
         return !amenities.includes("Wifi");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     const amenities = getUrlParam(page, "amenities") ?? "";

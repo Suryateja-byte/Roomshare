@@ -44,8 +44,14 @@ const sel = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Sort dropdown helpers (Radix Select, desktop viewport)
+// Sort dropdown helpers (desktop Radix Select + mobile bottom sheet)
 // ---------------------------------------------------------------------------
+
+/** Detect if the current viewport is mobile (<768px). */
+function isMobileViewport(page: Page): boolean {
+  const viewport = page.viewportSize();
+  return viewport ? viewport.width < 768 : false;
+}
 
 /** Locate the desktop Radix Select sort trigger button. */
 function getDesktopSortTrigger(page: Page): Locator {
@@ -63,18 +69,34 @@ async function openDesktopSort(page: Page): Promise<Locator> {
 }
 
 /**
- * Open the desktop sort dropdown, pick an option by visible label,
- * and wait for the URL to reflect the new sort param.
+ * Select a sort option via the desktop dropdown or mobile bottom sheet,
+ * then wait for the URL to reflect the new sort param.
  */
-async function selectDesktopSort(
+async function selectSort(
   page: Page,
   label: string,
   expectedUrlParam: string,
 ) {
-  await openDesktopSort(page);
-  const option = page.locator('[role="option"]').filter({ hasText: label });
-  await expect(option).toBeVisible({ timeout: 5_000 });
-  await option.click();
+  if (isMobileViewport(page)) {
+    // Mobile: click the sort button to open the bottom sheet
+    const mobileSortBtn = page.locator('button[aria-label^="Sort:"]');
+    await expect(mobileSortBtn).toBeVisible({ timeout: 10_000 });
+    await mobileSortBtn.click();
+
+    // Wait for the bottom sheet heading and pick the option
+    const sheetHeading = page.locator('h3:has-text("Sort by")');
+    await expect(sheetHeading).toBeVisible({ timeout: 5_000 });
+
+    const option = page.locator('button').filter({ hasText: label });
+    await expect(option.first()).toBeVisible({ timeout: 5_000 });
+    await option.first().click();
+  } else {
+    // Desktop: use Radix Select dropdown
+    await openDesktopSort(page);
+    const option = page.locator('[role="option"]').filter({ hasText: label });
+    await expect(option).toBeVisible({ timeout: 5_000 });
+    await option.click();
+  }
   await expect(page).toHaveURL(new RegExp(`sort=${expectedUrlParam}`), {
     timeout: 15_000,
   });
@@ -152,7 +174,7 @@ test.describe("5. Cursor Reset on Filter/Sort Change", () => {
     // This updates the URL with sort=price_asc, which changes the
     // searchParamsString key and triggers a full React remount of
     // SearchResultsClient.
-    await selectDesktopSort(page, "Price: Low to High", "price_asc");
+    await selectSort(page, "Price: Low to High", "price_asc");
 
     // After remount: only new first-page results are visible
     const container = searchResultsContainer(page);
@@ -520,7 +542,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
     // Switch sort to price_asc via the desktop dropdown.
     // This changes searchParamsString, which remounts SearchResultsClient,
     // discarding all accumulated extra listings and the cursor.
-    await selectDesktopSort(page, "Price: Low to High", "price_asc");
+    await selectSort(page, "Price: Low to High", "price_asc");
 
     // After remount: only fresh first-page results visible
     const container = searchResultsContainer(page);

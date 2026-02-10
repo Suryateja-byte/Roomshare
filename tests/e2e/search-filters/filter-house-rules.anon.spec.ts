@@ -60,7 +60,7 @@ test.describe("House Rules Filter", () => {
         const param = new URL(url).searchParams.get("houseRules");
         return param !== null && param.includes("Pets allowed");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     const houseRules = getUrlParam(page, "houseRules") ?? "";
@@ -91,7 +91,7 @@ test.describe("House Rules Filter", () => {
         const param = new URL(url).searchParams.get("houseRules");
         return param !== null && param.includes("Pets allowed") && param.includes("Couples allowed");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     const houseRules = getUrlParam(page, "houseRules") ?? "";
@@ -144,7 +144,7 @@ test.describe("House Rules Filter", () => {
         const param = new URL(url).searchParams.get("houseRules") ?? "";
         return param.includes("Pets allowed") && !param.includes("Smoking allowed");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     const houseRules = getUrlParam(page, "houseRules") ?? "";

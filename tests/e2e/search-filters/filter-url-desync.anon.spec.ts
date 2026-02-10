@@ -57,7 +57,7 @@ test.describe("Filter URL-UI Desync", () => {
     // Wait for URL to NOT contain amenities param
     await page.waitForURL(
       (url) => !new URL(url).searchParams.has("amenities"),
-      { timeout: 15_000 }
+      { timeout: 30_000 }
     );
 
     // Verify URL no longer has amenities param
@@ -103,7 +103,7 @@ test.describe("Filter URL-UI Desync", () => {
     await page.goBack();
     await page.waitForURL(
       (url) => !new URL(url).searchParams.has("amenities"),
-      { timeout: 15_000 }
+      { timeout: 30_000 }
     );
 
     // Wait for page to fully settle after goBack before going forward.
@@ -121,7 +121,7 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Verify Wifi chip is visible in applied filters
     const filtersRegion = appliedFiltersRegion(page);
-    await expect(filtersRegion.getByRole("button", { name: /Wifi/i })).toBeVisible({ timeout: 15_000 });
+    await expect(filtersRegion.getByRole("button", { name: /Wifi/i })).toBeVisible({ timeout: 30_000 });
   });
 
   test(`${tags.filter} Manual URL edit with filter params syncs UI state`, async ({
@@ -291,7 +291,7 @@ test.describe("Filter URL-UI Desync", () => {
         const params = new URL(url).searchParams;
         return params.has("amenities") && !params.has("roomType");
       },
-      { timeout: 15_000 }
+      { timeout: 30_000 }
     );
 
     // Verify URL has amenities=Wifi but no roomType
@@ -306,7 +306,7 @@ test.describe("Filter URL-UI Desync", () => {
         const params = new URL(url).searchParams;
         return !params.has("amenities") && !params.has("roomType");
       },
-      { timeout: 15_000 }
+      { timeout: 30_000 }
     );
 
     // Verify URL has neither amenities nor roomType

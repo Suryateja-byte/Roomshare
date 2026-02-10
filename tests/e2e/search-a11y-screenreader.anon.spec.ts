@@ -229,9 +229,9 @@ test.describe("Search A11y: ARIA Live Regions & Screen Reader", () => {
     }
 
     // Also check for the visual zero results UI
-    const zeroResultsHeading = page.getByText("No matches found").first();
+    // ZeroResultsSuggestions renders <h3>No exact matches</h3>, older UI may use <h2>No matches found</h2>
+    const zeroResultsHeading = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")').first();
     if (await zeroResultsHeading.isVisible().catch(() => false)) {
-      // The heading is h2 in the zero results UI
       await expect(zeroResultsHeading).toBeVisible();
     }
   });

@@ -103,7 +103,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
     // Wait for URL to contain nearMatches=1
     await page.waitForURL(
       (url) => new URL(url).searchParams.get("nearMatches") === "1",
-      { timeout: 15_000 }
+      { timeout: 30_000 }
     );
 
     // Verify URL has nearMatches=1

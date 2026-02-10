@@ -31,8 +31,8 @@ export const mobileSelectors = {
   collapseButton: 'button[aria-label="Collapse results"]',
   /** Minimize (X) button to dismiss sheet */
   minimizeButton: 'button[aria-label="Minimize results panel"]',
-  /** Listing card links */
-  listingCard: 'a[href^="/listings/c"]',
+  /** Listing card elements */
+  listingCard: '[data-testid="listing-card"]',
   /** Map container */
   mapContainer: '[data-testid="map"], .mapboxgl-map',
   /** Map markers */

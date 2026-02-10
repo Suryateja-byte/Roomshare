@@ -139,13 +139,15 @@ test.describe('Admin Journeys', () => {
 
   /**
    * Helper: navigate to an admin route and wait for the final destination.
-   * Admin routes redirect non-admin users to '/' (home) via server-side redirect.
+   * Admin routes redirect non-admin users to '/' (home) or '/login' via server-side redirect.
    * Returns true if we landed on the admin page, false if redirected away.
    */
   async function gotoAdminRoute(page: import('@playwright/test').Page, path: string): Promise<boolean> {
     await page.goto(path);
     // Wait for navigation to settle (server-side redirects may chain)
     await page.waitForLoadState('domcontentloaded');
+    // Give client-side redirects a moment to fire
+    await page.waitForTimeout(1000);
     const url = new URL(page.url());
     return url.pathname.startsWith('/admin');
   }
@@ -163,7 +165,7 @@ test.describe('Admin Journeys', () => {
         // Non-admin user: redirected to home page or login
         // Verify we landed on a valid page (home or login)
         const url = new URL(page.url());
-        const validRedirect = url.pathname === '/' || url.pathname.startsWith('/login');
+        const validRedirect = url.pathname === '/' || url.pathname.startsWith('/login') || url.pathname.startsWith('/signin');
         expect(validRedirect).toBe(true);
         await page.waitForLoadState('domcontentloaded');
       }

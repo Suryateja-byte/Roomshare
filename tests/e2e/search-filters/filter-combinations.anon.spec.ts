@@ -19,7 +19,6 @@
 import {
   test,
   expect,
-  SF_BOUNDS,
   selectors,
   tags,
   searchResultsContainer,
@@ -28,7 +27,8 @@ import {
   getUrlParam,
   getUrlParams,
   appliedFiltersRegion,
-  filtersButton,
+  openFilterModal,
+  applyFilters,
 } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -114,26 +114,22 @@ test.describe("Filter Combinations", () => {
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
-    // Open filter modal and add an amenity
-    const filtersBtn = filtersButton(page);
-    await filtersBtn.click();
-
-    const dialog = page.getByRole("dialog", { name: /filters/i });
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    // Open filter modal with retry-click for hydration race
+    await openFilterModal(page);
 
     // Toggle Wifi amenity
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiBtn = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
-    if (await wifiBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    if (await wifiBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await wifiBtn.click();
 
-      // Apply
-      await page.locator('[data-testid="filter-modal-apply"]').click();
+      // Apply filters (handles modal close + URL settle)
+      await applyFilters(page);
 
       // Wait for URL to update
       await page.waitForURL(
         (url) => new URL(url).searchParams.has("amenities"),
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       // Both room type and amenity should be in URL
@@ -161,7 +157,7 @@ test.describe("Filter Combinations", () => {
 
       await page.waitForURL(
         (url) => !new URL(url).searchParams.has("roomType"),
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       // roomType removed, others preserved
@@ -203,26 +199,22 @@ test.describe("Filter Combinations", () => {
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
-    // Open filter modal and change a filter
-    const filtersBtn = filtersButton(page);
-    await filtersBtn.click();
-
-    const dialog = page.getByRole("dialog", { name: /filters/i });
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    // Open filter modal with retry-click for hydration race
+    await openFilterModal(page);
 
     // Toggle an amenity to make the filter set dirty
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiBtn = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
-    if (await wifiBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    if (await wifiBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await wifiBtn.click();
 
-      // Apply
-      await page.locator('[data-testid="filter-modal-apply"]').click();
+      // Apply filters (handles modal close + URL settle)
+      await applyFilters(page);
 
       // Wait for navigation
       await page.waitForURL(
         (url) => new URL(url).searchParams.has("amenities"),
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       // page param should have been removed by commit()
@@ -246,16 +238,11 @@ test.describe("Filter Combinations", () => {
     expect(getUrlParam(page, "minLng")).toBeTruthy();
     expect(getUrlParam(page, "maxLng")).toBeTruthy();
 
-    // Apply additional filters via modal
-    const filtersBtn = filtersButton(page);
-    await filtersBtn.click();
-
-    const dialog = page.getByRole("dialog", { name: /filters/i });
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    // Apply additional filters via modal (with retry-click for hydration)
+    await openFilterModal(page);
 
     // Apply without changing anything (just to test bounds persistence)
-    await page.locator('[data-testid="filter-modal-apply"]').click();
-    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+    await applyFilters(page);
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Bounds should still be there

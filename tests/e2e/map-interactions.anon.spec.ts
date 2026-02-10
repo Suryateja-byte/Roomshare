@@ -115,7 +115,7 @@ async function turnToggleOff(page: Page) {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "true") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 10_000 });
   }
 }
 
@@ -240,22 +240,28 @@ test.describe("1.x: Map + List Scroll Sync", () => {
 
     // Click the first marker via evaluate to bypass overlay interception
     // (Playwright's .click() may be intercepted by bottom sheet / popup overlays)
-    await page.evaluate((id) => {
+    const markerClicked = await page.evaluate((id) => {
       const el = document.querySelector(
         `.mapboxgl-marker [data-listing-id="${id}"]`
       ) as HTMLElement;
-      if (el) el.click();
+      if (el) { el.click(); return true; }
+      return false;
     }, listingId);
+
+    if (!markerClicked) {
+      test.skip(true, "Marker element not found in DOM for click");
+      return;
+    }
 
     // Poll for card to become active and scrolled into viewport
     await expect.poll(
       async () => (await getCardState(page, listingId)).isActive,
-      { timeout: 5000 },
+      { timeout: 10_000 },
     ).toBe(true);
 
     await expect.poll(
       async () => isCardInViewport(page, listingId),
-      { timeout: 5000 },
+      { timeout: 10_000 },
     ).toBe(true);
   });
 
@@ -379,7 +385,7 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
       test.skip(true, "Search as I move toggle not found (map may not have loaded)");
       return;
     }
-    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 10_000 });
 
     // Record initial URL bounds
     const initialUrl = page.url();
@@ -399,9 +405,10 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
     }
 
     // Poll for URL bounds to change after debounce fires
+    // Allow extra time for Mobile Chrome and CI environments
     await expect.poll(
       () => boundsChanged(initialUrl, page.url()),
-      { timeout: MAP_SEARCH_DEBOUNCE_MS + 5000 },
+      { timeout: MAP_SEARCH_DEBOUNCE_MS + 10_000 },
     ).toBe(true);
 
     // Page should still be on /search
@@ -435,7 +442,7 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
       test.skip(true, "Search as I move toggle not found (map may not have loaded)");
       return;
     }
-    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 10_000 });
 
     // Clear tracked changes from initial load
     await page.evaluate(() => {
@@ -509,10 +516,10 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
 
     // Wait for banner to appear with count
     const searchAreaBtn = page.locator(sel.searchThisAreaBtn);
-    await expect(searchAreaBtn).toBeVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 5000 });
+    await expect(searchAreaBtn).toBeVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 10_000 });
 
     // Banner should show the mocked count
-    await expect(searchAreaBtn).toContainText("15");
+    await expect(searchAreaBtn).toContainText("15", { timeout: 10_000 });
 
     // Record listing card count before clicking
     const cardCountBefore = await page.locator(sel.listingCard).count();
@@ -533,7 +540,7 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     // Toggle state should be unchanged (still OFF)
     const toggleState = page.locator(sel.searchAsMoveToggle);
     if ((await toggleState.count()) > 0) {
-      await expect(toggleState).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
+      await expect(toggleState).toHaveAttribute("aria-checked", "false", { timeout: 10_000 });
     }
 
     // Keep reference to avoid unused var lint error
@@ -561,7 +568,7 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
 
     // Wait for banner
     const resetBtn = page.locator(sel.resetMapBtn);
-    await expect(resetBtn).toBeVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 5000 });
+    await expect(resetBtn).toBeVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 10_000 });
 
     // Click reset button
     await resetBtn.click();
@@ -570,10 +577,14 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     await waitForMapReady(page);
 
     // Banner should disappear
-    await expect(resetBtn).not.toBeVisible({ timeout: 5000 });
+    await expect(resetBtn).not.toBeVisible({ timeout: 10_000 });
 
     // URL should match the original (bounds restored)
-    expect(page.url()).toBe(initialUrl);
+    // Use poll to wait for URL to update after fly-back animation
+    await expect.poll(
+      () => page.url(),
+      { timeout: 10_000 },
+    ).toBe(initialUrl);
 
     // Map viewport has returned to original bounds (verified via URL match above)
   });

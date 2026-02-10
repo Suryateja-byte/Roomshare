@@ -58,7 +58,7 @@ test.describe("Lease Duration Filter", () => {
           const param = new URL(url).searchParams.get("leaseDuration");
           return param !== null && param === duration;
         },
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       expect(getUrlParam(page, "leaseDuration")).toBe(duration);
@@ -85,7 +85,7 @@ test.describe("Lease Duration Filter", () => {
 
     await page.waitForURL(
       (url) => !new URL(url).searchParams.has("leaseDuration"),
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     expect(getUrlParam(page, "leaseDuration")).toBeNull();

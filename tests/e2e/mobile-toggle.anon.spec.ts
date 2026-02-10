@@ -45,7 +45,7 @@ test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
     await page.goto(`/search?${boundsQS}`);
 
     // Wait for listings to load first
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('[data-testid="listing-card"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // The floating toggle button should be visible
@@ -87,7 +87,7 @@ test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
 
   test("toggle button has proper ARIA label", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Button should have one of the expected aria-labels
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
@@ -102,7 +102,7 @@ test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
 
   test("toggle button remains visible during scroll", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     const toggleBtn = page.locator(toggleSelectors.floatingToggle).first();
     await expect(toggleBtn).toBeVisible({ timeout: timeouts.action });
@@ -132,7 +132,7 @@ test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
 test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
   test("toggle switches from list to map view", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
 
@@ -157,7 +157,7 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
 
   test("toggle switches from map to list view", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     // First ensure we're in map view (click Show map if available)
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
@@ -179,14 +179,14 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
       const sheetVisible = await bottomSheet.isVisible({ timeout: 5000 }).catch(() => false);
 
       // List view is restored when bottom sheet or listings are visible
-      const listingsVisible = await page.locator('a[href^="/listings/c"]').first().isVisible().catch(() => false);
+      const listingsVisible = await page.locator('[data-testid="listing-card"]').first().isVisible().catch(() => false);
       expect(sheetVisible || listingsVisible).toBeTruthy();
     }
   });
 
   test("toggle button label changes after each click", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
     const showListBtn = page.locator(toggleSelectors.showListButton);
@@ -230,7 +230,7 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
 
   test("bottom sheet collapses when switching to map view", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     const bottomSheet = page.locator(toggleSelectors.bottomSheet);
     const sheetVisible = await bottomSheet.isVisible({ timeout: 5000 }).catch(() => false);
@@ -266,7 +266,7 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
 test.describe("Mobile Floating Toggle — Accessibility", () => {
   test("toggle button is keyboard accessible", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     const toggleBtn = page.locator(toggleSelectors.floatingToggle).first();
     await expect(toggleBtn).toBeVisible({ timeout: timeouts.action });
@@ -290,7 +290,7 @@ test.describe("Mobile Floating Toggle — Accessibility", () => {
 
   test("toggle button has visual feedback on press", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/c"]').first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     const toggleBtn = page.locator(toggleSelectors.floatingToggle).first();
     if (await toggleBtn.isVisible().catch(() => false)) {

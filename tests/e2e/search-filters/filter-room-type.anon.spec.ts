@@ -55,8 +55,8 @@ test.describe("Room Type Filter", () => {
   test(`${tags.core} - clicking inline room type tab updates URL`, async ({ page }) => {
     await waitForSearchReady(page);
 
-    // Find the "Private" room type tab
-    const privateTab = page.getByRole("button", { name: /filter by private/i });
+    // Find the "Private" room type tab (CategoryTabs renders button with text "Private" and aria-pressed)
+    const privateTab = page.locator('button[aria-pressed]').filter({ hasText: /^Private$/i });
     const tabVisible = await privateTab.isVisible().catch(() => false);
 
     if (tabVisible) {
@@ -65,7 +65,7 @@ test.describe("Room Type Filter", () => {
       // Wait for URL to update
       await page.waitForURL(
         (url) => new URL(url).searchParams.get("roomType") === "Private Room",
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       expect(getUrlParam(page, "roomType")).toBe("Private Room");
@@ -82,8 +82,8 @@ test.describe("Room Type Filter", () => {
 
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
-    // Click the "All" tab
-    const allTab = page.getByRole("button", { name: /filter by all room types/i });
+    // Click the "All" tab (CategoryTabs renders button with text "All" and aria-pressed)
+    const allTab = page.locator('button[aria-pressed]').filter({ hasText: /^All$/i });
     const tabVisible = await allTab.isVisible().catch(() => false);
 
     if (tabVisible) {
@@ -91,7 +91,7 @@ test.describe("Room Type Filter", () => {
 
       await page.waitForURL(
         (url) => !new URL(url).searchParams.has("roomType"),
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       expect(getUrlParam(page, "roomType")).toBeNull();
@@ -186,7 +186,7 @@ test.describe("Room Type Filter", () => {
         // URL should have roomType=Shared Room
         await page.waitForURL(
           (url) => new URL(url).searchParams.get("roomType") === "Shared Room",
-          { timeout: 15_000 },
+          { timeout: 30_000 },
         );
       }
     }
@@ -219,13 +219,13 @@ test.describe("Room Type Filter", () => {
     }
 
     const roomTypes = [
-      { name: /filter by private/i, param: "Private Room" },
-      { name: /filter by shared/i, param: "Shared Room" },
-      { name: /filter by entire/i, param: "Entire Place" },
+      { text: /^Private$/i, param: "Private Room" },
+      { text: /^Shared$/i, param: "Shared Room" },
+      { text: /^Entire$/i, param: "Entire Place" },
     ];
 
-    for (const { name, param } of roomTypes) {
-      const tab = page.getByRole("button", { name });
+    for (const { text, param } of roomTypes) {
+      const tab = page.locator('button[aria-pressed]').filter({ hasText: text });
       const tabVisible = await tab.isVisible().catch(() => false);
 
       if (!tabVisible) {
@@ -237,7 +237,7 @@ test.describe("Room Type Filter", () => {
 
       await page.waitForURL(
         (url) => new URL(url).searchParams.get("roomType") === param,
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       expect(getUrlParam(page, "roomType")).toBe(param);

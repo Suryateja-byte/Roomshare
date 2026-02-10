@@ -76,7 +76,7 @@ test.describe("Active Filter Chips", () => {
       // Wait for URL to update
       await page.waitForURL(
         (url) => !new URL(url).searchParams.has("roomType"),
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       // roomType should be removed but amenities should remain
@@ -106,7 +106,7 @@ test.describe("Active Filter Chips", () => {
         const params = new URL(url).searchParams;
         return !params.has("roomType") && !params.has("amenities") && !params.has("maxPrice");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     // All filters removed
@@ -190,7 +190,7 @@ test.describe("Active Filter Chips", () => {
           const amenities = new URL(url).searchParams.get("amenities") ?? "";
           return !amenities.includes("Wifi");
         },
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       // Parking should remain
@@ -260,7 +260,7 @@ test.describe("Active Filter Chips", () => {
           const params = new URL(url).searchParams;
           return !params.has("minPrice") && !params.has("maxPrice");
         },
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       expect(getUrlParam(page, "minPrice")).toBeNull();
@@ -284,7 +284,7 @@ test.describe("Active Filter Chips", () => {
 
     await page.waitForURL(
       (url) => !new URL(url).searchParams.has("roomType"),
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     // Bounds should be preserved

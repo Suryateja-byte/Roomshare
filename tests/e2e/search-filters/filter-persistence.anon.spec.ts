@@ -214,7 +214,7 @@ test.describe("Filter State Persistence", () => {
       // Wait for the price param to be removed from the URL
       await page.waitForURL(
         (url) => !new URL(url).searchParams.has("minPrice"),
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       // Price filter should be gone
@@ -243,7 +243,7 @@ test.describe("Filter State Persistence", () => {
 
         await page.waitForURL(
           (url) => !new URL(url).searchParams.has("amenities"),
-          { timeout: 15_000 },
+          { timeout: 30_000 },
         );
 
         // Amenity removed, sort preserved

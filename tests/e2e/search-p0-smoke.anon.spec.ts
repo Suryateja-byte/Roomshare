@@ -138,7 +138,7 @@ test.describe("Search P0 Smoke Suite", () => {
     // Either results appear or we get a valid zero-results state
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const zeroResults = page.locator('h2:has-text("No matches found")');
+    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
 
     // Wait for either cards or zero results heading
     await expect(
@@ -159,12 +159,12 @@ test.describe("Search P0 Smoke Suite", () => {
     // Wait for the page to settle -- either results or zero results
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const zeroResults = page.locator('h2:has-text("No matches found")');
+    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
     await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
 
     // Look for the "Clear all" button in the applied filter chips area
-    // or in the zero-results "Clear all filters" link
-    const clearAllBtn = page.locator('button:has-text("Clear all"), a:has-text("Clear all filters")');
+    // or in the zero-results "Clear all filters" button (ZeroResultsSuggestions renders a Button, not Link)
+    const clearAllBtn = page.locator('button:has-text("Clear all"), button:has-text("Clear all filters")');
     const clearVisible = await clearAllBtn.first().isVisible().catch(() => false);
 
     if (clearVisible) {
@@ -196,19 +196,24 @@ test.describe("Search P0 Smoke Suite", () => {
     const isMobile = viewport ? viewport.width < 768 : false;
 
     if (isMobile) {
-      // Click mobile sort button
+      // Click mobile sort button (needs hydration wait)
       const sortBtn = page.locator('button[aria-label^="Sort:"]');
-      if (await sortBtn.isVisible()) {
+      const mobileSortVisible = await sortBtn.isVisible({ timeout: 15_000 }).catch(() => false);
+      if (mobileSortVisible) {
         await sortBtn.click();
         // Select "Price: Low to High" from the bottom sheet
-        await page.locator('button:has-text("Price: Low to High")').click();
+        await page.locator('div.fixed button:not([role="combobox"])').filter({ hasText: "Price: Low to High" }).click();
       }
     } else {
-      // Click the desktop select trigger to open dropdown
-      const selectTrigger = page.locator('text=Sort by:').locator('..').locator('button').first();
-      if (await selectTrigger.isVisible({ timeout: 5000 }).catch(() => false)) {
+      // Click the desktop Radix Select trigger (role="combobox")
+      // SortSelect renders an SSR placeholder without role="combobox", so this
+      // only matches after client-side hydration sets mounted = true.
+      const selectTrigger = container.locator('button[role="combobox"]');
+      if (await selectTrigger.isVisible({ timeout: 15_000 }).catch(() => false)) {
         await selectTrigger.click();
-        await page.locator('[role="option"]:has-text("Price: Low to High")').click();
+        const listbox = page.locator('[role="listbox"]');
+        await expect(listbox).toBeVisible({ timeout: 5_000 });
+        await page.locator('[role="option"]').filter({ hasText: "Price: Low to High" }).click();
       } else {
         // Fallback: navigate directly with sort param
         await page.goto(`/search?sort=price_asc&${boundsQS}`);
@@ -409,7 +414,7 @@ test.describe("Search P0 Smoke Suite", () => {
     // Wait for page to settle
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const zeroResults = page.locator('h2:has-text("No matches found")');
+    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
     await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
 
     // Verify the URL still contains all the search parameters
@@ -493,7 +498,7 @@ test.describe("Search P0 Smoke Suite", () => {
     // Wait for results or zero state
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const zeroResults = page.locator('h2:has-text("No matches found")');
+    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
     await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
 
     // Assert URL preserves all params

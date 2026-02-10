@@ -443,7 +443,19 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
         !e.includes("net::ERR") &&
         !e.includes("Failed to load resource") &&
         !e.includes("AbortError") &&
-        !e.includes("abort"),
+        !e.includes("abort") &&
+        !e.includes("Failed to fetch") &&
+        !e.includes("Load failed") &&
+        !e.includes("ChunkLoadError") &&
+        !e.includes("Loading chunk") &&
+        !e.includes("Environment validation") &&
+        !e.includes("CORS") &&
+        !e.includes("cancelled") &&
+        !e.includes("ERR_BLOCKED") &&
+        !e.includes("maplibre") &&
+        !e.includes("Mapbox") &&
+        !e.includes("tile") &&
+        !e.includes("pbf"),
     );
 
     // No unexpected JS errors

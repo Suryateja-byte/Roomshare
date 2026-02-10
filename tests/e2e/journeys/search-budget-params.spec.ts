@@ -43,13 +43,11 @@ test.describe("Budget URL Param Aliases", () => {
       // CRITICAL ASSERTION: All visible listing prices must be within range
       // This validates server-side filtering is working, not just UI display
       for (let i = 0; i < priceCount; i++) {
-        const priceValue = await priceElements
-          .nth(i)
-          .getAttribute("data-price");
-        const price = parseFloat(priceValue || "0");
+        const priceText = await priceElements.nth(i).textContent();
+        const price = parseInt((priceText || "0").replace(/[^0-9]/g, ""), 10);
 
         // Skip if price is 0 (invalid/free listings)
-        if (price === 0) continue;
+        if (price === 0 || isNaN(price)) continue;
 
         expect(price).toBeGreaterThanOrEqual(minBudget);
         expect(price).toBeLessThanOrEqual(maxBudget);
@@ -75,12 +73,10 @@ test.describe("Budget URL Param Aliases", () => {
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
-        const priceValue = await priceElements
-          .nth(i)
-          .getAttribute("data-price");
-        const price = parseFloat(priceValue || "0");
+        const priceText = await priceElements.nth(i).textContent();
+        const price = parseInt((priceText || "0").replace(/[^0-9]/g, ""), 10);
 
-        if (price === 0) continue;
+        if (price === 0 || isNaN(price)) continue;
 
         expect(price).toBeGreaterThanOrEqual(minPrice);
         expect(price).toBeLessThanOrEqual(maxPrice);
@@ -137,12 +133,10 @@ test.describe("Budget URL Param Aliases", () => {
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
-        const priceValue = await priceElements
-          .nth(i)
-          .getAttribute("data-price");
-        const price = parseFloat(priceValue || "0");
+        const priceText = await priceElements.nth(i).textContent();
+        const price = parseInt((priceText || "0").replace(/[^0-9]/g, ""), 10);
 
-        if (price === 0) continue;
+        if (price === 0 || isNaN(price)) continue;
 
         // Should use canonical minPrice=700, not alias minBudget=500
         expect(price).toBeGreaterThanOrEqual(700);
@@ -170,12 +164,10 @@ test.describe("Budget URL Param Aliases", () => {
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
-        const priceValue = await priceElements
-          .nth(i)
-          .getAttribute("data-price");
-        const price = parseFloat(priceValue || "0");
+        const priceText = await priceElements.nth(i).textContent();
+        const price = parseInt((priceText || "0").replace(/[^0-9]/g, ""), 10);
 
-        if (price === 0) continue;
+        if (price === 0 || isNaN(price)) continue;
 
         expect(price).toBeGreaterThanOrEqual(500);
         // Should use canonical maxPrice=1200, not alias maxBudget=2000
@@ -206,12 +198,10 @@ test.describe("Budget URL Param Aliases", () => {
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
-        const priceValue = await priceElements
-          .nth(i)
-          .getAttribute("data-price");
-        const price = parseFloat(priceValue || "0");
+        const priceText = await priceElements.nth(i).textContent();
+        const price = parseInt((priceText || "0").replace(/[^0-9]/g, ""), 10);
 
-        if (price === 0) continue;
+        if (price === 0 || isNaN(price)) continue;
 
         expect(price).toBeGreaterThanOrEqual(500);
         expect(price).toBeLessThanOrEqual(1500);
@@ -239,12 +229,10 @@ test.describe("Budget URL Param Aliases", () => {
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
-        const priceValue = await priceElements
-          .nth(i)
-          .getAttribute("data-price");
-        const price = parseFloat(priceValue || "0");
+        const priceText = await priceElements.nth(i).textContent();
+        const price = parseInt((priceText || "0").replace(/[^0-9]/g, ""), 10);
 
-        if (price === 0) continue;
+        if (price === 0 || isNaN(price)) continue;
 
         expect(price).toBeGreaterThanOrEqual(600);
         expect(price).toBeLessThanOrEqual(1800);

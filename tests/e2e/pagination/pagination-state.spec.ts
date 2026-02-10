@@ -191,10 +191,13 @@ test.describe("Pagination URL State", () => {
     // Click load more
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
     await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    const countBefore = await cards.count();
     await loadMoreBtn.click();
-    // 12 initial + 12 mock = 24 (or fewer if filter narrows results)
-    // Use a flexible wait: just confirm cards increased
-    await page.waitForTimeout(3_000);
+    // Wait for card count to increase (filters may reduce matched items)
+    await expect(async () => {
+      const count = await cards.count();
+      expect(count).toBeGreaterThan(countBefore);
+    }).toPass({ timeout: 15_000 });
     const countAfter = await cards.count();
     expect(countAfter).toBeGreaterThan(0);
 

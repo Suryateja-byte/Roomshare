@@ -240,7 +240,7 @@ test.describe("Category Bar", () => {
           return params.has("amenities") || params.has("roomType") ||
             params.has("leaseDuration") || params.has("houseRules");
         },
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       // Verify some category param was set

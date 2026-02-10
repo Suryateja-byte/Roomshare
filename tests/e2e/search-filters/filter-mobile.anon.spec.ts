@@ -91,14 +91,14 @@ test.describe("Mobile Filter Experience", () => {
 
       // Wait for modal to close
       const dialog = filterDialog(page);
-      await expect(dialog).not.toBeVisible({ timeout: 5000 });
+      await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
       // Verify bottom sheet is still visible
       const bottomSheet = page.locator(mobileSelectors.bottomSheet);
       await expect(bottomSheet).toBeVisible();
 
       // Verify URL has amenities parameter
-      await page.waitForURL(/amenities=Wifi/, { timeout: 5000 });
+      await page.waitForURL(/amenities=Wifi/, { timeout: 30_000 });
       expectUrlParam(page, "amenities", "Wifi");
 
       // Verify snap position is reasonable (not broken)
@@ -206,7 +206,7 @@ test.describe("Mobile Filter Experience", () => {
       }
 
       // Wait for URL to update with sort param
-      await page.waitForURL(/[?&]sort=/, { timeout: 5000 });
+      await page.waitForURL(/[?&]sort=/, { timeout: 30_000 });
 
       // Verify sort param is present
       const sortParam = getUrlParam(page, "sort");

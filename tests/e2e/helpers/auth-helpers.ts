@@ -39,19 +39,22 @@ export const authHelpers = {
     const usePassword = password || creds.password;
 
     await page.goto('/login');
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for the login form to render (Suspense boundary + hydration)
     await expect(
       page.getByRole('heading', { name: /log in|sign in|welcome back/i })
     ).toBeVisible({ timeout: 30000 });
 
-    await page.getByLabel(/email/i).fill(useEmail);
-    await page.getByLabel('Password', { exact: true }).fill(usePassword);
-    await page.getByRole('button', { name: /sign in|log in|login/i }).click();
+    await page.getByLabel(/email/i).first().fill(useEmail);
+    await page.getByLabel(/password/i).first().fill(usePassword);
+    await page.getByRole('button', { name: /sign in|log in|login/i }).first().click();
 
     // Wait for redirect away from login
+    // Login uses window.location.href = '/' (full page navigation), use waitUntil: "commit"
     await page.waitForURL((url) => !url.pathname.includes('/login'), {
-      timeout: 15000,
+      timeout: 30000,
+      waitUntil: 'commit',
     });
   },
 
@@ -67,12 +70,18 @@ export const authHelpers = {
     }
   ) {
     await page.goto('/signup');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for the signup form to render (Suspense boundary + hydration)
+    await expect(
+      page.getByRole('heading', { name: /sign up|create.*account|register/i })
+    ).toBeVisible({ timeout: 30000 });
 
     // Fill registration form
     if (options.name) {
       await page.getByLabel(/name/i).first().fill(options.name);
     }
-    await page.getByLabel(/email/i).fill(options.email);
+    await page.getByLabel(/email/i).first().fill(options.email);
 
     // Handle password fields (might be "password" and "confirm password")
     const passwordInputs = page.locator('input[type="password"]');
@@ -85,10 +94,10 @@ export const authHelpers = {
       await passwordInputs.first().fill(options.password);
     }
 
-    await page.getByRole('button', { name: /sign up|register|create account/i }).click();
+    await page.getByRole('button', { name: /sign up|register|create account/i }).first().click();
 
     // Wait for redirect or success message
-    await expect(page).not.toHaveURL(/\/signup/, { timeout: 15000 });
+    await expect(page).not.toHaveURL(/\/signup/, { timeout: 30000 });
   },
 
   /**
@@ -101,16 +110,17 @@ export const authHelpers = {
       .or(page.locator('[data-testid="user-menu"]'))
       .or(page.locator('[aria-label*="user"]'));
 
-    await userMenuButton.click();
+    await userMenuButton.first().click();
 
     // Click logout option
-    await page
+    const logoutOption = page
       .getByRole('menuitem', { name: /log ?out|sign ?out/i })
-      .or(page.getByRole('button', { name: /log ?out|sign ?out/i }))
-      .click();
+      .or(page.getByRole('button', { name: /log ?out|sign ?out/i }));
+
+    await logoutOption.first().click();
 
     // Verify logged out
-    await expect(page).toHaveURL(/\/(login)?$/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/(login)?$/, { timeout: 15000 });
   },
 
   /**
@@ -123,7 +133,7 @@ export const authHelpers = {
         .or(page.locator('[data-testid="user-menu"]'))
         .or(page.locator('[aria-label*="user"]'));
 
-      await userMenu.waitFor({ state: 'visible', timeout: 5000 });
+      await userMenu.first().waitFor({ state: 'visible', timeout: 5000 });
       return true;
     } catch {
       return false;
@@ -137,7 +147,7 @@ export const authHelpers = {
     await page.goto(protectedUrl);
 
     // Should redirect to login
-    await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/login/, { timeout: 30000 });
   },
 
   /**
@@ -146,7 +156,7 @@ export const authHelpers = {
   async verifyAdminAccess(page: Page) {
     await page.goto('/admin');
     await expect(page).toHaveURL(/\/admin/);
-    await expect(page.locator('h1, h2').filter({ hasText: /admin/i })).toBeVisible();
+    await expect(page.locator('h1, h2').filter({ hasText: /admin/i }).first()).toBeVisible();
   },
 
   /**

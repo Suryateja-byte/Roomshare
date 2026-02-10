@@ -87,7 +87,7 @@ export async function waitForUrlParam(
   page: Page,
   key: string,
   value?: string,
-  timeout = 15_000,
+  timeout = 30_000,
 ): Promise<void> {
   await page.waitForURL(
     (url) => {
@@ -105,7 +105,7 @@ export async function waitForUrlParam(
 export async function waitForNoUrlParam(
   page: Page,
   key: string,
-  timeout = 15_000,
+  timeout = 30_000,
 ): Promise<void> {
   await page.waitForURL(
     (url) => !new URL(url).searchParams.has(key),
@@ -120,7 +120,7 @@ export async function expectUrlParam(
   page: Page,
   key: string,
   value: string,
-  timeout = 15_000,
+  timeout = 30_000,
 ): Promise<void> {
   await waitForUrlParam(page, key, value, timeout);
   expect(getUrlParam(page, key)).toBe(value);
@@ -132,7 +132,7 @@ export async function expectUrlParam(
 export async function expectNoUrlParam(
   page: Page,
   key: string,
-  timeout = 15_000,
+  timeout = 30_000,
 ): Promise<void> {
   await waitForNoUrlParam(page, key, timeout);
   expect(getUrlParam(page, key)).toBeNull();
@@ -412,7 +412,7 @@ export async function selectDropdownOption(
 export async function waitForUrlStable(
   page: Page,
   settleMs = 500,
-  timeout = 15_000,
+  timeout = 30_000,
 ): Promise<string> {
   const start = Date.now();
   let lastUrl = page.url();

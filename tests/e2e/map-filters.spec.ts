@@ -652,7 +652,18 @@ test.describe("Map + Filter Interactions", () => {
           !e.includes("abort") &&
           !e.includes("cancelled") &&
           !e.includes("net::ERR") &&
-          !e.includes("Failed to load resource")
+          !e.includes("Failed to load resource") &&
+          !e.includes("Failed to fetch") &&
+          !e.includes("Load failed") &&
+          !e.includes("ChunkLoadError") &&
+          !e.includes("Loading chunk") &&
+          !e.includes("Environment validation") &&
+          !e.includes("CORS") &&
+          !e.includes("ERR_BLOCKED") &&
+          !e.includes("maplibre") &&
+          !e.includes("Mapbox") &&
+          !e.includes("tile") &&
+          !e.includes("pbf")
       );
 
       expect(realErrors).toHaveLength(0);

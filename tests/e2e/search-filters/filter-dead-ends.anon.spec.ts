@@ -42,16 +42,16 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     await expect(zeroResultsHeading).toBeVisible({ timeout: 10000 });
 
     // Verify recovery paths are available
-    const clearAllLink = container.getByRole("link", { name: /clear all/i });
+    // ZeroResultsSuggestions renders "Clear all filters" as a <Button> (not a link)
+    // and suggestion buttons with "Remove: {label}" text
+    const clearAllButton = container.getByRole("button", { name: /clear all/i });
     const browseAllLink = container.getByRole("link", {
       name: /browse all/i,
     });
-    const suggestionButtons = container.getByRole("button", {
-      name: /remove.*filter/i,
-    });
+    const suggestionButtons = container.locator("button").filter({ hasText: /remove/i });
 
     // At least one recovery option should be visible
-    const hasClearAll = await clearAllLink.isVisible().catch(() => false);
+    const hasClearAll = await clearAllButton.isVisible().catch(() => false);
     const hasBrowseAll = await browseAllLink.isVisible().catch(() => false);
     const hasSuggestions =
       (await suggestionButtons.count().catch(() => 0)) > 0;
@@ -67,7 +67,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
 
       // Wait for URL to change (filter removed)
       await page.waitForURL((url) => url.toString() !== currentUrl, {
-        timeout: 5000,
+        timeout: 30_000,
       });
 
       // Verify we're still on search page
@@ -192,7 +192,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     );
 
     // Wait for applied filters region to be visible
-    await expect(appliedFiltersRegion).toBeVisible({ timeout: 5000 });
+    await expect(appliedFiltersRegion).toBeVisible({ timeout: 15_000 });
 
     // Count initial chips: should be 3 (Wifi + Parking + Private Room)
     const initialChipButtons = appliedFiltersRegion.getByRole("button", {
@@ -209,7 +209,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
 
     // Wait for URL to update
     await page.waitForURL((url) => !url.toString().includes("Wifi"), {
-      timeout: 5000,
+      timeout: 30_000,
     });
 
     // Verify URL still has Parking and roomType
@@ -233,7 +233,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     // Wait for URL update - amenities param should be deleted when last value removed
     await page.waitForURL(
       (url) => !new URL(url).searchParams.has("amenities"),
-      { timeout: 5000 }
+      { timeout: 30_000 }
     );
 
     // Verify amenities param is gone
@@ -256,7 +256,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     // Wait for URL update - no filters
     await page.waitForURL(
       (url) => !new URL(url).searchParams.has("roomType"),
-      { timeout: 5000 }
+      { timeout: 30_000 }
     );
 
     // Verify no filter params in URL
@@ -284,7 +284,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     );
 
     // Wait for applied filters region
-    await expect(appliedFiltersRegion).toBeVisible({ timeout: 5000 });
+    await expect(appliedFiltersRegion).toBeVisible({ timeout: 15_000 });
 
     // Capture bounds params before clearing (should be in URL from buildSearchUrl)
     const beforeParams = getUrlParams(page);
@@ -308,7 +308,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     // Wait for URL to update (amenities and roomType removed)
     await page.waitForURL(
       (url) => !new URL(url).searchParams.has("amenities"),
-      { timeout: 5000 }
+      { timeout: 30_000 }
     );
 
     // Verify filters were removed

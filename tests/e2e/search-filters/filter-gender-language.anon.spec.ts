@@ -65,7 +65,7 @@ test.describe("Gender & Language Filters", () => {
     // Verify URL contains genderPreference=FEMALE_ONLY
     await page.waitForURL(
       (url) => new URL(url).searchParams.get("genderPreference") === "FEMALE_ONLY",
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     expect(getUrlParam(page, "genderPreference")).toBe("FEMALE_ONLY");
@@ -85,7 +85,7 @@ test.describe("Gender & Language Filters", () => {
     // Verify URL contains householdGender=MIXED
     await page.waitForURL(
       (url) => new URL(url).searchParams.get("householdGender") === "MIXED",
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     expect(getUrlParam(page, "householdGender")).toBe("MIXED");
@@ -141,7 +141,7 @@ test.describe("Gender & Language Filters", () => {
         const languages = new URL(url).searchParams.get("languages");
         return languages !== null && languages.includes("es") && languages.includes("fr");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     const languages = getUrlParam(page, "languages") ?? "";
@@ -181,7 +181,7 @@ test.describe("Gender & Language Filters", () => {
         const languages = new URL(url).searchParams.get("languages") ?? "";
         return !languages.includes("es");
       },
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     const languages = getUrlParam(page, "languages") ?? "";
