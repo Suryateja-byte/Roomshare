@@ -306,7 +306,7 @@ test.describe("Map-List Synchronization", () => {
       }
 
       // Hover the card
-      const card = page
+      const card = searchResultsContainer(page)
         .locator(`[data-testid="listing-card"][data-listing-id="${cardId}"]`)
         .first();
       await card.hover();
@@ -335,7 +335,7 @@ test.describe("Map-List Synchronization", () => {
       }
 
       // Hover the card
-      const card = page
+      const card = searchResultsContainer(page)
         .locator(`[data-testid="listing-card"][data-listing-id="${cardId}"]`)
         .first();
       await card.hover();
@@ -374,7 +374,7 @@ test.describe("Map-List Synchronization", () => {
       const secondId = overlapping[1];
 
       // Hover first card
-      const firstCard = page
+      const firstCard = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${firstId}"]`,
         )
@@ -383,7 +383,7 @@ test.describe("Map-List Synchronization", () => {
       await waitForMarkerHover(page, firstId, timeouts.action);
 
       // Hover second card
-      const secondCard = page
+      const secondCard = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${secondId}"]`,
         )
@@ -448,7 +448,7 @@ test.describe("Map-List Synchronization", () => {
       await waitForCardHighlight(page, activeId);
 
       // Hover a DIFFERENT card
-      const hoverCard = page
+      const hoverCard = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${hoverId}"]`,
         )
@@ -484,7 +484,7 @@ test.describe("Map-List Synchronization", () => {
       await waitForCardHighlight(page, listingId);
 
       // Now hover the same card
-      const card = page
+      const card = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${listingId}"]`,
         )
@@ -704,7 +704,7 @@ test.describe("Map-List Synchronization", () => {
       const listingId = await getFirstMarkerIdOrSkip(page);
 
       // Verify the card exists
-      const cardExists = await page
+      const cardExists = await searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${listingId}"]`,
         )
@@ -877,11 +877,17 @@ test.describe("Map-List Synchronization", () => {
       await clickMarkerByIndex(page, 0);
       await waitForCardHighlight(page, listingId);
 
-      // Verify focus state via data attribute
+      // Verify focus state via data attribute (filter by visibility to skip hidden dual-container duplicate)
       const focusState = await page.evaluate((id) => {
-        const card = document.querySelector(
+        const cards = document.querySelectorAll(
           `[data-testid="listing-card"][data-listing-id="${id}"]`,
         );
+        let card: Element | null = null;
+        for (const c of cards) {
+          const r = c.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) { card = c; break; }
+        }
+        if (!card) card = cards[0] ?? null;
         return card?.getAttribute("data-focus-state") ?? "none";
       }, listingId);
 
@@ -904,7 +910,7 @@ test.describe("Map-List Synchronization", () => {
       }
 
       // Hover the card
-      const card = page
+      const card = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${cardId}"]`,
         )
@@ -914,9 +920,13 @@ test.describe("Map-List Synchronization", () => {
 
       // Verify hover state via data attribute
       const focusState = await page.evaluate((id) => {
-        const c = document.querySelector(
+        const cards = document.querySelectorAll(
           `[data-testid="listing-card"][data-listing-id="${id}"]`,
         );
+        const c = Array.from(cards).find((el) => {
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        }) ?? cards[0] ?? null;
         return c?.getAttribute("data-focus-state") ?? "none";
       }, cardId!);
 
@@ -941,7 +951,7 @@ test.describe("Map-List Synchronization", () => {
       const targetId = overlapping[0];
 
       // Hover the card to trigger marker hover state
-      const card = page
+      const card = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${targetId}"]`,
         )
@@ -994,9 +1004,15 @@ test.describe("Map-List Synchronization", () => {
           (window as any).__transitionCounts = { [targetId1]: 0, [targetId2]: 0 };
 
           const observe = (id: string) => {
-            const el = document.querySelector(
+            const els = document.querySelectorAll(
               `[data-testid="listing-card"][data-listing-id="${id}"]`,
             );
+            let el: Element | null = null;
+            for (const c of els) {
+              const r = c.getBoundingClientRect();
+              if (r.width > 0 && r.height > 0) { el = c; break; }
+            }
+            if (!el) el = els[0] ?? null;
             if (!el) return;
             const observer = new MutationObserver((mutations) => {
               for (const m of mutations) {
@@ -1014,12 +1030,12 @@ test.describe("Map-List Synchronization", () => {
       );
 
       // Perform rapid hover transitions
-      const card1 = page
+      const card1 = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${id1}"]`,
         )
         .first();
-      const card2 = page
+      const card2 = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${id2}"]`,
         )
@@ -1074,7 +1090,7 @@ test.describe("Map-List Synchronization", () => {
       if (!listingId) test.skip(true, "No marker ID");
 
       // Check if a card exists for this listing
-      const cardExists = await page
+      const cardExists = await searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${listingId}"]`,
         )
@@ -1195,7 +1211,7 @@ test.describe("Map-List Synchronization", () => {
       const listingId = await getMarkerListingId(page, 0);
       if (!listingId) test.skip(true, "No marker ID");
 
-      const cardExists = await page
+      const cardExists = await searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${listingId}"]`,
         )
@@ -1226,7 +1242,7 @@ test.describe("Map-List Synchronization", () => {
       if (!cardId) test.skip(true, "No card");
 
       // Find the "Show on map" button on the first card
-      const showOnMapBtn = page.locator(
+      const showOnMapBtn = searchResultsContainer(page).locator(
         `[data-testid="listing-card"][data-listing-id="${cardId}"] button[aria-label="Show on map"]`,
       );
 

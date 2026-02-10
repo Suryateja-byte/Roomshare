@@ -90,10 +90,16 @@ export async function getCardState(
   isInViewport: boolean;
 }> {
   return page.evaluate((id) => {
-    // Directly select the listing card (not a marker element)
-    const cardEl = document.querySelector(
+    // Find the VISIBLE listing card (skip hidden dual-container duplicate)
+    const cards = document.querySelectorAll(
       `[data-testid="listing-card"][data-listing-id="${id}"]`,
     );
+    let cardEl: Element | null = null;
+    for (const c of cards) {
+      const r = c.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) { cardEl = c; break; }
+    }
+    if (!cardEl) cardEl = cards[0] ?? null;
     if (!cardEl) {
       return {
         isActive: false,
@@ -130,9 +136,15 @@ export async function isCardInViewport(
   listingId: string,
 ): Promise<boolean> {
   return page.evaluate((id) => {
-    const card = document.querySelector(
+    // Find the VISIBLE card (skip hidden dual-container duplicate)
+    const cards = document.querySelectorAll(
       `[data-testid="listing-card"][data-listing-id="${id}"]`,
     );
+    let card: Element | null = null;
+    for (const c of cards) {
+      const r = c.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) { card = c; break; }
+    }
     if (!card) return false;
     const rect = card.getBoundingClientRect();
     return (
@@ -156,10 +168,16 @@ export async function getActiveListingId(
   page: Page,
 ): Promise<string | null> {
   return page.evaluate(() => {
-    const active = document.querySelector(
+    const all = document.querySelectorAll(
       '[data-testid="listing-card"][data-focus-state="active"]',
     );
-    return active?.getAttribute("data-listing-id") ?? null;
+    // Return the visible one (skip hidden dual-container duplicate)
+    for (const el of all) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0)
+        return el.getAttribute("data-listing-id");
+    }
+    return all[0]?.getAttribute("data-listing-id") ?? null;
   });
 }
 
@@ -175,6 +193,10 @@ export async function getHoveredListingIds(
         '[data-testid="listing-card"][data-focus-state="hovered"]',
       ),
     )
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      })
       .map((card) => card.getAttribute("data-listing-id"))
       .filter((id): id is string => id !== null);
   });
@@ -312,6 +334,10 @@ export async function getAllCardListingIds(
         '[data-testid="listing-card"][data-listing-id]',
       ),
     )
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      })
       .map((card) => card.getAttribute("data-listing-id"))
       .filter((id): id is string => id !== null);
   });
@@ -452,9 +478,14 @@ export async function waitForMarkersWithClusterExpansion(
  */
 export async function countActiveCards(page: Page): Promise<number> {
   return page.evaluate(() => {
-    return document.querySelectorAll(
-      '[data-testid="listing-card"][data-focus-state="active"]',
-    ).length;
+    return Array.from(
+      document.querySelectorAll(
+        '[data-testid="listing-card"][data-focus-state="active"]',
+      ),
+    ).filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    }).length;
   });
 }
 
