@@ -25,7 +25,9 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
   }
 
   await page.goto("/login");
+  // Wait for the login form to render (Suspense boundary + hydration)
   await page.waitForLoadState('domcontentloaded');
+  await page.getByRole('heading', { name: /log in|sign in|welcome back/i }).waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
 
   const emailField = page
     .getByLabel(/email/i)

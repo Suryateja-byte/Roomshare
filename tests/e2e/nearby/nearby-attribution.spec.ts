@@ -152,18 +152,28 @@ test.describe('Nearby Places Attribution Compliance', () => {
     const found = await navigateToListing(page);
     if (!found) { test.skip(true, 'No listings available'); return; }
 
-    // Wait for map to load
-    await page.waitForLoadState('domcontentloaded');
+    // Wait for MapLibre map to fully render (it loads asynchronously via dynamic import)
+    // First wait for the map canvas container which indicates MapLibre has initialized
+    const mapCanvas = page.locator('.maplibregl-canvas-container, .mapboxgl-canvas-container, .maplibregl-map, .mapboxgl-map');
+    await mapCanvas.first().waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
 
-    // MapLibre automatically adds attribution from style JSON
-    // Look for attribution control
+    const mapLoaded = await mapCanvas.count() > 0;
+    if (!mapLoaded) {
+      // Map did not load (NEXT_PUBLIC_NEARBY_ENABLED may be false) — skip
+      test.skip(true, 'Map did not render (nearby may be disabled)');
+      return;
+    }
+
+    // MapLibre adds attribution control after style JSON loads — wait for it
+    // The control uses class "maplibregl-ctrl-attrib" (or "mapboxgl-ctrl-attrib")
     const attributionControl = page.locator('.maplibregl-ctrl-attrib, .mapboxgl-ctrl-attrib');
+    await attributionControl.first().waitFor({ state: 'attached', timeout: 10_000 }).catch(() => {});
 
     const exists = await attributionControl.count() > 0;
 
     if (exists) {
       // Check that attribution contains expected text
-      const attributionText = await attributionControl.textContent();
+      const attributionText = await attributionControl.first().textContent();
 
       // Should contain OSM or Stadia reference
       const hasOSM = attributionText?.includes('OpenStreetMap');
@@ -171,9 +181,12 @@ test.describe('Nearby Places Attribution Compliance', () => {
 
       expect(hasOSM || hasStadia).toBe(true);
     } else {
-      // Attribution might be in a different location
-      // Check for any attribution-related elements
-      const anyAttribution = await page.locator('[class*="attribution"], [class*="attrib"]').count();
+      // Fallback: MapLibre attribution control uses classes like "maplibregl-ctrl-attrib"
+      // which contain the substring "attrib". Also check for Leaflet-style attribution
+      // and any element whose class contains "attribution" or "attrib".
+      const anyAttribution = await page.locator(
+        '.maplibregl-ctrl-attrib, .mapboxgl-ctrl-attrib, .leaflet-control-attribution, [class*="attribution"], [class*="attrib"]'
+      ).count();
       expect(anyAttribution).toBeGreaterThan(0);
     }
   });

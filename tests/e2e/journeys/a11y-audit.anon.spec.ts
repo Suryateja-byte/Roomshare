@@ -80,6 +80,8 @@ test.describe('Accessibility Audit (axe-core)', () => {
     test('Login page passes accessibility audit', async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       const results = await new AxeBuilder({ page })
         .withTags(WCAG_AA_TAGS)
@@ -426,6 +428,8 @@ test.describe('Accessibility Audit (axe-core)', () => {
     test('Form inputs have associated labels', async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       const inputs = page.locator('input:not([type="hidden"]):not([type="submit"])');
       const inputCount = await inputs.count();
@@ -465,6 +469,8 @@ test.describe('Accessibility Audit (axe-core)', () => {
     test('Error messages are associated with inputs', async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       // Submit empty form to trigger errors
       const submitButton = page.getByRole('button', { name: /log in|sign in|submit/i });

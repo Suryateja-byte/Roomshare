@@ -29,8 +29,8 @@ async function freshLogin(page: import('@playwright/test').Page) {
 
   await page.goto('/login');
   await page.waitForLoadState('domcontentloaded');
-  // Wait for the email input (login form compiled and rendered)
-  await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 60000 });
+  // Wait for the login form to render (Suspense boundary + hydration)
+  await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
   const email = process.env.E2E_TEST_EMAIL || 'test@example.com';
   const password = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
@@ -253,11 +253,12 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.context().clearCookies();
     await page.goto('/login');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 60000 });
+    // Wait for the login form to render (Suspense boundary + hydration)
+    await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
     await page.getByLabel(/email/i).fill('nonexistent@fake.com');
     const wrongPassword = process.env.E2E_TEST_WRONG_PASSWORD || 'WrongPassword123!';
-  await page.locator('input[name="password"]').fill(wrongPassword);
+    await page.locator('input[name="password"]').fill(wrongPassword);
     await page.getByRole('button', { name: /sign in|log in|login/i }).click();
 
     // Should show error or stay on login page
@@ -296,6 +297,8 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.context().clearCookies();
     await page.goto('/signup');
     await page.waitForLoadState('domcontentloaded');
+    // Wait for the signup form to render (Suspense boundary + hydration)
+    await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 }).catch(() => {});
 
     const submitBtn = page.getByRole('button', { name: /sign up|register|create/i });
     if (await submitBtn.isVisible({ timeout: 10000 }).catch(() => false)) {

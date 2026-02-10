@@ -56,6 +56,8 @@ test.describe('Dark Mode — Visual Regression', () => {
   test('login page dark mode — desktop', async ({ page }) => {
     await page.goto('/login');
     await page.waitForLoadState('domcontentloaded');
+    // Wait for the login form to render (Suspense boundary + hydration)
+    await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
     await disableAnimations(page);
 
     await expect(page).toHaveScreenshot('login-dark-desktop.png', {
@@ -66,6 +68,8 @@ test.describe('Dark Mode — Visual Regression', () => {
   test('signup page dark mode — desktop', async ({ page }) => {
     await page.goto('/signup');
     await page.waitForLoadState('domcontentloaded');
+    // Wait for the signup form to render (Suspense boundary + hydration)
+    await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
     await disableAnimations(page);
 
     await expect(page).toHaveScreenshot('signup-dark-desktop.png', {

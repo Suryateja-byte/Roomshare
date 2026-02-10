@@ -85,6 +85,8 @@ test.describe('axe-core — Dynamic UI States', () => {
     test('Login form with validation errors passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       // Submit empty form to trigger validation
       const submitBtn = page.getByRole('button', { name: /log in|sign in|submit/i });
@@ -111,6 +113,8 @@ test.describe('axe-core — Dynamic UI States', () => {
     test('Error messages have aria-describedby linking', async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       // Submit empty form
       const submitBtn = page.getByRole('button', { name: /log in|sign in|submit/i });
@@ -139,6 +143,8 @@ test.describe('axe-core — Dynamic UI States', () => {
     test('Signup form with validation errors passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/signup');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for the signup form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
 
       const submitBtn = page.getByRole('button', { name: /sign up|register|create account/i });
       if (await submitBtn.isVisible()) {

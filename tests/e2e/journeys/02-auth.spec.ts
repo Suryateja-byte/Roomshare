@@ -19,7 +19,7 @@ test.describe('Authentication Journeys', () => {
 
       // Step 1: Navigate to signup
       await page.goto('/signup');
-      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
 
       // Step 2: Fill name
       const nameInput = page.getByLabel(/name/i).first();
@@ -70,6 +70,8 @@ test.describe('Authentication Journeys', () => {
 
     test(`${tags.auth} - Signup with existing email shows error`, async ({ page, auth }) => {
       await page.goto('/signup');
+      // Wait for the signup form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
 
       // Use existing test email
       const creds = auth.getCredentials();
@@ -104,6 +106,8 @@ test.describe('Authentication Journeys', () => {
 
     test(`${tags.auth} - Weak password validation`, async ({ page }) => {
       await page.goto('/signup');
+      // Wait for the signup form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
 
       await page.getByLabel(/email/i).fill('test@example.com');
       await page.locator('input[type="password"]').first().fill('weak');
@@ -134,7 +138,7 @@ test.describe('Authentication Journeys', () => {
 
       // Step 1: Navigate to login
       await page.goto('/login');
-      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       // Step 2-3: Fill credentials
       await page.getByLabel(/email/i).fill(creds.email);
@@ -203,6 +207,8 @@ test.describe('Authentication Journeys', () => {
     test(`${tags.auth} ${tags.flaky} - Request password reset`, async ({ page }) => {
       // Step 1: Navigate to forgot password
       await page.goto('/forgot-password');
+      // Wait for the forgot password form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /forgot password|reset password/i })).toBeVisible({ timeout: 30000 });
 
       // Step 2: Fill email
       const emailInput = page.getByLabel(/email/i);

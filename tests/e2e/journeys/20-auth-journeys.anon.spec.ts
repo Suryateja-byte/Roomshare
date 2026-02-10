@@ -18,6 +18,8 @@ test.describe("J7: Login Page (Unauthenticated)", () => {
   }) => {
     await page.goto("/login");
     await page.waitForLoadState("domcontentloaded");
+    // Wait for the login form to render (Suspense boundary + hydration)
+    await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
     // Should have email field
     const emailField = page
@@ -47,6 +49,8 @@ test.describe("J7: Login Page (Unauthenticated)", () => {
   test("has link to signup page", async ({ page }) => {
     await page.goto("/login");
     await page.waitForLoadState("domcontentloaded");
+    // Wait for the login form to render (Suspense boundary + hydration)
+    await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
     const signupLink = page
       .getByRole("link", { name: /sign ?up|create|register/i })
@@ -60,6 +64,8 @@ test.describe("J8: Signup Page (Unauthenticated)", () => {
   test("renders signup form with required fields", async ({ page }) => {
     await page.goto("/signup");
     await page.waitForLoadState("domcontentloaded");
+    // Wait for the signup form to render (Suspense boundary + hydration)
+    await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
 
     // Should have email field
     const emailField = page

@@ -56,6 +56,8 @@ test.describe('Accessibility Journeys', () => {
 
     test(`${tags.a11y} - Form keyboard interaction`, async ({ page }) => {
       await page.goto('/login');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       // Tab to email field
       await page.keyboard.press('Tab');
@@ -118,6 +120,8 @@ test.describe('Accessibility Journeys', () => {
 
     test(`${tags.a11y} - Form labels present`, async ({ page }) => {
       await page.goto('/login');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       const inputs = page.locator('input:not([type="hidden"])');
       const inputCount = await inputs.count();
@@ -293,6 +297,8 @@ test.describe('Edge Case Journeys', () => {
   test.describe('J094: Concurrent actions', () => {
     test(`${tags.auth} - Double submit prevention`, async ({ page }) => {
       await page.goto('/login');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       await page.getByLabel(/email/i).fill('test@example.com');
       const loginPassword = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
@@ -417,11 +423,9 @@ test.describe('Edge Case Journeys', () => {
 
     test(`${tags.auth} - SQL injection prevention`, async ({ page }) => {
       await page.goto('/login');
-      // Login form is wrapped in Suspense — wait for hydration to complete
-      // so the email input is rendered and interactive
-      await page.waitForLoadState('domcontentloaded');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
       const emailInput = page.getByLabel(/email/i);
-      await emailInput.waitFor({ state: 'visible', timeout: timeouts.navigation });
 
       // Try SQL injection in email field
       await emailInput.fill("' OR '1'='1");

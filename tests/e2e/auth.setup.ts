@@ -20,8 +20,8 @@ setup('authenticate', async ({ page }) => {
   // Navigate to login page
   await page.goto('/login');
 
-  // Wait for page to be ready
-  await expect(page.locator('h1, h2').first()).toBeVisible({ timeout: 10000 });
+  // Wait for the login form to render (Suspense boundary + hydration)
+  await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
   // Fill login form
   await page.getByLabel(/email/i).fill(email);
@@ -70,6 +70,9 @@ setup.describe('admin auth', () => {
     const password = process.env.E2E_ADMIN_PASSWORD!;
 
     await page.goto('/login');
+    // Wait for the login form to render (Suspense boundary + hydration)
+    await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
+
     await page.getByLabel(/email/i).fill(email);
     await page.locator('input#password').fill(password);
 

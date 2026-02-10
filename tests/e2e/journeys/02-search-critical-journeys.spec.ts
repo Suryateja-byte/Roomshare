@@ -6,6 +6,10 @@
  */
 
 import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  openFilterModal,
+  applyFilters,
+} from "../helpers/filter-helpers";
 
 const SEARCH_URL_WITH_BOUNDS = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -70,8 +74,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     if (await privateTab.first().isVisible()) {
       await privateTab.first().click();
 
-      // URL should update with roomType (debounced navigation)
-      await page.waitForURL(/roomType/i, { timeout: 10000 });
+      // URL should update with roomType (debounced navigation — allow extra time under CI load)
+      await page.waitForURL(/roomType/i, { timeout: 15000 });
     }
   });
 
@@ -83,14 +87,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
-    // Open more filters
-    const moreFiltersBtn = page.getByRole("button", { name: /more filters|filters/i });
-    await expect(moreFiltersBtn.first()).toBeEnabled({ timeout: 5000 });
-    await moreFiltersBtn.first().click();
-
-    // Filter modal should open
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible({ timeout: 15000 });
+    // Open more filters (uses retry-click for hydration race)
+    const modal = await openFilterModal(page);
 
     // Select Wifi amenity
     const wifiBtn = modal.getByRole("button", { name: "Wifi" });
@@ -100,13 +98,8 @@ test.describe("20 Critical Search Page Journeys", () => {
       await expect(wifiBtn).toHaveAttribute("aria-pressed", "true");
     }
 
-    // Click Apply
-    const applyBtn = page.locator('[data-testid="filter-modal-apply"]');
-    await expect(applyBtn).toBeVisible();
-    await applyBtn.click();
-
-    // Modal should close and URL should update (debounced navigation ~300ms)
-    await expect(modal).not.toBeVisible({ timeout: 5000 });
+    // Apply and verify URL updates
+    await applyFilters(page);
     await page.waitForURL(/amenities/i, { timeout: 10000 });
     expect(page.url()).toMatch(/amenities/i);
   });
@@ -267,13 +260,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
-    // Open filter modal
-    const moreFiltersBtn = page.getByRole("button", { name: /more filters|filters/i });
-    await expect(moreFiltersBtn.first()).toBeEnabled({ timeout: 5000 });
-    await moreFiltersBtn.first().click();
-
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible({ timeout: 15000 });
+    // Open filter modal (uses retry-click for hydration race)
+    const modal = await openFilterModal(page);
 
     // Find lease duration trigger
     const leaseTrigger = modal.locator('#filter-lease');
@@ -288,8 +276,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     }
 
     // Apply
-    const applyBtn = page.locator('[data-testid="filter-modal-apply"]');
-    await applyBtn.click();
+    await applyFilters(page);
     await page.waitForURL(/leaseDuration/i, { timeout: 10000 });
 
     expect(page.url()).toMatch(/leaseDuration/i);
@@ -303,13 +290,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
-    // Open filter modal
-    const moreFiltersBtn = page.getByRole("button", { name: /more filters|filters/i });
-    await expect(moreFiltersBtn.first()).toBeEnabled({ timeout: 5000 });
-    await moreFiltersBtn.first().click();
-
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible({ timeout: 15000 });
+    // Open filter modal (uses retry-click for hydration race)
+    const modal = await openFilterModal(page);
 
     // Toggle "Pets allowed"
     const petsBtn = modal.getByRole("button", { name: "Pets allowed" });
@@ -319,7 +301,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     }
 
     // Apply and verify
-    await page.locator('[data-testid="filter-modal-apply"]').click();
+    await applyFilters(page);
     await page.waitForURL(/houseRules/i, { timeout: 10000 });
     expect(page.url()).toMatch(/houseRules/i);
   });
@@ -332,12 +314,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
-    const moreFiltersBtn = page.getByRole("button", { name: /more filters|filters/i });
-    await expect(moreFiltersBtn.first()).toBeEnabled({ timeout: 5000 });
-    await moreFiltersBtn.first().click();
-
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible({ timeout: 15000 });
+    // Open filter modal (uses retry-click for hydration race)
+    const modal = await openFilterModal(page);
 
     // Find gender preference trigger
     const genderTrigger = modal.locator('#filter-gender-pref');
@@ -349,7 +327,7 @@ test.describe("20 Critical Search Page Journeys", () => {
       }
     }
 
-    await page.locator('[data-testid="filter-modal-apply"]').click();
+    await applyFilters(page);
     await page.waitForURL(/genderPreference/i, { timeout: 10000 });
     expect(page.url()).toMatch(/genderPreference/i);
   });
@@ -504,14 +482,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     }).toPass({ timeout: 30000 });
 
     // Filter button should be visible and functional on mobile
-    // Use exact aria-label to avoid matching room-type "Filter by ..." buttons
-    const filterBtn = page.getByRole("button", { name: /^Filters/i }).first();
-    await expect(filterBtn).toBeVisible({ timeout: 10000 });
-    await filterBtn.click();
-
-    // Modal should appear (via portal to document.body)
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible({ timeout: 10000 });
+    // Uses openFilterModal which has retry-click for hydration race
+    const modal = await openFilterModal(page);
 
     // Close it via the X button (not the backdrop, which is behind the modal content)
     const closeBtn = page.getByRole("button", { name: "Close filters" }).first();

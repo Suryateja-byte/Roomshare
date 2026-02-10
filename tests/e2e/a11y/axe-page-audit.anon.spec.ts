@@ -71,6 +71,8 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
     test('Login page (/login) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for the login form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -84,6 +86,8 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
     test('Signup page (/signup) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/signup');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for the signup form to render (Suspense boundary + hydration)
+      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
