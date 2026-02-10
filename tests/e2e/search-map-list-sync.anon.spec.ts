@@ -93,45 +93,35 @@ async function getNthMarkerIdOrNull(
 }
 
 /**
- * Click a map marker by its listing ID using evaluate(focus) + keyboard.press('Enter').
+ * Click a map marker by its listing ID using wrapper.click() inside page.evaluate.
  *
- * Uses page.evaluate to focus the element (bypasses Playwright's actionability
- * checks that fail when Mapbox continuously re-renders/detaches markers), then
- * Playwright's keyboard.press('Enter') which sends a trusted browser event to
- * the focused element. The div[role="button"] onKeyDown handler (Map.tsx:1841)
- * calls handleMarkerClick() on Enter/Space.
+ * Calls HTMLElement.click() on the .mapboxgl-marker wrapper element, which has
+ * react-map-gl's native addEventListener('click') handler (marker.js:26).
+ * HTMLElement.click() creates a trusted click event that fires the handler
+ * and calls handleMarkerClick() (Map.tsx:1776).
  *
- * Why not marker.focus()? Mapbox GL JS re-creates marker DOM elements during
- * re-renders, causing "element was detached from the DOM, retrying" loops that
- * exhaust the timeout. page.evaluate runs synchronously in page context and
- * doesn't perform actionability checks.
+ * Wrapped in a toPass retry loop because Mapbox GL JS continuously re-creates
+ * marker DOM elements during re-renders — the element may be detached at the
+ * moment we try to click it. The retry catches this and tries again.
+ *
+ * Why not evaluate(focus) + keyboard.press('Enter')? The two calls span
+ * separate CDP round-trips; Mapbox can re-render between them, losing focus.
+ * wrapper.click() inside a single evaluate is atomic.
  */
 async function clickMarkerByListingId(page: Page, listingId: string): Promise<void> {
-  const selector = `.mapboxgl-marker [data-listing-id="${listingId}"]`;
-
-  // Wait for marker to exist and be connected in the DOM
-  await page.waitForFunction(
-    (sel) => {
-      const el = document.querySelector(sel);
-      return el !== null && el.isConnected;
-    },
-    selector,
-    { timeout: 15_000 },
-  );
-
-  // Brief stabilization — gives Mapbox a tick to finish batch DOM updates
-  await page.waitForTimeout(150);
-
-  // Focus via page.evaluate — bypasses actionability checks that would
-  // fail on detachment. querySelector + focus() is atomic in page context.
-  await page.evaluate((sel) => {
-    const el = document.querySelector(sel) as HTMLElement | null;
-    if (el?.isConnected) el.focus();
-  }, selector);
-
-  // Trusted keyboard Enter via Playwright — fires on the focused element,
-  // triggering React's onKeyDown handler → handleMarkerClick()
-  await page.keyboard.press('Enter');
+  await expect(async () => {
+    const clicked = await page.evaluate((id) => {
+      const inner = document.querySelector(
+        `.mapboxgl-marker [data-listing-id="${id}"]`,
+      );
+      if (!inner?.isConnected) return false;
+      const wrapper = inner.closest('.mapboxgl-marker') as HTMLElement;
+      if (!wrapper) return false;
+      wrapper.click();
+      return true;
+    }, listingId);
+    expect(clicked).toBe(true);
+  }).toPass({ timeout: 15_000, intervals: [100, 200, 500, 1000] });
 }
 
 /**
@@ -155,34 +145,28 @@ async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
  * Playwright's actionability checks that fail on marker detachment during
  * Mapbox re-renders. Sets pointerType='mouse' to pass the touch guard
  * in Map.tsx:1815 (`e.pointerType === 'touch'`).
+ *
+ * Wrapped in toPass retry to handle Mapbox marker DOM re-creation.
  */
 async function hoverMarkerByListingId(page: Page, listingId: string): Promise<void> {
-  const selector = `.mapboxgl-marker [data-listing-id="${listingId}"]`;
-
-  await page.waitForFunction(
-    (sel) => {
-      const el = document.querySelector(sel);
-      return el !== null && el.isConnected;
-    },
-    selector,
-    { timeout: 10_000 },
-  );
-
-  await page.waitForTimeout(150);
-
-  // Dispatch PointerEvent via evaluate — bypasses detachment race and overlay interception
-  await page.evaluate((sel) => {
-    const el = document.querySelector(sel) as HTMLElement | null;
-    if (!el?.isConnected) return;
-    const rect = el.getBoundingClientRect();
-    el.dispatchEvent(new PointerEvent('pointerover', {
-      bubbles: true,
-      cancelable: true,
-      pointerType: 'mouse',
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2,
-    }));
-  }, selector);
+  await expect(async () => {
+    const hovered = await page.evaluate((id) => {
+      const el = document.querySelector(
+        `.mapboxgl-marker [data-listing-id="${id}"]`,
+      ) as HTMLElement | null;
+      if (!el?.isConnected) return false;
+      const rect = el.getBoundingClientRect();
+      el.dispatchEvent(new PointerEvent('pointerover', {
+        bubbles: true,
+        cancelable: true,
+        pointerType: 'mouse',
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      }));
+      return true;
+    }, listingId);
+    expect(hovered).toBe(true);
+  }).toPass({ timeout: 10_000, intervals: [100, 200, 500, 1000] });
 }
 
 /**
