@@ -93,7 +93,8 @@ async function getNthMarkerIdOrNull(
 }
 
 /**
- * Click a map marker by its listing ID using dual strategy inside page.evaluate.
+ * Click a map marker by its listing ID using dual strategy inside page.evaluate,
+ * then verify the click triggered handleMarkerClick → setActive(listingId).
  *
  * Strategy 1: wrapper.click() on the .mapboxgl-marker wrapper element, which has
  * react-map-gl's native addEventListener('click') handler (marker.js:26).
@@ -104,7 +105,10 @@ async function getNthMarkerIdOrNull(
  * condition where Mapbox re-creates marker DOM between CDP round-trips.
  * Double-trigger is safe: handleMarkerClick calls setActive(id) which is idempotent.
  *
- * Wrapped in toPass retry for Mapbox marker DOM re-creation resilience.
+ * The verification step checks the card's data-focus-state="active" attribute.
+ * If the click fired but the React effect hadn't attached the event listener yet,
+ * the verification fails and the entire click+verify retries — the re-click will
+ * find the listener attached and succeed.
  */
 async function clickMarkerByListingId(page: Page, listingId: string): Promise<void> {
   await expect(async () => {
@@ -124,7 +128,11 @@ async function clickMarkerByListingId(page: Page, listingId: string): Promise<vo
       return 'ok';
     }, listingId);
     expect(result).toBe('ok');
-  }).toPass({ timeout: 15_000, intervals: [50, 100, 200, 500, 1000] });
+
+    // Verify the click triggered handleMarkerClick → setActive(listingId)
+    const cardState = await getCardState(page, listingId);
+    expect(cardState.isActive).toBe(true);
+  }).toPass({ timeout: 15_000, intervals: [200, 500, 1000, 2000] });
 }
 
 /**
@@ -140,16 +148,18 @@ async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
 }
 
 /**
- * Hover a map marker by listing ID using page.evaluate + PointerEvent dispatch.
+ * Hover a map marker by listing ID using page.evaluate + PointerEvent dispatch,
+ * then verify the hover triggered setHovered(listingId) → marker scales up.
  *
  * Dispatches 'pointerover' (which bubbles) because React 18 registers native
- * listeners for onPointerEnter using pointerover/pointerout events
- * (react-dom-client.production.js:12233). Uses page.evaluate to bypass
- * Playwright's actionability checks that fail on marker detachment during
- * Mapbox re-renders. Sets pointerType='mouse' to pass the touch guard
- * in Map.tsx:1815 (`e.pointerType === 'touch'`).
+ * listeners for onPointerEnter using pointerover/pointerout events.
+ * Sets relatedTarget to the parent element so React's enter/leave diffing
+ * correctly identifies this as a "pointer entered" event.
+ * Sets pointerType='mouse' to pass the touch guard in Map.tsx:1815.
  *
- * Wrapped in toPass retry to handle Mapbox marker DOM re-creation.
+ * The verification step checks the marker's isScaled state. If the PointerEvent
+ * dispatched before React's fiber tree was ready, the handler doesn't fire.
+ * The retry re-dispatches and re-verifies until the effect is observed.
  */
 async function hoverMarkerByListingId(page: Page, listingId: string): Promise<void> {
   await expect(async () => {
@@ -163,13 +173,18 @@ async function hoverMarkerByListingId(page: Page, listingId: string): Promise<vo
         bubbles: true,
         cancelable: true,
         pointerType: 'mouse',
+        relatedTarget: el.parentElement,
         clientX: rect.left + rect.width / 2,
         clientY: rect.top + rect.height / 2,
       }));
       return true;
     }, listingId);
     expect(hovered).toBe(true);
-  }).toPass({ timeout: 10_000, intervals: [100, 200, 500, 1000] });
+
+    // Verify the hover triggered the handler → setHovered(listingId) → marker scales
+    const state = await getMarkerState(page, listingId);
+    expect(state.isScaled).toBe(true);
+  }).toPass({ timeout: 10_000, intervals: [200, 500, 1000, 2000] });
 }
 
 /**
@@ -184,33 +199,65 @@ async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
 }
 
 /**
+ * Fire-and-forget marker hover (no effect verification).
+ * Used in debounce tests where rapid successive hovers are needed and
+ * verifying each one would defeat the timing test.
+ */
+async function hoverMarkerFast(page: Page, listingId: string): Promise<void> {
+  await page.evaluate((id) => {
+    const el = document.querySelector(
+      `.mapboxgl-marker [data-listing-id="${id}"]`,
+    ) as HTMLElement | null;
+    if (!el?.isConnected) return;
+    const rect = el.getBoundingClientRect();
+    el.dispatchEvent(new PointerEvent('pointerover', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'mouse',
+      relatedTarget: el.parentElement,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    }));
+  }, listingId);
+}
+
+/**
  * Hover a listing card element. On mobile, the bottom sheet overlay (z-40)
- * intercepts pointer events. We temporarily raise the card's z-index above
- * the overlay, perform a real Playwright hover (trusted mouse events that
- * React's event delegation processes correctly), then reset the z-index.
+ * intercepts pointer events. We raise the card's z-index above the overlay,
+ * then perform a real Playwright hover (trusted mouse events that React's
+ * event delegation processes correctly). The z-index stays elevated until
+ * unhoverCardElement resets it — resetting immediately would let the overlay
+ * re-cover the card and the browser would recalculate hover state.
  */
 async function hoverCardElement(page: Page, card: import('@playwright/test').Locator): Promise<void> {
   const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
   if (isMobile) {
     // Raise card above bottom sheet overlay for trusted mouse events
+    // Z-index is reset in unhoverCardElement, not here, to maintain hover state
     await card.evaluate((el) => {
       (el as HTMLElement).style.position = 'relative';
       (el as HTMLElement).style.zIndex = '9999';
     });
     await card.hover();
-    await card.evaluate((el) => {
-      (el as HTMLElement).style.position = '';
-      (el as HTMLElement).style.zIndex = '';
-    });
   } else {
     await card.hover();
   }
 }
 
 /**
- * Un-hover a card element. Moves mouse to (0,0) to trigger real mouseleave.
+ * Un-hover a card element. On mobile, resets the z-index that hoverCardElement
+ * elevated above the bottom sheet overlay. Then moves mouse away to trigger
+ * real mouseleave.
  */
-async function unhoverCardElement(page: Page, _card: import('@playwright/test').Locator): Promise<void> {
+async function unhoverCardElement(page: Page, card: import('@playwright/test').Locator): Promise<void> {
+  const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
+  if (isMobile) {
+    // Reset z-index that was raised in hoverCardElement
+    await card.evaluate((el) => {
+      (el as HTMLElement).style.position = '';
+      (el as HTMLElement).style.zIndex = '';
+    });
+  }
   await page.mouse.move(0, 0);
 }
 
@@ -580,9 +627,9 @@ test.describe("Map-List Synchronization", () => {
       const activeId = overlapping[0];
       const hoverId = overlapping[1];
 
-      // Click marker to set active
-      const markerIndex = markerIds.indexOf(activeId);
-      await clickMarkerByIndex(page, markerIndex);
+      // Click marker to set active (use listing ID directly — index-based lookup
+      // is brittle because getAllMarkerListingIds may return a high index)
+      await clickMarkerByListingId(page, activeId);
       await waitForCardHighlight(page, activeId);
 
       // Hover a DIFFERENT card (uses evaluate on mobile to bypass bottom sheet overlay)
@@ -1111,9 +1158,9 @@ test.describe("Map-List Synchronization", () => {
       await unhoverCardElement(page, card);
       await waitForMarkerUnhover(page, targetId, timeouts.action);
 
-      // Click marker to set active
-      const markerIndex = markerIds.indexOf(targetId);
-      await clickMarkerByIndex(page, markerIndex);
+      // Click marker to set active (use listing ID directly — index-based lookup
+      // is brittle because getAllMarkerListingIds may return a high index)
+      await clickMarkerByListingId(page, targetId);
       await waitForCardHighlight(page, targetId);
 
       // Marker should have z-40 when active (not hovered)
@@ -1326,10 +1373,12 @@ test.describe("Map-List Synchronization", () => {
         }
       });
 
-      // Rapidly hover across markers via PointerEvent dispatch (faster than 300ms debounce)
-      await hoverMarkerByListingId(page, hid0!);
+      // Rapidly hover across markers via PointerEvent dispatch (faster than 300ms debounce).
+      // First two use fire-and-forget dispatch to maintain rapid timing.
+      // Last one uses verified hover to ensure at least one handler fires.
+      await hoverMarkerFast(page, hid0!);
       await page.waitForTimeout(50); // debounce test: intentionally faster than 300ms debounce
-      await hoverMarkerByListingId(page, hid1!);
+      await hoverMarkerFast(page, hid1!);
       await page.waitForTimeout(50); // debounce test: intentionally faster than 300ms debounce
       await hoverMarkerByListingId(page, hid2!);
 
