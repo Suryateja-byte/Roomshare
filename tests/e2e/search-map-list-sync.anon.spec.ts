@@ -93,39 +93,23 @@ async function getNthMarkerIdOrNull(
 }
 
 /**
- * Click a map marker by its listing ID using keyboard Enter dispatch.
- * Bypasses overlay interception entirely (runs in page context).
+ * Click a map marker by its listing ID using Playwright focus + Enter.
  *
- * Why keyboard instead of element.click():
- *   element.click() on the inner div does NOT trigger react-map-gl's
- *   Marker onClick handler because react-map-gl registers a native
- *   addEventListener('click') on the .mapboxgl-marker wrapper element,
- *   and the synthetic click from HTMLElement.click() doesn't reliably
- *   propagate through Mapbox GL's internal event routing.
- *
- *   The keyboard path is guaranteed: the inner div[role="button"] has
- *   an onKeyDown handler (Map.tsx:1841) that directly calls
- *   handleMarkerClick() when Enter or Space is pressed.
+ * Uses Playwright's native .focus() and keyboard.press('Enter') which
+ * generate trusted browser events. The inner div[role="button"] has an
+ * onKeyDown handler (Map.tsx:1841) that calls handleMarkerClick() on
+ * Enter/Space. Trusted events are required because:
+ *   - element.click() doesn't propagate through react-map-gl's Marker
+ *   - dispatchEvent(KeyboardEvent) creates untrusted events that React
+ *     may not process through its delegation system in all browsers
+ *   - Playwright keyboard.press generates trusted events identical to
+ *     real user keypresses
  */
 async function clickMarkerByListingId(page: Page, listingId: string): Promise<void> {
-  await expect(page.locator(`.mapboxgl-marker [data-listing-id="${listingId}"]`))
-    .toBeAttached({ timeout: 10_000 });
-
-  const clicked = await page.evaluate((id) => {
-    const el = document.querySelector(
-      `.mapboxgl-marker [data-listing-id="${id}"]`,
-    ) as HTMLElement;
-    if (!el) return false;
-    el.focus();
-    el.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
-    }));
-    return true;
-  }, listingId);
-
-  if (!clicked) {
-    throw new Error(`Marker for listing ${listingId} not found in DOM`);
-  }
+  const marker = page.locator(`.mapboxgl-marker [data-listing-id="${listingId}"]`);
+  await expect(marker).toBeAttached({ timeout: 10_000 });
+  await marker.focus();
+  await page.keyboard.press('Enter');
 }
 
 /**
@@ -141,27 +125,20 @@ async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
 }
 
 /**
- * Hover a map marker by listing ID.
- * Dispatches PointerEvent('pointerover') with pointerType='mouse'.
- * React 18 registers 'pointerover'/'pointerout' as native event
- * dependencies for onPointerEnter (see registerDirectEvent in react-dom).
- * The onPointerEnter handler in Map.tsx skips touch via
- * `e.pointerType === 'touch'` guard, so pointerType='mouse' is required.
+ * Hover a map marker by listing ID using Playwright's native .hover().
+ * Generates trusted PointerEvents that React 18's onPointerEnter handler
+ * will process. The handler (Map.tsx:1815) skips touch via
+ * `e.pointerType === 'touch'` guard — Playwright hover generates mouse-type
+ * pointer events by default.
+ *
+ * Uses { force: true } because the marker may be behind overlays (bottom sheet).
+ * Unlike click events, force:true hover still generates real PointerEvents
+ * that fire at the correct element coordinates.
  */
 async function hoverMarkerByListingId(page: Page, listingId: string): Promise<void> {
-  await expect(page.locator(`.mapboxgl-marker [data-listing-id="${listingId}"]`))
-    .toBeAttached({ timeout: 10_000 });
-
-  await page.evaluate((id) => {
-    const el = document.querySelector(
-      `.mapboxgl-marker [data-listing-id="${id}"]`,
-    ) as HTMLElement;
-    if (!el) throw new Error(`Marker for listing ${id} not found`);
-    el.dispatchEvent(new PointerEvent('pointerover', {
-      bubbles: true,
-      pointerType: 'mouse',
-    }));
-  }, listingId);
+  const marker = page.locator(`.mapboxgl-marker [data-listing-id="${listingId}"]`);
+  await expect(marker).toBeAttached({ timeout: 10_000 });
+  await marker.hover({ force: true, timeout: 5000 });
 }
 
 /**
@@ -767,9 +744,9 @@ test.describe("Map-List Synchronization", () => {
 
       // Wait for map to settle after pan, then for markers or cards to appear
       await waitForMapReady(page);
-      // Wait for markers or cards to appear after pan (use .first() to avoid strict mode)
+      // Wait for markers to appear after pan
       await expect(
-        page.locator('.mapboxgl-marker:visible, [data-testid="search-results-container"] [data-testid="listing-card"]').first()
+        page.locator('.mapboxgl-marker:visible').first()
       ).toBeVisible({ timeout: timeouts.navigation });
 
       // Page should still have markers and cards
