@@ -93,35 +93,38 @@ async function getNthMarkerIdOrNull(
 }
 
 /**
- * Click a map marker by its listing ID using wrapper.click() inside page.evaluate.
+ * Click a map marker by its listing ID using dual strategy inside page.evaluate.
  *
- * Calls HTMLElement.click() on the .mapboxgl-marker wrapper element, which has
+ * Strategy 1: wrapper.click() on the .mapboxgl-marker wrapper element, which has
  * react-map-gl's native addEventListener('click') handler (marker.js:26).
- * HTMLElement.click() creates a trusted click event that fires the handler
- * and calls handleMarkerClick() (Map.tsx:1776).
+ * Strategy 2: focus + keydown Enter on the inner div, which triggers the React
+ * onKeyDown handler (Map.tsx:1841 → handleMarkerClick).
  *
- * Wrapped in a toPass retry loop because Mapbox GL JS continuously re-creates
- * marker DOM elements during re-renders — the element may be detached at the
- * moment we try to click it. The retry catches this and tries again.
+ * Both strategies run atomically in a single evaluate call to avoid the race
+ * condition where Mapbox re-creates marker DOM between CDP round-trips.
+ * Double-trigger is safe: handleMarkerClick calls setActive(id) which is idempotent.
  *
- * Why not evaluate(focus) + keyboard.press('Enter')? The two calls span
- * separate CDP round-trips; Mapbox can re-render between them, losing focus.
- * wrapper.click() inside a single evaluate is atomic.
+ * Wrapped in toPass retry for Mapbox marker DOM re-creation resilience.
  */
 async function clickMarkerByListingId(page: Page, listingId: string): Promise<void> {
   await expect(async () => {
-    const clicked = await page.evaluate((id) => {
+    const result = await page.evaluate((id) => {
       const inner = document.querySelector(
         `.mapboxgl-marker [data-listing-id="${id}"]`,
-      );
-      if (!inner?.isConnected) return false;
+      ) as HTMLElement | null;
+      if (!inner?.isConnected) return 'not-found';
+      // Strategy 1: Click the .mapboxgl-marker wrapper (react-map-gl native handler)
       const wrapper = inner.closest('.mapboxgl-marker') as HTMLElement;
-      if (!wrapper) return false;
-      wrapper.click();
-      return true;
+      if (wrapper) wrapper.click();
+      // Strategy 2: Keyboard Enter on inner div (React onKeyDown handler)
+      inner.focus();
+      inner.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
+      }));
+      return 'ok';
     }, listingId);
-    expect(clicked).toBe(true);
-  }).toPass({ timeout: 15_000, intervals: [100, 200, 500, 1000] });
+    expect(result).toBe('ok');
+  }).toPass({ timeout: 15_000, intervals: [50, 100, 200, 500, 1000] });
 }
 
 /**
@@ -185,12 +188,21 @@ async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
  * pointer events, so we use page.evaluate to dispatch mouseover directly.
  * React 18 uses native 'mouseover' (which bubbles) as dependency for
  * onMouseEnter (registerDirectEvent("onMouseEnter", ["mouseout", "mouseover"])).
+ *
+ * On desktop, Playwright's card.hover() sends real trusted mouse events
+ * which work reliably with React's event delegation.
  */
 async function hoverCardElement(page: Page, card: import('@playwright/test').Locator): Promise<void> {
   const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
   if (isMobile) {
     await card.evaluate((el) => {
-      el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+      const rect = el.getBoundingClientRect();
+      el.dispatchEvent(new MouseEvent('mouseover', {
+        bubbles: true, cancelable: true,
+        relatedTarget: document.body,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      }));
     });
   } else {
     await card.hover();
@@ -253,6 +265,9 @@ test.describe("Map-List Synchronization", () => {
 
     // Zoom in to expand clusters into individual markers
     await zoomToExpandClusters(page);
+
+    // Brief stabilization — let Mapbox finish rendering markers after zoom
+    await page.waitForTimeout(500);
   });
 
   // =========================================================================
