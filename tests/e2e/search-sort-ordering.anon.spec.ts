@@ -98,6 +98,22 @@ async function waitForMobileResults(page: Page) {
   return { cards, zeroResults };
 }
 
+/**
+ * Wait for the mobile sort button to be hydrated and visible.
+ *
+ * SortSelect renders an SSR placeholder _without_ aria-label, then swaps to
+ * the real button (with `aria-label="Sort: ..."`) after a `useEffect` sets
+ * `mounted = true`.  Cards can appear before that effect fires, so
+ * `waitForMobileCards` alone is not enough.
+ */
+async function waitForMobileSortButton(page: Page): Promise<Locator> {
+  const sortBtn = page
+    .locator(MOBILE)
+    .locator('button[aria-label^="Sort:"]');
+  await expect(sortBtn).toBeVisible({ timeout: 15_000 });
+  return sortBtn;
+}
+
 // ---------------------------------------------------------------------------
 // Desktop sort dropdown helpers
 // ---------------------------------------------------------------------------
@@ -114,7 +130,10 @@ function getDesktopSortTrigger(page: Page): Locator {
 /** Open the desktop sort dropdown and return the listbox locator. */
 async function openDesktopSort(page: Page): Promise<Locator> {
   const trigger = getDesktopSortTrigger(page);
-  await expect(trigger).toBeVisible({ timeout: 10_000 });
+  // SortSelect renders an SSR placeholder without role="combobox", so this
+  // locator only matches after client-side hydration sets `mounted = true`.
+  // Use a generous timeout to tolerate slow hydration in CI.
+  await expect(trigger).toBeVisible({ timeout: 15_000 });
   await trigger.click();
   // Radix portals the listbox outside the container -- use page-level locator
   const listbox = page.locator('[role="listbox"]');
@@ -545,11 +564,9 @@ test.describe("Group 4: Mobile Sort", () => {
     await page.goto(SEARCH_URL);
     await waitForMobileCards(page);
 
-    // Mobile sort button lives inside the mobile container
-    const sortBtn = page
-      .locator(MOBILE)
-      .locator('button[aria-label^="Sort:"]');
-    await expect(sortBtn).toBeVisible({ timeout: 10_000 });
+    // Wait for SortSelect hydration — the aria-label only appears after mount
+    const sortBtn = await waitForMobileSortButton(page);
+    await expect(sortBtn).toBeVisible();
 
     // Desktop combobox should NOT be visible (parent has hidden md:flex)
     const desktopTrigger = page
@@ -564,9 +581,7 @@ test.describe("Group 4: Mobile Sort", () => {
     await page.goto(SEARCH_URL);
     await waitForMobileCards(page);
 
-    const sortBtn = page
-      .locator(MOBILE)
-      .locator('button[aria-label^="Sort:"]');
+    const sortBtn = await waitForMobileSortButton(page);
     await sortBtn.click();
 
     // Sheet heading (rendered via fixed portal, page-level selector is fine)
@@ -590,9 +605,7 @@ test.describe("Group 4: Mobile Sort", () => {
     await page.goto(SEARCH_URL);
     await waitForMobileCards(page);
 
-    const sortBtn = page
-      .locator(MOBILE)
-      .locator('button[aria-label^="Sort:"]');
+    const sortBtn = await waitForMobileSortButton(page);
     await sortBtn.click();
 
     const sheetHeading = page.locator("h3").filter({ hasText: "Sort by" });
@@ -615,10 +628,7 @@ test.describe("Group 4: Mobile Sort", () => {
     await page.goto(`/search?sort=price_desc&${boundsQS}`);
     await waitForMobileCards(page);
 
-    const sortBtn = page
-      .locator(MOBILE)
-      .locator('button[aria-label^="Sort:"]');
-    await expect(sortBtn).toBeVisible();
+    const sortBtn = await waitForMobileSortButton(page);
 
     await expect(sortBtn).toHaveAttribute(
       "aria-label",
@@ -632,9 +642,7 @@ test.describe("Group 4: Mobile Sort", () => {
     await page.goto(SEARCH_URL);
     await waitForMobileCards(page);
 
-    const sortBtn = page
-      .locator(MOBILE)
-      .locator('button[aria-label^="Sort:"]');
+    const sortBtn = await waitForMobileSortButton(page);
     await sortBtn.click();
 
     const sheetHeading = page.locator("h3").filter({ hasText: "Sort by" });
@@ -760,9 +768,13 @@ test.describe("Group 6: Sort Edge Cases", () => {
     // Let the sort-selection navigation settle before overriding —
     // avoids NS_BINDING_ABORTED on Firefox when two navigations race.
     await page.waitForLoadState("domcontentloaded").catch(() => {});
+    await page.waitForTimeout(500);
 
-    // Override via URL navigation
-    await page.goto(`/search?sort=price_desc&${boundsQS}`);
+    // Override via URL navigation (use longer timeout for potentially slow navigation)
+    await page.goto(`/search?sort=price_desc&${boundsQS}`, {
+      timeout: 60_000,
+      waitUntil: "domcontentloaded",
+    });
     await waitForCards(page);
 
     // Only the final sort should be reflected

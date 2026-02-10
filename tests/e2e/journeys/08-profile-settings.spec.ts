@@ -59,40 +59,46 @@ test.describe('Profile & Settings Journeys', () => {
     test(`${tags.auth} - Update profile name and bio`, async ({ page, nav }) => {
       await nav.goToProfile();
 
-      // Find edit button
-      const editButton = page.getByRole('button', { name: /edit.*profile/i })
-        .or(page.getByRole('link', { name: /edit.*profile/i }))
+      // Find edit button — profile page uses Edit2 icon link or button
+      const editButton = page.getByRole('link', { name: /edit.*profile/i })
+        .or(page.getByRole('button', { name: /edit.*profile/i }))
+        .or(page.getByRole('link', { name: /edit/i }))
         .first();
 
-      if (await editButton.isVisible()) {
+      if (await editButton.isVisible().catch(() => false)) {
         await editButton.click();
 
-        // Wait for edit form
-        await page.waitForURL(/\/edit|\/settings/);
+        // Wait for edit form page to load
+        await page.waitForURL(/\/edit|\/settings/, { timeout: 15000 });
+        // Wait for the form to hydrate and become interactive
+        await page.locator('form').first().waitFor({ state: 'visible', timeout: 10000 });
 
-        // Update name
-        const nameInput = page.getByLabel(/name/i);
-        if (await nameInput.isVisible()) {
+        // Update name — label is "Full Name" on the edit profile page
+        const nameInput = page.getByLabel(/full.*name|name/i).first();
+        if (await nameInput.isVisible().catch(() => false)) {
           await nameInput.clear();
           await nameInput.fill('Updated Test User');
         }
 
         // Update bio
-        const bioInput = page.getByLabel(/bio|about/i);
-        if (await bioInput.isVisible()) {
+        const bioInput = page.getByLabel(/bio|about/i).first();
+        if (await bioInput.isVisible().catch(() => false)) {
           await bioInput.clear();
           await bioInput.fill('Updated bio for testing purposes.');
         }
 
-        // Save changes
-        await page.getByRole('button', { name: /save|update/i }).first().click();
+        // Save changes — button text is "Save Changes"
+        const saveButton = page.getByRole('button', { name: /save|update/i }).first();
+        await saveButton.waitFor({ state: 'visible', timeout: 5000 });
+        await saveButton.click();
 
-        // Verify success
+        // Verify success — EditProfileClient shows "Profile updated successfully! Redirecting..."
+        // or it may redirect back to /profile. Wait for either success text or navigation.
         await expect(
-          page.locator(selectors.toast)
-            .or(page.getByText(/saved|updated/i))
+          page.getByText(/updated successfully|profile updated/i)
+            .or(page.locator(selectors.toast))
             .first()
-        ).toBeVisible({ timeout: 10000 });
+        ).toBeVisible({ timeout: 15000 });
       }
     });
 
@@ -198,63 +204,71 @@ test.describe('Profile & Settings Journeys', () => {
     test(`${tags.auth} - Change password flow`, async ({ page, nav }) => {
       await nav.goToSettings();
 
-      // Find password change section
-      const passwordSection = page.getByRole('heading', { name: /password|security/i })
-        .or(page.getByRole('button', { name: /change.*password/i }))
-        .first();
+      // Wait for the settings page to fully hydrate
+      await page.locator('h1').waitFor({ state: 'visible', timeout: 10000 });
 
-      if (await passwordSection.isVisible()) {
-        await passwordSection.click();
+      // The password section is only rendered when hasPassword=true.
+      // Look for the "Change Password" heading (h2) which indicates the section exists.
+      const passwordHeading = page.getByRole('heading', { name: /change.*password/i });
+      const hasPasswordSection = await passwordHeading.isVisible({ timeout: 5000 }).catch(() => false);
 
-        // Fill password change form
-        const currentPassword = page.getByLabel(/current.*password/i);
-        const newPassword = page.getByLabel(/new.*password/i);
-        const confirmPassword = page.getByLabel(/confirm.*password/i);
-
-        if (await currentPassword.isVisible()) {
-          const currentPwd = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
-          const newPwd = process.env.E2E_TEST_NEW_PASSWORD || 'NewTestPassword123!';
-          await currentPassword.fill(currentPwd);
-          await newPassword.fill(newPwd);
-
-          if (await confirmPassword.isVisible()) {
-            await confirmPassword.fill(newPwd);
-          }
-
-          // Submit
-          await page.getByRole('button', { name: /change|update.*password/i }).click();
-
-          // Should show success or error
-          await expect(
-            page.locator(selectors.toast)
-              .or(page.getByText(/changed|updated|error/i))
-              .first()
-          ).toBeVisible({ timeout: 10000 });
-        }
+      if (!hasPasswordSection) {
+        // User has no password (OAuth-only) — skip gracefully
+        return;
       }
+
+      // The password form inputs are always visible when the section exists (no click-to-reveal)
+      const currentPasswordInput = page.getByLabel(/current.*password/i);
+      const newPasswordInput = page.getByLabel(/new.*password/i);
+      const confirmPasswordInput = page.getByLabel(/confirm.*new.*password|confirm.*password/i);
+
+      // Wait for the form inputs to be interactive (hydration)
+      await currentPasswordInput.waitFor({ state: 'visible', timeout: 10000 });
+
+      const currentPwd = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
+      const newPwd = process.env.E2E_TEST_NEW_PASSWORD || 'NewTestPassword123!';
+
+      await currentPasswordInput.fill(currentPwd);
+      await newPasswordInput.fill(newPwd);
+      await confirmPasswordInput.fill(newPwd);
+
+      // Submit — button text is "Change Password"
+      await page.getByRole('button', { name: /change.*password/i }).click();
+
+      // Should show success message, error message, or toast
+      await expect(
+        page.getByText(/password changed|password updated|do not match|at least|failed/i)
+          .or(page.locator(selectors.toast))
+          .first()
+      ).toBeVisible({ timeout: 10000 });
     });
 
     test(`${tags.auth} - Password strength validation`, async ({ page, nav }) => {
       await nav.goToSettings();
 
-      const changePasswordButton = page.getByRole('button', { name: /change.*password/i });
+      // Wait for the settings page to fully hydrate
+      await page.locator('h1').waitFor({ state: 'visible', timeout: 10000 });
 
-      if (await changePasswordButton.isVisible()) {
-        await changePasswordButton.click();
+      // The password section is only rendered when hasPassword=true.
+      const passwordHeading = page.getByRole('heading', { name: /change.*password/i });
+      const hasPasswordSection = await passwordHeading.isVisible({ timeout: 5000 }).catch(() => false);
 
-        const newPasswordInput = page.getByLabel(/new.*password/i);
-
-        if (await newPasswordInput.isVisible()) {
-          // Try weak password
-          await newPasswordInput.fill('weak');
-
-          // Should show strength indicator or error
-          const strengthMeter = page.locator('[data-testid="password-strength"]');
-          const error = page.getByText(/weak|strong|requirement/i);
-
-          await expect(strengthMeter.or(error).first()).toBeVisible({ timeout: 5000 });
-        }
+      if (!hasPasswordSection) {
+        // User has no password (OAuth-only) — skip gracefully
+        return;
       }
+
+      const newPasswordInput = page.getByLabel(/new.*password/i);
+      await newPasswordInput.waitFor({ state: 'visible', timeout: 10000 });
+
+      // Try weak password
+      await newPasswordInput.fill('weak');
+
+      // PasswordStrengthMeter component should render below the input
+      const strengthMeter = page.locator('[data-testid="password-strength"]');
+      const strengthText = page.getByText(/weak|fair|strong|very strong/i);
+
+      await expect(strengthMeter.or(strengthText).first()).toBeVisible({ timeout: 5000 });
     });
   });
 

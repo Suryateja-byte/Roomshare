@@ -16,6 +16,7 @@ import {
 
 test.describe('Listing Detail — Visual Regression', () => {
   test.beforeEach(async ({}, testInfo) => {
+    test.skip(!!process.env.CI, 'Visual baseline snapshots are platform-specific — skip in CI');
     test.slow();
     if (testInfo.project.name.includes('Mobile')) {
       test.skip(true, 'No Mobile Chrome snapshot baselines — skip visual regression');

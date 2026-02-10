@@ -17,6 +17,7 @@ test.describe('Filter Modal — Visual Regression', () => {
   const searchUrl = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
   test.beforeEach(async ({ page }, testInfo) => {
+    test.skip(!!process.env.CI, 'Visual baseline snapshots are platform-specific — skip in CI');
     test.slow();
     if (testInfo.project.name.includes('Mobile')) {
       test.skip(true, 'No Mobile Chrome snapshot baselines — skip visual regression');

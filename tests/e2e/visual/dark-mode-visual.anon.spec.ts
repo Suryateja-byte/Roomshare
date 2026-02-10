@@ -16,6 +16,7 @@ import {
 
 test.describe('Dark Mode — Visual Regression', () => {
   test.beforeEach(async ({ page }, testInfo) => {
+    test.skip(!!process.env.CI, 'Visual baseline snapshots are platform-specific — skip in CI');
     test.slow();
     // Visual snapshot baselines only exist for chromium/chromium-anon — skip on Mobile Chrome
     if (testInfo.project.name.includes('Mobile')) {
