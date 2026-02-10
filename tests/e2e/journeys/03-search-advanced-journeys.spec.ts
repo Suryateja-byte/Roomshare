@@ -43,14 +43,17 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
+    // Wait for search results to fully load (budget inputs hydrate after mount)
+    await page.waitForLoadState("networkidle").catch(() => {});
+
     // Set price range — wait for inputs to be ready under load
     const minInput = page.getByLabel(/minimum budget/i);
     const maxInput = page.getByLabel(/maximum budget/i);
     await expect(minInput).toBeVisible({ timeout: 15000 });
     await minInput.fill("800");
-    await expect(minInput).toHaveValue("800");
+    await expect(minInput).toHaveValue("800", { timeout: 15000 });
     await maxInput.fill("2000");
-    await expect(maxInput).toHaveValue("2000");
+    await expect(maxInput).toHaveValue("2000", { timeout: 15000 });
 
     // Open filter modal and set lease + amenity
     const modal = await openFilterModal(page);
@@ -152,6 +155,9 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
+    // Wait for search results to fully hydrate (budget inputs sync from URL after mount)
+    await page.waitForLoadState("networkidle").catch(() => {});
+
     // Click a room type tab
     const privateTab = page.getByRole("button", { name: /private/i })
       .or(page.locator('button:has-text("Private")'));
@@ -221,15 +227,20 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
+    // Wait for search results to fully hydrate before interacting with budget inputs
+    await page.waitForLoadState("networkidle").catch(() => {});
+
     const minInput = page.getByLabel(/minimum budget/i);
     const maxInput = page.getByLabel(/maximum budget/i);
     await expect(minInput).toBeVisible({ timeout: 10000 });
 
     // Enter inverted prices: min > max
     await minInput.fill("1500");
-    await expect(minInput).toHaveValue("1500");
+    await minInput.blur();
+    await expect(minInput).toHaveValue("1500", { timeout: 5000 });
     await maxInput.fill("500");
-    await expect(maxInput).toHaveValue("500");
+    await maxInput.blur();
+    await expect(maxInput).toHaveValue("500", { timeout: 5000 });
 
     // Submit form
     const searchBtn = page.locator('button[type="submit"]').first();
@@ -295,7 +306,9 @@ test.describe("30 Advanced Search Page Journeys", () => {
 
     // Set min to 0, max empty
     await minInput.fill("0");
+    await minInput.blur();
     await maxInput.fill("");
+    await maxInput.blur();
 
     const searchBtn = page.locator('button[type="submit"]').first();
     await searchBtn.click();
@@ -314,9 +327,12 @@ test.describe("30 Advanced Search Page Journeys", () => {
 
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
+    // Wait for search results to fully load (budget inputs hydrate with URL params after mount)
+    await page.waitForLoadState("networkidle").catch(() => {});
+
     // Negative price should be clamped to 0 in the input
     const minInput = page.getByLabel(/minimum budget/i);
-    await expect(minInput).toHaveValue("0", { timeout: 5000 });
+    await expect(minInput).toHaveValue("0", { timeout: 30000 });
   });
 
   // ─────────────────────────────────────────────────
@@ -477,9 +493,16 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
-    const prevBtn = page.locator('[aria-label*="previous" i]').first();
+    // Wait for pagination to fully hydrate before checking disabled state
+    await page.waitForLoadState("networkidle").catch(() => {});
+
+    const pagination = page.locator(selectors.pagination).or(page.locator('nav[aria-label*="Pagination" i]'));
+    const prevBtn = pagination.first().locator('[aria-label*="previous" i]').first();
     if (await prevBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await expect(prevBtn).toBeDisabled();
+      // Retry assertion to handle hydration race on Mobile Chrome
+      await expect(async () => {
+        await expect(prevBtn).toBeDisabled();
+      }).toPass({ timeout: 15000 });
     }
   });
 
@@ -491,8 +514,9 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
-    // Try to go to next page
-    const nextBtn = page.locator('[aria-label*="next" i]').first();
+    // Try to go to next page — scope to pagination nav to avoid carousel buttons
+    const pagination = page.locator(selectors.pagination).or(page.locator('nav[aria-label*="Pagination" i]'));
+    const nextBtn = pagination.first().locator('[aria-label*="next" i]').first();
     if (await nextBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       if (await nextBtn.isEnabled()) {
         await nextBtn.click();
@@ -515,20 +539,23 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
 
-    const nextBtn = page.locator('[aria-label*="next" i]').first();
+    const pagination = page.locator(selectors.pagination).or(page.locator('nav[aria-label*="Pagination" i]'));
+    const nextBtn = pagination.first().locator('[aria-label*="next" i]').first();
     if (await nextBtn.isVisible({ timeout: 5000 }).catch(() => false) && await nextBtn.isEnabled()) {
       // Go to page 2
       await nextBtn.click();
       await page.waitForLoadState("domcontentloaded");
 
-      // Go back
+      // Go back — use polling to wait for URL to settle after history navigation
       await page.goBack();
       await page.waitForLoadState("domcontentloaded");
 
-      // Should be back on page 1 (no page param or page=1)
-      const url = new URL(page.url());
-      const pageParam = url.searchParams.get("page");
-      expect(!pageParam || pageParam === "1").toBeTruthy();
+      // Poll until page param is absent or "1" (history navigation can be async)
+      await expect(async () => {
+        const url = new URL(page.url());
+        const pageParam = url.searchParams.get("page");
+        expect(!pageParam || pageParam === "1").toBeTruthy();
+      }).toPass({ timeout: 15000 });
     }
   });
 
@@ -805,6 +832,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
   // J51: Loading state appears during filter change
   // ─────────────────────────────────────────────────
   test("J51: Loading indicator appears during search transitions", async ({ page, nav }) => {
+    test.slow(); // Filter transitions can be slow under CI load
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
@@ -820,8 +848,9 @@ test.describe("30 Advanced Search Page Journeys", () => {
       .or(page.locator('button:has-text("Private")'));
     if (await privateTab.first().isVisible()) {
       await privateTab.first().click();
-      // Loading state may flash briefly — just verify page settles
-      await page.waitForURL(/roomType/i, { timeout: 15000, waitUntil: "commit" });
+      // Loading state may flash briefly — just verify page settles.
+      // Use longer timeout for CI environments.
+      await page.waitForURL(/roomType/i, { timeout: 30000, waitUntil: "commit" });
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
     }
   });

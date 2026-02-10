@@ -11,6 +11,7 @@
  */
 
 import { test, expect, SF_BOUNDS, selectors, timeouts, searchResultsContainer } from "./helpers/test-utils";
+import { pollForUrlParam } from "./helpers/sync-helpers";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -99,7 +100,7 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
 
-    expect(new URL(page.url()).searchParams.has("sort")).toBe(false);
+    await pollForUrlParam(page, "sort", null);
   });
 
   // -------------------------------------------------------------------------
@@ -122,7 +123,7 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
 
-    expect(new URL(page.url()).searchParams.has("q")).toBe(false);
+    await pollForUrlParam(page, "q", null);
   });
 
   // -------------------------------------------------------------------------
@@ -201,23 +202,23 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     // Back -> state C (no roomType)
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
+    await pollForUrlParam(page, "roomType", null);
+    // maxPrice and sort should still be present
     url = new URL(page.url());
     expect(url.searchParams.get("maxPrice")).toBe("1500");
     expect(url.searchParams.get("sort")).toBe("price_asc");
-    expect(url.searchParams.has("roomType")).toBe(false);
 
     // Back -> state B (no sort)
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
+    await pollForUrlParam(page, "sort", null);
     url = new URL(page.url());
     expect(url.searchParams.get("maxPrice")).toBe("1500");
-    expect(url.searchParams.has("sort")).toBe(false);
 
     // Back -> state A (no maxPrice)
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
-    url = new URL(page.url());
-    expect(url.searchParams.has("maxPrice")).toBe(false);
+    await pollForUrlParam(page, "maxPrice", null);
   });
 
   // -------------------------------------------------------------------------
@@ -237,12 +238,12 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     // Back -> state A
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
-    expect(new URL(page.url()).searchParams.has("sort")).toBe(false);
+    await pollForUrlParam(page, "sort", null);
 
     // Forward -> state B
     await page.goForward();
     await page.waitForLoadState("domcontentloaded");
-    expect(new URL(page.url()).searchParams.get("sort")).toBe("newest");
+    await pollForUrlParam(page, "sort", "newest");
   });
 
   // -------------------------------------------------------------------------

@@ -25,6 +25,7 @@ import {
   getUrlParam,
   waitForUrlParam,
   waitForNoUrlParam,
+  pollForUrlParam,
 } from "../helpers";
 import type { Page } from "@playwright/test";
 
@@ -38,6 +39,7 @@ async function setInlineMinPrice(page: Page, value: string) {
   await input.waitFor({ state: "visible", timeout: 15_000 });
   await input.click();
   await input.fill(value);
+  await input.blur();
 }
 
 /** Fill the inline budget max input */
@@ -46,6 +48,7 @@ async function setInlineMaxPrice(page: Page, value: string) {
   await input.waitFor({ state: "visible", timeout: 15_000 });
   await input.click();
   await input.fill(value);
+  await input.blur();
 }
 
 /** Submit the search form to commit inline price changes */
@@ -101,9 +104,8 @@ test.describe("Price Range Filter", () => {
     await setInlineMaxPrice(page, "2000");
     await submitSearch(page);
 
-    await waitForUrlParam(page, "minPrice");
-    expect(getUrlParam(page, "minPrice")).toBe("500");
-    expect(getUrlParam(page, "maxPrice")).toBe("2000");
+    await pollForUrlParam(page, "minPrice", "500");
+    await pollForUrlParam(page, "maxPrice", "2000");
   });
 
   // 4. Clear price filter -> params removed from URL
@@ -157,7 +159,8 @@ test.describe("Price Range Filter", () => {
     await submitSearch(page);
 
     // The app should either clamp to 0 or ignore the value
-    // Either way, no crash
+    // Either way, no crash — wait for URL to settle before checking
+    await page.waitForTimeout(2_000);
     const minPrice = getUrlParam(page, "minPrice");
     if (minPrice !== null) {
       expect(Number(minPrice)).toBeGreaterThanOrEqual(0);
@@ -174,6 +177,9 @@ test.describe("Price Range Filter", () => {
     await setInlineMinPrice(page, "3000");
     await setInlineMaxPrice(page, "1000");
     await submitSearch(page);
+
+    // Wait for URL to settle after submit
+    await page.waitForTimeout(2_000);
 
     // SearchForm auto-swaps inverted ranges
     const finalMin = getUrlParam(page, "minPrice");

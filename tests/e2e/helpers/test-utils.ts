@@ -294,3 +294,27 @@ export function searchResultsContainer(page: Page): Locator {
 export function scopedCards(page: Page): Locator {
   return searchResultsContainer(page).locator('[data-testid="listing-card"]');
 }
+
+/**
+ * Wait for the sort dropdown / button to be hydrated on the current viewport.
+ *
+ * SortSelect renders an SSR placeholder _without_ `role="combobox"` (desktop)
+ * or `aria-label` (mobile). The real interactive element only appears after a
+ * `useEffect` sets `mounted = true`. This helper gates on that hydration so
+ * tests don't interact with the inert placeholder.
+ *
+ * - Desktop (>= 768px): waits for `button[role="combobox"]`
+ * - Mobile  (< 768px):  waits for `button[aria-label^="Sort:"]`
+ */
+export async function waitForSortHydrated(page: Page): Promise<void> {
+  const viewport = page.viewportSize();
+  const isMobile = viewport ? viewport.width < 768 : false;
+
+  if (isMobile) {
+    const sortBtn = page.locator('button[aria-label^="Sort:"]');
+    await expect(sortBtn).toBeAttached({ timeout: 30_000 });
+  } else {
+    const sortBtn = page.locator('button[role="combobox"]');
+    await expect(sortBtn).toBeAttached({ timeout: 30_000 });
+  }
+}

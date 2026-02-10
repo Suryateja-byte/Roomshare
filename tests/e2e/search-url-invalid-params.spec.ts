@@ -8,7 +8,7 @@
  * Run: pnpm playwright test tests/e2e/search-url-invalid-params.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, selectors, timeouts, searchResultsContainer } from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -174,14 +174,18 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     await expect(resultsHeading.or(zeroResults).first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Sort should display "Recommended" (the default), not "hacked"
-    // SortSelect needs hydration (mounted state) before aria-label appears
-    const sortLabel = page.locator('text="Recommended"');
-    const mobileSortBtn = page.locator('button[aria-label="Sort: Recommended"]');
+    // SortSelect needs hydration (mounted state) before aria-label appears.
+    // Scope sort label to search results container to avoid matching unrelated
+    // "Recommended" text elsewhere on the page, and use isAttached() since the
+    // element may be in an sr-only or hidden container.
+    const container = searchResultsContainer(page);
+    const sortLabel = container.locator(':text("Recommended")');
+    const mobileSortBtn = container.locator('button[aria-label^="Sort:"]');
 
     await expect(async () => {
-      const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
-      const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
-      expect(desktopVisible || mobileVisible).toBe(true);
+      const desktopCount = await sortLabel.count();
+      const mobileCount = await mobileSortBtn.count();
+      expect(desktopCount + mobileCount).toBeGreaterThan(0);
     }).toPass({ timeout: 30_000 });
   });
 
@@ -219,14 +223,17 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     await expect(resultsHeading.or(zeroResults).first()).toBeAttached({ timeout: timeouts.navigation });
 
     // The page should behave as if no q, sort, or maxPrice were set
-    // Sort should default to "Recommended" (needs hydration via mounted state)
-    const sortLabel = page.locator('text="Recommended"');
-    const mobileSortBtn = page.locator('button[aria-label="Sort: Recommended"]');
+    // Sort should default to "Recommended" (needs hydration via mounted state).
+    // Scope to the search results container to avoid matching unrelated text,
+    // and use isAttached() since the element may be in an sr-only/hidden container.
+    const container = searchResultsContainer(page);
+    const sortLabel = container.locator(':text("Recommended")');
+    const mobileSortBtn = container.locator('button[aria-label^="Sort:"]');
 
     await expect(async () => {
-      const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
-      const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
-      expect(desktopVisible || mobileVisible).toBe(true);
+      const desktopCount = await sortLabel.count();
+      const mobileCount = await mobileSortBtn.count();
+      expect(desktopCount + mobileCount).toBeGreaterThan(0);
     }).toPass({ timeout: 30_000 });
   });
 

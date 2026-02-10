@@ -30,6 +30,7 @@ export {
   logStep,
   searchResultsContainer,
   scopedCards,
+  waitForSortHydrated,
 } from "./test-utils";
 
 // Map-list sync helpers (polling-based assertions)

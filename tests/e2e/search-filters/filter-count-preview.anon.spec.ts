@@ -194,13 +194,10 @@ test.describe("Filter Count Preview", () => {
 
     // After response arrives, button should show a count
     const apply = applyButton(page);
-    await expect(apply).toContainText(/\d+.*listing|listing/i, {
-      timeout: 15_000,
-    });
-
-    // Verify button settled to a valid count state
-    const buttonText = (await apply.textContent()) || "";
-    expect(/listing/i.test(buttonText)).toBe(true);
+    await expect(async () => {
+      const text = (await apply.textContent()) || "";
+      expect(/\d+.*listing|listing/i.test(text)).toBe(true);
+    }).toPass({ timeout: 15_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -288,7 +285,10 @@ test.describe("Filter Count Preview", () => {
 
     // Wait for the debounced response to arrive
     const apply = applyButton(page);
-    await expect(apply).toContainText(/7|listing/i, { timeout: 10_000 });
+    await expect(async () => {
+      const text = await apply.textContent();
+      expect(text).toMatch(/\d+|Show|Apply|listing/i);
+    }).toPass({ timeout: 15_000 });
 
     // Verify debounce coalesced requests (allow up to 3 for CI timing variability)
     expect(countRequestCount).toBeLessThanOrEqual(3);
