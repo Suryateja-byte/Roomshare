@@ -178,7 +178,8 @@ test.describe("J37: Edit Profile Fields", () => {
     const bioField = page
       .getByLabel(/bio/i)
       .or(page.locator('textarea[name="bio"]'))
-      .or(page.locator('textarea').first());
+      .or(page.locator('textarea'))
+      .first();
 
     const canEditBio = await bioField.isVisible().catch(() => false);
     test.skip(!canEditBio, "No bio field — skipping");

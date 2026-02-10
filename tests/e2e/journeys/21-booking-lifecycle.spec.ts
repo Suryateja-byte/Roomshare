@@ -54,7 +54,8 @@ test.describe("J21: Full Booking Request Submission", () => {
     // Step 4: Fill any booking form fields that appear
     const messageField = page
       .getByPlaceholder(/message|note|intro/i)
-      .or(page.locator('textarea[name*="message"]'));
+      .or(page.locator('textarea[name*="message"]'))
+      .first();
     if (await messageField.isVisible().catch(() => false)) {
       await messageField.fill("Hi, I am very interested in this room!");
     }
