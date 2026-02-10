@@ -12,10 +12,11 @@ import { waitForSheetAnimation } from "./helpers/mobile-helpers";
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
 // Mobile viewport (iPhone 14 Pro dimensions)
+// Note: isMobile/hasTouch removed — isMobile is unsupported in Firefox and
+// causes positioning bugs in Desktop WebKit. Viewport size alone is sufficient
+// to trigger mobile layout breakpoints.
 test.use({
   viewport: { width: 390, height: 844 },
-  isMobile: true,
-  hasTouch: true,
 });
 
 // Selectors for toggle functionality
