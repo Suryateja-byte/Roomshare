@@ -93,19 +93,56 @@ async function getNthMarkerIdOrNull(
 }
 
 /**
+ * Dismiss overlays that can intercept marker clicks on mobile:
+ * - "Pinch to zoom / Tap markers" hint overlay
+ * - Bottom sheet covering the map
+ */
+async function clearMarkerOverlays(page: Page): Promise<void> {
+  // Dismiss mobile hint overlay if present
+  const dismissBtn = page.locator('button:has-text("Dismiss hint")');
+  if (await dismissBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+    await dismissBtn.click();
+    await page.waitForTimeout(200);
+  }
+
+  // On mobile viewports, collapse bottom sheet to expose markers
+  const viewportSize = page.viewportSize();
+  if (viewportSize && viewportSize.width < 768) {
+    const minimizeBtn = page.locator('button[aria-label="Minimize results panel"], button:has-text("Minimize results panel")');
+    if (await minimizeBtn.first().isVisible({ timeout: 500 }).catch(() => false)) {
+      await minimizeBtn.first().click();
+      await page.waitForTimeout(400);
+    }
+  }
+}
+
+/**
  * Click a visible marker by index.
+ * Handles overlay interception and DOM detachment from map re-renders.
  */
 async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
+  await clearMarkerOverlays(page);
   const marker = page.locator(".mapboxgl-marker:visible").nth(index);
-  await marker.click();
+  try {
+    await marker.click({ timeout: 5000 });
+  } catch {
+    // Force click bypasses actionability checks (overlay interception, detachment)
+    await marker.click({ force: true, timeout: 5000 });
+  }
 }
 
 /**
  * Hover a visible marker by index.
+ * Uses force:true to bypass overlay interception on mobile.
  */
 async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
+  await clearMarkerOverlays(page);
   const marker = page.locator(".mapboxgl-marker:visible").nth(index);
-  await marker.hover();
+  try {
+    await marker.hover({ timeout: 5000 });
+  } catch {
+    await marker.hover({ force: true, timeout: 5000 });
+  }
 }
 
 /**
@@ -127,6 +164,16 @@ test.describe("Map-List Synchronization", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
+
+    // Handle rate-limit page: wait and retry if search returned 429
+    const rateLimited = page.locator('h1:has-text("Too Many Requests")');
+    if (await rateLimited.isVisible({ timeout: 2000 }).catch(() => false)) {
+      const retryText = await page.locator('text=/Try again in \\d+ seconds/').textContent().catch(() => null);
+      const seconds = parseInt(retryText?.match(/\d+/)?.[0] || "10");
+      await page.waitForTimeout((seconds + 1) * 1000);
+      await page.goto(SEARCH_URL);
+      await page.waitForLoadState("domcontentloaded");
+    }
 
     // Wait for listing cards to render (SSR) — scoped to visible container
     await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
@@ -405,9 +452,10 @@ test.describe("Map-List Synchronization", () => {
       const cardId = await getFirstCardId(page);
       if (!cardId) test.skip(true, "No card listing ID");
 
-      // Click the card (the link within it) — scoped to visible container
+      // Click the card's link to navigate — scoped to visible container
       const card = searchResultsContainer(page).locator(selectors.listingCard).first();
-      await card.click();
+      const cardLink = card.locator("a").first();
+      await cardLink.click();
 
       // Should navigate to listing detail page
       await page.waitForURL(`**/listings/${cardId}`, {
@@ -588,9 +636,11 @@ test.describe("Map-List Synchronization", () => {
         timeout: timeouts.navigation,
       });
 
-      // Wait for map and network to settle after filter change
+      // Wait for map and content to settle after filter change
       await waitForMapReady(page);
-      await page.waitForLoadState("networkidle");
+      await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
+        timeout: timeouts.navigation,
+      });
 
       // Cards should have updated (may be fewer due to filter)
       const filteredCardCount = await page

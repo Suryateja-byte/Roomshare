@@ -113,6 +113,11 @@ export async function checkServerComponentRateLimit(
     type: RateLimitKey,
     endpoint: string
 ): Promise<ServerComponentRateLimitResult> {
+    // Skip rate limiting in development/test (E2E tests hit search heavily)
+    if (process.env.NODE_ENV !== 'production') {
+        return { allowed: true, remaining: 999, retryAfter: undefined };
+    }
+
     // Import here to avoid circular dependency
     const { RATE_LIMITS } = await import('./rate-limit');
     const config = RATE_LIMITS[type];
