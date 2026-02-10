@@ -47,7 +47,7 @@ export const mobileSelectors = {
   /** Mobile filter button in collapsed search bar */
   mobileFilterButton: '[data-testid="mobile-filter-button"]',
   /** Filters button in the search form */
-  filtersButton: 'button[aria-label*="Filters"]',
+  filtersButton: 'button[aria-label^="Filters"]',
   /** Filter modal dialog */
   filterModal: '[role="dialog"]',
   /** Desktop sidebar results container */

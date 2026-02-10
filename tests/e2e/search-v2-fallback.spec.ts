@@ -28,14 +28,15 @@ const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=$
 const SEARCH_URL = `/search?${boundsQS}`;
 const V2_API_URL = `/api/search/v2?${boundsQS}`;
 
-/** Wait for search results heading to be visible */
+/** Wait for search results heading to be attached (heading is sr-only, not visible) */
 async function waitForResults(page: import("@playwright/test").Page) {
   await page.waitForLoadState("domcontentloaded");
-  // Wait for the search results heading OR zero-results heading to appear.
+  // Wait for the search results heading OR zero-results heading to appear in DOM.
+  // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
   // SSR can be slow in CI — use navigation timeout (30s) instead of 15s.
-  const resultsHeading = page.locator("#search-results-heading").first();
-  const zeroResults = page.locator('h2:has-text("No matches found")').first();
-  await expect(resultsHeading.or(zeroResults)).toBeVisible({ timeout: timeouts.navigation });
+  const resultsHeading = page.locator("#search-results-heading");
+  const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+  await expect(resultsHeading.or(zeroResults).first()).toBeAttached({ timeout: timeouts.navigation });
 }
 
 // --------------------------------------------------------------------------
@@ -182,8 +183,9 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
     await waitForResults(page);
 
     // Page should render results regardless of which path was used
+    // The heading is sr-only (visually hidden for accessibility), so use toBeAttached
     const heading = page.locator("#search-results-heading").first();
-    await expect(heading).toBeVisible();
+    await expect(heading).toBeAttached();
 
     const headingText = await heading.textContent();
     expect(headingText?.trim()).toBeTruthy();
@@ -253,9 +255,7 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
     await page.goto(SEARCH_URL);
     await waitForResults(page);
 
-    // Get initial result count
     const heading = page.locator("#search-results-heading").first();
-    const initialText = await heading.textContent();
 
     // Navigate to a different search (add filter)
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);

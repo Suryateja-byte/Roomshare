@@ -168,9 +168,10 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     // Wait for search results to render before checking sort component.
     // The sort component is SSR-rendered alongside the heading; without this
     // wait, the check can fire before Next.js streaming delivers the content.
-    const resultsHeading = page.locator("#search-results-heading").first();
-    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")').first();
-    await expect(resultsHeading.or(zeroResults)).toBeVisible({ timeout: timeouts.navigation });
+    // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
+    const resultsHeading = page.locator("#search-results-heading");
+    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+    await expect(resultsHeading.or(zeroResults).first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Sort should display "Recommended" (the default), not "hacked"
     // SortSelect needs hydration (mounted state) before aria-label appears
@@ -212,9 +213,10 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
 
     // Wait for search results heading to render (sort component is in the same section).
     // This ensures SSR streaming has delivered the full search results block.
-    const resultsHeading = page.locator("#search-results-heading").first();
-    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")').first();
-    await expect(resultsHeading.or(zeroResults)).toBeVisible({ timeout: timeouts.navigation });
+    // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
+    const resultsHeading = page.locator("#search-results-heading");
+    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+    await expect(resultsHeading.or(zeroResults).first()).toBeAttached({ timeout: timeouts.navigation });
 
     // The page should behave as if no q, sort, or maxPrice were set
     // Sort should default to "Recommended" (needs hydration via mounted state)

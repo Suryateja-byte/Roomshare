@@ -14,7 +14,7 @@
  * - pointer-events-none is on the overlay child, not the container itself
  */
 
-import { test, expect, tags, selectors, timeouts, searchResultsContainer } from "../helpers";
+import { test, expect, tags, selectors, timeouts, searchResultsContainer, filtersButton } from "../helpers";
 
 test.describe("Breathing Pending State (PR1)", () => {
   // Filter tests run as anonymous user
@@ -52,7 +52,7 @@ test.describe("Breathing Pending State (PR1)", () => {
       });
 
       // Open filter drawer and apply a different filter to trigger transition
-      const filterButton = page.getByRole("button", { name: /filters/i });
+      const filterButton = filtersButton(page);
       await expect(filterButton).toBeVisible({ timeout: 10000 });
       await filterButton.click();
 

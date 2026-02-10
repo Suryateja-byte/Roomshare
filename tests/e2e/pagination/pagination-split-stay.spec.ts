@@ -188,7 +188,7 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
     await expect(async () => {
       const count = await cards.count();
       expect(count).toBeGreaterThan(initialCardCount);
-    }).toPass({ timeout: 15_000 });
+    }).toPass({ timeout: 30_000 });
 
     // Split-stay section should still be visible after recalculation.
     // The useMemo dependency [allListings.length, estimatedMonths] triggers

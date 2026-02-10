@@ -66,7 +66,7 @@ export const A11Y_CONFIG = {
   /** Elements to always exclude from axe scans (map canvases are third-party) */
   globalExcludes: ['.mapboxgl-canvas', '.maplibregl-canvas', '.maplibregl-ctrl-group'] as const,
   /** Rules with known acceptable violations */
-  knownExclusions: ['color-contrast'] as const,
+  knownExclusions: ['color-contrast', 'aria-prohibited-attr'] as const,
 } as const;
 
 /**

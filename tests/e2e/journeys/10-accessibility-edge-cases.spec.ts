@@ -59,6 +59,13 @@ test.describe('Accessibility Journeys', () => {
     test(`${tags.a11y} - Form keyboard interaction`, async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+
+      // Authenticated users may be redirected away from /login
+      if (!page.url().includes('/login')) {
+        test.skip(true, 'Authenticated user redirected away from /login');
+        return;
+      }
+
       // Wait for the login form to render (Suspense boundary + hydration)
       await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
@@ -126,6 +133,13 @@ test.describe('Accessibility Journeys', () => {
     test(`${tags.a11y} - Form labels present`, async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+
+      // Authenticated users may be redirected away from /login
+      if (!page.url().includes('/login')) {
+        test.skip(true, 'Authenticated user redirected away from /login');
+        return;
+      }
+
       // Wait for the login form to render (Suspense boundary + hydration)
       await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
@@ -142,8 +156,7 @@ test.describe('Accessibility Journeys', () => {
         // Should have label association
         if (id) {
           const label = page.locator(`label[for="${id}"]`);
-          const hasLabel = (await label.count()) > 0 || ariaLabel || ariaLabelledBy || placeholder;
-          // Most inputs should have labels
+          expect((await label.count()) > 0 || !!ariaLabel || !!ariaLabelledBy || !!placeholder).toBeTruthy();
         }
       }
     });
@@ -165,8 +178,6 @@ test.describe('Accessibility Journeys', () => {
 
         // Get computed style
         const color = await heading.evaluate(el => getComputedStyle(el).color);
-        const bgColor = await heading.evaluate(el => getComputedStyle(el).backgroundColor);
-
         // Color should be defined (not transparent/invisible)
         expect(color).toBeTruthy();
       }
@@ -190,8 +201,7 @@ test.describe('Accessibility Journeys', () => {
         const boxShadow = await firstButton.evaluate(el => getComputedStyle(el).boxShadow);
 
         // Should have some focus indication
-        const hasFocusStyle = outlineStyle !== 'none' || boxShadow !== 'none';
-        // Note: Some designs use custom focus indicators
+        expect(outlineStyle !== 'none' || boxShadow !== 'none').toBeTruthy();
       }
     });
   });
@@ -273,8 +283,7 @@ test.describe('Edge Case Journeys', () => {
       }
 
       // Should show offline indicator or error
-      const offlineIndicator = page.getByText(/offline|connection|network/i).first();
-      // May or may not show depending on implementation
+      // Offline indicator may or may not show depending on implementation
 
       // Go back online
       await network.goOnline();
@@ -324,6 +333,13 @@ test.describe('Edge Case Journeys', () => {
     test(`${tags.auth} - Double submit prevention`, async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+
+      // Authenticated users may be redirected away from /login
+      if (!page.url().includes('/login')) {
+        test.skip(true, 'Authenticated user redirected away from /login');
+        return;
+      }
+
       // Wait for the login form to render (Suspense boundary + hydration)
       await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
@@ -456,6 +472,13 @@ test.describe('Edge Case Journeys', () => {
     test(`${tags.auth} - SQL injection prevention`, async ({ page }) => {
       await page.goto('/login');
       await page.waitForLoadState('domcontentloaded');
+
+      // Authenticated users may be redirected away from /login
+      if (!page.url().includes('/login')) {
+        test.skip(true, 'Authenticated user redirected away from /login');
+        return;
+      }
+
       // Wait for the login form to render (Suspense boundary + hydration)
       await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
       const emailInput = page.getByLabel(/email/i).first();
@@ -483,7 +506,7 @@ test.describe('Edge Case Journeys', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Images should be lazy loaded or optimized
-      const images = page.locator('img[loading="lazy"], img[decoding="async"]');
+      // Images should be lazy loaded or optimized (img[loading="lazy"], img[decoding="async"])
 
       // Page should remain responsive
       const isResponsive = await page.evaluate(() => {

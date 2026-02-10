@@ -247,8 +247,8 @@ test.describe('Profile & Settings Journeys', () => {
 
       // The password form inputs are always visible when the section exists (no click-to-reveal)
       const currentPasswordInput = page.getByLabel(/current.*password/i);
-      const newPasswordInput = page.getByLabel(/new.*password/i);
-      const confirmPasswordInput = page.getByLabel(/confirm.*new.*password|confirm.*password/i);
+      const newPasswordInput = page.getByLabel(/^new password$/i);
+      const confirmPasswordInput = page.getByLabel(/confirm/i);
 
       // Wait for the form inputs to be interactive (hydration)
       await currentPasswordInput.waitFor({ state: 'visible', timeout: 10000 });
@@ -292,7 +292,7 @@ test.describe('Profile & Settings Journeys', () => {
         return;
       }
 
-      const newPasswordInput = page.getByLabel(/new.*password/i);
+      const newPasswordInput = page.getByLabel(/^new password$/i);
       await newPasswordInput.waitFor({ state: 'visible', timeout: 10000 });
 
       // Try weak password

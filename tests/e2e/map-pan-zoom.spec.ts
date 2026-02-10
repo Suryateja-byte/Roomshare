@@ -31,16 +31,21 @@ async function waitForSearchPage(page: import("@playwright/test").Page) {
   await waitForMapReady(page);
 }
 
-// Helper: check if map canvas is visible (WebGL loaded and rendering)
+// Helper: check if map canvas is visible with non-zero dimensions (WebGL loaded and rendering)
 async function isMapAvailable(page: import("@playwright/test").Page) {
   try {
     const canvas = page.locator(".mapboxgl-canvas:visible").first();
     await canvas.waitFor({ state: "visible", timeout: 5_000 });
-    return true;
+    // Verify canvas has non-zero dimensions (WebGL actually rendered)
+    const hasSize = await page.evaluate(() => {
+      const c = document.querySelector(".mapboxgl-canvas");
+      if (!c) return false;
+      const rect = c.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    return hasSize;
   } catch {
-    // Fallback: check if map container at least exists
-    const mapContainer = page.locator(selectors.map);
-    return (await mapContainer.count()) > 0;
+    return false;
   }
 }
 

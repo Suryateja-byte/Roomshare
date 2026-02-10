@@ -9,12 +9,15 @@
 import { test, expect, tags, timeouts } from '../helpers';
 
 test.describe('Authentication Journeys', () => {
+  // All auth tests must start unauthenticated — clear any inherited storageState
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test.beforeEach(async () => {
     test.slow();
   });
 
   test.describe('J007: User signup with email', () => {
-    test(`${tags.auth} ${tags.a11y} - Complete signup flow`, async ({ page, auth, data }) => {
+    test(`${tags.auth} ${tags.a11y} - Complete signup flow`, async ({ page, data }) => {
       const userData = data.generateUserData();
 
       // Step 1: Navigate to signup
@@ -257,9 +260,6 @@ test.describe('Authentication Journeys', () => {
   });
 
   test.describe('J011-J012: Protected route access', () => {
-    // These tests require unauthenticated state — clear auth storageState
-    test.use({ storageState: { cookies: [], origins: [] } });
-
     test(`${tags.auth} - Unauthenticated user redirected from protected routes`, async ({
       page,
       auth,
@@ -350,9 +350,6 @@ test.describe('Authentication Journeys', () => {
 
       // After multiple attempts, should see rate limit or be slowed down
       // (exact behavior depends on implementation)
-      const rateLimitMessage = page.getByText(/too many|try again|rate limit|slow down/i).first();
-      const isLimited = await rateLimitMessage.isVisible().catch(() => false);
-
       // Rate limiting may or may not be visible, but login should still work eventually
       // This test mainly ensures the app doesn't crash under rapid auth attempts
       expect(page.url()).toContain('/login');

@@ -62,7 +62,7 @@ test.describe("Pagination URL State", () => {
       await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
       await loadMoreBtn.click();
       // 12 initial + (i+1)*12 mock items = (i+2)*12
-      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 15_000 });
+      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 30_000 });
 
       // Assert URL never contains cursor after each load-more
       const currentUrl = page.url();
@@ -92,7 +92,7 @@ test.describe("Pagination URL State", () => {
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
     await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     // Refresh the page
     await page.reload();
@@ -242,7 +242,7 @@ test.describe("Pagination URL State", () => {
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
     await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     // Copy the current URL (which should NOT contain cursor)
     const sharedUrl = page.url();

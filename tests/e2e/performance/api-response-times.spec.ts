@@ -13,8 +13,8 @@ test.describe('API Response Time Budgets', () => {
   test.slow();
 
   test.describe('Search API', () => {
-    // CI runners are slower — use generous budget
-    const budget = process.env.CI ? 8000 : 3000;
+    // CI runners are slower — use generous budget (40-shard CI adds contention)
+    const budget = process.env.CI ? 12000 : 3000;
 
     test('/api/search responds under budget', async ({ page }) => {
       const searchUrl = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -66,14 +66,15 @@ test.describe('API Response Time Budgets', () => {
 
   test.describe('Listing Detail API', () => {
     test('/api/listings/[id] responds under budget', async ({ page }) => {
-      // CI runners are slower — use generous budget
-      const budget = process.env.CI ? 5000 : 2000;
+      // CI runners are slower — use generous budget (40-shard CI adds contention)
+      const budget = process.env.CI ? 8000 : 2000;
 
       // First get a listing ID
       await page.goto('/search');
       await page.waitForLoadState('domcontentloaded');
 
       const firstCard = page.locator('[data-testid="listing-card"]').first();
+      await firstCard.waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {});
       const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
       test.skip(!listingId, 'No listings available');
 
@@ -100,8 +101,8 @@ test.describe('API Response Time Budgets', () => {
   });
 
   test.describe('Static page load budgets', () => {
-    // CI runners are slower — use generous budget
-    const budget = process.env.CI ? 15000 : 8000;
+    // CI runners are slower — use generous budget (40-shard CI adds contention)
+    const budget = process.env.CI ? 20000 : 8000;
 
     for (const route of ['/', '/login', '/signup', '/about']) {
       test(`${route} DOMContentLoaded under budget`, async ({ page }) => {

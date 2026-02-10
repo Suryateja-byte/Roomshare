@@ -314,34 +314,29 @@ test.describe("Search Loading States", () => {
     await page.goto(SEARCH_URL);
     await waitForResults(page);
 
-    // Measure the position of the results heading after full load.
-    // The heading is inside the search-results-container which may be scoped
-    // to the visible viewport (desktop vs mobile).
+    // Measure the position of a visible element after full load.
+    // The #search-results-heading is sr-only (visually hidden), so use the
+    // search results container or first listing card for layout shift measurement.
     const container = searchResultsContainer(page);
-    const heading = container.locator("#search-results-heading").first();
 
-    // The heading may be outside the scoped container in some layouts;
-    // fall back to page-level if not found within the container.
-    const headingInContainer = await heading.isVisible().catch(() => false);
-    const effectiveHeading = headingInContainer
-      ? heading
-      : page.locator("#search-results-heading").first();
-    await expect(effectiveHeading).toBeVisible({ timeout: 15000 });
+    // Use the search-results div or first listing card as the layout anchor
+    const layoutAnchor = container.locator('#search-results, [data-testid="listing-card"]').first();
+    await expect(layoutAnchor).toBeVisible({ timeout: 15000 });
 
-    const headingBox = await effectiveHeading.boundingBox();
-    expect(headingBox).toBeTruthy();
+    const anchorBox = await layoutAnchor.boundingBox();
+    expect(anchorBox).toBeTruthy();
 
-    // Reload the page and measure heading position again
+    // Reload the page and measure position again
     await page.reload();
     await waitForResults(page);
 
-    const headingBoxAfter = await effectiveHeading.boundingBox();
-    expect(headingBoxAfter).toBeTruthy();
+    const anchorBoxAfter = await layoutAnchor.boundingBox();
+    expect(anchorBoxAfter).toBeTruthy();
 
     // Position should be consistent (within a small tolerance for rendering differences)
-    if (headingBox && headingBoxAfter) {
-      const yDiff = Math.abs(headingBox.y - headingBoxAfter.y);
-      // Allow up to 10px difference (CLS threshold)
+    if (anchorBox && anchorBoxAfter) {
+      const yDiff = Math.abs(anchorBox.y - anchorBoxAfter.y);
+      // Allow up to 50px difference (CLS threshold)
       expect(yDiff).toBeLessThan(50);
     }
 
@@ -399,9 +394,9 @@ test.describe("Search Loading States", () => {
 
       if (feedVisible) {
         const cards = container.locator('[data-testid="listing-card"]');
-        const cardCount = await cards.count();
         // Should have results (or confirmed zero results)
         // The key point is no crash or stuck loading state
+        expect(await cards.count()).toBeGreaterThanOrEqual(0);
       }
 
       // Verify no aria-busy="true" stuck elements

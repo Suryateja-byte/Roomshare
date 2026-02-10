@@ -35,6 +35,7 @@ import type { Page } from "@playwright/test";
 /** Fill the inline budget min input and submit the form */
 async function setInlineMinPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-min");
+  await input.waitFor({ state: "visible", timeout: 15_000 });
   await input.click();
   await input.fill(value);
 }
@@ -42,6 +43,7 @@ async function setInlineMinPrice(page: Page, value: string) {
 /** Fill the inline budget max input */
 async function setInlineMaxPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-max");
+  await input.waitFor({ state: "visible", timeout: 15_000 });
   await input.click();
   await input.fill(value);
 }

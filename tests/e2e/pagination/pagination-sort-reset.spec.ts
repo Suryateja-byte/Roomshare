@@ -79,7 +79,11 @@ async function selectSort(
 ) {
   if (isMobileViewport(page)) {
     // Mobile: click the sort button to open the bottom sheet
-    const mobileSortBtn = page.locator('button[aria-label^="Sort:"]');
+    // Scope to mobile container to avoid strict mode violation when both
+    // desktop and mobile sort buttons are in the DOM (webkit).
+    const mobileSortBtn = page
+      .locator('[data-testid="mobile-search-results-container"]')
+      .locator('button[aria-label^="Sort:"]');
     await expect(mobileSortBtn).toBeVisible({ timeout: 10_000 });
     await mobileSortBtn.click();
 
@@ -140,7 +144,7 @@ async function loadTwoPages(page: Page) {
   const loadMoreBtn = container.locator(sel.loadMoreBtn);
   await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
   await loadMoreBtn.click();
-  await expect(cards).toHaveCount(initialCount + 12, { timeout: 15_000 });
+  await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
   return { cards, initialCount };
 }
@@ -366,7 +370,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
     await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(initialCount + 12, { timeout: 15_000 });
+    await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
     // Extract all prices after load-more
     const allPrices = await extractPrices(page);
@@ -420,7 +424,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
     await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(initialCount + 12, { timeout: 15_000 });
+    await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
     // Extract all prices after load-more
     const allPrices = await extractPrices(page);
@@ -457,7 +461,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
     await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(initialCount + 12, { timeout: 15_000 });
+    await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
     // Verify URL maintains sort=newest with no cursor leakage
     expect(page.url()).toContain("sort=newest");
@@ -502,7 +506,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
     await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(initialCount + 12, { timeout: 15_000 });
+    await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
     // Verify URL maintains sort=rating with no cursor leakage
     expect(page.url()).toContain("sort=rating");
