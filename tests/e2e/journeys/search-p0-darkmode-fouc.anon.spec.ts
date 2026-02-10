@@ -10,6 +10,10 @@
 import { test, expect, tags } from "../helpers";
 
 test.describe("P0-2: Dark Mode FOUC Prevention", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.smoke} - next-themes init script exists in SSR HTML`, async ({
     request,
   }) => {

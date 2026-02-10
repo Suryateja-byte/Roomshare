@@ -8,6 +8,10 @@
 
 import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J25: Send Message in Conversation ────────────────────────────────────────
 test.describe("J25: Send Message in Conversation", () => {
   test("go to messages → open conversation → send message → verify appears", async ({

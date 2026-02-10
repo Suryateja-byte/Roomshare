@@ -8,6 +8,10 @@
 
 import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J28: Write a Review ──────────────────────────────────────────────────────
 test.describe("J28: Write a Review", () => {
   test("listing detail → reviews section → write review → submit → verify appears", async ({

@@ -45,6 +45,10 @@ test.describe('30 Critical User Journey Simulations', () => {
   // Dev server compiles routes on first visit (16s+ per route)
   test.use({ actionTimeout: 30000, navigationTimeout: 60000 });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // ──────────────────────────────────────────────
   // DISCOVERY & FIRST IMPRESSIONS (S1–S5)
   // ──────────────────────────────────────────────

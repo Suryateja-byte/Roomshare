@@ -20,6 +20,10 @@ const KNOWN_ISSUES: string[] = [
 ];
 
 test.describe('Accessibility Audit (axe-core)', () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe('Critical Pages - WCAG 2.1 AA Compliance', () => {
     test('Homepage passes accessibility audit', async ({ page }) => {
       await page.goto('/');

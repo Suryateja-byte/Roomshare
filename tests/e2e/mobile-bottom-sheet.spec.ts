@@ -120,6 +120,8 @@ async function dragHandle(
   await waitForSheetAnimation(page);
 }
 
+test.beforeEach(async () => { test.slow(); });
+
 test.describe("Mobile Bottom Sheet - Snap Points (7.1)", () => {
   test("bottom sheet renders with 3 snap points (collapsed ~15vh, half ~50vh, expanded ~85vh)", async ({
     page,

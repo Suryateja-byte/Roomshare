@@ -11,6 +11,10 @@ import { test, expect, tags, selectors } from '../helpers';
 test.describe('Profile & Settings Journeys', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe('J067: View user profile', () => {
     test(`${tags.auth} - View own profile`, async ({ page, nav, assert }) => {
       await nav.goToProfile();

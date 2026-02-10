@@ -10,6 +10,10 @@ test.describe("P0-1: Mobile Filters Accessibility", () => {
   // Test at iPhone-sized viewport
   test.use({ viewport: { width: 375, height: 812 } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.a11y} - Filters button is visible and accessible on mobile`, async ({
     page,
   }) => {

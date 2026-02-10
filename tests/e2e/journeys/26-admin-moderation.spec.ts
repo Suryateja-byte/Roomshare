@@ -54,6 +54,10 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
   return !onLogin;
 }
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J38: Admin Dashboard Overview ────────────────────────────────────────────
 test.describe("J38: Admin Dashboard Overview", () => {
   test("login as admin → /admin → verify stats and sub-pages", async ({

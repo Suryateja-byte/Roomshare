@@ -47,6 +47,10 @@ import {
 test.describe("Gender & Language Filters", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 8.1: Select gender preference -> URL has genderPreference=FEMALE_ONLY
   test(`${tags.core} - selecting gender preference and applying updates URL`, async ({ page }) => {
     await waitForSearchReady(page);

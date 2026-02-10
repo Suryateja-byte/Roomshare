@@ -30,6 +30,10 @@ import {
 test.describe("Filter State Persistence", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // 12.1: Filters preserved on page refresh
   // -------------------------------------------------------------------------

@@ -34,6 +34,10 @@ function categoryButton(page: Page, label: string) {
 test.describe("Category Bar", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // 14.1 Category bar renders with buttons
   // -------------------------------------------------------------------------

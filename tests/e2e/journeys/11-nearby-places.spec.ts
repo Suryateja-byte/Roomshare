@@ -101,6 +101,10 @@ async function navigateToTestListing(page: Page): Promise<boolean> {
 }
 
 test.describe('Nearby Places Feature', () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe('Authentication', () => {
     test('unauthenticated user sees login prompt', async ({ page, network }) => {
       test.info().annotations.push({ type: 'tag', description: tags.anon });

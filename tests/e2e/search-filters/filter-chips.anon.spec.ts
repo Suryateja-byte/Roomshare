@@ -35,6 +35,10 @@ import {
 test.describe("Active Filter Chips", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 1. Active filters show as chips above results
   test(`${tags.core} - active filters display as chips in applied filters region`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);

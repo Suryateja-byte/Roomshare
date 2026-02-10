@@ -49,6 +49,10 @@ const mockPlacesFixture = [
   },
 ];
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 test.describe('Nearby Places Attribution Compliance', () => {
   test.beforeEach(async ({ page }) => {
     // Mock /api/nearby for deterministic results

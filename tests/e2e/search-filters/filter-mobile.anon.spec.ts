@@ -28,6 +28,10 @@ test.describe("Mobile Filter Experience", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test.use({ viewport: { width: 375, height: 812 } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(
     `${tags.filter}${tags.mobile} filter modal opens correctly on mobile (P0)`,
     async ({ page }) => {

@@ -19,6 +19,10 @@ import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 test.describe("Filter + Pagination Interactions", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.filter} Filter change resets cursor and accumulated listings`, async ({
     page,
   }) => {

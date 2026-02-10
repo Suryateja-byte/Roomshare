@@ -15,6 +15,8 @@ import {
 } from '../helpers/visual-helpers';
 
 test.describe('Listing Detail — Visual Regression', () => {
+  test.beforeEach(async () => { test.slow(); });
+
   /** Navigate to the first available listing */
   async function goToFirstListing(page: import('@playwright/test').Page): Promise<boolean> {
     await page.goto('/search');

@@ -11,6 +11,10 @@
 
 import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J45: Report a Listing ────────────────────────────────────────────────────
 test.describe("J45: Report a Listing", () => {
   test("listing detail → report → fill reason → submit → verify toast", async ({

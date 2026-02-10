@@ -55,6 +55,8 @@ async function navigateToListing(page: import('@playwright/test').Page): Promise
 }
 
 test.describe('Listing Detail — Accessibility Deep-Dive', () => {
+  test.beforeEach(async () => { test.slow(); });
+
   test.describe('axe-core scans', () => {
     test('Full page passes WCAG 2.1 AA', async ({ page }) => {
       const found = await navigateToListing(page);

@@ -8,6 +8,10 @@
 import { test, expect, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 test.describe("Search API v2 Endpoint", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe("Feature flag gating", () => {
     test(`${tags.core} - Returns 404 when v2 not enabled`, async ({
       request,

@@ -11,6 +11,10 @@ import { test, expect, tags, timeouts, selectors } from '../helpers';
 test.describe('Messaging Journeys', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe('J047: Start new conversation', () => {
     test(`${tags.auth} - Contact host from listing`, async ({ page, nav }) => {
       await nav.goToSearch();

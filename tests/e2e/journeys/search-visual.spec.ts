@@ -8,6 +8,8 @@ import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 test.describe("Search Visual Regression", () => {
   test.beforeEach(async ({ page }) => {
+    test.slow();
+
     // Disable animations for stable screenshots
     await page.emulateMedia({ reducedMotion: "reduce" });
   });

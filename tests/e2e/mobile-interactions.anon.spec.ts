@@ -34,6 +34,8 @@ const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=$
 // Tests that are NOT covered by mobile-bottom-sheet.spec.ts
 // ---------------------------------------------------------------------------
 
+test.beforeEach(async () => { test.slow(); });
+
 test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
   test.use({
     viewport: { width: 390, height: 844 },

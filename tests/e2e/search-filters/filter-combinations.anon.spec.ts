@@ -38,6 +38,10 @@ import {
 test.describe("Filter Combinations", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 1. Price + room type combination
   test(`${tags.core} - price and room type filters work together`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&maxPrice=1500&roomType=Private+Room`);

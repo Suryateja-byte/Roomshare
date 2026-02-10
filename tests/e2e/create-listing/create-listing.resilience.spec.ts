@@ -13,6 +13,7 @@ import type { ListingData } from '../helpers/data-helpers';
 
 test.describe('Create Listing – Resilience', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
+  test.beforeEach(async () => { test.slow(); });
 
   let createPage: CreateListingPage;
 

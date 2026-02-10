@@ -14,6 +14,10 @@ test.describe("Breathing Pending State (PR1)", () => {
   // Filter tests run as anonymous user
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe("Pending State Styling", () => {
     test(`${tags.anon} ${tags.smoke} - Results container shows breathing fade during filter transition`, async ({
       page,

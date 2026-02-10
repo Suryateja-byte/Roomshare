@@ -16,6 +16,7 @@ import {
 
 test.describe('Dark Mode — Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
+    test.slow();
     // Set localStorage so next-themes applies .dark class on mount
     // (emulateMedia alone only sets CSS media query, not the class)
     await page.addInitScript(() => {

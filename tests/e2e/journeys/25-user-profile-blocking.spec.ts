@@ -8,6 +8,10 @@
 
 import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J35: View Public User Profile ────────────────────────────────────────────
 test.describe("J35: View Public User Profile", () => {
   test("listing detail → click host name → verify profile page", async ({

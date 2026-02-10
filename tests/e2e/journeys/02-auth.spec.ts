@@ -9,6 +9,10 @@
 import { test, expect, tags, timeouts } from '../helpers';
 
 test.describe('Authentication Journeys', () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe('J007: User signup with email', () => {
     test(`${tags.auth} ${tags.a11y} - Complete signup flow`, async ({ page, auth, data }) => {
       const userData = data.generateUserData();

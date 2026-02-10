@@ -9,6 +9,10 @@
 
 import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J21: Full Booking Request Submission ─────────────────────────────────────
 test.describe("J21: Full Booking Request Submission", () => {
   test("search → listing detail → submit booking → verify on bookings page", async ({

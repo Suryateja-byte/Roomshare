@@ -9,6 +9,10 @@ import { test, expect, SF_BOUNDS, searchResultsContainer } from "./helpers/test-
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ---------------------------------------------------------------------------
 // 2.1: Image carousel — dots capped at 5, arrows visible on hover
 // ---------------------------------------------------------------------------

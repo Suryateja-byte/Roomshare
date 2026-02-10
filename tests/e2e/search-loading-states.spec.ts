@@ -42,6 +42,10 @@ test.describe("Search Loading States", () => {
     viewport: { width: 1280, height: 800 },
   });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 1. Skeleton loading on initial page load
   test("1. skeleton or loading placeholder on initial page load", async ({ page }) => {
     // Navigate but do NOT wait for results - we want to catch the loading state

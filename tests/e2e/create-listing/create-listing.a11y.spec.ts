@@ -12,6 +12,7 @@ import AxeBuilder from '@axe-core/playwright';
 
 test.describe('Create Listing — Accessibility Tests', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
+  test.beforeEach(async () => { test.slow(); });
 
   // ────────────────────────────────────────────────────────
   // Helpers

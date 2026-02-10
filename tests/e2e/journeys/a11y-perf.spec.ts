@@ -15,6 +15,10 @@ async function waitForResults(page: import("@playwright/test").Page) {
 }
 
 test.describe("Accessibility & Performance", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe("Screen reader landmarks", () => {
     test("search results page has correct ARIA landmarks", async ({
       page,

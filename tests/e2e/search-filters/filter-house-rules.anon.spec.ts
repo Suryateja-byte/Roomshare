@@ -35,6 +35,10 @@ import {
 test.describe("House Rules Filter", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 6.1: Select single house rule -> aria-pressed="true", URL has houseRules param
   test(`${tags.core} - selecting a single house rule updates URL`, async ({ page }) => {
     await waitForSearchReady(page);

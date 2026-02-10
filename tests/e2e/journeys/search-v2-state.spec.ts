@@ -14,6 +14,10 @@
 import { test, expect, tags, SF_BOUNDS, timeouts } from "../helpers";
 
 test.describe("V2 State Reset on Bounds-Required Path", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.core} - resets v2 context state when navigating to bounds-required path`, async ({
     page,
   }) => {

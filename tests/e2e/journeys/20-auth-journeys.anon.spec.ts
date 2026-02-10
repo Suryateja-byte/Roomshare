@@ -7,6 +7,10 @@
 
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J7: Login Page (Unauthenticated) ────────────────────────────────────────
 test.describe("J7: Login Page (Unauthenticated)", () => {
   test("renders login form with email and password fields", async ({

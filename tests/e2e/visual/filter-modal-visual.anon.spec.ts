@@ -17,6 +17,7 @@ test.describe('Filter Modal — Visual Regression', () => {
   const searchUrl = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
   test.beforeEach(async ({ page }) => {
+    test.slow();
     await page.setViewportSize(VIEWPORTS.desktop);
     await page.goto(searchUrl);
     await page.waitForLoadState('domcontentloaded');

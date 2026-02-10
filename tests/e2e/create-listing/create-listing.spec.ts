@@ -11,6 +11,7 @@ import { CreateListingPage, CreateListingData } from '../page-objects/create-lis
 
 test.describe('Create Listing — Functional Tests', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
+  test.beforeEach(async () => { test.slow(); });
 
   // ────────────────────────────────────────────────────────
   // Helpers

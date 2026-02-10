@@ -26,6 +26,10 @@
 
 import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J1: Home Page Load & Hero CTA ────────────────────────────────────────────
 test.describe("J1: Home Page Load & Hero CTA", () => {
   test("loads home page with hero section and navigates to search", async ({

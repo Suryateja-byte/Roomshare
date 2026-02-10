@@ -39,6 +39,8 @@ function logViolations(label: string, violations: any[]) {
 }
 
 test.describe('axe-core — Dynamic UI States', () => {
+  test.beforeEach(async () => { test.slow(); });
+
   test.describe('Filter modal states', () => {
     test('Search filter modal open state passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/search');

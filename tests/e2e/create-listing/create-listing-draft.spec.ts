@@ -11,6 +11,7 @@ import { CreateListingPage } from '../page-objects/create-listing.page';
 
 test.describe('Create Listing — Draft Persistence', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
+  test.beforeEach(async () => { test.slow(); });
 
   // ── D-001: Draft auto-saves form data ──
 

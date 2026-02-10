@@ -9,6 +9,10 @@
 
 import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J31: Edit Listing and Verify ─────────────────────────────────────────────
 test.describe("J31: Edit Listing and Verify", () => {
   test("navigate to own listing → edit → change title + price → save → verify", async ({

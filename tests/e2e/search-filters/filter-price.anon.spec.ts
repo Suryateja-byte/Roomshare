@@ -62,6 +62,10 @@ async function submitSearch(page: Page) {
 test.describe("Price Range Filter", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 1. Set min price -> URL gets minPrice param
   test(`${tags.core} - setting min price updates URL with minPrice param`, async ({ page }) => {
     await waitForSearchReady(page);

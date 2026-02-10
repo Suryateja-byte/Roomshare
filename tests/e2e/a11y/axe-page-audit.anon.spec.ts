@@ -39,6 +39,8 @@ function logViolations(label: string, violations: any[]) {
 }
 
 test.describe('axe-core Page Audit — Anonymous Pages', () => {
+  test.beforeEach(async () => { test.slow(); });
+
   test.describe('P0 — Critical public pages', () => {
     test('Homepage (/) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/');

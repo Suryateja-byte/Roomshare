@@ -17,6 +17,10 @@ test.describe("Budget URL Param Aliases", () => {
   // Filter tests run as anonymous user
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe("Server-Side Price Filtering", () => {
     test(`${tags.anon} ${tags.smoke} - Budget aliases filter listings server-side`, async ({
       page,

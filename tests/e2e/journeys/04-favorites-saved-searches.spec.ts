@@ -11,6 +11,10 @@ import { test, expect, tags, selectors, searchResultsContainer } from "../helper
 test.describe("Favorites & Saved Searches Journeys", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe("J027: Save and unsave listing", () => {
     test(`${tags.auth} ${tags.mobile} - Toggle favorite on listing`, async ({
       page,

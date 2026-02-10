@@ -31,6 +31,10 @@ import {
 test.describe("Lease Duration Filter", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 5.1: Select each lease duration option -> URL contains leaseDuration=<value>
   test(`${tags.core} - selecting each lease duration option updates URL`, async ({ page }) => {
     // 5 iterations × ~12s each can exceed the default 60s timeout in slow environments

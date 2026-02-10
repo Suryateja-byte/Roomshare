@@ -35,6 +35,10 @@ function recommendedRow(page: Page) {
 test.describe("Recommended Filters", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 16.1: Recommended filter pills shown on base search
   test("16.1 - recommended filter pills shown with Try label and up to 5 pills", async ({ page }) => {
     await page.goto(SEARCH_URL);

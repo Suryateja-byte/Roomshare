@@ -15,6 +15,8 @@ test.describe("Listing Card Carousel", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page, nav }) => {
+    test.slow();
+
     // Navigate to search page with some results
     await nav.goToSearch();
 

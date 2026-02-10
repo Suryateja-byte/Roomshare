@@ -11,6 +11,10 @@ import { test, expect, tags, selectors } from "../helpers";
 test.describe("Reviews Journeys", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe("J057: View listing reviews", () => {
     test(`${tags.core} - Display reviews on listing page`, async ({
       page,

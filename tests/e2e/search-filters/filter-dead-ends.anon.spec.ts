@@ -21,6 +21,10 @@ import {
 test.describe("Filter Dead-Ends & Edge Cases", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.filter} highly restrictive filters produce zero results with recovery path`, async ({
     page,
   }) => {

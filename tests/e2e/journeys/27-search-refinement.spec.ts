@@ -8,6 +8,10 @@
 
 import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ─── J42: Filter Refinement Chain ─────────────────────────────────────────────
 test.describe("J42: Filter Refinement Chain", () => {
   test("search with price filter → add room type → verify narrowing → refresh preserves", async ({

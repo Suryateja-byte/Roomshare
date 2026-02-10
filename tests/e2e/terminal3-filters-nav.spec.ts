@@ -28,6 +28,10 @@ async function waitForSearchPage(page: import("@playwright/test").Page) {
     .waitFor({ state: "attached", timeout: 30_000 });
 }
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ---------------------------------------------------------------------------
 // 3.1: Category Icon Bar
 // ---------------------------------------------------------------------------

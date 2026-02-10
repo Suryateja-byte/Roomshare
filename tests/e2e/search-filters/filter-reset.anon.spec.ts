@@ -33,6 +33,10 @@ import {
 test.describe("Filter Reset", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // 13.1 "Clear all" in modal resets all filters
   // -------------------------------------------------------------------------

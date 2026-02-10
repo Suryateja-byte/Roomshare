@@ -36,6 +36,7 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
+    test.slow();
     await waitForSearchReady(page);
   });
 

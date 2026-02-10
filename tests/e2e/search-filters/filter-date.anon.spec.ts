@@ -54,6 +54,10 @@ function getNextMonth15th(): { year: number; month: number; day: number; dateStr
 test.describe("Move-In Date Filter", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 7.1: Select move-in date from picker -> URL contains moveInDate=YYYY-MM-DD
   test(`${tags.core} - selecting a date via picker and applying updates URL`, async ({ page }) => {
     await waitForSearchReady(page);

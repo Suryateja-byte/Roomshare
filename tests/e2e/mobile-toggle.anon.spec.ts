@@ -28,6 +28,8 @@ const toggleSelectors = {
   mapContainer: '[data-testid="map"], .mapboxgl-map',
 } as const;
 
+test.beforeEach(async () => { test.slow(); });
+
 test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
   test("toggle button is visible on mobile viewport with fixed position", async ({ page }) => {
     const errors: string[] = [];

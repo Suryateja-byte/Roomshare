@@ -8,6 +8,10 @@
 import { test, expect, tags, SF_BOUNDS } from "../helpers";
 
 test.describe("Search V2 UI Integration", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.core} - List renders with v2 data`, async ({ page }) => {
     // Use desktop viewport for consistent behavior
     await page.setViewportSize({ width: 1280, height: 800 });

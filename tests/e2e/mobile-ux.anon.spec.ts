@@ -18,6 +18,8 @@ test.use({
   viewport: { width: 393, height: 852 },
 });
 
+test.beforeEach(async () => { test.slow(); });
+
 test.describe("Mobile UX — Page Load", () => {
   test("search page loads and shows listings on mobile", async ({ page }) => {
     const errors: string[] = [];

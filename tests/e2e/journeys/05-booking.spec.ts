@@ -11,6 +11,10 @@ import { test, expect, tags, selectors, timeouts } from '../helpers';
 test.describe('Booking Journeys', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe('J037: Submit booking request', () => {
     test(`${tags.auth} - Request to book a listing`, async ({ page, nav, data }) => {
       // Navigate to a listing
