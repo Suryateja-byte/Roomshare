@@ -272,8 +272,10 @@ test.describe('30 Critical User Journey Simulations', () => {
 
     // Wait for either a redirect to /login or an auth message to appear
     // (client-side redirect may fire after domcontentloaded)
-    const loginRedirect = page.waitForURL(/\/login/, { timeout: 15_000 }).then(() => true).catch(() => false);
-    const authMsg = page.locator('text=/sign in|log in|unauthorized/i').waitFor({ state: 'visible', timeout: 15_000 }).then(() => true).catch(() => false);
+    // NOTE: Do NOT add .catch(() => false) on individual promises — that
+    // makes them always-resolve, defeating Promise.any()'s rejection logic.
+    const loginRedirect = page.waitForURL(/\/login/, { timeout: 15_000 }).then(() => true);
+    const authMsg = page.locator('text=/sign in|log in|unauthorized/i').waitFor({ state: 'visible', timeout: 15_000 }).then(() => true);
     const result = await Promise.any([loginRedirect, authMsg]).catch(() => false);
     expect(result).toBeTruthy();
   });
@@ -284,8 +286,8 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Wait for either a redirect to /login or an auth message to appear
-    const loginRedirect = page.waitForURL(/\/login/, { timeout: 15_000 }).then(() => true).catch(() => false);
-    const authMsg = page.locator('text=/sign in|log in|unauthorized/i').waitFor({ state: 'visible', timeout: 15_000 }).then(() => true).catch(() => false);
+    const loginRedirect = page.waitForURL(/\/login/, { timeout: 15_000 }).then(() => true);
+    const authMsg = page.locator('text=/sign in|log in|unauthorized/i').waitFor({ state: 'visible', timeout: 15_000 }).then(() => true);
     const result = await Promise.any([loginRedirect, authMsg]).catch(() => false);
     expect(result).toBeTruthy();
   });

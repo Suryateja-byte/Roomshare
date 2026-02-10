@@ -270,7 +270,8 @@ test.describe("Discovery & Search Journeys", () => {
       const sortSelect = page
         .getByLabel(/sort/i)
         .or(page.locator('[data-testid="sort-select"]'))
-        .or(page.locator("select").filter({ has: page.getByText(/sort/i) }));
+        .or(page.locator("select").filter({ has: page.getByText(/sort/i) }))
+        .first();
 
       if (await sortSelect.isVisible()) {
         // Sort by price low to high

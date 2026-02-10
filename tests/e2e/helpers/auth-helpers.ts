@@ -154,15 +154,20 @@ export const authHelpers = {
     await page.goto('/admin');
 
     // Should redirect away or show access denied
-    await page.waitForTimeout(2000);
-    const url = page.url();
-    const isRedirected = !url.includes('/admin') || url.includes('/login');
-    const hasAccessDenied = await page
-      .locator('text=/access denied|unauthorized|forbidden/i')
-      .isVisible()
+    // Wait for either a redirect away from /admin or an access denied message.
+    // Client-side auth redirects may fire after domcontentloaded, so we
+    // race a URL change against a visible denial message.
+    const redirected = await page
+      .waitForURL((url) => !url.pathname.startsWith('/admin'), { timeout: 10_000 })
+      .then(() => true)
       .catch(() => false);
 
-    expect(isRedirected || hasAccessDenied).toBeTruthy();
+    if (!redirected) {
+      // Still on /admin — must show access denied
+      await expect(
+        page.locator('text=/access denied|unauthorized|forbidden/i'),
+      ).toBeVisible({ timeout: 5_000 });
+    }
   },
 
   /**

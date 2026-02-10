@@ -127,7 +127,7 @@ test.describe("Listing Management Journeys", () => {
         .getByRole("button", { name: /activate|reactivate/i })
         .first();
 
-      const statusButton = pauseButton.or(activateButton);
+      const statusButton = pauseButton.or(activateButton).first();
 
       if (await statusButton.isVisible()) {
         const initialText = await statusButton.textContent();

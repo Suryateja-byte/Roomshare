@@ -89,7 +89,8 @@ test.describe('Booking Journeys', () => {
 
       // Should show tabs or sections for different booking states
       const pendingTab = page.getByRole('tab', { name: /pending/i })
-        .or(page.getByRole('button', { name: /pending/i }));
+        .or(page.getByRole('button', { name: /pending/i }))
+        .first();
 
       if (await pendingTab.isVisible()) {
         await pendingTab.click();
