@@ -101,7 +101,9 @@ export function assertionHelpers(page: Page) {
     },
 
     /**
-     * Assert user is logged in
+     * Assert user is logged in.
+     * On mobile viewports the user menu is hidden behind a hamburger menu,
+     * so we assert DOM attachment instead of visibility.
      */
     async isLoggedIn() {
       const userMenu = page
@@ -109,7 +111,15 @@ export function assertionHelpers(page: Page) {
         .or(page.locator('[data-testid="user-menu"]'))
         .or(page.locator('[aria-label*="user"]'));
 
-      await expect(userMenu.first()).toBeVisible({ timeout: 15000 });
+      const viewport = page.viewportSize();
+      const isMobile = viewport ? viewport.width < 768 : false;
+
+      if (isMobile) {
+        // On mobile, nav items are behind a hamburger — check attached instead of visible
+        await expect(userMenu.first()).toBeAttached({ timeout: 15000 });
+      } else {
+        await expect(userMenu.first()).toBeVisible({ timeout: 15000 });
+      }
     },
 
     /**

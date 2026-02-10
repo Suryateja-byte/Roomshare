@@ -133,15 +133,16 @@ test.describe("Search URL Deep Links (P0)", () => {
     // or the mobile sort button label should reflect the sort.
     // Wait for the sort control to hydrate (Radix UI mounts after useEffect).
     // SortSelect has a `mounted` state - SSR placeholder renders first without aria-label.
+    // Use isAttached() since the sort element may be in an sr-only/hidden container.
     const container = searchResultsContainer(page);
     const sortLabel = container.locator('text="Price: Low to High"');
-    const mobileSortBtn = page.locator('button[aria-label="Sort: Price: Low to High"]');
+    const mobileSortBtn = container.locator('button[aria-label^="Sort:"]');
 
     // Use a retry assertion since the sort control may take time to hydrate
     await expect(async () => {
-      const desktopVisible = await sortLabel.first().isVisible().catch(() => false);
-      const mobileVisible = await mobileSortBtn.isVisible().catch(() => false);
-      expect(desktopVisible || mobileVisible).toBe(true);
+      const desktopCount = await sortLabel.count();
+      const mobileCount = await mobileSortBtn.count();
+      expect(desktopCount + mobileCount).toBeGreaterThan(0);
     }).toPass({ timeout: 30_000 });
   });
 

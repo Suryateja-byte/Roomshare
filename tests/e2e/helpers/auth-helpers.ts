@@ -104,6 +104,21 @@ export const authHelpers = {
    * Logout via UI
    */
   async logoutViaUI(page: Page) {
+    // On mobile, open hamburger menu first to reveal nav items
+    const viewport = page.viewportSize();
+    const isMobile = viewport ? viewport.width < 768 : false;
+
+    if (isMobile) {
+      const hamburger = page.getByRole('button', { name: /menu/i })
+        .or(page.locator('[data-testid="mobile-menu"]'))
+        .or(page.locator('[class*="hamburger"]'));
+      const hamburgerVisible = await hamburger.first().isVisible().catch(() => false);
+      if (hamburgerVisible) {
+        await hamburger.first().click();
+        await page.waitForTimeout(500);
+      }
+    }
+
     // Try to find and click user menu
     const userMenuButton = page
       .getByRole('button', { name: /menu|profile|account/i })
@@ -124,7 +139,9 @@ export const authHelpers = {
   },
 
   /**
-   * Check if currently logged in
+   * Check if currently logged in.
+   * On mobile viewports the user menu may be hidden behind a hamburger menu,
+   * so we check for DOM attachment rather than visibility.
    */
   async isLoggedIn(page: Page): Promise<boolean> {
     try {
@@ -133,7 +150,15 @@ export const authHelpers = {
         .or(page.locator('[data-testid="user-menu"]'))
         .or(page.locator('[aria-label*="user"]'));
 
-      await userMenu.first().waitFor({ state: 'visible', timeout: 5000 });
+      // On mobile, nav items are hidden behind hamburger — check attached instead of visible
+      const viewport = page.viewportSize();
+      const isMobile = viewport ? viewport.width < 768 : false;
+
+      if (isMobile) {
+        await userMenu.first().waitFor({ state: 'attached', timeout: 5000 });
+      } else {
+        await userMenu.first().waitFor({ state: 'visible', timeout: 5000 });
+      }
       return true;
     } catch {
       return false;

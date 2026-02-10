@@ -168,7 +168,10 @@ test.describe("Search P0 Smoke Suite", () => {
     const clearVisible = await clearAllBtn.first().isVisible().catch(() => false);
 
     if (clearVisible) {
-      await clearAllBtn.first().click();
+      // Use scrollIntoViewIfNeeded + force:true to avoid click timeout in webkit
+      // where the button may be partially obscured by map overlay or bottom sheet
+      await clearAllBtn.first().scrollIntoViewIfNeeded();
+      await clearAllBtn.first().click({ timeout: 30_000 });
       await page.waitForLoadState("domcontentloaded");
 
       // After clearing, URL should not contain maxPrice or roomType

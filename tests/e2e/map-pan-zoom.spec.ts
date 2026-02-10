@@ -495,7 +495,9 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     if (toggleExists) {
       const isOn = (await searchToggle.getAttribute("aria-checked")) === "true";
       if (isOn) {
-        await searchToggle.click();
+        // Use evaluate click for reliability on Mobile Chrome / headless CI
+        await searchToggle.evaluate((el) => (el as HTMLElement).click());
+        await expect(searchToggle).toHaveAttribute("aria-checked", "false", { timeout: 10_000 });
       }
     }
 
@@ -553,7 +555,9 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     if (toggleExists) {
       const isOn = (await searchToggle.getAttribute("aria-checked")) === "true";
       if (isOn) {
-        await searchToggle.click();
+        // Use evaluate click for reliability on Mobile Chrome / headless CI
+        await searchToggle.evaluate((el) => (el as HTMLElement).click());
+        await expect(searchToggle).toHaveAttribute("aria-checked", "false", { timeout: 10_000 });
       }
     }
 

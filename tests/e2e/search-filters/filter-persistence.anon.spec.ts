@@ -145,13 +145,14 @@ test.describe("Filter State Persistence", () => {
     expect(getUrlParam(page, "roomType")).toBe("Entire Place");
     expect(getUrlParam(page, "leaseDuration")).toBe("12 months");
 
-    // Verify filter chips are visible on load
+    // Verify filter chips are visible on load.
+    // Chips may take time to render after SSR hydration, so use a generous timeout.
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
+    const regionVisible = await region.isVisible({ timeout: 15_000 }).catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 10_000 });
-      await expect(region.locator("text=/Parking/i").first()).toBeVisible({ timeout: 10_000 });
-      await expect(region.locator("text=/Entire Place/i").first()).toBeVisible({ timeout: 10_000 });
+      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 15_000 });
+      await expect(region.locator("text=/Parking/i").first()).toBeVisible({ timeout: 15_000 });
+      await expect(region.locator("text=/Entire Place/i").first()).toBeVisible({ timeout: 15_000 });
     }
 
     // Open the filter modal and verify internal state matches URL

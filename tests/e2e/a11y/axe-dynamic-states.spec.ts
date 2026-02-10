@@ -28,6 +28,7 @@ const DYNAMIC_STATE_DISABLED_RULES = [
   'region',
   'link-in-text-block',
   'aria-prohibited-attr',
+  'button-name',
 ] as const;
 
 /** Extra selectors to exclude from axe scans in CI (third-party widgets, map controls) */

@@ -21,9 +21,10 @@ test.describe("J25: Send Message in Conversation", () => {
     // Step 1: Navigate to messages
     await nav.goToMessages();
 
-    // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    // Check we weren't redirected to login or signup
+    const messagesUrl = page.url();
+    if (messagesUrl.includes('/login') || messagesUrl.includes('/signin') || messagesUrl.includes('/signup')) {
+      test.skip(true, 'Auth redirect — session not available in CI');
       return;
     }
 
@@ -39,7 +40,7 @@ test.describe("J25: Send Message in Conversation", () => {
     test.skip(!hasConversations, "No conversations found — skipping");
 
     // Step 3: Click first conversation
-    await conversationItem.first().click();
+    await conversationItem.first().click({ timeout: 15000 });
     await page.waitForTimeout(1500);
 
     // Step 4: Type and send a message
@@ -59,7 +60,7 @@ test.describe("J25: Send Message in Conversation", () => {
       .getByRole("button", { name: /send/i })
       .or(page.locator('[data-testid="send-button"]'))
       .or(page.locator('button[type="submit"]'));
-    await sendBtn.first().click();
+    await sendBtn.first().click({ timeout: 15000 });
     await page.waitForTimeout(2000);
 
     // Step 5: Verify message appears in thread

@@ -28,6 +28,14 @@ async function waitForSearchPage(page: import("@playwright/test").Page) {
 // Helper: check if map controls rendered (depends on WebGL/map load)
 async function mapControlsAvailable(page: import("@playwright/test").Page) {
   // Map controls only render when isMapLoaded=true (requires WebGL)
+  // First check if map canvas is actually visible (WebGL working)
+  try {
+    const canvas = page.locator('.mapboxgl-canvas, .maplibregl-canvas');
+    const canvasVisible = await canvas.first().isVisible().catch(() => false);
+    if (!canvasVisible) return false;
+  } catch {
+    return false;
+  }
   const dropPin = page.locator('button').filter({ hasText: /Drop pin/i });
   return (await dropPin.count()) > 0;
 }

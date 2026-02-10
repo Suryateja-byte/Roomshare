@@ -1190,8 +1190,16 @@ test.describe("List <-> Map Sync", () => {
     const listingId = await firstCard.getAttribute("data-listing-id");
     expect(listingId).toBeTruthy();
 
-    // Click the card
-    await firstCard.click();
+    // Close popup first to avoid overlay interception of the card click
+    await page.keyboard.press("Escape");
+    await expect(popup).not.toBeVisible({ timeout: 5_000 }).catch(() => {});
+
+    // Click the card — use evaluate click to bypass any remaining overlay interception
+    await firstCard.evaluate((el) => {
+      // Find the anchor inside the card and click it for proper navigation
+      const link = el.querySelector('a[href*="/listings/"]') as HTMLElement | null;
+      if (link) { link.click(); } else { (el as HTMLElement).click(); }
+    });
 
     // Should navigate to listing detail page -- use "commit" to avoid waiting for full resource load
     await page.waitForURL(`**/listings/${listingId}`, {

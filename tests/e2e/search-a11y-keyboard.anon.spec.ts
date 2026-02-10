@@ -209,9 +209,19 @@ test.describe("Search A11y: Keyboard Navigation", () => {
       await page.waitForLoadState("domcontentloaded").catch(() => {});
       await filtersButton.click();
 
-      // Filter modal should be open
+      // Filter modal should be open — retry click if it didn't appear
+      // (hydration delay: button HTML renders via SSR before onClick is attached)
       const modal = page.locator('[role="dialog"][aria-modal="true"]');
-      await expect(modal).toBeVisible({ timeout: 10_000 });
+      const modalAppeared = await modal
+        .waitFor({ state: "visible", timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (!modalAppeared) {
+        // Retry: by now hydration + dynamic import should be complete
+        await filtersButton.click();
+        await expect(modal).toBeVisible({ timeout: 10_000 });
+      }
 
       // Close modal with Escape
       await page.keyboard.press("Escape");

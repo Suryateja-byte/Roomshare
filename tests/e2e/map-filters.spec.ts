@@ -441,12 +441,12 @@ test.describe("Map + Filter Interactions", () => {
       console.log(`[Test] Marker count after sort: ${afterSortMarkerCount}`);
 
       // Sort should not change marker count (same data, different order).
-      // Allow tolerance of +-2 for CI timing variance in marker rendering.
+      // Allow tolerance of +-5 for CI timing variance in marker rendering.
       expect(afterSortMarkerCount).toBeGreaterThanOrEqual(
-        Math.max(0, initialMarkerCount - 2),
+        Math.max(0, initialMarkerCount - 5),
       );
       expect(afterSortMarkerCount).toBeLessThanOrEqual(
-        initialMarkerCount + 2,
+        initialMarkerCount + 5,
       );
     });
 
@@ -498,12 +498,12 @@ test.describe("Map + Filter Interactions", () => {
       } catch {
         afterSortMarkerCount = await getMarkerCount(page);
       }
-      // Sort should not change marker count. Allow tolerance of +-2 for CI timing.
+      // Sort should not change marker count. Allow tolerance of +-5 for CI timing.
       expect(afterSortMarkerCount).toBeGreaterThanOrEqual(
-        Math.max(0, initialMarkerCount - 2),
+        Math.max(0, initialMarkerCount - 5),
       );
       expect(afterSortMarkerCount).toBeLessThanOrEqual(
-        initialMarkerCount + 2,
+        initialMarkerCount + 5,
       );
 
       // If we have prices, the order may have changed

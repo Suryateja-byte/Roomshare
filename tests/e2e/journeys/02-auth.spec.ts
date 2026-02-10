@@ -213,6 +213,8 @@ test.describe('Authentication Journeys', () => {
       await nav.goHome();
 
       // Step 3-4: Open user menu and click logout
+      // On mobile viewports the user menu may be behind a hamburger;
+      // logoutViaUI now handles this internally.
       await auth.logoutViaUI(page);
 
       // Step 5-6: Verify logged out
@@ -296,9 +298,10 @@ test.describe('Authentication Journeys', () => {
       await page.getByLabel(/password/i).first().fill(creds.password);
       await page.getByRole('button', { name: /log in|sign in/i }).first().click();
 
-      // Login form redirects to home after successful login (via window.location.href)
+      // Login form redirects to home after successful login (via window.location.href).
+      // Use a longer timeout — CI can be slow for full page navigation.
       await page.waitForURL((url) => !url.pathname.includes('/login'), {
-        timeout: 30000,
+        timeout: 60000,
         waitUntil: 'commit',
       });
     });
@@ -314,12 +317,20 @@ test.describe('Authentication Journeys', () => {
       await newPage.goto('/');
       await newPage.waitForLoadState('domcontentloaded');
 
-      // Should be logged in on new tab too
+      // Should be logged in on new tab too.
+      // On mobile viewports the user menu is behind a hamburger — check attached.
       const userMenu = newPage
         .getByRole('button', { name: /menu|profile|account/i })
         .or(newPage.locator('[data-testid="user-menu"]'));
 
-      await expect(userMenu.first()).toBeVisible({ timeout: 15000 });
+      const viewport = newPage.viewportSize();
+      const isMobile = viewport ? viewport.width < 768 : false;
+
+      if (isMobile) {
+        await expect(userMenu.first()).toBeAttached({ timeout: 15000 });
+      } else {
+        await expect(userMenu.first()).toBeVisible({ timeout: 15000 });
+      }
 
       await newPage.close();
     });

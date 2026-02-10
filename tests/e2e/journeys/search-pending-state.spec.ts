@@ -65,7 +65,10 @@ test.describe("Breathing Pending State (PR1)", () => {
       }
 
       // Change a filter by clicking an amenity button
-      const parkingButton = page.getByRole("button", {
+      // Scope to filterDialog to avoid strict mode violation — SearchViewToggle
+      // renders recommended filters in both mobile and desktop containers,
+      // so page-level getByRole finds 2 "Parking" buttons.
+      const parkingButton = filterDialog.getByRole("button", {
         name: "Parking",
         exact: true,
       });
