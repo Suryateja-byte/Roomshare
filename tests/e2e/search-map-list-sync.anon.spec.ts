@@ -93,22 +93,44 @@ async function getNthMarkerIdOrNull(
 }
 
 /**
- * Click a map marker by its listing ID using Playwright focus + Enter.
+ * Click a map marker by its listing ID using evaluate(focus) + keyboard.press('Enter').
  *
- * Uses Playwright's native .focus() and keyboard.press('Enter') which
- * generate trusted browser events. The inner div[role="button"] has an
- * onKeyDown handler (Map.tsx:1841) that calls handleMarkerClick() on
- * Enter/Space. Trusted events are required because:
- *   - element.click() doesn't propagate through react-map-gl's Marker
- *   - dispatchEvent(KeyboardEvent) creates untrusted events that React
- *     may not process through its delegation system in all browsers
- *   - Playwright keyboard.press generates trusted events identical to
- *     real user keypresses
+ * Uses page.evaluate to focus the element (bypasses Playwright's actionability
+ * checks that fail when Mapbox continuously re-renders/detaches markers), then
+ * Playwright's keyboard.press('Enter') which sends a trusted browser event to
+ * the focused element. The div[role="button"] onKeyDown handler (Map.tsx:1841)
+ * calls handleMarkerClick() on Enter/Space.
+ *
+ * Why not marker.focus()? Mapbox GL JS re-creates marker DOM elements during
+ * re-renders, causing "element was detached from the DOM, retrying" loops that
+ * exhaust the timeout. page.evaluate runs synchronously in page context and
+ * doesn't perform actionability checks.
  */
 async function clickMarkerByListingId(page: Page, listingId: string): Promise<void> {
-  const marker = page.locator(`.mapboxgl-marker [data-listing-id="${listingId}"]`);
-  await expect(marker).toBeAttached({ timeout: 10_000 });
-  await marker.focus();
+  const selector = `.mapboxgl-marker [data-listing-id="${listingId}"]`;
+
+  // Wait for marker to exist and be connected in the DOM
+  await page.waitForFunction(
+    (sel) => {
+      const el = document.querySelector(sel);
+      return el !== null && el.isConnected;
+    },
+    selector,
+    { timeout: 15_000 },
+  );
+
+  // Brief stabilization — gives Mapbox a tick to finish batch DOM updates
+  await page.waitForTimeout(150);
+
+  // Focus via page.evaluate — bypasses actionability checks that would
+  // fail on detachment. querySelector + focus() is atomic in page context.
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel) as HTMLElement | null;
+    if (el?.isConnected) el.focus();
+  }, selector);
+
+  // Trusted keyboard Enter via Playwright — fires on the focused element,
+  // triggering React's onKeyDown handler → handleMarkerClick()
   await page.keyboard.press('Enter');
 }
 
@@ -125,20 +147,42 @@ async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
 }
 
 /**
- * Hover a map marker by listing ID using Playwright's native .hover().
- * Generates trusted PointerEvents that React 18's onPointerEnter handler
- * will process. The handler (Map.tsx:1815) skips touch via
- * `e.pointerType === 'touch'` guard — Playwright hover generates mouse-type
- * pointer events by default.
+ * Hover a map marker by listing ID using page.evaluate + PointerEvent dispatch.
  *
- * Uses { force: true } because the marker may be behind overlays (bottom sheet).
- * Unlike click events, force:true hover still generates real PointerEvents
- * that fire at the correct element coordinates.
+ * Dispatches 'pointerover' (which bubbles) because React 18 registers native
+ * listeners for onPointerEnter using pointerover/pointerout events
+ * (react-dom-client.production.js:12233). Uses page.evaluate to bypass
+ * Playwright's actionability checks that fail on marker detachment during
+ * Mapbox re-renders. Sets pointerType='mouse' to pass the touch guard
+ * in Map.tsx:1815 (`e.pointerType === 'touch'`).
  */
 async function hoverMarkerByListingId(page: Page, listingId: string): Promise<void> {
-  const marker = page.locator(`.mapboxgl-marker [data-listing-id="${listingId}"]`);
-  await expect(marker).toBeAttached({ timeout: 10_000 });
-  await marker.hover({ force: true, timeout: 5000 });
+  const selector = `.mapboxgl-marker [data-listing-id="${listingId}"]`;
+
+  await page.waitForFunction(
+    (sel) => {
+      const el = document.querySelector(sel);
+      return el !== null && el.isConnected;
+    },
+    selector,
+    { timeout: 10_000 },
+  );
+
+  await page.waitForTimeout(150);
+
+  // Dispatch PointerEvent via evaluate — bypasses detachment race and overlay interception
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel) as HTMLElement | null;
+    if (!el?.isConnected) return;
+    const rect = el.getBoundingClientRect();
+    el.dispatchEvent(new PointerEvent('pointerover', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'mouse',
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    }));
+  }, selector);
 }
 
 /**
@@ -150,6 +194,38 @@ async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
     throw new Error(`No marker at index ${index}`);
   }
   await hoverMarkerByListingId(page, listingId);
+}
+
+/**
+ * Hover a listing card element. On mobile, the bottom sheet overlay intercepts
+ * pointer events, so we use page.evaluate to dispatch mouseover directly.
+ * React 18 uses native 'mouseover' (which bubbles) as dependency for
+ * onMouseEnter (registerDirectEvent("onMouseEnter", ["mouseout", "mouseover"])).
+ */
+async function hoverCardElement(page: Page, card: import('@playwright/test').Locator): Promise<void> {
+  const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
+  if (isMobile) {
+    await card.evaluate((el) => {
+      el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+    });
+  } else {
+    await card.hover();
+  }
+}
+
+/**
+ * Un-hover a card element. On mobile, dispatches mouseout directly
+ * since mouse.move(0,0) may be intercepted by the bottom sheet overlay.
+ */
+async function unhoverCardElement(page: Page, card: import('@playwright/test').Locator): Promise<void> {
+  const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
+  if (isMobile) {
+    await card.evaluate((el) => {
+      el.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, cancelable: true }));
+    });
+  } else {
+    await page.mouse.move(0, 0);
+  }
 }
 
 /**
@@ -362,11 +438,11 @@ test.describe("Map-List Synchronization", () => {
         test.skip(true, "Card listing has no visible marker on map");
       }
 
-      // Hover the card
+      // Hover the card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
         .locator(`[data-testid="listing-card"][data-listing-id="${cardId}"]`)
         .first();
-      await card.hover();
+      await hoverCardElement(page, card);
 
       // Marker should get scale-[1.15] (hovered state)
       await waitForMarkerHover(page, cardId!, timeouts.action);
@@ -391,15 +467,15 @@ test.describe("Map-List Synchronization", () => {
         test.skip(true, "No visible marker for this card");
       }
 
-      // Hover the card
+      // Hover the card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
         .locator(`[data-testid="listing-card"][data-listing-id="${cardId}"]`)
         .first();
-      await card.hover();
+      await hoverCardElement(page, card);
       await waitForMarkerHover(page, cardId!, timeouts.action);
 
-      // Move mouse away from the card
-      await page.mouse.move(0, 0);
+      // Move mouse away from the card (uses evaluate on mobile)
+      await unhoverCardElement(page, card);
 
       // Marker should return to normal scale
       await waitForMarkerUnhover(page, cardId!, timeouts.action);
@@ -430,13 +506,13 @@ test.describe("Map-List Synchronization", () => {
       const firstId = overlapping[0];
       const secondId = overlapping[1];
 
-      // Hover first card
+      // Hover first card (uses evaluate on mobile to bypass bottom sheet overlay)
       const firstCard = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${firstId}"]`,
         )
         .first();
-      await firstCard.hover();
+      await hoverCardElement(page, firstCard);
       await waitForMarkerHover(page, firstId, timeouts.action);
 
       // Hover second card
@@ -445,7 +521,7 @@ test.describe("Map-List Synchronization", () => {
           `[data-testid="listing-card"][data-listing-id="${secondId}"]`,
         )
         .first();
-      await secondCard.hover();
+      await hoverCardElement(page, secondCard);
       await waitForMarkerHover(page, secondId, timeouts.action);
 
       // First marker should no longer be scaled
@@ -462,18 +538,31 @@ test.describe("Map-List Synchronization", () => {
       const cardId = await getFirstCardId(page);
       if (!cardId) test.skip(true, "No card listing ID");
 
-      // Click the card's link to navigate — scoped to visible container
+      // Get the card's navigation link href — the Link component wraps the
+      // card content including ImageCarousel which has drag handlers that can
+      // intercept Playwright clicks. Verify href and navigate via evaluate.
       const card = searchResultsContainer(page).locator(selectors.listingCard).first();
-      const cardLink = card.locator("a").first();
-      await cardLink.click();
+      const cardLink = card.locator(`a[href*="/listings/"]`).first();
+      await expect(cardLink).toBeAttached({ timeout: 5000 });
+      const href = await cardLink.getAttribute("href");
+      expect(href).toContain(`/listings/${cardId}`);
 
-      // Should navigate to listing detail page
-      // Use waitUntil: "commit" to avoid waiting for full resource load (SSR overhead)
-      await page.waitForURL(`**/listings/${cardId}`, {
+      // Use page.evaluate to click the link — bypasses ImageCarousel's drag
+      // handler which can prevent default click behavior on Playwright's
+      // synthesized mouse events. HTMLAnchorElement.click() triggers both
+      // native navigation and Next.js Link's React onClick handler.
+      await page.evaluate((id) => {
+        const cardEl = document.querySelector(
+          `[data-testid="listing-card"][data-listing-id="${id}"]`,
+        );
+        const link = cardEl?.querySelector('a[href*="/listings/"]') as HTMLAnchorElement;
+        if (link) link.click();
+      }, cardId);
+
+      // Wait for URL to contain the listing ID (works with client-side navigation)
+      await expect(page).toHaveURL(new RegExp(`/listings/${cardId}`), {
         timeout: timeouts.navigation,
-        waitUntil: "commit",
       });
-      expect(page.url()).toContain(`/listings/${cardId}`);
     });
   });
 
@@ -507,13 +596,13 @@ test.describe("Map-List Synchronization", () => {
       await clickMarkerByIndex(page, markerIndex);
       await waitForCardHighlight(page, activeId);
 
-      // Hover a DIFFERENT card
+      // Hover a DIFFERENT card (uses evaluate on mobile to bypass bottom sheet overlay)
       const hoverCard = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${hoverId}"]`,
         )
         .first();
-      await hoverCard.hover();
+      await hoverCardElement(page, hoverCard);
       await waitForCardHover(page, hoverId, timeouts.action);
 
       // Active card should still have ring-2
@@ -543,13 +632,13 @@ test.describe("Map-List Synchronization", () => {
       await clickMarkerByIndex(page, 0);
       await waitForCardHighlight(page, listingId);
 
-      // Now hover the same card
+      // Now hover the same card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${listingId}"]`,
         )
         .first();
-      await card.hover();
+      await hoverCardElement(page, card);
 
       // Wait for hover event to propagate, then verify active takes precedence
       await expect.poll(
@@ -975,13 +1064,13 @@ test.describe("Map-List Synchronization", () => {
         test.skip(true, "Card has no visible marker");
       }
 
-      // Hover the card
+      // Hover the card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${cardId}"]`,
         )
         .first();
-      await card.hover();
+      await hoverCardElement(page, card);
       await waitForCardHover(page, cardId!, timeouts.action);
 
       // Verify hover state via data attribute
@@ -1016,21 +1105,21 @@ test.describe("Map-List Synchronization", () => {
 
       const targetId = overlapping[0];
 
-      // Hover the card to trigger marker hover state
+      // Hover the card to trigger marker hover state (evaluate on mobile)
       const card = searchResultsContainer(page)
         .locator(
           `[data-testid="listing-card"][data-listing-id="${targetId}"]`,
         )
         .first();
-      await card.hover();
+      await hoverCardElement(page, card);
       await waitForMarkerHover(page, targetId, timeouts.action);
 
       // Marker should have z-50 when hovered
       const hoveredState = await getMarkerState(page, targetId);
       expect(hoveredState.isScaled).toBe(true);
 
-      // Move away to clear hover
-      await page.mouse.move(0, 0);
+      // Move away to clear hover (evaluate on mobile)
+      await unhoverCardElement(page, card);
       await waitForMarkerUnhover(page, targetId, timeouts.action);
 
       // Click marker to set active
@@ -1108,11 +1197,11 @@ test.describe("Map-List Synchronization", () => {
         .first();
 
       // Hover card1 -> card2 -> card1 -> card2 -> away (rapid transitions)
-      await card1.hover();
-      await card2.hover();
-      await card1.hover();
-      await card2.hover();
-      await page.mouse.move(0, 0);
+      await hoverCardElement(page, card1);
+      await hoverCardElement(page, card2);
+      await hoverCardElement(page, card1);
+      await hoverCardElement(page, card2);
+      await unhoverCardElement(page, card2);
 
       // Wait for all class mutations to settle
       await expect.poll(
