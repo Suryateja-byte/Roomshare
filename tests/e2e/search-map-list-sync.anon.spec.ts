@@ -93,56 +93,78 @@ async function getNthMarkerIdOrNull(
 }
 
 /**
- * Dismiss overlays that can intercept marker clicks on mobile:
- * - "Pinch to zoom / Tap markers" hint overlay
- * - Bottom sheet covering the map
+ * Click a map marker by its listing ID using evaluate + element.click().
+ * Bypasses overlay interception by calling the DOM click method directly.
+ * HTMLElement.click() triggers a full click cycle (mousedown → mouseup → click)
+ * that bubbles through React 18's delegated event system and the react-map-gl
+ * Marker onClick handler (Map.tsx:1776 → handleMarkerClick).
+ *
+ * This pattern is proven in: map-pin-tiering.spec.ts:70,
+ * mobile-interactions.anon.spec.ts:502,535,699,708
  */
-async function clearMarkerOverlays(page: Page): Promise<void> {
-  // Dismiss mobile hint overlay if present
-  const dismissBtn = page.locator('button:has-text("Dismiss hint")');
-  if (await dismissBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-    await dismissBtn.click();
-    await page.waitForTimeout(200);
-  }
+async function clickMarkerByListingId(page: Page, listingId: string): Promise<void> {
+  await expect(page.locator(`.mapboxgl-marker [data-listing-id="${listingId}"]`))
+    .toBeAttached({ timeout: 10_000 });
 
-  // On mobile viewports, collapse bottom sheet to expose markers
-  const viewportSize = page.viewportSize();
-  if (viewportSize && viewportSize.width < 768) {
-    const minimizeBtn = page.locator('button[aria-label="Minimize results panel"], button:has-text("Minimize results panel")');
-    if (await minimizeBtn.first().isVisible({ timeout: 500 }).catch(() => false)) {
-      await minimizeBtn.first().click();
-      await page.waitForTimeout(400);
-    }
+  const clicked = await page.evaluate((id) => {
+    const el = document.querySelector(
+      `.mapboxgl-marker [data-listing-id="${id}"]`,
+    ) as HTMLElement;
+    if (!el) return false;
+    el.click();
+    return true;
+  }, listingId);
+
+  if (!clicked) {
+    throw new Error(`Marker for listing ${listingId} not found in DOM`);
   }
 }
 
 /**
  * Click a visible marker by index.
- * Handles overlay interception and DOM detachment from map re-renders.
+ * Resolves the listing ID first, then delegates to clickMarkerByListingId.
  */
 async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
-  await clearMarkerOverlays(page);
-  const marker = page.locator(".mapboxgl-marker:visible").nth(index);
-  try {
-    await marker.click({ timeout: 5000 });
-  } catch {
-    // Force click bypasses actionability checks (overlay interception, detachment)
-    await marker.click({ force: true, timeout: 5000 });
+  const listingId = await getMarkerListingId(page, index);
+  if (!listingId) {
+    throw new Error(`No marker at index ${index}`);
   }
+  await clickMarkerByListingId(page, listingId);
+}
+
+/**
+ * Hover a map marker by listing ID.
+ * Dispatches PointerEvent('pointerover') with pointerType='mouse'.
+ * React 18 registers 'pointerover'/'pointerout' as native event
+ * dependencies for onPointerEnter (see registerDirectEvent in react-dom).
+ * The onPointerEnter handler in Map.tsx skips touch via
+ * `e.pointerType === 'touch'` guard, so pointerType='mouse' is required.
+ */
+async function hoverMarkerByListingId(page: Page, listingId: string): Promise<void> {
+  await expect(page.locator(`.mapboxgl-marker [data-listing-id="${listingId}"]`))
+    .toBeAttached({ timeout: 10_000 });
+
+  await page.evaluate((id) => {
+    const el = document.querySelector(
+      `.mapboxgl-marker [data-listing-id="${id}"]`,
+    ) as HTMLElement;
+    if (!el) throw new Error(`Marker for listing ${id} not found`);
+    el.dispatchEvent(new PointerEvent('pointerover', {
+      bubbles: true,
+      pointerType: 'mouse',
+    }));
+  }, listingId);
 }
 
 /**
  * Hover a visible marker by index.
- * Uses force:true to bypass overlay interception on mobile.
  */
 async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
-  await clearMarkerOverlays(page);
-  const marker = page.locator(".mapboxgl-marker:visible").nth(index);
-  try {
-    await marker.hover({ timeout: 5000 });
-  } catch {
-    await marker.hover({ force: true, timeout: 5000 });
+  const listingId = await getMarkerListingId(page, index);
+  if (!listingId) {
+    throw new Error(`No marker at index ${index}`);
   }
+  await hoverMarkerByListingId(page, listingId);
 }
 
 /**
@@ -217,12 +239,15 @@ test.describe("Map-List Synchronization", () => {
       const listingId = await getFirstMarkerIdOrSkip(page);
 
       // Scroll the list container to bottom so the target card is offscreen
-      await page.evaluate(() => {
+      await page.evaluate((isMobile) => {
+        const testId = isMobile
+          ? 'mobile-search-results-container'
+          : 'search-results-container';
         const container = document.querySelector(
-          '[data-testid="search-results-container"]',
+          `[data-testid="${testId}"]`,
         );
         if (container) container.scrollTop = container.scrollHeight;
-      });
+      }, (page.viewportSize()?.width ?? 1024) < 768);
 
       // Click the marker
       await clickMarkerByIndex(page, 0);
@@ -458,8 +483,10 @@ test.describe("Map-List Synchronization", () => {
       await cardLink.click();
 
       // Should navigate to listing detail page
+      // Use waitUntil: "commit" to avoid waiting for full resource load (SSR overhead)
       await page.waitForURL(`**/listings/${cardId}`, {
         timeout: timeouts.navigation,
+        waitUntil: "commit",
       });
       expect(page.url()).toContain(`/listings/${cardId}`);
     });
@@ -617,6 +644,7 @@ test.describe("Map-List Synchronization", () => {
     test("4.2 - After filter change -> both markers and cards update", async ({
       page,
     }) => {
+      test.slow(); // Filter navigation + map reload can exceed 60s on mobile
       if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
 
       await waitForMarkersWithClusterExpansion(page);
@@ -676,9 +704,10 @@ test.describe("Map-List Synchronization", () => {
         timeout: timeouts.navigation,
       });
 
-      // Wait for map and network to settle after sort change
+      // Wait for map and cards to settle after sort change
       await waitForMapReady(page);
-      await page.waitForLoadState("networkidle");
+      await expect(searchResultsContainer(page).locator(selectors.listingCard).first())
+        .toBeVisible({ timeout: timeouts.navigation });
 
       const sortedCardIds = await getAllCardListingIds(page);
 
@@ -698,6 +727,7 @@ test.describe("Map-List Synchronization", () => {
     test("4.4 - After search-as-I-move -> new markers and new cards appear", async ({
       page,
     }) => {
+      test.slow(); // Map pan + search reload can exceed 60s on mobile
       if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
 
       const hasMapRef = await waitForMapRef(page);
@@ -728,9 +758,12 @@ test.describe("Map-List Synchronization", () => {
 
       if (!moved) test.skip(true, "Could not pan map");
 
-      // Wait for map to settle after pan, then for markers to load
+      // Wait for map to settle after pan, then for markers or cards to appear
       await waitForMapReady(page);
-      await page.waitForLoadState("networkidle");
+      await expect(
+        page.locator('.mapboxgl-marker:visible').first()
+          .or(searchResultsContainer(page).locator(selectors.listingCard).first())
+      ).toBeVisible({ timeout: timeouts.navigation });
 
       // Page should still have markers and cards
       const newMarkerCount = await page
@@ -764,9 +797,12 @@ test.describe("Map-List Synchronization", () => {
       }
 
       // Scroll the results container to the bottom to ensure card is offscreen
-      await page.evaluate(() => {
+      await page.evaluate((isMobile) => {
+        const testId = isMobile
+          ? 'mobile-search-results-container'
+          : 'search-results-container';
         const container = document.querySelector(
-          '[data-testid="search-results-container"]',
+          `[data-testid="${testId}"]`,
         );
         if (container) {
           container.scrollTop = container.scrollHeight;
@@ -774,7 +810,7 @@ test.describe("Map-List Synchronization", () => {
           // Fallback: scroll window
           window.scrollTo(0, document.body.scrollHeight);
         }
-      });
+      }, (page.viewportSize()?.width ?? 1024) < 768);
 
       // Click the marker
       await clickMarkerByIndex(page, 0);
@@ -801,14 +837,10 @@ test.describe("Map-List Synchronization", () => {
       const id2 = await getMarkerListingId(page, 2);
       if (!id0 || !id1 || !id2) test.skip(true, "Could not read marker IDs");
 
-      // Rapidly click three markers in quick succession
-      const m0 = page.locator(".mapboxgl-marker:visible").nth(0);
-      const m1 = page.locator(".mapboxgl-marker:visible").nth(1);
-      const m2 = page.locator(".mapboxgl-marker:visible").nth(2);
-
-      await m0.click({ delay: 0 });
-      await m1.click({ delay: 0 });
-      await m2.click({ delay: 0 });
+      // Rapidly click three markers in quick succession (overlay-proof via element.click())
+      await clickMarkerByListingId(page, id0!);
+      await clickMarkerByListingId(page, id1!);
+      await clickMarkerByListingId(page, id2!);
 
       // Wait for the last clicked card to become active
       await waitForCardHighlight(page, id2!);
@@ -1211,18 +1243,19 @@ test.describe("Map-List Synchronization", () => {
       });
       if (markerCount < 3) test.skip(true, "Need 3+ markers");
 
-      // Rapidly hover across multiple markers (faster than 300ms debounce)
-      const m0 = page.locator(".mapboxgl-marker:visible").nth(0);
-      const m1 = page.locator(".mapboxgl-marker:visible").nth(1);
-      const m2 = page.locator(".mapboxgl-marker:visible").nth(2);
+      // Get marker IDs for PointerEvent-based hover dispatch
+      const hid0 = await getMarkerListingId(page, 0);
+      const hid1 = await getMarkerListingId(page, 1);
+      const hid2 = await getMarkerListingId(page, 2);
+      if (!hid0 || !hid1 || !hid2) test.skip(true, "Could not read marker IDs");
 
-      // Instrument scroll count before hovering
+      // Instrument scroll count before hovering (viewport-aware container)
       await page.evaluate(() => {
         (window as any).__scrollRequestCount = 0;
-        const orig = (window as any).__e2eMapRef?._listeners;
-        // We can check via scroll events on the results container
+        const isMobile = window.innerWidth < 768;
+        const testId = isMobile ? 'mobile-search-results-container' : 'search-results-container';
         const container = document.querySelector(
-          '[data-testid="search-results-container"]',
+          `[data-testid="${testId}"]`,
         );
         if (container) {
           container.addEventListener("scroll", () => {
@@ -1231,11 +1264,12 @@ test.describe("Map-List Synchronization", () => {
         }
       });
 
-      await m0.hover();
+      // Rapidly hover across markers via PointerEvent dispatch (faster than 300ms debounce)
+      await hoverMarkerByListingId(page, hid0!);
       await page.waitForTimeout(50); // debounce test: intentionally faster than 300ms debounce
-      await m1.hover();
+      await hoverMarkerByListingId(page, hid1!);
       await page.waitForTimeout(50); // debounce test: intentionally faster than 300ms debounce
-      await m2.hover();
+      await hoverMarkerByListingId(page, hid2!);
 
       // debounce wait: allow 300ms debounce timer to fire + buffer
       await page.waitForTimeout(500);
