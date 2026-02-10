@@ -141,7 +141,7 @@ test.describe("Map Pin Tiering", () => {
       await page.waitForTimeout(timeouts.animation);
 
       // On hover, the wrapper div gets data-focus-state="hovered" and scale-[1.15]
-      await expect(wrapperEl).toHaveAttribute("data-focus-state", "hovered");
+      await expect(wrapperEl).toHaveAttribute("data-focus-state", "hovered", { timeout: 5_000 });
     } finally {
       await cleanup();
     }

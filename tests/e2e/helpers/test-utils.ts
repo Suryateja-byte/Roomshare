@@ -182,21 +182,36 @@ export async function waitForStable(
 /**
  * Wait for the Mapbox GL map to be fully loaded and idle (not panning/zooming).
  * Replaces `waitForTimeout(2000)` after map initialization and interactions.
+ *
+ * In CI headless environments without GPU/WebGL, the map ref may never be
+ * exposed. This function uses a two-phase approach:
+ * 1. Try to wait for the E2E map ref to report loaded + idle
+ * 2. If that fails, fall back to waiting for the map container to be present in DOM
  */
 export async function waitForMapReady(
   page: Page,
   timeout = 15_000,
 ): Promise<void> {
-  await page.waitForFunction(
+  // Phase 1: Try the E2E map ref (fast path when WebGL works)
+  const mapRefReady = await page.waitForFunction(
     () => {
       const map = (window as any).__e2eMapRef;
       if (!map) return false;
       return map.loaded() && !map.isMoving() && !map.isZooming() && !map.isRotating();
     },
-    { timeout },
-  ).catch(() => {
-    // If map ref isn't exposed yet, fall back to checking canvas visibility
-  });
+    { timeout: Math.min(timeout, 10_000) },
+  ).then(() => true).catch(() => false);
+
+  if (mapRefReady) return;
+
+  // Phase 2: Fall back to waiting for map container or canvas in DOM
+  await page.locator('.mapboxgl-map, .mapboxgl-canvas, [data-testid="map"]')
+    .first()
+    .waitFor({ state: 'attached', timeout: Math.min(timeout, 5_000) })
+    .catch(() => {
+      // Map may not render at all in headless without WebGL -- callers
+      // should use isMapAvailable() guards before map-dependent assertions.
+    });
 }
 
 /**

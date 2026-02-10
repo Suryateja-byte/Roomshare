@@ -29,6 +29,20 @@ async function waitForPageReady(
 }
 
 /**
+ * Check whether the page was redirected to /login (auth expired).
+ * Returns true if we are on the intended page, false if redirected to login.
+ * Protected-route tests should call this after navigation to skip gracefully
+ * when the auth session is invalid in CI.
+ */
+async function isOnAuthenticatedPage(page: Page): Promise<boolean> {
+  const url = page.url();
+  if (url.includes("/login") || url.includes("/signin")) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Navigation helper factory
  */
 export function navigationHelpers(page: Page) {
@@ -320,6 +334,15 @@ export function navigationHelpers(page: Page) {
         window.scrollTo(0, 0);
       });
       await page.waitForTimeout(200);
+    },
+
+    /**
+     * Check if the page is on an authenticated route (not redirected to /login).
+     * Call after navigating to a protected route. Returns false if auth session
+     * is expired and the app redirected to /login.
+     */
+    async isOnAuthenticatedPage(): Promise<boolean> {
+      return isOnAuthenticatedPage(page);
     },
   };
 }

@@ -103,7 +103,7 @@ async function turnToggleOff(page: Page) {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "true") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
   }
 }
 
@@ -115,7 +115,7 @@ async function turnToggleOn(page: Page) {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "false") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
   }
 }
 
@@ -249,7 +249,7 @@ test.describe("Search as I move: Toggle behavior", () => {
 
     const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
     await expect(toggle).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
 
     // Green indicator dot should be visible when ON
     const greenDot = toggle.locator('[data-testid="search-toggle-indicator"]');

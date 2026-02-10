@@ -165,6 +165,13 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     await page.waitForLoadState("domcontentloaded");
     await assertNoCrash(page, response);
 
+    // Wait for search results to render before checking sort component.
+    // The sort component is SSR-rendered alongside the heading; without this
+    // wait, the check can fire before Next.js streaming delivers the content.
+    const resultsHeading = page.locator("#search-results-heading").first();
+    const zeroResults = page.locator('h2:has-text("No matches found")').first();
+    await expect(resultsHeading.or(zeroResults)).toBeVisible({ timeout: timeouts.navigation });
+
     // Sort should display "Recommended" (the default), not "hacked"
     const sortLabel = page.locator('text="Recommended"');
     const mobileSortBtn = page.locator('button[aria-label="Sort: Recommended"]');
@@ -201,10 +208,11 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     await page.waitForLoadState("domcontentloaded");
     await assertNoCrash(page, response);
 
-    // Wait for search content to render (cards or zero-results)
-    const cards = page.locator('[data-testid="listing-card"]');
-    const zeroResults = page.locator('h2:has-text("No matches found")');
-    await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
+    // Wait for search results heading to render (sort component is in the same section).
+    // This ensures SSR streaming has delivered the full search results block.
+    const resultsHeading = page.locator("#search-results-heading").first();
+    const zeroResults = page.locator('h2:has-text("No matches found")').first();
+    await expect(resultsHeading.or(zeroResults)).toBeVisible({ timeout: timeouts.navigation });
 
     // The page should behave as if no q, sort, or maxPrice were set
     // Sort should default to "Recommended"

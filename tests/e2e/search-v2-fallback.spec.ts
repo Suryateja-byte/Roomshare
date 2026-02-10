@@ -31,9 +31,11 @@ const V2_API_URL = `/api/search/v2?${boundsQS}`;
 /** Wait for search results heading to be visible */
 async function waitForResults(page: import("@playwright/test").Page) {
   await page.waitForLoadState("domcontentloaded");
-  await expect(
-    page.getByRole("heading", { level: 1 }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  // Wait for the search results heading OR zero-results heading to appear.
+  // SSR can be slow in CI — use navigation timeout (30s) instead of 15s.
+  const resultsHeading = page.locator("#search-results-heading").first();
+  const zeroResults = page.locator('h2:has-text("No matches found")').first();
+  await expect(resultsHeading.or(zeroResults)).toBeVisible({ timeout: timeouts.navigation });
 }
 
 // --------------------------------------------------------------------------

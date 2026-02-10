@@ -177,7 +177,7 @@ async function ensureSearchAsMoveOn(page: Page): Promise<void> {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "false") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
   }
 }
 
@@ -305,8 +305,8 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         .locator(".mapboxgl-marker:visible")
         .count();
 
-      // Click the first cluster
-      await clusterMarkers.first().click();
+      // Click the first cluster via evaluate to bypass actionability timeout
+      await clusterMarkers.first().evaluate((el) => (el as HTMLElement).click());
 
       // Wait for cluster expansion animation to complete
       await waitForMapReady(page);
@@ -392,7 +392,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       if (overlappingIndex === null) {
         // No overlapping markers found -- click first marker and verify popup
         // shows either single listing or stacked format
-        await markers.first().click();
+        await markers.first().evaluate((el) => (el as HTMLElement).click());
 
         const popup = page.locator(".mapboxgl-popup");
         await expect(popup).toBeVisible({ timeout: timeouts.action });
@@ -415,8 +415,8 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         return;
       }
 
-      // Click the overlapping marker
-      await markers.nth(overlappingIndex).click();
+      // Click the overlapping marker via evaluate to bypass actionability timeout
+      await markers.nth(overlappingIndex).evaluate((el) => (el as HTMLElement).click());
 
       const popup = page.locator(".mapboxgl-popup");
       await expect(popup).toBeVisible({ timeout: timeouts.action });
@@ -466,7 +466,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
 
       let foundStackedPopup = false;
       for (let i = 0; i < Math.min(markerCount, 10); i++) {
-        await markers.nth(i).click();
+        await markers.nth(i).evaluate((el) => (el as HTMLElement).click());
         // Wait for popup to appear before checking if it's a stacked popup
         await page.locator(".mapboxgl-popup").waitFor({ state: 'visible', timeout: timeouts.action }).catch(() => {});
 

@@ -172,7 +172,7 @@ async function ensureSearchAsMoveOn(page: Page) {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "false") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
   }
 }
 

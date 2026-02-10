@@ -36,13 +36,11 @@ test.describe("V2 State Reset on Bounds-Required Path", () => {
     await page.goto(`/search?${boundsParams.toString()}`);
     await page.waitForLoadState("domcontentloaded");
 
-    // Wait for initial search to complete (results heading visible)
-    const resultsHeading = page
-      .getByRole("heading", {
-        name: /\d+\+?\s*places?|available/i,
-      })
-      .first();
-    await expect(resultsHeading).toBeVisible({ timeout: timeouts.navigation });
+    // Wait for initial search to complete (results heading or zero-results visible)
+    // SSR can be slow in CI — use the search-results-heading ID for reliability
+    const resultsHeading = page.locator("#search-results-heading").first();
+    const zeroResults = page.locator('h2:has-text("No matches found")').first();
+    await expect(resultsHeading.or(zeroResults)).toBeVisible({ timeout: timeouts.navigation });
 
     // 2. Navigate to bounds-required path (query without bounds)
     // This triggers the boundsRequired early return in page.tsx

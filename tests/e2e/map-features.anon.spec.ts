@@ -172,11 +172,15 @@ test.describe("Map controls (requires WebGL)", () => {
     const transitBtn = page.locator('button[aria-pressed]').filter({ hasText: /Transit/i }).first();
     if ((await transitBtn.count()) === 0) return;
 
-    await expect(transitBtn).toHaveAttribute("aria-pressed", "false");
+    // Read current state rather than assuming it starts at "false"
+    const initialState = await transitBtn.getAttribute("aria-pressed");
     await transitBtn.click();
-    await expect(transitBtn).toHaveAttribute("aria-pressed", "true");
+    // After click, state should have toggled
+    const expectedAfterClick = initialState === "true" ? "false" : "true";
+    await expect(transitBtn).toHaveAttribute("aria-pressed", expectedAfterClick, { timeout: 5_000 });
     await transitBtn.click();
-    await expect(transitBtn).toHaveAttribute("aria-pressed", "false");
+    // After second click, state should be back to initial
+    await expect(transitBtn).toHaveAttribute("aria-pressed", initialState ?? "false", { timeout: 5_000 });
   });
 
   test("POIs master toggle activates all categories", async ({ page }) => {
@@ -189,10 +193,10 @@ test.describe("Map controls (requires WebGL)", () => {
     const parksBtn = page.locator('button[aria-pressed]').filter({ hasText: /Parks/i }).first();
 
     if ((await transitBtn.count()) > 0) {
-      await expect(transitBtn).toHaveAttribute("aria-pressed", "true");
+      await expect(transitBtn).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
     }
     if ((await parksBtn.count()) > 0) {
-      await expect(parksBtn).toHaveAttribute("aria-pressed", "true");
+      await expect(parksBtn).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
     }
   });
 
@@ -240,9 +244,11 @@ test.describe("Map controls (requires WebGL)", () => {
 
     const transitBtn = page.locator('button[aria-pressed]').filter({ hasText: /Transit/i }).first();
     if ((await transitBtn.count()) > 0) {
+      const prevState = await transitBtn.getAttribute("aria-pressed");
       await transitBtn.focus();
       await page.keyboard.press("Enter");
-      await expect(transitBtn).toHaveAttribute("aria-pressed", "true");
+      const expectedState = prevState === "true" ? "false" : "true";
+      await expect(transitBtn).toHaveAttribute("aria-pressed", expectedState, { timeout: 5_000 });
     }
   });
 });

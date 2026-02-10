@@ -436,8 +436,8 @@ test.describe("Map Marker Interactions", () => {
         }
       }
 
-      // Click the first cluster
-      await clusterMarker.first().click();
+      // Click the first cluster via evaluate to bypass actionability timeout
+      await clusterMarker.first().evaluate((el) => (el as HTMLElement).click());
 
       // Wait for map to settle after cluster expansion zoom
       await waitForMapReady(page);

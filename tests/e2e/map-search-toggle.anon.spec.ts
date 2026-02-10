@@ -96,7 +96,7 @@ async function turnToggleOff(page: Page) {
   if (isChecked === "true") {
     await toggle.click();
     // Wait for state to update
-    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
   }
 }
 
@@ -109,7 +109,7 @@ async function turnToggleOn(page: Page) {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "false") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
   }
 }
 
@@ -195,7 +195,7 @@ test.describe("4.x: Search as I move toggle", () => {
 
       // Toggle should be checked (ON) by default
       const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
-      await expect(toggle).toHaveAttribute("aria-checked", "true");
+      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
 
       // Banner should NOT be visible when toggle is ON
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
@@ -228,7 +228,7 @@ test.describe("4.x: Search as I move toggle", () => {
 
       // Verify toggle is now OFF
       const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
-      await expect(toggle).toHaveAttribute("aria-checked", "false");
+      await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
 
       // Banner should not be visible yet (no map movement)
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
@@ -550,15 +550,15 @@ test.describe("4.x: Search as I move toggle", () => {
       const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
 
       // Start: ON
-      await expect(toggle).toHaveAttribute("aria-checked", "true");
+      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
 
       // Toggle OFF
       await toggle.click();
-      await expect(toggle).toHaveAttribute("aria-checked", "false");
+      await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
 
       // Toggle ON again
       await toggle.click();
-      await expect(toggle).toHaveAttribute("aria-checked", "true");
+      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
 
       // Verify no banner when toggle is ON
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
@@ -612,13 +612,13 @@ test.describe("4.x: Search as I move toggle", () => {
       await toggle.focus();
 
       // Toggle with Enter key
-      await expect(toggle).toHaveAttribute("aria-checked", "true");
+      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
       await page.keyboard.press("Enter");
-      await expect(toggle).toHaveAttribute("aria-checked", "false");
+      await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
 
       // Toggle back with Space key
       await page.keyboard.press("Space");
-      await expect(toggle).toHaveAttribute("aria-checked", "true");
+      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
     });
   });
 });

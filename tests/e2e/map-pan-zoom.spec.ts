@@ -31,10 +31,17 @@ async function waitForSearchPage(page: import("@playwright/test").Page) {
   await waitForMapReady(page);
 }
 
-// Helper: check if map is available (WebGL loaded)
+// Helper: check if map canvas is visible (WebGL loaded and rendering)
 async function isMapAvailable(page: import("@playwright/test").Page) {
-  const mapContainer = page.locator(selectors.map);
-  return (await mapContainer.count()) > 0;
+  try {
+    const canvas = page.locator(".mapboxgl-canvas:visible").first();
+    await canvas.waitFor({ state: "visible", timeout: 5_000 });
+    return true;
+  } catch {
+    // Fallback: check if map container at least exists
+    const mapContainer = page.locator(selectors.map);
+    return (await mapContainer.count()) > 0;
+  }
 }
 
 // Helper: get current URL bounds
