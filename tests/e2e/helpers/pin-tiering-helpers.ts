@@ -131,7 +131,7 @@ export async function setupPinTieringMock(page: Page): Promise<{
       await page.waitForLoadState("domcontentloaded");
 
       // Navigate to search with specific bounds - triggers fresh fetch with mock
-      await page.goto(searchUrl, { waitUntil: "networkidle" });
+      await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
 
       // Wait for VISIBLE map canvas (page has both mobile and desktop maps)
       const mapCanvas = page.locator(".mapboxgl-canvas:visible").first();

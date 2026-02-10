@@ -232,6 +232,6 @@ export async function navigateToMobileSearch(
   const url = `/search?${boundsQS}${extraParams ? `&${extraParams}` : ""}`;
 
   await page.goto(url);
-  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
   return waitForMobileSheet(page);
 }

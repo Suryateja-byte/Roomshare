@@ -16,7 +16,7 @@ test.describe('Search Interaction Performance', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto(searchUrl);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('Sort change latency under 1s', async ({ page }) => {
@@ -71,7 +71,7 @@ test.describe('Search Interaction Performance', () => {
   test('Filter chip removal latency under 1s', async ({ page }) => {
     // Apply a filter first via URL
     await page.goto(`${searchUrl}&minPrice=500`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Find and click a filter chip remove button
     const chipRemove = page.locator('[data-testid="filter-chip"] button, [data-testid*="remove-filter"]').first();

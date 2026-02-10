@@ -558,7 +558,7 @@ test.describe("Search as I move: Result synchronization", () => {
 
     // Wait for debounce to fire, then for network activity to settle
     await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should still be functional (not crashed)
     expect(await page.locator("body").isVisible()).toBe(true);
@@ -594,7 +594,7 @@ test.describe("Search as I move: Result synchronization", () => {
     await simulateMapPan(page, 100, 50);
     // Wait for debounce to fire, then for network activity to settle
     await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Get E2E marker count
     const state = await page.evaluate(() => {
@@ -649,7 +649,7 @@ test.describe("Search as I move: Result synchronization", () => {
 
     // Wait for debounce to fire, then for network activity to settle
     await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should be functional (no stale response issues)
     expect(await page.locator("body").isVisible()).toBe(true);
@@ -688,7 +688,7 @@ test.describe("Search as I move: Result synchronization", () => {
 
     // Wait for debounce to fire, then for network activity to settle
     await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Should have at most 2 API calls despite 4 pans
     // (debounce should coalesce them, throttle allows at most 1 per interval)
@@ -795,7 +795,7 @@ test.describe("Search as I move: Debounce and performance", () => {
 
     // Wait for debounce to fire, then for network activity to settle
     await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Should see at most a few URL changes (not 5)
     // The debounce coalesces rapid moves
@@ -851,7 +851,7 @@ test.describe("Search as I move: Debounce and performance", () => {
 
     // Wait for debounce to fire, then for network activity to settle
     await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100); // debounce wait: 600ms area count debounce
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // If multiple requests were in-flight, earlier ones should have been aborted
     const totalRequests = completedRequests.length + abortedRequests.length;

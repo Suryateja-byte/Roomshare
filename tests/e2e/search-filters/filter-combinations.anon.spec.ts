@@ -42,7 +42,7 @@ test.describe("Filter Combinations", () => {
   test(`${tags.core} - price and room type filters work together`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&maxPrice=1500&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Both params should be in URL
     expect(getUrlParam(page, "maxPrice")).toBe("1500");
@@ -67,7 +67,7 @@ test.describe("Filter Combinations", () => {
   test(`${tags.core} - price and amenities filters work together`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&maxPrice=2000&amenities=Wifi,Parking`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     expect(getUrlParam(page, "maxPrice")).toBe("2000");
     const amenities = getUrlParam(page, "amenities") ?? "";
@@ -90,7 +90,7 @@ test.describe("Filter Combinations", () => {
 
     await page.goto(`/search?${filterQS}`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Verify all params are present
     expect(getUrlParam(page, "minPrice")).toBe("500");
@@ -108,7 +108,7 @@ test.describe("Filter Combinations", () => {
     // Start with room type
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Open filter modal and add an amenity
     const filtersBtn = filtersButton(page);
@@ -142,7 +142,7 @@ test.describe("Filter Combinations", () => {
   test(`${tags.core} - removing one filter preserves the others`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -171,7 +171,7 @@ test.describe("Filter Combinations", () => {
   test(`${tags.core} - filter and sort params coexist in URL`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
     expect(getUrlParam(page, "sort")).toBe("price_asc");
@@ -184,7 +184,7 @@ test.describe("Filter Combinations", () => {
   test(`${tags.core} - filter and query params coexist in URL`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&q=downtown&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     expect(getUrlParam(page, "q")).toBe("downtown");
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
@@ -197,7 +197,7 @@ test.describe("Filter Combinations", () => {
     // Start with a page param
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&page=2`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Open filter modal and change a filter
     const filtersBtn = filtersButton(page);
@@ -234,7 +234,7 @@ test.describe("Filter Combinations", () => {
   test(`${tags.core} - geographic bounds persist through filter changes`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Bounds should be in URL
     expect(getUrlParam(page, "minLat")).toBeTruthy();
@@ -252,7 +252,7 @@ test.describe("Filter Combinations", () => {
     // Apply without changing anything (just to test bounds persistence)
     await page.locator('[data-testid="filter-modal-apply"]').click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Bounds should still be there
     expect(getUrlParam(page, "minLat")).toBeTruthy();
@@ -263,7 +263,7 @@ test.describe("Filter Combinations", () => {
   test(`${tags.core} - house rules and amenities can be combined`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&amenities=Wifi&houseRules=Pets+allowed`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     expect(getUrlParam(page, "amenities")).toContain("Wifi");
     expect(getUrlParam(page, "houseRules")).toContain("Pets allowed");
@@ -287,7 +287,7 @@ test.describe("Filter Combinations", () => {
     for (const sort of sortOptions) {
       await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=${sort}`);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
 
       expect(getUrlParam(page, "sort")).toBe(sort);
       expect(getUrlParam(page, "roomType")).toBe("Private Room");
@@ -319,7 +319,7 @@ test.describe("Filter Combinations", () => {
 
     await page.goto(`/search?${filterQS}`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Filter known benign errors
     const realErrors = consoleErrors.filter(

@@ -13,7 +13,7 @@ test.describe("Search V2 UI Integration", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     await page.goto("/search?searchV2=1");
-    // Don't use networkidle - page has continuous polling that prevents it from settling
+    // Don't use domcontentloaded - page has continuous polling that prevents it from settling
     await page.waitForLoadState("domcontentloaded");
 
     // Should see results heading - use .first() to avoid strict mode violation
@@ -59,7 +59,7 @@ test.describe("Search V2 UI Integration", () => {
     await page.goto(
       `/search?searchV2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
     );
-    // Don't use networkidle - page has continuous polling
+    // Don't use domcontentloaded - page has continuous polling
     await page.waitForLoadState("domcontentloaded");
 
     // Try to wait for map canvas - may fail in test environments without Mapbox token
@@ -121,7 +121,7 @@ test.describe("Search V2 UI Integration", () => {
     await page.goto(
       `/search?searchV2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
     );
-    // Don't use networkidle - page has continuous polling
+    // Don't use domcontentloaded - page has continuous polling
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for page content to stabilize - the V2 context is set during initial render

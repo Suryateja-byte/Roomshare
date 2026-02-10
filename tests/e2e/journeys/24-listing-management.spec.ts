@@ -20,7 +20,7 @@ test.describe("J31: Edit Listing and Verify", () => {
       q: "Sunny Mission Room",
       bounds: SF_BOUNDS,
     });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "No listings found — skipping");
@@ -40,7 +40,7 @@ test.describe("J31: Edit Listing and Verify", () => {
     test.skip(!canEdit, "No edit button — not owner view");
 
     await editBtn.first().click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 4: Edit title
     const titleField = page
@@ -57,7 +57,7 @@ test.describe("J31: Edit Listing and Verify", () => {
       .or(page.locator('button[type="submit"]'));
     if (await saveBtn.first().isVisible().catch(() => false)) {
       await saveBtn.first().click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 6: Verify changes
@@ -71,7 +71,7 @@ test.describe("J31: Edit Listing and Verify", () => {
       const editAgain = page.getByRole("link", { name: /edit|manage/i }).or(page.locator('a[href*="/edit"]'));
       if (await editAgain.first().isVisible().catch(() => false)) {
         await editAgain.first().click();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
         const tf = page.getByLabel(/title/i).or(page.locator('input[name="title"]'));
         if (await tf.first().isVisible().catch(() => false)) {
           await tf.first().clear();
@@ -79,7 +79,7 @@ test.describe("J31: Edit Listing and Verify", () => {
           const sb = page.getByRole("button", { name: /save|update|submit/i }).or(page.locator('button[type="submit"]'));
           if (await sb.first().isVisible().catch(() => false)) {
             await sb.first().click();
-            await page.waitForLoadState('networkidle');
+            await page.waitForLoadState('domcontentloaded');
           }
         }
       }
@@ -98,7 +98,7 @@ test.describe("J32: Pause and Unpause Listing", () => {
       q: "Richmond District Room",
       bounds: SF_BOUNDS,
     });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "Listing not found — skipping");
@@ -121,7 +121,7 @@ test.describe("J32: Pause and Unpause Listing", () => {
     await pausedOption.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     if (await pausedOption.isVisible().catch(() => false)) {
       await pausedOption.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 4: Verify paused state — button should now show "Paused"
@@ -138,7 +138,7 @@ test.describe("J32: Pause and Unpause Listing", () => {
       await activeOption.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       if (await activeOption.isVisible().catch(() => false)) {
         await activeOption.click();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
       }
     }
 
@@ -154,7 +154,7 @@ test.describe("J33: Delete Listing with Confirmation", () => {
   }) => {
     // Step 1: Navigate to an owned listing detail page
     await nav.goToSearch({ q: "Sunny Mission", bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "No owned listing found — skipping");
@@ -178,7 +178,7 @@ test.describe("J33: Delete Listing with Confirmation", () => {
     const confirmBtn = page.getByRole("button", { name: /confirm|yes|delete/i }).last();
     if (await confirmBtn.isVisible().catch(() => false)) {
       await confirmBtn.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 4: Verify redirect or success toast
@@ -206,7 +206,7 @@ test.describe("J34: Form Validation Errors", () => {
     test.skip(!canSubmit, "No submit button found — skipping");
 
     await submitBtn.first().click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 3: Verify validation errors appear
     const errors = page
@@ -226,7 +226,7 @@ test.describe("J34: Form Validation Errors", () => {
 
     // Step 5: Submit again
     await submitBtn.first().click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should still have errors (other required fields empty)
     // Or page might have advanced to next step in multi-step form

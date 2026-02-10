@@ -19,7 +19,7 @@ test.describe("J45: Report a Listing", () => {
   }) => {
     // Step 1: Find a listing NOT owned by test user (report button only shows for non-owners)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const container = searchResultsContainer(page);
     const cards = container.locator(selectors.listingCard);
@@ -78,7 +78,7 @@ test.describe("J45: Report a Listing", () => {
       .or(reportDialog.getByRole("button", { name: /submit/i }));
     if (await submitBtn.first().isVisible().catch(() => false)) {
       await submitBtn.first().click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 6: Verify confirmation — ReportButton shows inline "Thank you" text
@@ -97,7 +97,7 @@ test.describe("J46: XSS Prevention", () => {
     // Step 1: Navigate to search with XSS payload in query
     const xssPayload = '<script>alert("xss")</script>';
     await nav.goToSearch({ q: xssPayload });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Verify the script tag is not executed
     // Check that no alert dialog appeared
@@ -126,7 +126,7 @@ test.describe("J47: Rate Limit Feedback", () => {
   }) => {
     // Step 1: Find a listing NOT owned by test user (action buttons only show for non-owners)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const j47Container = searchResultsContainer(page);
     const cards = j47Container.locator(selectors.listingCard);
@@ -148,7 +148,7 @@ test.describe("J47: Rate Limit Feedback", () => {
     for (let i = 0; i < 5; i++) {
       await actionBtn.click().catch(() => {});
     }
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 4: Verify some feedback happened
     // Could be: button disabled, toast, error message, or just normal toggle behavior
@@ -171,7 +171,7 @@ test.describe("J48: Protected Route Redirects", () => {
     for (const route of protectedRoutes) {
       // Use a fresh context approach: just verify the page loads or redirects
       await page.goto(route);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const currentUrl = page.url();
 
@@ -227,7 +227,7 @@ test.describe("J50: Cross-Page Navigation Chain", () => {
 
     // Step 2: Search page
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.locator("body")).toBeVisible();
     expect(page.url()).toContain("/search");
 
@@ -242,17 +242,17 @@ test.describe("J50: Cross-Page Navigation Chain", () => {
 
     // Step 4: Bookings page
     await nav.goToBookings();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.locator("body")).toBeVisible();
 
     // Step 5: Messages page
     await nav.goToMessages();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.locator("body")).toBeVisible();
 
     // Step 6: Profile page
     await nav.goToProfile();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.locator("body")).toBeVisible();
 
     // All pages should have loaded without crashes

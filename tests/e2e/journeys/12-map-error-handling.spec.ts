@@ -47,7 +47,7 @@ test.describe("Map Error Handling", () => {
     errorPattern: RegExp,
     timeout = timeouts.action,
   ) {
-    // Wait for DOM to be ready (don't use networkidle - Next.js HMR keeps connections open)
+    // Wait for DOM to be ready (don't use domcontentloaded - Next.js HMR keeps connections open)
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for the map panel to be rendered - "Hide map" button indicates map container is mounted

@@ -8,6 +8,23 @@
  */
 
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+/**
+ * Navigate to a real listing page by finding one via search.
+ * Returns false if no listings are available.
+ */
+async function navigateToListing(page: Page): Promise<boolean> {
+  await page.goto('/search');
+  await page.waitForLoadState('domcontentloaded');
+  const firstCard = page.locator('[data-testid="listing-card"]').first();
+  await firstCard.waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
+  const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
+  if (!listingId) return false;
+  await page.goto(`/listings/${listingId}`);
+  await page.waitForLoadState('domcontentloaded');
+  return true;
+}
 
 // Mock places fixture for deterministic testing
 const mockPlacesFixture = [
@@ -50,7 +67,8 @@ test.describe('Nearby Places Attribution Compliance', () => {
     await page.setViewportSize({ width: 375, height: 667 });
 
     // Navigate to a listing page with nearby places
-    await page.goto('/listings/test-listing');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     // Wait for the map to load
     await page.waitForSelector('[data-testid="nearby-places-map"]', {
@@ -84,10 +102,11 @@ test.describe('Nearby Places Attribution Compliance', () => {
   test('J2: Dark mode attribution has sufficient contrast', async ({ page }) => {
     // Enable dark mode
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.goto('/listings/test-listing');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     // Wait for page to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Find attribution element
     const attribution = page.locator('a[href*="radar.com"]').first();
@@ -123,10 +142,11 @@ test.describe('Nearby Places Attribution Compliance', () => {
 
   // J3: Stadia tiles attribution present
   test('J3: Map tile attribution is present', async ({ page }) => {
-    await page.goto('/listings/test-listing');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     // Wait for map to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // MapLibre automatically adds attribution from style JSON
     // Look for attribution control
@@ -153,8 +173,9 @@ test.describe('Nearby Places Attribution Compliance', () => {
 
   // J9: Third-party scripts don't break links
   test('J9: Attribution links are functional', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
+    await page.waitForLoadState('domcontentloaded');
 
     // Find Radar attribution link
     const radarLink = page.locator('a[href*="radar.com"]').first();
@@ -207,8 +228,9 @@ test.describe('Nearby Places Attribution Compliance', () => {
       }
     });
 
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for map to render
     await page.waitForTimeout(2000);
@@ -256,8 +278,9 @@ test.describe('Nearby Places Privacy Compliance', () => {
       consoleLogs.push(msg.text());
     });
 
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
 
     // Should not log raw API responses
@@ -288,8 +311,9 @@ test.describe('Nearby Places Privacy Compliance', () => {
       }
     });
 
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
+    await page.waitForLoadState('domcontentloaded');
 
     // Verify requests were made
     if (requests.length > 0) {

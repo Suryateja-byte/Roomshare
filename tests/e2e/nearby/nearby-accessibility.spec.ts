@@ -8,6 +8,23 @@
  */
 
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+/**
+ * Navigate to a real listing page by finding one via search.
+ * Returns false if no listings are available.
+ */
+async function navigateToListing(page: Page): Promise<boolean> {
+  await page.goto('/search');
+  await page.waitForLoadState('domcontentloaded');
+  const firstCard = page.locator('[data-testid="listing-card"]').first();
+  await firstCard.waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
+  const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
+  if (!listingId) return false;
+  await page.goto(`/listings/${listingId}`);
+  await page.waitForLoadState('domcontentloaded');
+  return true;
+}
 
 // Mock places fixture for deterministic testing
 const mockPlacesFixture = [
@@ -46,8 +63,8 @@ test.describe('Nearby Places Accessibility', () => {
 
   // F2: Focus outline visible on chips
   test('F2: Focus outline is visible on category chips', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     // Find a category chip button
     const categoryChip = page.locator('button').filter({ hasText: /grocery|restaurant|shopping/i }).first();
@@ -103,8 +120,8 @@ test.describe('Nearby Places Accessibility', () => {
 
   // F6: Escape closes popup
   test('F6: Escape key closes map popup', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     // Trigger a search to show results and markers
     const categoryChip = page.locator('button').filter({ hasText: /grocery/i }).first();
@@ -162,8 +179,8 @@ test.describe('Nearby Places Accessibility', () => {
     // Enable forced colors (high contrast mode simulation)
     await page.emulateMedia({ forcedColors: 'active' });
 
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     // Verify key elements are visible
     const searchInput = page.locator('input[type="text"], input[placeholder*="search" i]').first();
@@ -227,8 +244,8 @@ test.describe('Nearby Places Accessibility', () => {
       `,
     });
 
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     // Check that key elements don't overflow viewport
     const nearbySection = page.locator('[data-testid="nearby-places"], [class*="nearby"]').first();
@@ -301,8 +318,8 @@ test.describe('Nearby Places Keyboard Navigation', () => {
   });
 
   test('All interactive elements are reachable via keyboard', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     const tabbedElements: string[] = [];
     let attempts = 0;
@@ -340,8 +357,8 @@ test.describe('Nearby Places Keyboard Navigation', () => {
   });
 
   test('Enter key activates focused buttons', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     // Tab to find a category button
     let foundButton = false;
@@ -381,8 +398,8 @@ test.describe('Nearby Places Keyboard Navigation', () => {
   });
 
   test('Space key activates focused buttons', async ({ page }) => {
-    await page.goto('/listings/test-listing');
-    await page.waitForLoadState('networkidle');
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, 'No listings available'); return; }
 
     // Tab to find a category button
     for (let i = 0; i < 20; i++) {

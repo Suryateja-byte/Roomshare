@@ -2,7 +2,7 @@ import { Page, expect } from "@playwright/test";
 import { selectors, timeouts } from "./test-utils";
 
 /**
- * Wait for page to be ready - more reliable than networkidle
+ * Wait for page to be ready - more reliable than domcontentloaded
  * Uses domcontentloaded + element visibility instead of waiting for all network traffic
  */
 async function waitForPageReady(

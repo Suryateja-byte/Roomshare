@@ -174,7 +174,7 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     await filtersButton(page).click();
     const dialog = filterDialog(page);
     await expect(dialog).toBeVisible({ timeout: 10_000 });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Check that the room type select shows the pre-applied value
     const roomTypeText = dialog.locator("#filter-room-type");

@@ -278,7 +278,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
         .locator('text=/No.*match|No listing/i').or(page.locator('a[href^="/listings/"]'))
         .first()
         .waitFor({ state: "attached", timeout: 30_000 });
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
 
       const cardCount = await scopedCards(page).count();
 

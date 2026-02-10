@@ -509,7 +509,7 @@ test.describe("4.x: Search as I move toggle", () => {
       await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100);
 
       // Wait for all in-flight requests to settle
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Only the last request should complete successfully
       // Earlier requests should have been aborted

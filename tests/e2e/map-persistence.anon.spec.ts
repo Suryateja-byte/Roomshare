@@ -407,7 +407,7 @@ test.describe("Map persistence: Map state recovery", () => {
 
     await listingLink.click();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Should be on a listing page now
     expect(page.url()).toContain("/listings/");

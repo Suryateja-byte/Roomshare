@@ -18,7 +18,7 @@ test.describe("J21: Full Booking Request Submission", () => {
   }) => {
     // Step 1: Search for a listing NOT owned by test user (reviewer's listing)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     const count = await cards.count();
@@ -45,7 +45,7 @@ test.describe("J21: Full Booking Request Submission", () => {
     test.skip(!canBook, "No booking button visible (owner view or unavailable)");
 
     await bookingBtn.first().click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 4: Fill any booking form fields that appear
     const messageField = page
@@ -61,7 +61,7 @@ test.describe("J21: Full Booking Request Submission", () => {
       .or(page.locator('button[type="submit"]'));
     if (await submitBtn.first().isVisible().catch(() => false)) {
       await submitBtn.first().click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 5: Verify toast or redirect
@@ -80,7 +80,7 @@ test.describe("J22: Booking Rejection Flow", () => {
   }) => {
     // Step 1: Go to bookings page
     await nav.goToBookings();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Look for a PENDING booking
     const pendingBadge = page.locator("main").getByText(/pending/i).first();
@@ -92,7 +92,7 @@ test.describe("J22: Booking Rejection Flow", () => {
     const detailLink = bookingRow.locator("a").first();
     if (await detailLink.isVisible().catch(() => false)) {
       await detailLink.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 4: Look for reject/decline button
@@ -115,7 +115,7 @@ test.describe("J22: Booking Rejection Flow", () => {
     const confirmBtn = page.getByRole("button", { name: /confirm|submit|yes/i }).first();
     if (await confirmBtn.isVisible().catch(() => false)) {
       await confirmBtn.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 5: Verify status changed
@@ -134,7 +134,7 @@ test.describe("J23: Booking Cancellation", () => {
   }) => {
     // Step 1: Go to bookings page
     await nav.goToBookings();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Look for an ACCEPTED booking
     const acceptedBadge = page.locator("main").getByText(/accepted|confirmed|active/i).first();
@@ -146,7 +146,7 @@ test.describe("J23: Booking Cancellation", () => {
     const detailLink = bookingRow.locator("a").first();
     if (await detailLink.isVisible().catch(() => false)) {
       await detailLink.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 4: Click cancel button
@@ -163,7 +163,7 @@ test.describe("J23: Booking Cancellation", () => {
     const confirmBtn = page.getByRole("button", { name: /confirm|yes|cancel booking/i }).first();
     if (await confirmBtn.isVisible().catch(() => false)) {
       await confirmBtn.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 5: Verify CANCELLED status
@@ -190,21 +190,21 @@ test.describe("J24: Double-Booking Prevention", () => {
   }) => {
     // Step 1: Find a listing NOT owned by test user (with retry)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     let cards = searchResultsContainer(page).locator(selectors.listingCard);
     let count = await cards.count();
     if (count === 0) {
       // Retry with fresh navigation
       await nav.goToSearch({ q: "Reviewer", bounds: SF_BOUNDS });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       cards = searchResultsContainer(page).locator(selectors.listingCard);
       count = await cards.count();
     }
     if (count === 0) {
       // Last resort: search all listings in bounds
       await nav.goToSearch({ bounds: SF_BOUNDS });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       cards = searchResultsContainer(page).locator(selectors.listingCard);
       count = await cards.count();
     }
@@ -228,7 +228,7 @@ test.describe("J24: Double-Booking Prevention", () => {
     const isDisabled = await bookingBtn.isDisabled().catch(() => false);
     const secondClickResult = await bookingBtn.click().catch(() => "blocked");
 
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 4: Verify some form of duplicate prevention
     // Could be: disabled button, error toast, redirect, or just the form staying open

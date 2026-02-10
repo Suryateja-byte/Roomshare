@@ -23,7 +23,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
   test.describe('Critical Pages - WCAG 2.1 AA Compliance', () => {
     test('Homepage passes accessibility audit', async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await new AxeBuilder({ page })
         .withTags(WCAG_AA_TAGS)
@@ -51,7 +51,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
 
     test('Search page passes accessibility audit', async ({ page }) => {
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await new AxeBuilder({ page })
         .withTags(WCAG_AA_TAGS)
@@ -75,7 +75,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
 
     test('Login page passes accessibility audit', async ({ page }) => {
       await page.goto('/login');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await new AxeBuilder({ page })
         .withTags(WCAG_AA_TAGS)
@@ -102,7 +102,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
   test.describe('Touch Targets (WCAG 2.1 AA - 44x44px minimum)', () => {
     test('All buttons meet 44px minimum touch target', async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const buttons = page.locator('button:visible');
       const buttonCount = await buttons.count();
@@ -143,7 +143,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
 
     test('All links meet touch target requirements', async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const links = page.locator('a:visible');
       const linkCount = await links.count();
@@ -180,7 +180,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
   test.describe('Focus Management', () => {
     test('Focus is visible on all interactive elements', async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Tab through elements and verify focus is visible
       const focusChecks: { element: string; hasFocusIndicator: boolean }[] = [];
@@ -260,7 +260,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
   test.describe('Keyboard Navigation', () => {
     test('Can navigate search filters with keyboard only', async ({ page }) => {
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Tab to filter controls
       let foundFilterButton = false;
@@ -304,7 +304,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
 
     test('Modal dialogs trap focus correctly', async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Find and click a button that opens a modal (login, signup, etc.)
       const modalTrigger = page
@@ -353,7 +353,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
   test.describe('Screen Reader Support', () => {
     test('Page has proper heading hierarchy', async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const headings = await page.evaluate(() => {
         const hs = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
@@ -391,7 +391,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
 
     test('Images have appropriate alt text', async ({ page }) => {
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const images = page.locator('img');
       const imageCount = await images.count();
@@ -421,7 +421,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
 
     test('Form inputs have associated labels', async ({ page }) => {
       await page.goto('/login');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const inputs = page.locator('input:not([type="hidden"]):not([type="submit"])');
       const inputCount = await inputs.count();
@@ -460,7 +460,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
 
     test('Error messages are associated with inputs', async ({ page }) => {
       await page.goto('/login');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Submit empty form to trigger errors
       const submitButton = page.getByRole('button', { name: /log in|sign in|submit/i });
@@ -500,7 +500,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
       await page.emulateMedia({ forcedColors: 'active' });
 
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Buttons should remain visible and distinguishable
       const buttons = page.locator('button:visible');
@@ -528,7 +528,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
 
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Check that transition durations are reduced or removed
       const animatedElements = page.locator('[class*="transition"], [class*="animate"]');

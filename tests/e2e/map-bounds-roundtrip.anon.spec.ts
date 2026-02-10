@@ -420,7 +420,7 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     // Navigate with invalid bounds (NaN, Infinity, inverted)
     await page.goto("/search?minLat=NaN&maxLat=Infinity&minLng=-999&maxLng=999");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Page should not crash
     expect(await page.locator("body").isVisible()).toBe(true);

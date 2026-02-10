@@ -42,7 +42,7 @@ function logViolations(label: string, violations: any[]) {
 /** Navigate to the first available listing detail page */
 async function navigateToListing(page: import('@playwright/test').Page): Promise<boolean> {
   await page.goto('/search');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 
   const firstCard = page.locator(selectors.listingCard).first();
   const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
@@ -50,7 +50,7 @@ async function navigateToListing(page: import('@playwright/test').Page): Promise
   if (!listingId) return false;
 
   await page.goto(`/listings/${listingId}`);
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   return true;
 }
 

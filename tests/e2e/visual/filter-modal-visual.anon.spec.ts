@@ -19,7 +19,7 @@ test.describe('Filter Modal — Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize(VIEWPORTS.desktop);
     await page.goto(searchUrl);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('filter modal — initial open state', async ({ page }) => {
@@ -74,7 +74,7 @@ test.describe('Filter Modal — Visual Regression', () => {
   test('filter modal — mobile viewport (375x667)', async ({ page }) => {
     await page.setViewportSize(VIEWPORTS.mobileSmall);
     await page.goto(searchUrl);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await disableAnimations(page);
 
     const filterButton = page.getByRole('button', { name: /filter/i })

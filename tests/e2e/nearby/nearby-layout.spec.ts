@@ -8,6 +8,23 @@
  */
 
 import { test, expect } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+/**
+ * Navigate to a real listing page by finding one via search.
+ * Returns false if no listings are available.
+ */
+async function navigateToListing(page: Page): Promise<boolean> {
+  await page.goto("/search");
+  await page.waitForLoadState("domcontentloaded");
+  const firstCard = page.locator('[data-testid="listing-card"]').first();
+  await firstCard.waitFor({ state: "attached", timeout: 15_000 }).catch(() => {});
+  const listingId = await firstCard.getAttribute("data-listing-id").catch(() => null);
+  if (!listingId) return false;
+  await page.goto(`/listings/${listingId}`);
+  await page.waitForLoadState("domcontentloaded");
+  return true;
+}
 
 // Mock places fixture for deterministic testing
 const mockPlacesFixture = [
@@ -56,8 +73,8 @@ test.describe("Nearby Places Layout", () => {
   test("G1: Map renders correctly inside transformed container", async ({
     page,
   }) => {
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     // Check if map container exists and has proper dimensions
     // TODO: add data-testid="map" to the Map component wrapper
@@ -96,8 +113,8 @@ test.describe("Nearby Places Layout", () => {
 
   // G2: Container height 0 shows fallback
   test("G2: Handles zero-height container gracefully", async ({ page }) => {
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     // Find the map section
     // TODO: add data-testid="nearby-places" to the NearbyPlaces component if not present
@@ -137,8 +154,8 @@ test.describe("Nearby Places Layout", () => {
 
   // G3: Sticky header doesn't overlap controls
   test("G3: Sticky header does not overlap map controls", async ({ page }) => {
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     // Scroll down to reveal any sticky header behavior
     await page.evaluate(() => {
@@ -188,8 +205,8 @@ test.describe("Nearby Places Layout", () => {
 
   // G4: Popup z-index above overlays
   test("G4: Map popup appears above other overlays", async ({ page }) => {
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     // Trigger a search to show markers
     const categoryChip = page
@@ -230,8 +247,8 @@ test.describe("Nearby Places Layout", () => {
 
   // G5: Pointer-events allows map interaction
   test("G5: Pointer events allow map interaction", async ({ page }) => {
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     const mapCanvas = page
       .locator(".maplibregl-canvas, .mapboxgl-canvas")
@@ -262,8 +279,8 @@ test.describe("Nearby Places Layout", () => {
 
   // G6: Panel scroll contained
   test("G6: Panel scrolling is contained", async ({ page }) => {
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     // Trigger search to show results
     const categoryChip = page
@@ -305,8 +322,8 @@ test.describe("Nearby Places Layout", () => {
   // G7: Safari rubber-band zoom handled
   test("G7: Touch zoom handling on Safari", async ({ page, browserName }) => {
     // This test is most relevant for Safari/WebKit
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     const mapCanvas = page
       .locator(".maplibregl-canvas, .mapboxgl-canvas")
@@ -338,8 +355,8 @@ test.describe("Nearby Places Layout", () => {
 
   // G8: Resize after rotation updates map
   test("G8: Map updates after viewport rotation/resize", async ({ page }) => {
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     const mapCanvas = page
       .locator(".maplibregl-canvas, .mapboxgl-canvas")
@@ -385,8 +402,8 @@ test.describe("Nearby Places Layout", () => {
       });
     });
 
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     // Trigger search to show markers
     const categoryChip = page
@@ -445,8 +462,8 @@ test.describe("Nearby Places Mobile Layout", () => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     // Find nearby section
     const nearbySection = page
@@ -488,8 +505,8 @@ test.describe("Nearby Places Mobile Layout", () => {
   test("Map/list toggle works on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     // Look for map/list toggle buttons
     const mapToggle = page
@@ -527,8 +544,8 @@ test.describe("Nearby Places Mobile Layout", () => {
   test("Search input is accessible on mobile keyboard", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await page.goto("/listings/test-listing");
-    await page.waitForLoadState("networkidle");
+    const found = await navigateToListing(page);
+    if (!found) { test.skip(true, "No listings available"); return; }
 
     const searchInput = page
       .locator('input[type="text"], input[placeholder*="search" i]')

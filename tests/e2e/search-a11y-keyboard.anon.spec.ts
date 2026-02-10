@@ -206,7 +206,7 @@ test.describe("Search A11y: Keyboard Navigation", () => {
     const filtersButton = page.getByRole("button", { name: /^Filters/ });
 
     if (await filtersButton.isVisible().catch(() => false)) {
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
       await filtersButton.click();
 
       // Filter modal should be open
@@ -252,7 +252,7 @@ test.describe("Search A11y: Keyboard Navigation", () => {
     ).first();
 
     if (await filtersButton.isVisible().catch(() => false)) {
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
       await filtersButton.click();
 
       const modal = page.locator('[role="dialog"][aria-modal="true"]');

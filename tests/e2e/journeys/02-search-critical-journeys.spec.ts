@@ -416,7 +416,7 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J17: Map toggle shows and hides map view", async ({ page, nav }) => {
     test.slow();
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Look for map toggle button
@@ -489,7 +489,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.setViewportSize({ width: 375, height: 812 });
 
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Results heading visible
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });

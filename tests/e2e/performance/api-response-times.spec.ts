@@ -63,7 +63,7 @@ test.describe('API Response Time Budgets', () => {
     test('/api/listings/[id] responds under 300ms', async ({ page }) => {
       // First get a listing ID
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const firstCard = page.locator('[data-testid="listing-card"]').first();
       const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);

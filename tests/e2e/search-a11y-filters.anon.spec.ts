@@ -36,7 +36,7 @@ async function openFilterModal(page: import("@playwright/test").Page) {
   // Use getByRole to reliably target the "Filters" button (not room type filter pills)
   const filtersButton = page.getByRole("button", { name: /^Filters/ });
 
-  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
   await expect(filtersButton).toBeVisible({ timeout: timeouts.action });
   await filtersButton.click();
   await page.waitForTimeout(500);
@@ -143,7 +143,7 @@ test.describe("Search A11y: Filter Modal Accessibility", () => {
     await expect(filtersButton).toBeVisible();
 
     // Open modal
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
     await filtersButton.click();
     await page.waitForTimeout(500);
 

@@ -68,7 +68,7 @@ test.describe("Group 1: Zero Results State", () => {
       `/search?q=xyznonexistent123absolutelynotareallocation&${boundsQS}`,
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // The zero results heading should appear — scope to visible container
     // to avoid picking the hidden mobile/desktop duplicate
@@ -90,7 +90,7 @@ test.describe("Group 1: Zero Results State", () => {
       `/search?q=xyznonexistent123absolutelynotareallocation&${boundsQS}`,
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Wait for the no-results state to render — scope to visible container
     const container = searchResultsContainer(page);
@@ -116,7 +116,7 @@ test.describe("Group 1: Zero Results State", () => {
       `/search?q=xyznonexistent123absolutelynotareallocation&${boundsQS}`,
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Wait for zero-results state — scope to visible container
     const container = searchResultsContainer(page);
@@ -158,7 +158,7 @@ test.describe("Group 1: Zero Results State", () => {
     // maxPrice=1 should find no results (no $1/month listing)
     await page.goto(`/search?maxPrice=1&${boundsQS}`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Should show zero results or a very small number — scope to visible container
     const container = searchResultsContainer(page);
@@ -278,7 +278,7 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     // Wait for error state to appear. Next.js may show the error boundary,
     // a generic error overlay, or the previous content with an error toast.
     // We check for multiple possible error indicators.
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const errorBoundary = page.locator(
       'h1:has-text("Unable to load search results")',
@@ -322,7 +322,7 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
       link.click();
     });
 
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Now remove the interception to allow recovery
     await page.unrouteAll();
@@ -584,7 +584,7 @@ test.describe("Group 4: Error Boundary", () => {
       link.click();
     });
 
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Check for the error boundary heading
     const errorBoundary = page.locator(
@@ -645,7 +645,7 @@ test.describe("Group 4: Error Boundary", () => {
       a.click();
     });
 
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Check if error boundary appeared
     const errorBoundary = page.locator(
@@ -666,7 +666,7 @@ test.describe("Group 4: Error Boundary", () => {
       await tryAgain.click();
 
       // After recovery, the page should show results or at least not crash
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
       const bodyContent = await page.locator("body").textContent();
       expect(bodyContent).toBeTruthy();
     } else {
@@ -1026,7 +1026,7 @@ test.describe("Group 7: Load-More Error States", () => {
       await tryAgainInline.first().click();
 
       // After successful retry, either more listings appear or the error disappears
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
 
       // Error should be gone OR new listings loaded
       const errorStillVisible = await inlineError
@@ -1145,7 +1145,7 @@ test.describe("Group 8: Console Error Monitoring", () => {
     }
 
     // Allow any async operations to settle
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Filter out benign errors
     const realConsoleErrors = consoleErrors.filter(
@@ -1210,7 +1210,7 @@ test.describe("Group 8: Console Error Monitoring", () => {
 
     // Trigger some client-side actions that would hit the APIs
     await page.mouse.wheel(0, 300);
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Remove interception
     await page.unrouteAll();
@@ -1218,7 +1218,7 @@ test.describe("Group 8: Console Error Monitoring", () => {
     // Reload to recover
     await page.reload({ timeout: timeouts.navigation });
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Filter out benign errors
     const realRejections = unhandledRejections.filter(

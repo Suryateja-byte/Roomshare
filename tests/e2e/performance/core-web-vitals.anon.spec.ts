@@ -166,7 +166,7 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
     test('LCP under 2500ms', async ({ page }) => {
       // Find first listing ID
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       const firstCard = page.locator('[data-testid="listing-card"]').first();
       const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
       test.skip(!listingId, 'No listings available');
@@ -182,7 +182,7 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
     test('CLS under 0.1', async ({ page }) => {
       await setupClsObserver(page);
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       const firstCard = page.locator('[data-testid="listing-card"]').first();
       const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
       test.skip(!listingId, 'No listings available');

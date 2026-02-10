@@ -16,12 +16,12 @@ import { test, expect, selectors, timeouts } from "../helpers";
 async function loginAsAdmin(page: import("@playwright/test").Page) {
   // Sign out current user first
   await page.goto("/api/auth/signout");
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   // Click the signout confirmation if present
   const signOutBtn = page.getByRole("button", { name: /sign out/i });
   if (await signOutBtn.isVisible().catch(() => false)) {
     await signOutBtn.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   }
 
   await page.goto("/login");
@@ -47,7 +47,7 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
     .getByRole("button", { name: /log ?in|sign ?in|submit/i })
     .or(page.locator('button[type="submit"]'));
   await submitBtn.first().click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 
   // Verify not still on login page
   const onLogin = page.url().includes("/login");
@@ -65,7 +65,7 @@ test.describe("J38: Admin Dashboard Overview", () => {
 
     // Step 2: Navigate to admin
     await page.goto("/admin");
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 3: Verify admin page loaded (not redirected to login)
     const isAdmin = page.url().includes("/admin");
@@ -104,7 +104,7 @@ test.describe("J39: Admin Resolves Report", () => {
 
     // Step 1: Navigate to admin reports
     await page.goto("/admin/reports");
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const isAdminReports = page.url().includes("/admin");
     test.skip(!isAdminReports, "Redirected away — skipping");
@@ -118,7 +118,7 @@ test.describe("J39: Admin Resolves Report", () => {
 
     // Step 3: Click to view/resolve
     await reportRow.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 4: Look for resolve button
     const resolveBtn = page
@@ -133,7 +133,7 @@ test.describe("J39: Admin Resolves Report", () => {
       }
 
       await resolveBtn.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 5: Verify
@@ -154,7 +154,7 @@ test.describe("J40: Admin Reviews Verification Request", () => {
 
     // Step 1: Navigate to verifications
     await page.goto("/admin/verifications");
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const isAdminPage = page.url().includes("/admin");
     test.skip(!isAdminPage, "Redirected away — skipping");
@@ -166,7 +166,7 @@ test.describe("J40: Admin Reviews Verification Request", () => {
 
     // Step 3: Click to review
     await pendingItem.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Step 4: Approve
     const approveBtn = page
@@ -175,7 +175,7 @@ test.describe("J40: Admin Reviews Verification Request", () => {
     const canApprove = await approveBtn.isVisible().catch(() => false);
     if (canApprove) {
       await approveBtn.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     // Step 5: Verify
@@ -196,12 +196,12 @@ test.describe("J41: Admin Audit Log", () => {
 
     // Step 1: Navigate to audit log
     await page.goto("/admin/audit");
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Try alternative paths
     if (!page.url().includes("/admin")) {
       await page.goto("/admin/audit-log");
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     const isAdminPage = page.url().includes("/admin");

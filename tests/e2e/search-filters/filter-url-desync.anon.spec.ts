@@ -104,7 +104,7 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Wait for page to fully settle after goBack before going forward.
     // Without this, Next.js router re-render may clear forward history.
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
     await waitForUrlStable(page);
 
     // Go forward - wait for amenities=Wifi to return
@@ -235,7 +235,7 @@ test.describe("Filter URL-UI Desync", () => {
       .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
       .first()
       .waitFor({ state: "attached", timeout: 30_000 });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Verify URL still has amenities=Wifi (committed state preserved)
     const currentUrl = new URL(page.url());

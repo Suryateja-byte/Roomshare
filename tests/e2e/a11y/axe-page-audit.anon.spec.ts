@@ -42,7 +42,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
   test.describe('P0 — Critical public pages', () => {
     test('Homepage (/) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -55,7 +55,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
 
     test('Search page (/search) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -68,7 +68,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
 
     test('Login page (/login) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/login');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -81,7 +81,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
 
     test('Signup page (/signup) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/signup');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -95,7 +95,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
     test('Listing detail (/listings/[id]) passes WCAG 2.1 AA', async ({ page }) => {
       // Navigate to search to find a listing ID
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Get the first listing link
       const firstCard = page.locator(selectors.listingCard).first();
@@ -103,7 +103,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
 
       if (listingId) {
         await page.goto(`/listings/${listingId}`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         const results = await runAxeScan(page);
         const violations = results.violations.filter(
@@ -122,7 +122,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
   test.describe('P1 — Secondary public pages', () => {
     test('Forgot password page passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/forgot-password');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -138,7 +138,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
     for (const route of ['/about', '/terms', '/privacy']) {
       test(`${route} passes WCAG 2.1 AA`, async ({ page }) => {
         await page.goto(route);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         const results = await runAxeScan(page);
         const violations = results.violations.filter(
@@ -155,7 +155,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
     for (const route of ['/', '/search', '/login', '/signup']) {
       test(`${route} has valid heading hierarchy`, async ({ page }) => {
         await page.goto(route);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         const headings = await page.evaluate(() => {
           const hs = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
@@ -191,7 +191,7 @@ test.describe('axe-core Page Audit — Anonymous Pages', () => {
     for (const route of ['/', '/search', '/login']) {
       test(`${route} has required landmarks`, async ({ page }) => {
         await page.goto(route);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         const landmarks = await page.evaluate(() => {
           return {

@@ -172,7 +172,7 @@ export async function waitForStable(
   page: Page,
   options?: { timeout?: number },
 ) {
-  await page.waitForLoadState("networkidle", { timeout: options?.timeout });
+  await page.waitForLoadState("domcontentloaded", { timeout: options?.timeout });
 }
 
 // ---------------------------------------------------------------------------

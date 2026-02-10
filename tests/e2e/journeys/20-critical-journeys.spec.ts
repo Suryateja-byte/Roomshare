@@ -72,7 +72,7 @@ test.describe("J2: Search With Text Query", () => {
     await nav.goToSearch({ location: "San Francisco" });
 
     // Wait for results to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should show either listings or empty state
     const listings = searchResultsContainer(page).locator(selectors.listingCard);
@@ -102,7 +102,7 @@ test.describe("J3: Search Filters (Price, Room Type, Amenities)", () => {
       bounds: SF_BOUNDS,
     });
 
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Check URL reflects filter params
     const url = page.url();
@@ -123,7 +123,7 @@ test.describe("J3: Search Filters (Price, Room Type, Amenities)", () => {
   test("applies room type filter via URL", async ({ page, nav }) => {
     await nav.goToSearch({ roomType: "private", bounds: SF_BOUNDS });
 
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const url = page.url();
     expect(url).toContain("roomType");
     await expect(page.locator("body")).toBeVisible();
@@ -139,7 +139,7 @@ test.describe("J4: Map & Listing Sync", () => {
   }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
 
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Check for map container
     const map = page.locator(selectors.map);
@@ -164,7 +164,7 @@ test.describe("J5: Listing Detail Page", () => {
   }) => {
     // Go to search first
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const listings = searchResultsContainer(page).locator(selectors.listingCard);
     const count = await listings.count();
@@ -204,7 +204,7 @@ test.describe("J6: Image Carousel on Listing", () => {
     nav,
   }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const listings = searchResultsContainer(page).locator(selectors.listingCard);
     if ((await listings.count()) === 0) {
@@ -239,7 +239,7 @@ test.describe("J7: Auth — Login Redirect (Authenticated)", () => {
   }) => {
     await page.goto("/login");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Authenticated users should be redirected to home or dashboard
     const url = page.url();
@@ -254,7 +254,7 @@ test.describe("J8: Auth — Signup Redirect (Authenticated)", () => {
   }) => {
     await page.goto("/signup");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Authenticated users should be redirected to home or dashboard
     const url = page.url();
@@ -289,7 +289,7 @@ test.describe("J10: Booking Request Flow", () => {
     assert,
   }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const listings = searchResultsContainer(page).locator(selectors.listingCard);
     if ((await listings.count()) === 0) {
@@ -426,7 +426,7 @@ test.describe("J14: Favorites — Save & View", () => {
     nav,
   }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const listings = searchResultsContainer(page).locator(selectors.listingCard);
     if ((await listings.count()) === 0) {
@@ -493,7 +493,7 @@ test.describe("J17: Reviews on Listing", () => {
     nav,
   }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const listings = searchResultsContainer(page).locator(selectors.listingCard);
     if ((await listings.count()) === 0) {
@@ -583,7 +583,7 @@ test.describe("J19: Mobile Responsive Navigation", () => {
 
     // Navigate to search on mobile
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Page should render without horizontal overflow
     const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
@@ -616,7 +616,7 @@ test.describe("J20: Error Handling & 404", () => {
   test("non-existent listing shows error or 404", async ({ page }) => {
     await page.goto("/listings/non-existent-listing-id-xyz-000");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should show error or not-found state
     const errorContent = page

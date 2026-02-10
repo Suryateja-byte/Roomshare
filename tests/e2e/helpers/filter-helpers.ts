@@ -144,7 +144,7 @@ export async function expectNoUrlParam(
 
 /**
  * Navigate to the search page and wait for content to attach + hydrate.
- * Waits for domcontentloaded, element attachment, then networkidle
+ * Waits for domcontentloaded, element attachment, then domcontentloaded
  * to ensure React hydration completes before tests interact with buttons.
  */
 export async function waitForSearchReady(
@@ -158,14 +158,14 @@ export async function waitForSearchReady(
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  // Wait for networkidle to ensure React hydration completes —
+  // Wait for domcontentloaded to ensure React hydration completes —
   // without this, button clicks can fire before event handlers attach
-  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
 }
 
 /**
  * Navigate to a search URL with specific filter params and wait for readiness.
- * Waits for element attachment + networkidle to ensure React hydration.
+ * Waits for element attachment + domcontentloaded to ensure React hydration.
  */
 export async function gotoSearchWithFilters(
   page: Page,
@@ -178,7 +178,7 @@ export async function gotoSearchWithFilters(
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
 }
 
 // ---------------------------------------------------------------------------

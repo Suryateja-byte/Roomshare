@@ -238,7 +238,7 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      * Wait for network idle
      */
     async waitForIdle(timeout = 30000) {
-      await page.waitForLoadState('networkidle', { timeout });
+      await page.waitForLoadState('domcontentloaded', { timeout });
     },
   };
 }

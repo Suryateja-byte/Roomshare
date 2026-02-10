@@ -18,14 +18,14 @@ test.describe('Listing Detail — Visual Regression', () => {
   /** Navigate to the first available listing */
   async function goToFirstListing(page: import('@playwright/test').Page): Promise<boolean> {
     await page.goto('/search');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const firstCard = page.locator(selectors.listingCard).first();
     const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
     if (!listingId) return false;
 
     await page.goto(`/listings/${listingId}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     return true;
   }
 

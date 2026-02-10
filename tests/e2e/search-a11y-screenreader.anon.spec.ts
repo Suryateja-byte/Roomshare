@@ -210,7 +210,7 @@ test.describe("Search A11y: ARIA Live Regions & Screen Reader", () => {
       `/search?${boundsQS}&minPrice=99999&maxPrice=100000`,
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Check aria-live region for zero results announcement
     const liveRegion = page.locator('[aria-live="polite"][aria-atomic="true"]');
@@ -253,7 +253,7 @@ test.describe("Search A11y: ARIA Live Regions & Screen Reader", () => {
       await pill.click();
 
       // Page should navigate (URL changes with filter applied)
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
 
       // After navigation, the applied filter should appear as a chip
       // or the recommendation pill should disappear
@@ -289,7 +289,7 @@ test.describe("Search A11y: ARIA Live Regions & Screen Reader", () => {
       await recommendedPill.click();
       // Wait for page navigation to complete
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
     }
 
     // Assert that an aria-live region exists on the page with result count content

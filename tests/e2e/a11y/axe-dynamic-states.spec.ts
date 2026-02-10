@@ -42,7 +42,7 @@ test.describe('axe-core — Dynamic UI States', () => {
   test.describe('Filter modal states', () => {
     test('Search filter modal open state passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Open the filter modal
       const filterButton = page.getByRole('button', { name: /filter/i })
@@ -82,7 +82,7 @@ test.describe('axe-core — Dynamic UI States', () => {
   test.describe('Login form validation states', () => {
     test('Login form with validation errors passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/login');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Submit empty form to trigger validation
       const submitBtn = page.getByRole('button', { name: /log in|sign in|submit/i });
@@ -108,7 +108,7 @@ test.describe('axe-core — Dynamic UI States', () => {
 
     test('Error messages have aria-describedby linking', async ({ page }) => {
       await page.goto('/login');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Submit empty form
       const submitBtn = page.getByRole('button', { name: /log in|sign in|submit/i });
@@ -136,7 +136,7 @@ test.describe('axe-core — Dynamic UI States', () => {
   test.describe('Signup form validation states', () => {
     test('Signup form with validation errors passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/signup');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const submitBtn = page.getByRole('button', { name: /sign up|register|create account/i });
       if (await submitBtn.isVisible()) {
@@ -161,7 +161,7 @@ test.describe('axe-core — Dynamic UI States', () => {
   test.describe('Search page loading states', () => {
     test('Search results loading state has accessible announcements', async ({ page }) => {
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Verify aria-live regions exist for dynamic content updates
       const liveRegions = page.locator('[aria-live], [role="status"], [role="alert"]');
@@ -172,7 +172,7 @@ test.describe('axe-core — Dynamic UI States', () => {
     test('Search page with no results passes WCAG 2.1 AA', async ({ page }) => {
       // Navigate to search with impossible filters
       await page.goto('/search?minPrice=99999&maxPrice=99999');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -189,7 +189,7 @@ test.describe('axe-core — Dynamic UI States', () => {
 
     test('Mobile search with bottom sheet passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -205,7 +205,7 @@ test.describe('axe-core — Dynamic UI States', () => {
     test('Homepage in dark mode passes WCAG 2.1 AA', async ({ page }) => {
       await page.emulateMedia({ colorScheme: 'dark' });
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -219,7 +219,7 @@ test.describe('axe-core — Dynamic UI States', () => {
     test('Search page in dark mode passes WCAG 2.1 AA', async ({ page }) => {
       await page.emulateMedia({ colorScheme: 'dark' });
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -235,7 +235,7 @@ test.describe('axe-core — Dynamic UI States', () => {
     test('Interactive elements remain visible in high contrast', async ({ page }) => {
       await page.emulateMedia({ forcedColors: 'active' });
       await page.goto('/search');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Buttons remain visible
       const buttons = page.locator('button:visible');
@@ -252,7 +252,7 @@ test.describe('axe-core — Dynamic UI States', () => {
     test('Animations are reduced with prefers-reduced-motion', async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Check that transition durations are reduced
       const longAnimations = await page.evaluate(() => {

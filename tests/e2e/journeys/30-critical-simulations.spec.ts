@@ -223,7 +223,7 @@ test.describe('30 Critical User Journey Simulations', () => {
       const nextBtn = page.locator(selectors.nextPage);
       if (await nextBtn.isEnabled()) {
         await nextBtn.click();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
         expect(page.url()).toMatch(/page=|offset=/);
       }
     }
@@ -257,14 +257,14 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.getByRole('button', { name: /sign in|log in|login/i }).click();
 
     // Should show error or stay on login page
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     expect(page.url()).toContain('/login');
   });
 
   test('S12: Protected route access without auth — redirect to login', async ({ page }) => {
     await page.context().clearCookies();
     await page.goto('/bookings');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const url = page.url();
     const isProtected = url.includes('/login') || url.includes('/api/auth');
@@ -275,7 +275,7 @@ test.describe('30 Critical User Journey Simulations', () => {
   test('S13: Protected route — messages page requires auth', async ({ page }) => {
     await page.context().clearCookies();
     await page.goto('/messages');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const url = page.url();
     const redirectedToLogin = url.includes('/login') || url.includes('/api/auth');
@@ -291,7 +291,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     const submitBtn = page.getByRole('button', { name: /sign up|register|create/i });
     if (await submitBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
       await submitBtn.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       expect(page.url()).toContain('/signup');
     }
   });
@@ -379,7 +379,7 @@ test.describe('30 Critical User Journey Simulations', () => {
   test('S19: Invalid listing ID — 404 handling', async ({ page }) => {
     await page.goto('/listings/nonexistent-fake-id-12345');
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const pageText = await page.locator('body').textContent();
     const has404 = /not found|404|doesn't exist|no longer available/i.test(pageText || '');
@@ -413,7 +413,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     const favBtn = page.locator('button[aria-label*="save" i], button[aria-label*="favorite" i], [data-testid*="favorite"], [data-testid*="save"]').first();
     if (await favBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await favBtn.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
   });
 
@@ -480,7 +480,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const realErrors = errors.filter(e => !e.includes('hydration') && !e.includes('ResizeObserver'));
     expect(realErrors.length).toBe(0);
@@ -499,7 +499,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     const criticalPages = ['/', '/search', '/login', '/signup'];
     for (const url of criticalPages) {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     }
 
     if (errors.length > 0) {

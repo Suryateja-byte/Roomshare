@@ -350,7 +350,7 @@ test.describe("Search API v2 Endpoint", () => {
       // Navigate to search page with v2 flag
       await page.goto("/search?searchV2=1");
 
-      // Wait for DOM to be ready (not networkidle - search page has polling)
+      // Wait for DOM to be ready (not domcontentloaded - search page has polling)
       await page.waitForLoadState("domcontentloaded");
 
       // Verify search results heading is visible

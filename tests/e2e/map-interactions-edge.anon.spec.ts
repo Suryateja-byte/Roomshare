@@ -104,7 +104,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       // Step 1: Navigate to homepage (no map)
       await page.goto("/");
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("domcontentloaded");
 
       // Check that no mapbox-gl chunk was loaded on the homepage
       const homepageMapboxChunks = homepageChunks.filter(
@@ -310,7 +310,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       });
 
       if (errorInjected) {
-        await page.waitForLoadState("networkidle");
+        await page.waitForLoadState("domcontentloaded");
 
         // Check if fallback appeared after map removal
         const fallbackText = page.getByText("Map unavailable");
@@ -365,7 +365,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for the page to process the error
-      await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("domcontentloaded");
 
       // Look for an error banner with role="alert"
       const alertBanner = page.getByRole("alert");

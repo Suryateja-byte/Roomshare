@@ -54,7 +54,7 @@ test.describe('Create Listing — Visual Regression Tests', () => {
     const clp = new CreateListingPage(page);
     await clp.goto();
     await disableAnimations(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await expect(page).toHaveScreenshot('create-listing-empty-desktop.png', {
       fullPage: true,
@@ -71,7 +71,7 @@ test.describe('Create Listing — Visual Regression Tests', () => {
     const clp = new CreateListingPage(page);
     await clp.goto();
     await disableAnimations(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await expect(page).toHaveScreenshot('create-listing-empty-mobile.png', {
       fullPage: true,
@@ -89,7 +89,7 @@ test.describe('Create Listing — Visual Regression Tests', () => {
     await clp.submit();
     await page.waitForTimeout(500);
     await disableAnimations(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await expect(page).toHaveScreenshot('create-listing-errors-desktop.png', {
       fullPage: true,
@@ -109,7 +109,7 @@ test.describe('Create Listing — Visual Regression Tests', () => {
     await clp.submit();
     await page.waitForTimeout(500);
     await disableAnimations(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await expect(page).toHaveScreenshot('create-listing-errors-mobile.png', {
       fullPage: true,
@@ -130,7 +130,7 @@ test.describe('Create Listing — Visual Regression Tests', () => {
 
     const data = validData();
     await clp.fillRequiredFields(data);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Mask the date value since it varies between runs
     const dateMask = page.locator('[data-testid="move-in-date"], input[name*="date"]');
@@ -150,7 +150,7 @@ test.describe('Create Listing — Visual Regression Tests', () => {
     await clp.uploadTestImage();
     await page.waitForTimeout(500);
     await disableAnimations(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Mask actual image content since it can render differently
     const imagePreviews = page.locator('img[src*="supabase"], img[src*="blob:"]');
@@ -179,7 +179,7 @@ test.describe('Create Listing — Visual Regression Tests', () => {
     // Tab out to trigger progress update
     await page.keyboard.press('Tab');
     await page.waitForTimeout(300);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Capture just the progress section area
     const progressArea = clp.progressSection;

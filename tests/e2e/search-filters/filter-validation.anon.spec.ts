@@ -106,7 +106,7 @@ test.describe("Filter Validation & Security", () => {
       .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
       .first()
       .waitFor({ state: "attached", timeout: 30_000 });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should render without crashing
     expect(await page.title()).toBeTruthy();
@@ -159,7 +159,7 @@ test.describe("Filter Validation & Security", () => {
       .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
       .first()
       .waitFor({ state: "attached", timeout: 30_000 });
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should not crash
     expect(await page.title()).toBeTruthy();
