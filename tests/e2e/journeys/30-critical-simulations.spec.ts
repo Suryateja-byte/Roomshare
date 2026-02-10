@@ -266,10 +266,12 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/bookings');
     await page.waitForLoadState('domcontentloaded');
 
-    const url = page.url();
-    const isProtected = url.includes('/login') || url.includes('/api/auth');
-    const hasAuthMsg = await page.locator('text=/sign in|log in|unauthorized/i').isVisible().catch(() => false);
-    expect(isProtected || hasAuthMsg).toBeTruthy();
+    // Wait for either a redirect to /login or an auth message to appear
+    // (client-side redirect may fire after domcontentloaded)
+    const loginRedirect = page.waitForURL(/\/login/, { timeout: 15_000 }).then(() => true).catch(() => false);
+    const authMsg = page.locator('text=/sign in|log in|unauthorized/i').waitFor({ state: 'visible', timeout: 15_000 }).then(() => true).catch(() => false);
+    const result = await Promise.any([loginRedirect, authMsg]).catch(() => false);
+    expect(result).toBeTruthy();
   });
 
   test('S13: Protected route — messages page requires auth', async ({ page }) => {
@@ -277,10 +279,11 @@ test.describe('30 Critical User Journey Simulations', () => {
     await page.goto('/messages');
     await page.waitForLoadState('domcontentloaded');
 
-    const url = page.url();
-    const redirectedToLogin = url.includes('/login') || url.includes('/api/auth');
-    const hasAuthMsg = await page.locator('text=/sign in|log in|unauthorized/i').isVisible().catch(() => false);
-    expect(redirectedToLogin || hasAuthMsg).toBeTruthy();
+    // Wait for either a redirect to /login or an auth message to appear
+    const loginRedirect = page.waitForURL(/\/login/, { timeout: 15_000 }).then(() => true).catch(() => false);
+    const authMsg = page.locator('text=/sign in|log in|unauthorized/i').waitFor({ state: 'visible', timeout: 15_000 }).then(() => true).catch(() => false);
+    const result = await Promise.any([loginRedirect, authMsg]).catch(() => false);
+    expect(result).toBeTruthy();
   });
 
   test('S14: Signup form validation — empty fields show errors', async ({ page }) => {

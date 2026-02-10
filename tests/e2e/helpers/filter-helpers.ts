@@ -215,6 +215,7 @@ export function clearAllButton(page: Page): Locator {
 
 /**
  * Open the filter modal: click Filters button, wait for dialog visible.
+ * Also waits for amenity buttons to render (indicates facet data loaded).
  * Returns the dialog locator.
  */
 export async function openFilterModal(page: Page): Promise<Locator> {
@@ -224,6 +225,18 @@ export async function openFilterModal(page: Page): Promise<Locator> {
 
   const dialog = filterDialog(page);
   await expect(dialog).toBeVisible({ timeout: 10_000 });
+
+  // Wait for amenity buttons to render — ensures facet data has loaded
+  // (useFacets hook completes async after dialog opens)
+  const group = amenitiesGroup(page);
+  await group
+    .getByRole("button")
+    .first()
+    .waitFor({ state: "attached", timeout: 15_000 })
+    .catch(() => {
+      // Amenities group may not be present in all filter modals
+    });
+
   return dialog;
 }
 

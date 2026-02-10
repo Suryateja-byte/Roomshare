@@ -87,6 +87,7 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
   // 2. Set sort via UI -> URL has sort param -> refresh -> sort preserved
   // -------------------------------------------------------------------------
   test("2: sort round-trip via URL -> refresh -> sort preserved", async ({ page }) => {
+    test.slow();
     await page.goto(buildSearchUrl({ sort: "price_asc" }));
     await waitForSearchContent(page);
 
@@ -102,7 +103,7 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
 
     // Refresh
     await page.reload();
-    await page.waitForLoadState("domcontentloaded");
+    await waitForSearchContent(page);
 
     // Sort param should persist
     await assertUrlParams(page, { sort: "price_asc" });

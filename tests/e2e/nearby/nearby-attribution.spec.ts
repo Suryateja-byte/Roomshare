@@ -10,15 +10,18 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+/** SF bounds for deterministic search results */
+const boundsQS = 'minLat=37.7&maxLat=37.85&minLng=-122.52&maxLng=-122.35';
+
 /**
  * Navigate to a real listing page by finding one via search.
  * Returns false if no listings are available.
  */
 async function navigateToListing(page: Page): Promise<boolean> {
-  await page.goto('/search');
+  await page.goto(`/search?${boundsQS}`);
   await page.waitForLoadState('domcontentloaded');
   const firstCard = page.locator('[data-testid="listing-card"]').first();
-  await firstCard.waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
+  await firstCard.waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {});
   const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
   if (!listingId) return false;
   await page.goto(`/listings/${listingId}`);

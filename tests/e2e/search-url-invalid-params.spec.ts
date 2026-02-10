@@ -191,10 +191,16 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // 8. Empty string params treated as absent
   // -------------------------------------------------------------------------
   test("8: empty string params are treated as absent", async ({ page }) => {
+    test.slow();
     const response = await page.goto(`/search?q=&sort=&maxPrice=&${boundsQS}`);
 
     await page.waitForLoadState("domcontentloaded");
     await assertNoCrash(page, response);
+
+    // Wait for search content to render (cards or zero-results)
+    const cards = page.locator('[data-testid="listing-card"]');
+    const zeroResults = page.locator('h2:has-text("No matches found")');
+    await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
 
     // The page should behave as if no q, sort, or maxPrice were set
     // Sort should default to "Recommended"

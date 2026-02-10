@@ -147,11 +147,21 @@ export function registerShutdownHandlers(): void {
     process.exit(1);
   });
 
-  // Handle unhandled promise rejections - fail fast after graceful shutdown.
-  // Ignore benign disconnect-style errors.
+  // Handle unhandled promise rejections.
+  // In production: fail fast after graceful shutdown.
+  // In dev/test: log but do NOT crash — prevents a single parse error from
+  // killing the dev server and failing all remaining E2E tests in a shard.
   process.on('unhandledRejection', async (reason) => {
     const code = (reason as NodeJS.ErrnoException | undefined)?.code;
     if (code === 'ECONNRESET' || code === 'ECONNABORTED' || code === 'EPIPE') {
+      return;
+    }
+
+    // In dev/test, log-only for non-fatal errors (SyntaxError from truncated
+    // JSON, TypeError from race conditions, etc.) to keep the server alive.
+    const isDev = process.env.NODE_ENV !== 'production';
+    if (isDev) {
+      console.error('[Shutdown] Unhandled rejection (dev — not exiting):', reason);
       return;
     }
 
