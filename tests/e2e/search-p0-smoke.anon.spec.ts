@@ -546,7 +546,7 @@ test.describe("Search P0 Smoke Suite", () => {
     const desktopListContainer = page.locator('[data-testid="search-results-container"]');
     // Desktop split view: the hidden md:flex container should be visible
     const desktopSplitView = page.locator(".md\\:flex").first();
-    await expect(desktopListContainer.or(desktopSplitView)).toBeAttached({ timeout: 15_000 });
+    await expect(desktopListContainer.or(desktopSplitView).first()).toBeAttached({ timeout: 15_000 });
 
     // Mobile bottom sheet should be hidden at desktop
     const mobileSheet = page.locator('[role="region"][aria-label="Search results"]');

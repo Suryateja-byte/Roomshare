@@ -23,7 +23,8 @@ test.describe('Search Interaction Performance', () => {
     // Find sort control
     const sortSelect = page.getByRole('combobox', { name: /sort/i })
       .or(page.locator('[data-testid="sort-select"]'))
-      .or(page.locator('select[name*="sort"]'));
+      .or(page.locator('select[name*="sort"]'))
+      .first();
 
     const isVisible = await sortSelect.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!isVisible, 'Sort control not found');

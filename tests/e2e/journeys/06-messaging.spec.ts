@@ -30,7 +30,8 @@ test.describe('Messaging Journeys', () => {
         await page.waitForTimeout(1000);
 
         const messageInput = page.getByPlaceholder(/message|type.*here/i)
-          .or(page.locator('textarea'));
+          .or(page.locator('textarea'))
+          .first();
 
         if (await messageInput.isVisible()) {
           await messageInput.fill('Hello, I am interested in this room. Is it still available?');
@@ -43,6 +44,7 @@ test.describe('Messaging Journeys', () => {
             page.locator(selectors.toast)
               .or(page.getByText(/sent|delivered/i))
               .or(page.locator('[data-testid="message-sent"]'))
+              .first()
           ).toBeVisible({ timeout: 10000 });
         }
       }
@@ -82,7 +84,8 @@ test.describe('Messaging Journeys', () => {
 
         // Should show message input
         const messageInput = page.getByPlaceholder(/message|type/i)
-          .or(page.locator('textarea'));
+          .or(page.locator('textarea'))
+          .first();
         await expect(messageInput).toBeVisible();
       }
     });
@@ -103,7 +106,8 @@ test.describe('Messaging Journeys', () => {
 
         // Send a message
         const messageInput = page.getByPlaceholder(/message|type/i)
-          .or(page.locator('textarea'));
+          .or(page.locator('textarea'))
+          .first();
 
         const testMessage = `Test message ${Date.now()}`;
         await messageInput.fill(testMessage);
@@ -148,7 +152,8 @@ test.describe('Messaging Journeys', () => {
 
       // Look for unread indicator on messages link/icon
       const messagesLink = page.getByRole('link', { name: /message/i }).first()
-        .or(page.locator('a[href*="/messages"]').first());
+        .or(page.locator('a[href*="/messages"]').first())
+        .first();
 
       if (await messagesLink.isVisible()) {
         // Check for badge
@@ -211,6 +216,7 @@ test.describe('Messaging Journeys', () => {
             await expect(
               page.getByText(/blocked/i)
                 .or(page.locator(selectors.toast))
+                .first()
             ).toBeVisible({ timeout: 5000 });
           }
         }

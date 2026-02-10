@@ -200,7 +200,7 @@ test.describe('Create Listing — Accessibility Tests', () => {
     // After validation failure, focus should move to the first error field
     // or the error banner should be visible for screen readers
     const firstErrorField = clp.titleInput;
-    const errorBannerOrField = clp.errorBanner.or(firstErrorField);
+    const errorBannerOrField = clp.errorBanner.or(firstErrorField).first();
     await expect(errorBannerOrField).toBeVisible({ timeout: 5000 });
   });
 

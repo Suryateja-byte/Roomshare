@@ -30,7 +30,8 @@ test.describe('Filter Modal — Visual Regression', () => {
     await disableAnimations(page);
 
     const filterButton = page.getByRole('button', { name: /filter/i })
-      .or(page.locator('[data-testid="filter-button"]'));
+      .or(page.locator('[data-testid="filter-button"]'))
+      .first();
 
     const isVisible = await filterButton.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!isVisible, 'Filter button not found');
@@ -49,7 +50,8 @@ test.describe('Filter Modal — Visual Regression', () => {
     await disableAnimations(page);
 
     const filterButton = page.getByRole('button', { name: /filter/i })
-      .or(page.locator('[data-testid="filter-button"]'));
+      .or(page.locator('[data-testid="filter-button"]'))
+      .first();
 
     const isVisible = await filterButton.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!isVisible, 'Filter button not found');
@@ -82,7 +84,8 @@ test.describe('Filter Modal — Visual Regression', () => {
     await disableAnimations(page);
 
     const filterButton = page.getByRole('button', { name: /filter/i })
-      .or(page.locator('[data-testid="filter-button"]'));
+      .or(page.locator('[data-testid="filter-button"]'))
+      .first();
 
     const isVisible = await filterButton.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!isVisible, 'Filter button not found on mobile');

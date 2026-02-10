@@ -137,7 +137,8 @@ test.describe('Nearby Places Feature', () => {
           // Should show error or auth prompt
           const errorOrAuth = page
             .locator(nearbySelectors.errorMessage)
-            .or(page.locator(nearbySelectors.loginPrompt));
+            .or(page.locator(nearbySelectors.loginPrompt))
+            .first();
           await expect(errorOrAuth).toBeVisible({ timeout: timeouts.action });
         }
       }
@@ -520,7 +521,7 @@ test.describe('Nearby Places Feature', () => {
         // Wait for empty state to render
         const emptyState = page.locator(nearbySelectors.emptyState);
         const noResults = page.locator('text=/no places|no results|nothing found/i');
-        await expect(emptyState.or(noResults)).toBeVisible({ timeout: timeouts.action });
+        await expect(emptyState.or(noResults).first()).toBeVisible({ timeout: timeouts.action });
       }
     });
 
@@ -547,7 +548,7 @@ test.describe('Nearby Places Feature', () => {
         // Wait for error to render
         const errorMessage = page.locator(nearbySelectors.errorMessage);
         const errorText = page.locator('text=/error|failed|something went wrong/i');
-        await expect(errorMessage.or(errorText)).toBeVisible({ timeout: timeouts.action });
+        await expect(errorMessage.or(errorText).first()).toBeVisible({ timeout: timeouts.action });
       }
     });
   });

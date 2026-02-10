@@ -48,7 +48,8 @@ test.describe('axe-core — Dynamic UI States', () => {
 
       // Open the filter modal
       const filterButton = page.getByRole('button', { name: /filter/i })
-        .or(page.locator('[data-testid="filter-button"]'));
+        .or(page.locator('[data-testid="filter-button"]'))
+        .first();
 
       if (await filterButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         await filterButton.click();
