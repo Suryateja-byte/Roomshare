@@ -148,32 +148,55 @@ async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
 }
 
 /**
+ * Fire-and-forget marker click (no effect verification).
+ * Used for intermediate clicks in rapid-click tests where verifying each
+ * click would take 15s and the marker DOM may change between clicks.
+ */
+async function clickMarkerFast(page: Page, listingId: string): Promise<void> {
+  await page.evaluate((id) => {
+    const inner = document.querySelector(
+      `.mapboxgl-marker [data-listing-id="${id}"]`,
+    ) as HTMLElement | null;
+    if (!inner?.isConnected) return;
+    const wrapper = inner.closest('.mapboxgl-marker') as HTMLElement;
+    if (wrapper) wrapper.click();
+    inner.focus();
+    inner.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
+    }));
+  }, listingId);
+}
+
+/**
  * Hover a map marker by listing ID using page.evaluate + PointerEvent dispatch,
  * then verify the hover triggered setHovered(listingId) → marker scales up.
  *
- * Dispatches 'pointerover' (which bubbles) because React 18 registers native
- * listeners for onPointerEnter using pointerover/pointerout events.
- * Sets relatedTarget to the parent element so React's enter/leave diffing
- * correctly identifies this as a "pointer entered" event.
+ * Dispatches 'pointerover' on the .mapboxgl-marker WRAPPER element (where
+ * react-map-gl attaches onPointerEnter). React 18 uses pointerover/pointerout
+ * for enter/leave delegation. Setting relatedTarget to document.body (outside
+ * the marker tree) ensures React's enter/leave diffing correctly identifies
+ * this as a "pointer entered from outside" event — if relatedTarget were inside
+ * the marker tree, React would suppress the enter.
  * Sets pointerType='mouse' to pass the touch guard in Map.tsx:1815.
- *
- * The verification step checks the marker's isScaled state. If the PointerEvent
- * dispatched before React's fiber tree was ready, the handler doesn't fire.
- * The retry re-dispatches and re-verifies until the effect is observed.
  */
 async function hoverMarkerByListingId(page: Page, listingId: string): Promise<void> {
   await expect(async () => {
     const hovered = await page.evaluate((id) => {
-      const el = document.querySelector(
+      const inner = document.querySelector(
         `.mapboxgl-marker [data-listing-id="${id}"]`,
       ) as HTMLElement | null;
-      if (!el?.isConnected) return false;
-      const rect = el.getBoundingClientRect();
-      el.dispatchEvent(new PointerEvent('pointerover', {
+      if (!inner?.isConnected) return false;
+      // Target the wrapper where onPointerEnter is attached
+      const wrapper = inner.closest('.mapboxgl-marker') as HTMLElement;
+      if (!wrapper) return false;
+      const rect = wrapper.getBoundingClientRect();
+      wrapper.dispatchEvent(new PointerEvent('pointerover', {
         bubbles: true,
         cancelable: true,
         pointerType: 'mouse',
-        relatedTarget: el.parentElement,
+        // relatedTarget MUST be outside the marker tree for React to treat
+        // this as an "enter" event (not just moving between children)
+        relatedTarget: document.body,
         clientX: rect.left + rect.width / 2,
         clientY: rect.top + rect.height / 2,
       }));
@@ -205,16 +228,18 @@ async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
  */
 async function hoverMarkerFast(page: Page, listingId: string): Promise<void> {
   await page.evaluate((id) => {
-    const el = document.querySelector(
+    const inner = document.querySelector(
       `.mapboxgl-marker [data-listing-id="${id}"]`,
     ) as HTMLElement | null;
-    if (!el?.isConnected) return;
-    const rect = el.getBoundingClientRect();
-    el.dispatchEvent(new PointerEvent('pointerover', {
+    if (!inner?.isConnected) return;
+    const wrapper = inner.closest('.mapboxgl-marker') as HTMLElement;
+    if (!wrapper) return;
+    const rect = wrapper.getBoundingClientRect();
+    wrapper.dispatchEvent(new PointerEvent('pointerover', {
       bubbles: true,
       cancelable: true,
       pointerType: 'mouse',
-      relatedTarget: el.parentElement,
+      relatedTarget: document.body,
       clientX: rect.left + rect.width / 2,
       clientY: rect.top + rect.height / 2,
     }));
@@ -946,9 +971,11 @@ test.describe("Map-List Synchronization", () => {
       const id2 = await getMarkerListingId(page, 2);
       if (!id0 || !id1 || !id2) test.skip(true, "Could not read marker IDs");
 
-      // Rapidly click three markers in quick succession (overlay-proof via element.click())
-      await clickMarkerByListingId(page, id0!);
-      await clickMarkerByListingId(page, id1!);
+      // Rapidly click three markers: fire-and-forget for first two (no verification
+      // delay), verify only the last click's effect. Using clickMarkerFast avoids the
+      // 15s verify timeout per click and prevents marker DOM churn between clicks.
+      await clickMarkerFast(page, id0!);
+      await clickMarkerFast(page, id1!);
       await clickMarkerByListingId(page, id2!);
 
       // Wait for the last clicked card to become active
