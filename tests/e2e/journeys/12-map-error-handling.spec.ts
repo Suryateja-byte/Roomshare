@@ -42,12 +42,14 @@ test.describe("Map Error Handling", () => {
     }
   });
 
-  // Helper to wait for map panel and error state
-  async function waitForMapError(
+  // Helper to wait for map panel and a banner (error or info)
+  async function waitForMapBanner(
     page: import("@playwright/test").Page,
-    errorPattern: RegExp,
-    timeout = timeouts.action,
+    textPattern: RegExp,
+    options: { timeout?: number; role?: "alert" | "status" } = {},
   ) {
+    const { timeout = timeouts.action, role = "alert" } = options;
+
     // Wait for DOM to be ready (don't use domcontentloaded - Next.js HMR keeps connections open)
     await page.waitForLoadState("domcontentloaded");
 
@@ -72,43 +74,49 @@ test.describe("Map Error Handling", () => {
       // Loading text was never visible or already gone - that's fine
     }
 
-    // Now look for the error banner in the map container
-    // Use getByRole('alert') with filter to distinguish from Next.js route announcer
+    // Now look for the banner in the map container
+    // Use getByRole with filter to distinguish from Next.js route announcer
     // (which also has role="alert" but is empty)
-    const alertBanner = page.getByRole("alert").filter({ hasText: errorPattern });
-    await expect(alertBanner).toBeVisible({ timeout });
+    const banner = page.getByRole(role).filter({ hasText: textPattern });
+    await expect(banner).toBeVisible({ timeout });
   }
 
   test.describe("Viewport validation", () => {
-    test(`${tags.anon} - Shows error when viewport too large`, async ({
+    test(`${tags.anon} - Shows info banner when viewport is clamped`, async ({
       page,
     }) => {
       // Navigate to search with very wide bounds (beyond 5 degree limit)
       // lat span = 45 - 30 = 15 degrees (exceeds MAX_LAT_SPAN of 5)
       // lng span = -120 - (-130) = 10 degrees (exceeds MAX_LNG_SPAN of 5)
+      // PersistentMapWrapper clamps to max span and shows an info banner
       await page.goto("/search?minLng=-130&maxLng=-120&minLat=30&maxLat=45");
 
-      // The exact error message is "Zoom in further to see listings"
-      await waitForMapError(page, /Zoom in further to see listings/i);
+      // The component clamps the viewport and shows "Zoomed in to show results"
+      // as a role="status" info banner (not an error alert)
+      await waitForMapBanner(page, /Zoomed in to show results/i, {
+        role: "status",
+      });
     });
 
-    test(`${tags.anon} - Clears error when viewport becomes valid`, async ({
+    test(`${tags.anon} - Clears info banner when viewport becomes valid`, async ({
       page,
     }) => {
-      // Start with invalid (too large) viewport
+      // Start with too-large viewport (clamped by PersistentMapWrapper)
       await page.goto("/search?minLng=-130&maxLng=-120&minLat=30&maxLat=45");
 
-      // Should show error initially
-      await waitForMapError(page, /Zoom in further to see listings/i);
+      // Should show info banner initially
+      await waitForMapBanner(page, /Zoomed in to show results/i, {
+        role: "status",
+      });
 
       // Navigate to valid viewport (within 2 degree limits)
       await page.goto(
         "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
       );
 
-      // Check that error message is no longer visible
-      const errorLocator = page.getByText(/Zoom in further to see listings/i);
-      await expect(errorLocator).not.toBeVisible({ timeout: timeouts.action });
+      // Check that info message is no longer visible
+      const infoBanner = page.getByText(/Zoomed in to show results/i);
+      await expect(infoBanner).not.toBeVisible({ timeout: timeouts.action });
     });
   });
 

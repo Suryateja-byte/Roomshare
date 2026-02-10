@@ -71,7 +71,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
 
       // Should have heading
       await expect(
-        page.getByRole("heading", { name: /saved|favorites/i }),
+        page.getByRole("heading", { name: /saved|favorites/i }).first(),
       ).toBeVisible();
 
       // Should show listings or empty state
@@ -152,7 +152,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
         // Save
         const confirmButton = page.getByRole("button", {
           name: /save|confirm/i,
-        });
+        }).first();
         await confirmButton.click();
 
         // Should show success

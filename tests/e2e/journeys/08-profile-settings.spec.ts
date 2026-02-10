@@ -85,7 +85,7 @@ test.describe('Profile & Settings Journeys', () => {
         }
 
         // Save changes
-        await page.getByRole('button', { name: /save|update/i }).click();
+        await page.getByRole('button', { name: /save|update/i }).first().click();
 
         // Verify success
         await expect(
@@ -179,7 +179,8 @@ test.describe('Profile & Settings Journeys', () => {
 
       // Find privacy section
       const privacySection = page.getByRole('heading', { name: /privacy/i })
-        .or(page.locator('[data-testid="privacy-settings"]'));
+        .or(page.locator('[data-testid="privacy-settings"]'))
+        .first();
 
       if (await privacySection.isVisible()) {
         const visibilityToggle = page.getByLabel(/public.*profile|profile.*visibility/i);
@@ -278,7 +279,8 @@ test.describe('Profile & Settings Journeys', () => {
 
       // Find account management or danger zone
       const dangerSection = page.getByRole('heading', { name: /danger|account.*management/i })
-        .or(page.locator('[data-testid="danger-zone"]'));
+        .or(page.locator('[data-testid="danger-zone"]'))
+        .first();
 
       if (await dangerSection.isVisible()) {
         const deactivateButton = page.getByRole('button', { name: /deactivate|disable/i });

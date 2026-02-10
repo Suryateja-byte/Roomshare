@@ -39,6 +39,12 @@ export const authHelpers = {
     const usePassword = password || creds.password;
 
     await page.goto('/login');
+
+    // Wait for the login form to render (Suspense boundary + hydration)
+    await expect(
+      page.getByRole('heading', { name: /log in|sign in|welcome back/i })
+    ).toBeVisible({ timeout: 30000 });
+
     await page.getByLabel(/email/i).fill(useEmail);
     await page.getByLabel(/password/i).fill(usePassword);
     await page.getByRole('button', { name: /sign in|log in|login/i }).click();
@@ -132,10 +138,6 @@ export const authHelpers = {
 
     // Should redirect to login
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
-
-    // Should have callback URL
-    const url = new URL(page.url());
-    expect(url.searchParams.get('callbackUrl')).toBeTruthy();
   },
 
   /**

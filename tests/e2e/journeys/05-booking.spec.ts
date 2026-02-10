@@ -47,6 +47,7 @@ test.describe('Booking Journeys', () => {
         await expect(
           page.locator(selectors.toast)
             .or(page.getByText(/sent|submitted|pending/i))
+            .first()
         ).toBeVisible({ timeout: 10000 });
       } else if (await contactButton.isVisible()) {
         await contactButton.click();
@@ -121,6 +122,7 @@ test.describe('Booking Journeys', () => {
         await expect(
           page.locator(selectors.toast)
             .or(page.getByText(/accepted|approved/i))
+            .first()
         ).toBeVisible({ timeout: 10000 });
       }
     });
@@ -147,6 +149,7 @@ test.describe('Booking Journeys', () => {
         await expect(
           page.locator(selectors.toast)
             .or(page.getByText(/rejected|declined/i))
+            .first()
         ).toBeVisible({ timeout: 10000 });
       }
     });
@@ -173,6 +176,7 @@ test.describe('Booking Journeys', () => {
         await expect(
           page.locator(selectors.toast)
             .or(page.getByText(/cancelled/i))
+            .first()
         ).toBeVisible({ timeout: 10000 });
       }
     });
@@ -217,6 +221,7 @@ test.describe('Booking Journeys', () => {
           await expect(
             page.getByText(/past|future|invalid.*date/i)
               .or(page.locator('[aria-invalid="true"]'))
+              .first()
           ).toBeVisible({ timeout: 5000 });
         }
       }

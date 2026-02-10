@@ -401,6 +401,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                 aria-modal={isMobileMenuOpen}
                 aria-label="Navigation menu"
                 aria-hidden={!isMobileMenuOpen}
+                inert={!isMobileMenuOpen || undefined}
             >
                 <div className="overflow-hidden">
                     <div className="px-6 py-4 space-y-4">

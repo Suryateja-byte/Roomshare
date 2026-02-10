@@ -110,7 +110,8 @@ test.describe('Verification Journeys', () => {
       // Look for verified badge
       const verifiedBadge = page.locator('[data-testid="verified-badge"]')
         .or(page.locator('[aria-label*="verified"]'))
-        .or(page.getByText(/verified/i).first());
+        .or(page.getByText(/verified/i))
+        .first();
 
       // May or may not have verified badge
       await page.waitForLoadState('domcontentloaded');
@@ -121,7 +122,8 @@ test.describe('Verification Journeys', () => {
 
       // Look for verified indicators on listing cards
       const verifiedIndicator = page.locator('[data-testid="verified-host"]')
-        .or(page.locator('[class*="verified"]'));
+        .or(page.locator('[class*="verified"]'))
+        .first();
 
       // May or may not have verified hosts
       await page.waitForLoadState('domcontentloaded');

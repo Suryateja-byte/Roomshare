@@ -416,9 +416,14 @@ test.describe('Edge Case Journeys', () => {
 
     test(`${tags.auth} - SQL injection prevention`, async ({ page }) => {
       await page.goto('/login');
+      // Login form is wrapped in Suspense — wait for hydration to complete
+      // so the email input is rendered and interactive
+      await page.waitForLoadState('domcontentloaded');
+      const emailInput = page.getByLabel(/email/i);
+      await emailInput.waitFor({ state: 'visible', timeout: timeouts.navigation });
 
       // Try SQL injection in email field
-      await page.getByLabel(/email/i).fill("' OR '1'='1");
+      await emailInput.fill("' OR '1'='1");
       await page.getByLabel(/password/i).fill("' OR '1'='1");
 
       await page.getByRole('button', { name: /log in/i }).click();

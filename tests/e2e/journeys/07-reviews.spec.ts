@@ -26,7 +26,8 @@ test.describe("Reviews Journeys", () => {
       // Look for reviews section
       const reviewsSection = page
         .locator('[data-testid="reviews-section"], [id="reviews"]')
-        .or(page.getByRole("heading", { name: /review/i }));
+        .or(page.getByRole("heading", { name: /review/i }))
+        .first();
 
       // Reviews may or may not exist
       await page.waitForLoadState("domcontentloaded");
