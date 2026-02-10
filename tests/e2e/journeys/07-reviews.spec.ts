@@ -46,7 +46,7 @@ test.describe("Reviews Journeys", () => {
         const rating = firstReview.locator(
           '[data-testid="rating"], [class*="star"], [aria-label*="rating"]',
         );
-        await expect(rating.or(firstReview.locator("svg"))).toBeVisible();
+        await expect(rating.or(firstReview.locator("svg")).first()).toBeVisible();
       }
     });
 
@@ -100,7 +100,8 @@ test.describe("Reviews Journeys", () => {
         const ratingInput = page
           .locator('[data-testid="rating-input"]')
           .or(page.locator('input[name="rating"]'))
-          .or(page.locator('[class*="star"]').first());
+          .or(page.locator('[class*="star"]').first())
+          .first();
 
         if (await ratingInput.isVisible()) {
           await ratingInput.click();
@@ -109,7 +110,8 @@ test.describe("Reviews Journeys", () => {
         // Fill review text
         const reviewText = page
           .getByLabel(/review|comment/i)
-          .or(page.locator("textarea"));
+          .or(page.locator("textarea"))
+          .first();
 
         if (await reviewText.isVisible()) {
           await reviewText.fill(
@@ -126,7 +128,8 @@ test.describe("Reviews Journeys", () => {
           await expect(
             page
               .locator(selectors.toast)
-              .or(page.getByText(/submitted|posted|thank you/i)),
+              .or(page.getByText(/submitted|posted|thank you/i))
+              .first(),
           ).toBeVisible({ timeout: 10000 });
         }
       }
@@ -184,7 +187,7 @@ test.describe("Reviews Journeys", () => {
 
         // Verify success
         await expect(
-          page.locator(selectors.toast).or(page.getByText(/updated|saved/i)),
+          page.locator(selectors.toast).or(page.getByText(/updated|saved/i)).first(),
         ).toBeVisible({ timeout: 10000 });
       }
     });
@@ -217,7 +220,8 @@ test.describe("Reviews Journeys", () => {
           await expect(
             page
               .locator(selectors.toast)
-              .or(page.getByText(/deleted|removed/i)),
+              .or(page.getByText(/deleted|removed/i))
+              .first(),
           ).toBeVisible({ timeout: 10000 });
         }
       }
@@ -248,7 +252,7 @@ test.describe("Reviews Journeys", () => {
         await submitButton.click();
 
         await expect(
-          page.locator(selectors.toast).or(page.getByText(/posted|submitted/i)),
+          page.locator(selectors.toast).or(page.getByText(/posted|submitted/i)).first(),
         ).toBeVisible({ timeout: 10000 });
       }
     });
@@ -286,7 +290,8 @@ test.describe("Reviews Journeys", () => {
       // Find rating filter
       const ratingFilter = page
         .getByRole("combobox", { name: /rating|filter/i })
-        .or(page.locator('[data-testid="rating-filter"]'));
+        .or(page.locator('[data-testid="rating-filter"]'))
+        .first();
 
       if (await ratingFilter.isVisible()) {
         // @ts-expect-error - Playwright accepts RegExp for label matching at runtime
@@ -303,7 +308,8 @@ test.describe("Reviews Journeys", () => {
 
       const sortSelect = page
         .getByRole("combobox", { name: /sort/i })
-        .or(page.locator('[data-testid="review-sort"]'));
+        .or(page.locator('[data-testid="review-sort"]'))
+        .first();
 
       if (await sortSelect.isVisible()) {
         // @ts-expect-error - Playwright accepts RegExp for label matching at runtime
@@ -367,7 +373,8 @@ test.describe("Reviews Journeys", () => {
         await expect(
           page
             .getByText(/booking|complete|stay/i)
-            .or(page.locator(selectors.toast)),
+            .or(page.locator(selectors.toast))
+            .first(),
         ).toBeVisible({ timeout: 5000 });
       }
     });

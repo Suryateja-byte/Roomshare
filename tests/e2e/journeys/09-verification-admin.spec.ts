@@ -23,6 +23,7 @@ test.describe('Verification Journeys', () => {
       await expect(
         page.getByRole('heading', { name: /verify|verification/i })
           .or(page.getByText(/verify.*identity/i))
+          .first()
       ).toBeVisible({ timeout: 10000 });
 
       // Check for verification status or start button
@@ -33,6 +34,7 @@ test.describe('Verification Journeys', () => {
       // User may be in any verification state
       await expect(
         startButton.or(pendingStatus).or(verifiedStatus)
+          .first()
       ).toBeVisible({ timeout: 10000 });
     });
 
@@ -69,7 +71,8 @@ test.describe('Verification Journeys', () => {
 
       // Should show current status
       const statusIndicator = page.locator('[data-testid="verification-status"]')
-        .or(page.getByText(/pending|approved|rejected|not verified/i));
+        .or(page.getByText(/pending|approved|rejected|not verified/i))
+        .first();
 
       await expect(statusIndicator).toBeVisible({ timeout: 10000 });
     });
@@ -92,6 +95,7 @@ test.describe('Verification Journeys', () => {
           await expect(
             page.locator(selectors.toast)
               .or(page.getByText(/cancelled/i))
+              .first()
           ).toBeVisible({ timeout: 10000 });
         }
       }
@@ -141,6 +145,7 @@ test.describe('Admin Journeys', () => {
 
       await expect(
         adminPanel.or(accessDenied).or(loginRedirect)
+          .first()
       ).toBeVisible({ timeout: 10000 });
     });
 
@@ -149,7 +154,8 @@ test.describe('Admin Journeys', () => {
 
       // If admin access granted, verify dashboard components
       const statsSection = page.locator('[data-testid="admin-stats"]')
-        .or(page.getByText(/total.*users|total.*listings/i));
+        .or(page.getByText(/total.*users|total.*listings/i))
+        .first();
 
       if (await statsSection.isVisible().catch(() => false)) {
         await expect(statsSection).toBeVisible();
@@ -166,7 +172,7 @@ test.describe('Admin Journeys', () => {
         .or(page.locator('[data-testid="users-list"]'));
       const accessDenied = page.getByText(/denied|unauthorized/i);
 
-      await expect(usersTable.or(accessDenied)).toBeVisible({ timeout: 10000 });
+      await expect(usersTable.or(accessDenied).first()).toBeVisible({ timeout: 10000 });
     });
 
     test(`${tags.auth} - Suspend user action`, async ({ page }) => {
@@ -197,7 +203,7 @@ test.describe('Admin Journeys', () => {
         .or(page.getByRole('heading', { name: /report/i }));
       const accessDenied = page.getByText(/denied|unauthorized/i);
 
-      await expect(reportsSection.or(accessDenied)).toBeVisible({ timeout: 10000 });
+      await expect(reportsSection.or(accessDenied).first()).toBeVisible({ timeout: 10000 });
     });
 
     test(`${tags.auth} - Review flagged listing`, async ({ page }) => {
@@ -213,7 +219,7 @@ test.describe('Admin Journeys', () => {
         const approveButton = page.getByRole('button', { name: /approve/i });
         const rejectButton = page.getByRole('button', { name: /reject|remove/i });
 
-        await expect(approveButton.or(rejectButton)).toBeVisible({ timeout: 5000 });
+        await expect(approveButton.or(rejectButton).first()).toBeVisible({ timeout: 5000 });
       }
     });
   });
@@ -227,7 +233,7 @@ test.describe('Admin Journeys', () => {
         .or(page.getByRole('heading', { name: /verification/i }));
       const accessDenied = page.getByText(/denied|unauthorized/i);
 
-      await expect(pendingList.or(accessDenied)).toBeVisible({ timeout: 10000 });
+      await expect(pendingList.or(accessDenied).first()).toBeVisible({ timeout: 10000 });
     });
 
     test(`${tags.auth} - Approve verification request`, async ({ page }) => {
@@ -242,6 +248,7 @@ test.describe('Admin Journeys', () => {
         await expect(
           page.locator(selectors.modal)
             .or(page.locator(selectors.toast))
+            .first()
         ).toBeVisible({ timeout: 5000 });
       }
     });
@@ -255,7 +262,7 @@ test.describe('Admin Journeys', () => {
         await rejectButton.click();
 
         // Should show reason input
-        const reasonInput = page.getByLabel(/reason/i).or(page.locator('textarea'));
+        const reasonInput = page.getByLabel(/reason/i).or(page.locator('textarea')).first();
 
         if (await reasonInput.isVisible()) {
           await reasonInput.fill('Document quality too low for verification.');
@@ -279,14 +286,15 @@ test.describe('Admin Journeys', () => {
         .or(page.getByRole('heading', { name: /audit/i }));
       const accessDenied = page.getByText(/denied|unauthorized/i);
 
-      await expect(auditLog.or(accessDenied)).toBeVisible({ timeout: 10000 });
+      await expect(auditLog.or(accessDenied).first()).toBeVisible({ timeout: 10000 });
     });
 
     test(`${tags.auth} - Filter audit logs`, async ({ page }) => {
       await page.goto('/admin/audit');
 
       const filterSelect = page.getByLabel(/filter|action/i)
-        .or(page.locator('[data-testid="audit-filter"]'));
+        .or(page.locator('[data-testid="audit-filter"]'))
+        .first();
 
       if (await filterSelect.isVisible()) {
         await filterSelect.selectOption({ index: 1 });
@@ -313,7 +321,8 @@ test.describe('Admin Journeys', () => {
         }
 
         const detailsInput = page.getByLabel(/details|description/i)
-          .or(page.locator('textarea'));
+          .or(page.locator('textarea'))
+          .first();
         if (await detailsInput.isVisible()) {
           await detailsInput.fill('This listing appears to violate community guidelines.');
         }
@@ -326,6 +335,7 @@ test.describe('Admin Journeys', () => {
           await expect(
             page.locator(selectors.toast)
               .or(page.getByText(/submitted|received/i))
+              .first()
           ).toBeVisible({ timeout: 10000 });
         }
       }

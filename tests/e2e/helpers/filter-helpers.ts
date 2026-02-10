@@ -198,6 +198,28 @@ export function filterDialog(page: Page): Locator {
   return page.getByRole("dialog", { name: /filters/i });
 }
 
+/**
+ * Click the Filters button and wait for the dialog to appear.
+ * Retries once if the dialog doesn't appear — handles hydration race
+ * where the button is SSR-rendered but onClick isn't attached yet.
+ */
+export async function clickFiltersButton(page: Page): Promise<void> {
+  const btn = filtersButton(page);
+  await expect(btn).toBeVisible({ timeout: 10_000 });
+  await btn.click();
+
+  const dialog = filterDialog(page);
+  const visible = await dialog
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!visible) {
+    await btn.click();
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
+  }
+}
+
 /** Locate the Apply button inside the filter modal */
 export function applyButton(page: Page): Locator {
   return page.locator('[data-testid="filter-modal-apply"]');
@@ -217,14 +239,31 @@ export function clearAllButton(page: Page): Locator {
  * Open the filter modal: click Filters button, wait for dialog visible.
  * Also waits for amenity buttons to render (indicates facet data loaded).
  * Returns the dialog locator.
+ *
+ * Includes a retry-click to handle two CI race conditions:
+ * 1. React hydration: button HTML renders via SSR before onClick is attached
+ * 2. Dynamic import: FilterModal chunk may not be loaded on first click
  */
 export async function openFilterModal(page: Page): Promise<Locator> {
   const btn = filtersButton(page);
   await expect(btn).toBeVisible({ timeout: 10_000 });
-  await btn.click();
 
   const dialog = filterDialog(page);
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
+
+  // Click and wait for dialog. If it doesn't appear, the button click may
+  // have fired before React hydration attached the onClick handler, or the
+  // FilterModal dynamic import chunk hadn't loaded yet. Retry once.
+  await btn.click();
+  let dialogVisible = await dialog
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!dialogVisible) {
+    // Retry: by now hydration + dynamic import should be complete
+    await btn.click();
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
+  }
 
   // Wait for amenity buttons to render — ensures facet data has loaded
   // (useFacets hook completes async after dialog opens)

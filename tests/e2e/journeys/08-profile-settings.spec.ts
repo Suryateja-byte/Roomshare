@@ -51,7 +51,7 @@ test.describe('Profile & Settings Journeys', () => {
       const publicProfile = page.getByRole('heading');
       const notFound = page.getByText(/not found|404/i);
 
-      await expect(publicProfile.or(notFound)).toBeVisible({ timeout: 10000 });
+      await expect(publicProfile.or(notFound).first()).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -61,7 +61,8 @@ test.describe('Profile & Settings Journeys', () => {
 
       // Find edit button
       const editButton = page.getByRole('button', { name: /edit.*profile/i })
-        .or(page.getByRole('link', { name: /edit.*profile/i }));
+        .or(page.getByRole('link', { name: /edit.*profile/i }))
+        .first();
 
       if (await editButton.isVisible()) {
         await editButton.click();
@@ -90,6 +91,7 @@ test.describe('Profile & Settings Journeys', () => {
         await expect(
           page.locator(selectors.toast)
             .or(page.getByText(/saved|updated/i))
+            .first()
         ).toBeVisible({ timeout: 10000 });
       }
     });
@@ -98,7 +100,8 @@ test.describe('Profile & Settings Journeys', () => {
       await nav.goToProfile();
 
       const editButton = page.getByRole('button', { name: /edit.*profile/i })
-        .or(page.getByRole('link', { name: /edit/i }));
+        .or(page.getByRole('link', { name: /edit/i }))
+        .first();
 
       if (await editButton.isVisible()) {
         await editButton.click();
@@ -120,13 +123,15 @@ test.describe('Profile & Settings Journeys', () => {
 
       // Find notification settings section
       const notificationSection = page.getByRole('heading', { name: /notification/i }).first()
-        .or(page.locator('[data-testid="notification-settings"]'));
+        .or(page.locator('[data-testid="notification-settings"]'))
+        .first();
 
       await expect(notificationSection).toBeVisible({ timeout: 10000 });
 
       // Find email notification toggle
       const emailToggle = page.getByLabel(/email.*notification/i)
-        .or(page.locator('input[type="checkbox"]').first());
+        .or(page.locator('input[type="checkbox"]').first())
+        .first();
 
       if (await emailToggle.isVisible()) {
         const initialState = await emailToggle.isChecked();
@@ -157,7 +162,8 @@ test.describe('Profile & Settings Journeys', () => {
 
       for (const type of notificationTypes) {
         const toggle = page.getByLabel(new RegExp(type, 'i'))
-          .or(page.locator(`[data-testid="${type}-notifications"]`));
+          .or(page.locator(`[data-testid="${type}-notifications"]`))
+          .first();
 
         if (await toggle.isVisible().catch(() => false)) {
           // Notification type exists
@@ -193,7 +199,8 @@ test.describe('Profile & Settings Journeys', () => {
 
       // Find password change section
       const passwordSection = page.getByRole('heading', { name: /password|security/i })
-        .or(page.getByRole('button', { name: /change.*password/i }));
+        .or(page.getByRole('button', { name: /change.*password/i }))
+        .first();
 
       if (await passwordSection.isVisible()) {
         await passwordSection.click();
@@ -220,6 +227,7 @@ test.describe('Profile & Settings Journeys', () => {
           await expect(
             page.locator(selectors.toast)
               .or(page.getByText(/changed|updated|error/i))
+              .first()
           ).toBeVisible({ timeout: 10000 });
         }
       }
@@ -243,7 +251,7 @@ test.describe('Profile & Settings Journeys', () => {
           const strengthMeter = page.locator('[data-testid="password-strength"]');
           const error = page.getByText(/weak|strong|requirement/i);
 
-          await expect(strengthMeter.or(error)).toBeVisible({ timeout: 5000 });
+          await expect(strengthMeter.or(error).first()).toBeVisible({ timeout: 5000 });
         }
       }
     });
@@ -323,7 +331,8 @@ test.describe('Profile & Settings Journeys', () => {
       // Find theme toggle
       const themeToggle = page.getByRole('button', { name: /dark.*mode|theme/i })
         .or(page.getByLabel(/dark.*mode|theme/i))
-        .or(page.locator('[data-testid="theme-toggle"]'));
+        .or(page.locator('[data-testid="theme-toggle"]'))
+        .first();
 
       if (await themeToggle.isVisible()) {
         // Get initial theme
@@ -345,7 +354,8 @@ test.describe('Profile & Settings Journeys', () => {
 
       // Find language selector
       const languageSelect = page.getByLabel(/language/i)
-        .or(page.locator('[data-testid="language-select"]'));
+        .or(page.locator('[data-testid="language-select"]'))
+        .first();
 
       if (await languageSelect.isVisible()) {
         // Should have language options

@@ -130,7 +130,8 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       // Find save search button
       const saveSearchButton = page
         .getByRole("button", { name: /save.*search/i })
-        .or(page.locator('[data-testid="save-search"]'));
+        .or(page.locator('[data-testid="save-search"]'))
+        .first();
 
       if (await saveSearchButton.isVisible()) {
         await saveSearchButton.click();
@@ -156,7 +157,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
 
         // Should show success
         await expect(
-          page.locator(selectors.toast).or(page.getByText(/saved|created/i)),
+          page.locator(selectors.toast).or(page.getByText(/saved|created/i)).first(),
         ).toBeVisible({ timeout: 5000 });
       }
     });
@@ -269,7 +270,8 @@ test.describe("Favorites & Saved Searches Journeys", () => {
         page
           .getByRole("heading", { level: 1, name: /recent|history|viewed/i })
           .or(page.locator(selectors.listingCard).first())
-          .or(page.locator(selectors.emptyState).first()),
+          .or(page.locator(selectors.emptyState).first())
+          .first(),
       ).toBeVisible({ timeout: 10000 });
     });
   });

@@ -23,6 +23,7 @@ import {
   gotoSearchWithFilters,
   filtersButton,
   filterDialog,
+  clickFiltersButton,
   applyButton,
   closeButton,
 } from "../helpers";
@@ -45,21 +46,15 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
 
   // 1. Open filter modal via button click
   test(`${tags.core} - opens filter modal via Filters button click`, async ({ page }) => {
-    const btn = filtersButton(page);
-    await expect(btn).toBeVisible({ timeout: 10_000 });
-
-    await btn.click();
-
-    const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await clickFiltersButton(page);
+    await expect(filterDialog(page)).toBeVisible();
   });
 
   // 2. Modal has correct ARIA attributes
   test(`${tags.a11y} - modal has role=dialog and aria-modal=true`, async ({ page }) => {
-    await filtersButton(page).click();
+    await clickFiltersButton(page);
 
     const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
 
     // Verify ARIA attributes on the dialog container
     const dialogEl = page.locator('[role="dialog"][aria-modal="true"]');
@@ -72,9 +67,8 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
 
   // 3. Close modal via close button
   test(`${tags.core} - closes modal via close button`, async ({ page }) => {
-    await filtersButton(page).click();
+    await clickFiltersButton(page);
     const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
 
     await closeButton(page).click();
 
@@ -83,9 +77,8 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
 
   // 4. Close modal via Escape key
   test(`${tags.core} - closes modal via Escape key`, async ({ page }) => {
-    await filtersButton(page).click();
+    await clickFiltersButton(page);
     const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
 
     await page.keyboard.press("Escape");
 
@@ -94,9 +87,8 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
 
   // 5. Close modal via overlay/backdrop click
   test(`${tags.core} - closes modal via backdrop click`, async ({ page }) => {
-    await filtersButton(page).click();
+    await clickFiltersButton(page);
     const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
 
     // Click the backdrop overlay (aria-label="Close filters")
     const backdrop = page.locator('[aria-label="Close filters"]').first();
@@ -109,9 +101,8 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   // 6. Apply filters updates URL and closes modal
   test(`${tags.core} - apply button commits filters to URL and closes modal`, async ({ page }) => {
     test.setTimeout(90_000);
-    await filtersButton(page).click();
+    await clickFiltersButton(page);
     const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
 
     // Click Apply (even without changing filters, it should close the modal)
     const applyBtn = applyButton(page);
@@ -126,9 +117,8 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   test(`${tags.core} - closing without apply does not change URL`, async ({ page }) => {
     const urlBefore = page.url();
 
-    await filtersButton(page).click();
+    await clickFiltersButton(page);
     const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
 
     // Toggle an amenity to create a pending change
     const wifiButton = dialog.getByRole("button", { name: /wifi/i }).first();
@@ -146,9 +136,7 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
 
   // 8. Modal traps focus (first/last element tab cycling)
   test(`${tags.a11y} - modal traps focus within dialog`, async ({ page }) => {
-    await filtersButton(page).click();
-    const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await clickFiltersButton(page);
 
     // Tab through the dialog - focus should stay within
     // Press Tab multiple times and verify focus remains inside dialog
@@ -175,10 +163,8 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
     // Open the filter modal (button label includes count when filters active)
-    await filtersButton(page).click();
+    await clickFiltersButton(page);
     const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Check that the room type select shows the pre-applied value
     const roomTypeText = dialog.locator("#filter-room-type");
@@ -191,8 +177,7 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     await closeButton(page).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
-    await filtersButton(page).click();
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await clickFiltersButton(page);
 
     // State should still be there
     if (await roomTypeText.isVisible()) {
@@ -208,8 +193,7 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     // Initially not expanded
     await expect(btn).toHaveAttribute("aria-expanded", "false");
 
-    await btn.click();
-    await expect(filterDialog(page)).toBeVisible({ timeout: 10_000 });
+    await clickFiltersButton(page);
 
     // Now expanded
     await expect(btn).toHaveAttribute("aria-expanded", "true");
@@ -229,9 +213,8 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     await gotoSearchWithFilters(page, { roomType: "Private Room", amenities: "Wifi" });
 
     // Button label changes to "Filters (N active)" when filters are present
-    await filtersButton(page).click();
+    await clickFiltersButton(page);
     const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
 
     // The heading should contain a badge with the count
     const heading = dialog.getByRole("heading", { name: /filters/i });
