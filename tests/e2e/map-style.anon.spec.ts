@@ -62,6 +62,9 @@ async function expectSessionStorage(
   ).toBe(expectedValue);
 }
 
+// Map tests need extra time for WebGL rendering and tile loading in CI
+test.beforeEach(async () => { test.slow(); });
+
 // ---------------------------------------------------------------------------
 // 9.1: Style toggle buttons visible (Standard/Satellite/Transit) - P0
 // ---------------------------------------------------------------------------

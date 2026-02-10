@@ -216,6 +216,9 @@ test.describe("Map + Filter Interactions", () => {
   // Run as anonymous user for these tests
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  // Map tests need extra time for WebGL rendering and tile loading in CI
+  test.beforeEach(async () => { test.slow(); });
+
   // ---------------------------------------------------------------------------
   // 5.1: Filter change updates map markers (count decreases) [P0]
   // ---------------------------------------------------------------------------

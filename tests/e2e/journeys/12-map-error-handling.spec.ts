@@ -32,6 +32,7 @@ test.describe("Map Error Handling", () => {
   // - Mobile: device emulation overrides viewport settings
   // - webkit: rendering timing issues cause flaky map visibility detection
   test.beforeEach(async ({}, testInfo) => {
+    test.slow(); // Map tests need extra time for WebGL rendering in CI
     const projectName = testInfo.project.name;
     if (projectName.includes("Mobile")) {
       test.skip(true, "Map tests require desktop viewport - skipping on mobile");

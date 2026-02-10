@@ -189,6 +189,9 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
   // Run as anonymous user
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  // Map tests need extra time for WebGL rendering and tile loading in CI
+  test.beforeEach(async () => { test.slow(); });
+
   // =========================================================================
   // Story 5: Map Marker Clustering
   // =========================================================================

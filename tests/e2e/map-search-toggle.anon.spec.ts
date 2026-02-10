@@ -178,6 +178,9 @@ async function mockSearchCountApi(
 // ---------------------------------------------------------------------------
 
 test.describe("4.x: Search as I move toggle", () => {
+  // Map tests need extra time for WebGL rendering and tile loading in CI
+  test.beforeEach(async () => { test.slow(); });
+
   // ---------------------------------------------------------------------------
   // P0: Core Functionality
   // ---------------------------------------------------------------------------

@@ -153,6 +153,8 @@ test.describe("List ↔ Map Sync", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page, nav }) => {
+    test.slow(); // Map tests need extra time for WebGL rendering in CI
+
     // Navigate to search page with SF bounds pre-set
     // This enables immediate marker fetch (skips 2s throttle in PersistentMapWrapper)
     await nav.goToSearch({ bounds: SF_BOUNDS });

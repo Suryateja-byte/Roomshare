@@ -136,6 +136,9 @@ async function navigateWithFilter(page: Page, paramKey: string, paramValue: stri
   await waitForMapReady(page);
 }
 
+// Map tests need extra time for WebGL rendering and tile loading in CI
+test.beforeEach(async () => { test.slow(); });
+
 // ---------------------------------------------------------------------------
 // Group 1: Map Survives Changes
 // ---------------------------------------------------------------------------

@@ -92,6 +92,9 @@ async function isMapVisible(page: import("@playwright/test").Page, timeout = 15_
   }
 }
 
+// Map tests need extra time for WebGL rendering and tile loading in CI
+test.beforeEach(async () => { test.slow(); });
+
 // ---------------------------------------------------------------------------
 // 1.1: Map loads without JavaScript errors (P0)
 // ---------------------------------------------------------------------------

@@ -40,6 +40,7 @@ test.describe("Map Error States and Accessibility", () => {
 
   // Skip on mobile browsers and webkit - map tests require specific browser support
   test.beforeEach(async ({}, testInfo) => {
+    test.slow(); // Map tests need extra time for WebGL rendering in CI
     const projectName = testInfo.project.name;
     if (projectName.includes("Mobile")) {
       test.skip(true, "Map tests require desktop viewport - skipping on mobile");

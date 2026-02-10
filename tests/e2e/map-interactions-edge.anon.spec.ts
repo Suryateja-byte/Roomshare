@@ -76,6 +76,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
 
   // Skip on mobile browsers and webkit
   test.beforeEach(async ({}, testInfo) => {
+    test.slow(); // Map tests need extra time for WebGL rendering in CI
     const projectName = testInfo.project.name;
     if (projectName.includes("Mobile")) {
       test.skip(true, "Map tests require desktop viewport - skipping on mobile");

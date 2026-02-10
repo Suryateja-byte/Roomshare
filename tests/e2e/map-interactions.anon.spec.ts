@@ -196,6 +196,9 @@ async function mockSearchCountApi(
   });
 }
 
+// Map tests need extra time for WebGL rendering and tile loading in CI
+test.beforeEach(async () => { test.slow(); });
+
 // ---------------------------------------------------------------------------
 // Story 1: Map + List Scroll Sync (ListScrollBridge)
 // ---------------------------------------------------------------------------

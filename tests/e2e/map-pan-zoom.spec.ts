@@ -54,6 +54,9 @@ async function getMapBoundingBox(page: import("@playwright/test").Page) {
   return mapContainer.boundingBox();
 }
 
+// Map tests need extra time for WebGL rendering and tile loading in CI
+test.beforeEach(async () => { test.slow(); });
+
 // ---------------------------------------------------------------------------
 // 2.1: Pan map with mouse drag - viewport moves, URL updates
 // ---------------------------------------------------------------------------

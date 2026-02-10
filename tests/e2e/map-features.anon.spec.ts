@@ -32,6 +32,9 @@ async function mapControlsAvailable(page: import("@playwright/test").Page) {
   return (await dropPin.count()) > 0;
 }
 
+// Map tests need extra time for WebGL rendering and tile loading in CI
+test.beforeEach(async () => { test.slow(); });
+
 // ---------------------------------------------------------------------------
 // Smoke: Search page loads without JS crashes
 // ---------------------------------------------------------------------------

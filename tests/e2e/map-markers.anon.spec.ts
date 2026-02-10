@@ -242,6 +242,7 @@ test.describe("Map Marker Interactions", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
+    test.slow(); // Map tests need extra time for WebGL rendering in CI
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 

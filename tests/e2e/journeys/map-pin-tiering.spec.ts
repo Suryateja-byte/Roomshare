@@ -15,6 +15,9 @@ test.describe("Map Pin Tiering", () => {
   // Run as anonymous user
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  // Map tests need extra time for WebGL rendering and tile loading in CI
+  test.beforeEach(async () => { test.slow(); });
+
   test(`${tags.anon} - Renders both primary and mini pins`, async ({
     page,
   }) => {
