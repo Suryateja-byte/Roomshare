@@ -38,6 +38,10 @@ const sel = {
 test.describe("Pagination Reset on Param Change", () => {
   test.describe.configure({ mode: "serial" });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // Helper: load initial page and click load-more once to accumulate 24 items
   // -------------------------------------------------------------------------

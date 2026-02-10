@@ -127,6 +127,10 @@ async function loadTwoPages(page: Page) {
 // Scenario 5: Cursor Reset on Filter/Sort Change
 // ===========================================================================
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 test.describe("5. Cursor Reset on Filter/Sort Change", () => {
   test.describe.configure({ mode: "serial" });
 

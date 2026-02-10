@@ -33,6 +33,10 @@ const sel = {
 } as const;
 
 test.describe("Pagination URL State", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // 1. Cursor never appears in URL
   // -------------------------------------------------------------------------

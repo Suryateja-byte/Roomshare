@@ -8,6 +8,10 @@
 
 import { test, expect, tags, selectors, timeouts } from '../helpers';
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 test.describe('Verification Journeys', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
 

@@ -52,6 +52,10 @@ async function waitForSearchContent(page: Page) {
 // ---------------------------------------------------------------------------
 
 test.describe("Search URL Param Round-Trip (P0)", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // 1. Set filter via UI -> URL has param -> refresh -> filter still active
   // -------------------------------------------------------------------------

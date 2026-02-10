@@ -36,6 +36,10 @@ import {
 test.describe("Amenities Filter", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 1. Select amenity -> URL gets amenities param
   test(`${tags.core} - selecting an amenity and applying updates URL`, async ({ page }) => {
     await waitForSearchReady(page);

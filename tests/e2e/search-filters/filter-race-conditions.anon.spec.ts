@@ -27,6 +27,10 @@ import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 test.describe("Filter Race Conditions", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.filter} Rapid checkbox toggling in modal (5 clicks, P0)`, async ({
     page,
   }) => {

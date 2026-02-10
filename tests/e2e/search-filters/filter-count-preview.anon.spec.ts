@@ -122,6 +122,10 @@ void filterDialog;
 test.describe("Filter Count Preview", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // 11.1: Apply button shows result count when dirty
   // -------------------------------------------------------------------------

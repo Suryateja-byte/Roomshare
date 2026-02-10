@@ -10,6 +10,8 @@ import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContai
 const SEARCH_URL_WITH_BOUNDS = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
 test.describe("20 Critical Search Page Journeys", () => {
+  test.beforeEach(async () => { test.slow(); });
+
   // ─────────────────────────────────────────────────
   // J1: Basic search page loads with results
   // ─────────────────────────────────────────────────

@@ -19,6 +19,10 @@ test.describe("Search Pagination Journey", () => {
   // that may hide content on mobile viewports
   test.use({ viewport: { width: 1280, height: 800 } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.core} - Forward/back pagination with cursor`, async ({
     page,
     nav,

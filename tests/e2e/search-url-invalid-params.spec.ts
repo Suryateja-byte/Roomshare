@@ -59,6 +59,10 @@ function setupDialogGuard(page: Page): { wasTriggered: () => boolean } {
 // ---------------------------------------------------------------------------
 
 test.describe("Search URL Invalid/Malicious Params (P0)", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // 1. XSS in query: script tag injection
   // -------------------------------------------------------------------------

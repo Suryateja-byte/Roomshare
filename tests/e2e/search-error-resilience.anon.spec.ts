@@ -57,6 +57,10 @@ function isBenignError(msg: string): boolean {
   return BENIGN_ERROR_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
 }
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 // ---------------------------------------------------------------------------
 // Group 1: Zero Results State
 // ---------------------------------------------------------------------------

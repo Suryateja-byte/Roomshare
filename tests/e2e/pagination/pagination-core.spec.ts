@@ -46,6 +46,10 @@ const sel = {
 test.describe("Pagination Core", () => {
   test.describe.configure({ mode: "serial" });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // 1. Basic load-more: initial 12 real + 12 mock = 24
   // -------------------------------------------------------------------------

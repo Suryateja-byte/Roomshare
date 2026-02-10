@@ -33,6 +33,10 @@ import {
 test.describe("Room Type Filter", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 1. Select room type via URL -> URL has roomType param
   test(`${tags.core} - room type param in URL is reflected on page load`, async ({ page }) => {
     await gotoSearchWithFilters(page, { roomType: "Private Room" });

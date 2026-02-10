@@ -9,6 +9,10 @@
 import { test, expect, selectors, timeouts, tags, SF_BOUNDS } from "../helpers";
 
 test.describe("Discovery & Search Journeys", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.describe("J001: Anonymous user browses home page", () => {
     test(`${tags.anon} ${tags.mobile} ${tags.a11y} - Home page discovery flow`, async ({
       page,

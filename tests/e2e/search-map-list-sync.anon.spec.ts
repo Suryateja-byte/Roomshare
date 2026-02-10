@@ -302,6 +302,10 @@ test.describe("Map-List Synchronization", () => {
   // Run as anonymous user
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");

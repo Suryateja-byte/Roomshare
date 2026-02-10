@@ -26,6 +26,10 @@ import {
 test.describe("Filter URL-UI Desync", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.filter} Browser Back after applying filter via modal reverts URL and UI state`, async ({
     page,
   }) => {

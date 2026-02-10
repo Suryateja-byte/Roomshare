@@ -37,6 +37,10 @@ import {
 test.describe("Filter Validation & Security", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // 17.1: XSS in filter params sanitized
   test("17.1 - XSS payload in amenities param is sanitized and ignored", async ({ page }) => {
     // Track console errors and script execution

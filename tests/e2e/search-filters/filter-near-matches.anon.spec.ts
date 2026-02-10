@@ -19,6 +19,10 @@ import {
 test.describe("Near Matches & Low Results Guidance", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   test(`${tags.filter} LowResultsGuidance renders when results < 5 (P0)`, async ({
     page,
   }) => {

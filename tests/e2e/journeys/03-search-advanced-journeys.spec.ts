@@ -48,6 +48,8 @@ async function closeFilterModal(page: import("@playwright/test").Page) {
 }
 
 test.describe("30 Advanced Search Page Journeys", () => {
+  test.beforeEach(async () => { test.slow(); });
+
   // ═══════════════════════════════════════════════════
   // SECTION A: MULTI-FILTER COMBINATIONS (5 journeys)
   // ═══════════════════════════════════════════════════

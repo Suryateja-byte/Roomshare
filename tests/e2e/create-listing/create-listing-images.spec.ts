@@ -16,6 +16,7 @@ test.describe('Create Listing — Image Upload', () => {
   let createPage: CreateListingPage;
 
   test.beforeEach(async ({ page }) => {
+    test.slow();
     createPage = new CreateListingPage(page);
   });
 

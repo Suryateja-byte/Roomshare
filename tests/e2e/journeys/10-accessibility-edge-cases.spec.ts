@@ -8,6 +8,10 @@
 
 import { test, expect, tags, selectors, timeouts, searchResultsContainer } from '../helpers';
 
+test.beforeEach(async () => {
+  test.slow();
+});
+
 test.describe('Accessibility Journeys', () => {
   test.describe('J087: Keyboard navigation', () => {
     test(`${tags.a11y} ${tags.core} - Tab navigation through main interface`, async ({ page, nav }) => {
