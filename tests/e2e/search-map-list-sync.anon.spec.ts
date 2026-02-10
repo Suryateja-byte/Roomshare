@@ -620,9 +620,11 @@ test.describe("Map-List Synchronization", () => {
         if (link) link.click();
       }, cardId);
 
-      // Wait for URL to contain the listing ID (works with client-side navigation)
-      await expect(page).toHaveURL(new RegExp(`/listings/${cardId}`), {
+      // Wait for URL to contain the listing ID — use waitForURL with "commit"
+      // to avoid timeout waiting for full page resource load on listing detail pages
+      await page.waitForURL(new RegExp(`/listings/${cardId}`), {
         timeout: timeouts.navigation,
+        waitUntil: "commit",
       });
     });
   });
