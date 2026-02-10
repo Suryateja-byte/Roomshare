@@ -147,8 +147,8 @@ test.describe('Messaging Journeys', () => {
       await nav.goHome();
 
       // Look for unread indicator on messages link/icon
-      const messagesLink = page.getByRole('link', { name: /message/i })
-        .or(page.locator('a[href*="/messages"]'));
+      const messagesLink = page.getByRole('link', { name: /message/i }).first()
+        .or(page.locator('a[href*="/messages"]').first());
 
       if (await messagesLink.isVisible()) {
         // Check for badge

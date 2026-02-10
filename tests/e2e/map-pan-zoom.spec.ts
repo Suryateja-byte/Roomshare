@@ -274,6 +274,14 @@ test.describe("2.3: Zoom with touch pinch on mobile", () => {
     viewport: { width: 393, height: 852 },
   });
 
+  // Touch gestures require hasTouch which is only enabled on mobile projects
+  test.beforeEach(({}, testInfo) => {
+    const projectName = testInfo.project.name;
+    if (!projectName.includes("Mobile")) {
+      test.skip(true, "Touch tests require mobile project with hasTouch enabled");
+    }
+  });
+
   test("touch interactions are enabled on mobile viewport", async ({ page }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");

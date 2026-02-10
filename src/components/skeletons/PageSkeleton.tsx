@@ -169,7 +169,7 @@ export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
 
 export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-[80px] sm:pt-[96px]" aria-busy="true" aria-label="Loading search results">
+    <div className="h-screen flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-[80px] sm:pt-[96px]" role="status" aria-busy="true" aria-label="Loading search results">
       {/* Search Header Skeleton */}
       <header className="w-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800">
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">

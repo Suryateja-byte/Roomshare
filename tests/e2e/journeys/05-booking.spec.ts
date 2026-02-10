@@ -183,7 +183,7 @@ test.describe('Booking Journeys', () => {
       await nav.clickListingCard(0);
 
       // Look for calendar component
-      const calendar = page.locator('[data-testid="calendar"], [class*="calendar"]');
+      const calendar = page.locator('[data-testid="calendar"], [class*="calendar"]').first();
 
       if (await calendar.isVisible()) {
         // Should show available/unavailable dates
