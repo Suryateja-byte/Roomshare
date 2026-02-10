@@ -15,7 +15,7 @@ test.describe('Authentication Journeys', () => {
 
       // Step 1: Navigate to signup
       await page.goto('/signup');
-      await expect(page.getByRole('heading', { name: /sign up|create account|register/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible();
 
       // Step 2: Fill name
       const nameInput = page.getByLabel(/name/i).first();
@@ -130,7 +130,7 @@ test.describe('Authentication Journeys', () => {
 
       // Step 1: Navigate to login
       await page.goto('/login');
-      await expect(page.getByRole('heading', { name: /log in|sign in/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible();
 
       // Step 2-3: Fill credentials
       await page.getByLabel(/email/i).fill(creds.email);
@@ -209,8 +209,9 @@ test.describe('Authentication Journeys', () => {
       ).toBeVisible({ timeout: 10000 });
 
       // Step 5-7: Test with non-existent email (should show same message - no enumeration)
-      await emailInput.clear();
-      await emailInput.fill('nonexistent-email-12345@example.com');
+      // After success, click "Try another email" to return to the form
+      await page.getByRole('button', { name: /try another email/i }).click();
+      await page.getByLabel(/email/i).fill('nonexistent-email-12345@example.com');
       await page.getByRole('button', { name: /reset|send|submit/i }).click();
 
       // Should show same success-like message
@@ -221,6 +222,9 @@ test.describe('Authentication Journeys', () => {
   });
 
   test.describe('J011-J012: Protected route access', () => {
+    // These tests require unauthenticated state — clear auth storageState
+    test.use({ storageState: { cookies: [], origins: [] } });
+
     test(`${tags.auth} - Unauthenticated user redirected from protected routes`, async ({
       page,
       auth,
