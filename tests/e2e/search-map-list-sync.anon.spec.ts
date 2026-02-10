@@ -93,14 +93,19 @@ async function getNthMarkerIdOrNull(
 }
 
 /**
- * Click a map marker by its listing ID using evaluate + element.click().
- * Bypasses overlay interception by calling the DOM click method directly.
- * HTMLElement.click() triggers a full click cycle (mousedown → mouseup → click)
- * that bubbles through React 18's delegated event system and the react-map-gl
- * Marker onClick handler (Map.tsx:1776 → handleMarkerClick).
+ * Click a map marker by its listing ID using keyboard Enter dispatch.
+ * Bypasses overlay interception entirely (runs in page context).
  *
- * This pattern is proven in: map-pin-tiering.spec.ts:70,
- * mobile-interactions.anon.spec.ts:502,535,699,708
+ * Why keyboard instead of element.click():
+ *   element.click() on the inner div does NOT trigger react-map-gl's
+ *   Marker onClick handler because react-map-gl registers a native
+ *   addEventListener('click') on the .mapboxgl-marker wrapper element,
+ *   and the synthetic click from HTMLElement.click() doesn't reliably
+ *   propagate through Mapbox GL's internal event routing.
+ *
+ *   The keyboard path is guaranteed: the inner div[role="button"] has
+ *   an onKeyDown handler (Map.tsx:1841) that directly calls
+ *   handleMarkerClick() when Enter or Space is pressed.
  */
 async function clickMarkerByListingId(page: Page, listingId: string): Promise<void> {
   await expect(page.locator(`.mapboxgl-marker [data-listing-id="${listingId}"]`))
@@ -111,7 +116,10 @@ async function clickMarkerByListingId(page: Page, listingId: string): Promise<vo
       `.mapboxgl-marker [data-listing-id="${id}"]`,
     ) as HTMLElement;
     if (!el) return false;
-    el.click();
+    el.focus();
+    el.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
+    }));
     return true;
   }, listingId);
 
@@ -666,11 +674,10 @@ test.describe("Map-List Synchronization", () => {
 
       // Wait for map and content to settle after filter change
       await waitForMapReady(page);
-      await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
-        timeout: timeouts.navigation,
-      });
+      // Wait for search results to load (either cards appear or "no results" state settles)
+      await page.waitForTimeout(2000);
 
-      // Cards should have updated (may be fewer due to filter)
+      // Cards should have updated (may be fewer or zero due to filter)
       const filteredCardCount = await page
         .locator(selectors.listingCard)
         .count();
@@ -760,9 +767,9 @@ test.describe("Map-List Synchronization", () => {
 
       // Wait for map to settle after pan, then for markers or cards to appear
       await waitForMapReady(page);
+      // Wait for markers or cards to appear after pan (use .first() to avoid strict mode)
       await expect(
-        page.locator('.mapboxgl-marker:visible').first()
-          .or(searchResultsContainer(page).locator(selectors.listingCard).first())
+        page.locator('.mapboxgl-marker:visible, [data-testid="search-results-container"] [data-testid="listing-card"]').first()
       ).toBeVisible({ timeout: timeouts.navigation });
 
       // Page should still have markers and cards
