@@ -227,7 +227,7 @@ test.describe('Booking Journeys', () => {
       await nav.goToNotifications();
 
       // Should load notifications
-      await expect(page.getByRole('heading', { name: /notification/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /notification/i }).first()).toBeVisible();
 
       // Look for booking-related notifications
       const bookingNotification = page.getByText(/booking|request/i);

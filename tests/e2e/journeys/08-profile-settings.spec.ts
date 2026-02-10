@@ -119,7 +119,7 @@ test.describe('Profile & Settings Journeys', () => {
       await nav.goToSettings();
 
       // Find notification settings section
-      const notificationSection = page.getByRole('heading', { name: /notification/i })
+      const notificationSection = page.getByRole('heading', { name: /notification/i }).first()
         .or(page.locator('[data-testid="notification-settings"]'));
 
       await expect(notificationSection).toBeVisible({ timeout: 10000 });

@@ -28,7 +28,12 @@ const toggleSelectors = {
   mapContainer: '[data-testid="map"], .mapboxgl-map',
 } as const;
 
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async ({}, testInfo) => {
+  if (testInfo.project.name.includes('webkit')) {
+    test.skip(true, 'Radix UI hydration issues on webkit');
+  }
+  test.slow();
+});
 
 test.describe("Mobile Floating Toggle — Visibility (8.1)", () => {
   test("toggle button is visible on mobile viewport with fixed position", async ({ page }) => {

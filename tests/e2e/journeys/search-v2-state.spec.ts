@@ -51,7 +51,7 @@ test.describe("V2 State Reset on Bounds-Required Path", () => {
 
     // 3. Verify: Should show location prompt, not hang in loading
     // The key assertion: "Please select a location" appears within reasonable time
-    const locationPrompt = page.getByText("Please select a location");
+    const locationPrompt = page.getByText("Please select a location").first();
     await expect(locationPrompt).toBeVisible({ timeout: timeouts.action });
 
     // 4. Map should not be stuck in loading state
@@ -98,7 +98,7 @@ test.describe("V2 State Reset on Bounds-Required Path", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Final state: should show location prompt, not be stuck
-    const locationPrompt = page.getByText("Please select a location");
+    const locationPrompt = page.getByText("Please select a location").first();
     await expect(locationPrompt).toBeVisible({ timeout: timeouts.action });
 
     // Verify no stuck loading states

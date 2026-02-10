@@ -49,7 +49,7 @@ test.describe('Accessibility Journeys', () => {
         await page.keyboard.press('Enter');
 
         // Focus should move to main content
-        const mainContent = page.locator('main, #main, #content');
+        const mainContent = page.locator('main, #main, #content').first();
         await expect(mainContent).toBeFocused();
       }
     });
@@ -94,8 +94,8 @@ test.describe('Accessibility Journeys', () => {
       };
 
       // At least main and navigation should exist
-      await expect(landmarks.main.or(page.locator('[role="main"]'))).toBeAttached();
-      await expect(landmarks.navigation.or(page.locator('[role="navigation"]'))).toBeAttached();
+      await expect(landmarks.main.or(page.locator('[role="main"]')).first()).toBeAttached();
+      await expect(landmarks.navigation.or(page.locator('[role="navigation"]')).first()).toBeAttached();
     });
 
     test(`${tags.a11y} - Images have alt text`, async ({ page, nav }) => {
