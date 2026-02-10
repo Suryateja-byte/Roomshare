@@ -10,18 +10,18 @@
 import {
   test,
   expect,
-  SF_BOUNDS,
-  timeouts,
   tags,
   searchResultsContainer,
 } from "./helpers/test-utils";
+import {
+  openFilterModal,
+  boundsQS,
+  SEARCH_URL,
+} from "./helpers/filter-helpers";
 
 // --------------------------------------------------------------------------
 // Constants
 // --------------------------------------------------------------------------
-
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-const SEARCH_URL = `/search?${boundsQS}`;
 
 /** Wait for search results heading to be visible */
 async function waitForResults(page: import("@playwright/test").Page) {
@@ -29,21 +29,6 @@ async function waitForResults(page: import("@playwright/test").Page) {
   await expect(
     page.getByRole("heading", { level: 1 }).first(),
   ).toBeVisible({ timeout: 15000 });
-}
-
-/** Open the filter modal and return the dialog locator */
-async function openFilterModal(page: import("@playwright/test").Page) {
-  // Use getByRole to reliably target the "Filters" button (not room type filter pills)
-  const filtersButton = page.getByRole("button", { name: /^Filters/ });
-
-  await page.waitForLoadState("domcontentloaded").catch(() => {});
-  await expect(filtersButton).toBeVisible({ timeout: timeouts.action });
-  await filtersButton.click();
-  await page.waitForTimeout(500);
-
-  const modal = page.locator('[role="dialog"][aria-modal="true"]');
-  await expect(modal).toBeVisible({ timeout: 10_000 });
-  return modal;
 }
 
 // --------------------------------------------------------------------------
@@ -138,17 +123,25 @@ test.describe("Search A11y: Filter Modal Accessibility", () => {
   // 5. Focus returns to trigger button when modal closed
   test("5. focus returns to trigger button when modal closed", { tag: [tags.a11y] }, async ({ page }) => {
     // Remember the filters button
-    const filtersButton = page.getByRole("button", { name: /^Filters/ });
+    const triggerButton = page.getByRole("button", { name: /^Filters/ });
 
-    await expect(filtersButton).toBeVisible();
+    await expect(triggerButton).toBeVisible();
 
-    // Open modal
+    // Open modal with retry-click for hydration race
     await page.waitForLoadState("domcontentloaded").catch(() => {});
-    await filtersButton.click();
-    await page.waitForTimeout(500);
+    await triggerButton.click();
 
     const modal = page.locator('[role="dialog"][aria-modal="true"]');
-    await expect(modal).toBeVisible({ timeout: 10_000 });
+    const visible = await modal
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!visible) {
+      // Retry: hydration may not have attached onClick on first click
+      await triggerButton.click();
+      await expect(modal).toBeVisible({ timeout: 15_000 });
+    }
 
     // Close with the close button (X button with aria-label="Close filters")
     const closeButton = modal.locator('button[aria-label="Close filters"]');

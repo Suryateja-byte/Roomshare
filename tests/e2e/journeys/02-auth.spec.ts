@@ -138,7 +138,7 @@ test.describe('Authentication Journeys', () => {
 
       // Step 2-3: Fill credentials
       await page.getByLabel(/email/i).fill(creds.email);
-      await page.getByLabel(/password/i).fill(creds.password);
+      await page.getByLabel('Password', { exact: true }).fill(creds.password);
 
       // Step 4: Submit
       await page.getByRole('button', { name: /log in|sign in/i }).click();
@@ -165,7 +165,7 @@ test.describe('Authentication Journeys', () => {
       ).toBeVisible({ timeout: 30000 });
 
       await page.getByLabel(/email/i).fill('invalid@example.com');
-      await page.getByLabel(/password/i).fill('wrongpassword');
+      await page.getByLabel('Password', { exact: true }).fill('wrongpassword');
       await page.getByRole('button', { name: /log in|sign in/i }).click();
 
       // Should show error without revealing which field is wrong
@@ -266,7 +266,7 @@ test.describe('Authentication Journeys', () => {
       // Login
       const creds = auth.getCredentials();
       await page.getByLabel(/email/i).fill(creds.email);
-      await page.getByLabel(/password/i).fill(creds.password);
+      await page.getByLabel('Password', { exact: true }).fill(creds.password);
       await page.getByRole('button', { name: /log in|sign in/i }).click();
 
       // Login form redirects to home after successful login
@@ -308,7 +308,7 @@ test.describe('Authentication Journeys', () => {
       // Attempt multiple failed logins
       for (let i = 0; i < 5; i++) {
         await page.getByLabel(/email/i).fill(`test${i}@example.com`);
-        await page.getByLabel(/password/i).fill('wrongpassword');
+        await page.getByLabel('Password', { exact: true }).fill('wrongpassword');
         await page.getByRole('button', { name: /log in|sign in/i }).click();
         await page.waitForTimeout(500);
       }

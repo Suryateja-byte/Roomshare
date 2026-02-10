@@ -229,7 +229,7 @@ test.describe("Search A11y: ARIA Live Regions & Screen Reader", () => {
     }
 
     // Also check for the visual zero results UI
-    const zeroResultsHeading = page.getByText("No matches found");
+    const zeroResultsHeading = page.getByText("No matches found").first();
     if (await zeroResultsHeading.isVisible().catch(() => false)) {
       // The heading is h2 in the zero results UI
       await expect(zeroResultsHeading).toBeVisible();

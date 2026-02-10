@@ -163,7 +163,7 @@ test.describe("Breathing Pending State (PR1)", () => {
 
       // The SlowTransitionBadge component should have proper accessibility attributes
       // when visible (during slow transitions). We verify the implementation exists.
-      const slowBadge = page.locator('[role="status"][aria-live="polite"]');
+      const slowBadge = page.locator('[role="status"][aria-live="polite"]').first();
 
       // Badge might not be visible if transition is fast, but the implementation
       // should be present in the DOM during slow transitions

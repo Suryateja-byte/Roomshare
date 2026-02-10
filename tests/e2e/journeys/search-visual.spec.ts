@@ -113,7 +113,7 @@ test.describe("Search Visual Regression", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for empty state to appear
-    const emptyState = page.getByText(/no matches found/i);
+    const emptyState = page.getByText(/no matches found/i).first();
     await expect(emptyState).toBeVisible({ timeout: 30000 });
 
     // Wait for content to stabilize

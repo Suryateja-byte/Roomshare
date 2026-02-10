@@ -46,7 +46,7 @@ test.describe("Listing Card Carousel", () => {
     await expect(nextButton).toHaveCount(1);
 
     // The button's parent container should have opacity-0 initially
-    const controlsContainer = carouselRegion.locator(".pointer-events-none");
+    const controlsContainer = carouselRegion.locator(".pointer-events-none").first();
     const initialClasses = await controlsContainer.getAttribute("class");
     expect(initialClasses).toContain("opacity-0");
 

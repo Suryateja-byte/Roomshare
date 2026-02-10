@@ -28,7 +28,7 @@ test.describe("J7: Login Page (Unauthenticated)", () => {
 
     // Should have password field
     const passwordField = page
-      .getByLabel(/password/i)
+      .getByLabel('Password', { exact: true })
       .or(page.locator('input[type="password"]'));
     await expect(passwordField.first()).toBeVisible();
 
@@ -69,7 +69,7 @@ test.describe("J8: Signup Page (Unauthenticated)", () => {
 
     // Should have password field
     const passwordField = page
-      .getByLabel(/password/i)
+      .getByLabel('Password', { exact: true })
       .or(page.locator('input[type="password"]'));
     await expect(passwordField.first()).toBeVisible();
 

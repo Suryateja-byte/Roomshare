@@ -12,6 +12,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { A11Y_CONFIG } from '../helpers/test-utils';
+import { filtersButton, filterDialog, clickFiltersButton } from '../helpers/filter-helpers';
 
 /** Helper: run axe scan with shared config */
 async function runAxeScan(page: import('@playwright/test').Page, extraExcludes: string[] = [], disabledRules: string[] = []) {
@@ -46,16 +47,14 @@ test.describe('axe-core — Dynamic UI States', () => {
       await page.goto('/search');
       await page.waitForLoadState('domcontentloaded');
 
-      // Open the filter modal
-      const filterButton = page.getByRole('button', { name: /filter/i })
-        .or(page.locator('[data-testid="filter-button"]'))
-        .first();
+      // Open the filter modal (uses retry-click for hydration race)
+      const filterBtn = filtersButton(page);
 
-      if (await filterButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await filterButton.click();
+      if (await filterBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await clickFiltersButton(page);
 
         // Wait for modal/dialog to appear
-        const modal = page.locator('[role="dialog"]');
+        const modal = filterDialog(page);
         await expect(modal).toBeVisible({ timeout: 5000 });
 
         const results = await runAxeScan(page);

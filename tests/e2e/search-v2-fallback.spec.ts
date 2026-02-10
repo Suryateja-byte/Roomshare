@@ -180,7 +180,7 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
     await waitForResults(page);
 
     // Page should render results regardless of which path was used
-    const heading = page.locator("#search-results-heading");
+    const heading = page.locator("#search-results-heading").first();
     await expect(heading).toBeVisible();
 
     const headingText = await heading.textContent();
@@ -252,7 +252,7 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
     await waitForResults(page);
 
     // Get initial result count
-    const heading = page.locator("#search-results-heading");
+    const heading = page.locator("#search-results-heading").first();
     const initialText = await heading.textContent();
 
     // Navigate to a different search (add filter)

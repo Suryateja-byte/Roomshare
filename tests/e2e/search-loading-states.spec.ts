@@ -153,7 +153,7 @@ test.describe("Search Loading States", () => {
 
     // The feed element itself does not have aria-busy
     // (only the SearchResultsLoadingWrapper parent does)
-    const feed = page.locator('[role="feed"]');
+    const feed = page.locator('[role="feed"]').first();
     await expect(feed).toBeAttached();
   });
 
@@ -270,7 +270,7 @@ test.describe("Search Loading States", () => {
     expect(spinnerCount).toBe(0);
 
     // 3. Results content should be visible
-    const feed = page.locator('[role="feed"]');
+    const feed = page.locator('[role="feed"]').first();
     await expect(feed).toBeVisible();
 
     const container = searchResultsContainer(page);
@@ -285,7 +285,7 @@ test.describe("Search Loading States", () => {
     await waitForResults(page);
 
     // Measure the position of the results heading after full load
-    const heading = page.locator("#search-results-heading");
+    const heading = page.locator("#search-results-heading").first();
     await expect(heading).toBeVisible();
 
     const headingBox = await heading.boundingBox();
@@ -348,7 +348,7 @@ test.describe("Search Loading States", () => {
       await waitForResults(page);
 
       // Verify results are showing (not stuck in loading)
-      const feed = page.locator('[role="feed"]');
+      const feed = page.locator('[role="feed"]').first();
       const feedVisible = await feed.isVisible().catch(() => false);
 
       if (feedVisible) {

@@ -9,26 +9,13 @@
  */
 
 import { test, expect, selectors, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  openFilterModal,
+  applyFilters,
+  closeFilterModal,
+} from "../helpers/filter-helpers";
 
 const BOUNDS_PARAMS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-
-// Helper: open the filter modal and wait for it to be visible
-async function openFilterModal(page: import("@playwright/test").Page) {
-  const btn = page.getByRole("button", { name: /more filters|^filters/i }).first();
-  await expect(btn).toBeVisible({ timeout: 15000 });
-  await expect(btn).toBeEnabled({ timeout: 10000 });
-  await btn.click();
-  const modal = page.locator('[role="dialog"]');
-  await expect(modal).toBeVisible({ timeout: 15000 });
-  return modal;
-}
-
-// Helper: apply filters in the modal
-async function applyFilters(page: import("@playwright/test").Page) {
-  const applyBtn = page.locator('[data-testid="filter-modal-apply"]');
-  await applyBtn.click();
-  await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 5000 });
-}
 
 // Helper: select a Radix Select option (combobox, not native <select>)
 async function selectRadixOption(page: import("@playwright/test").Page, triggerId: string, optionText: RegExp | string) {
@@ -38,13 +25,6 @@ async function selectRadixOption(page: import("@playwright/test").Page, triggerI
   const option = page.getByRole("option", { name: optionText });
   await expect(option).toBeVisible({ timeout: 3000 });
   await option.click();
-}
-
-// Helper: close filter modal
-async function closeFilterModal(page: import("@playwright/test").Page) {
-  const closeBtn = page.getByRole("button", { name: "Close filters" }).first();
-  await closeBtn.click();
-  await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 5000 });
 }
 
 test.describe("30 Advanced Search Page Journeys", () => {

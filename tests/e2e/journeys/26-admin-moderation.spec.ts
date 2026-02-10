@@ -33,7 +33,7 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
     .or(page.locator('input[type="email"]'));
   const passwordField = page
     .locator('input#password')
-    .or(page.getByLabel(/password/i))
+    .or(page.getByLabel('Password', { exact: true }))
     .or(page.locator('input[type="password"]'));
 
   const canLogin = await emailField.first().isVisible().catch(() => false);

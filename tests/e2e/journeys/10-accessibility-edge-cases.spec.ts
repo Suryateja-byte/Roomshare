@@ -191,6 +191,7 @@ test.describe('Edge Case Journeys', () => {
       await expect(
         page.locator(selectors.emptyState)
           .or(page.getByText(/no.*results|no.*listings|nothing.*found/i))
+          .first()
       ).toBeVisible({ timeout: 10000 });
     });
 
@@ -295,7 +296,7 @@ test.describe('Edge Case Journeys', () => {
 
       await page.getByLabel(/email/i).fill('test@example.com');
       const loginPassword = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
-      await page.getByLabel(/password/i).fill(loginPassword);
+      await page.getByLabel('Password', { exact: true }).fill(loginPassword);
 
       const submitButton = page.getByRole('button', { name: /log in|sign in/i });
 
@@ -424,7 +425,7 @@ test.describe('Edge Case Journeys', () => {
 
       // Try SQL injection in email field
       await emailInput.fill("' OR '1'='1");
-      await page.getByLabel(/password/i).fill("' OR '1'='1");
+      await page.getByLabel('Password', { exact: true }).fill("' OR '1'='1");
 
       await page.getByRole('button', { name: /log in/i }).click();
       await page.waitForLoadState('domcontentloaded');

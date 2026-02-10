@@ -46,7 +46,7 @@ export const authHelpers = {
     ).toBeVisible({ timeout: 30000 });
 
     await page.getByLabel(/email/i).fill(useEmail);
-    await page.getByLabel(/password/i).fill(usePassword);
+    await page.getByLabel('Password', { exact: true }).fill(usePassword);
     await page.getByRole('button', { name: /sign in|log in|login/i }).click();
 
     // Wait for redirect away from login
