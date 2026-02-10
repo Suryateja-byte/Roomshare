@@ -12,10 +12,10 @@ import { test, expect, SF_BOUNDS } from "./helpers/test-utils";
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
 // Mobile viewport - iPhone 14 Pro dimensions
+// Note: isMobile/hasTouch removed — unsupported in Firefox and causes
+// positioning bugs in Desktop WebKit. Viewport size alone triggers mobile layout.
 test.use({
   viewport: { width: 390, height: 844 },
-  isMobile: true,
-  hasTouch: true,
 });
 
 // Selectors

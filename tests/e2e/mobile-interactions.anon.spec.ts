@@ -37,8 +37,6 @@ const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=$
 test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
   test.use({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
   });
 
   test("double ArrowUp from collapsed traverses half then expanded", async ({
@@ -109,8 +107,6 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
 test.describe("Mobile Bottom Sheet - Content", () => {
   test.use({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
   });
 
   test("listing cards are visible in half position", async ({ page }) => {
@@ -253,8 +249,6 @@ test.describe("Mobile Bottom Sheet - Content", () => {
 test.describe("Mobile Map and Sheet", () => {
   test.use({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
   });
 
   test("map is visible behind sheet in half position", async ({ page }) => {
@@ -373,8 +367,6 @@ test.describe("Mobile Map and Sheet", () => {
 test.describe("Mobile Sort Interaction", () => {
   test.use({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
   });
 
   test("sort button opens sort bottom sheet on mobile", async ({ page }) => {
@@ -474,8 +466,6 @@ test.describe("Mobile Sort Interaction", () => {
 test.describe("Mobile Filter Interaction", () => {
   test.use({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
   });
 
   test("filters button opens filter modal on mobile", async ({ page }) => {
@@ -577,8 +567,6 @@ test.describe("Mobile Filter Interaction", () => {
 test.describe("Mobile Edge Cases", () => {
   test.use({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
   });
 
   test("orientation change (portrait to landscape) preserves sheet state", async ({
@@ -810,8 +798,6 @@ test.describe("Mobile Layout Responsiveness", () => {
 test.describe("Mobile Bottom Sheet - Overlay", () => {
   test.use({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
   });
 
   test("dim overlay appears when sheet is expanded", async ({ page }) => {
@@ -867,8 +853,6 @@ test.describe("Mobile Bottom Sheet - Overlay", () => {
 test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
   test.use({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
   });
 
   test("content scroll is disabled when sheet is collapsed", async ({

@@ -12,10 +12,10 @@ import { waitForSheetAnimation } from "./helpers/mobile-helpers";
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
 // Mobile viewport — overrides Desktop Chrome defaults
+// Note: isMobile/hasTouch removed — unsupported in Firefox and causes
+// positioning bugs in Desktop WebKit. Viewport size alone triggers mobile layout.
 test.use({
   viewport: { width: 393, height: 852 },
-  isMobile: true,
-  hasTouch: true,
 });
 
 test.describe("Mobile UX — Page Load", () => {

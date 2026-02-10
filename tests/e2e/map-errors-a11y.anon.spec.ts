@@ -381,8 +381,6 @@ test.describe("Map Error States and Accessibility", () => {
     test.describe("11.5 - Bottom sheet accessibility", () => {
       test.use({
         viewport: { width: 393, height: 852 },
-        isMobile: true,
-        hasTouch: true,
       });
 
       test(`${tags.anon} ${tags.a11y} ${tags.mobile} - Bottom sheet has role="region" and aria-label`, async ({

@@ -529,21 +529,10 @@ test.describe("Group 3: Sort + Pagination", () => {
 // ===========================================================================
 
 test.describe("Group 4: Mobile Sort", () => {
+  // Note: isMobile/hasTouch removed — unsupported in Firefox and causes
+  // positioning bugs in Desktop WebKit. Viewport size alone triggers mobile layout.
   test.use({
     viewport: { width: 393, height: 852 },
-    isMobile: true,
-    hasTouch: true,
-  });
-
-  test.beforeEach(async ({ browserName }) => {
-    test.skip(
-      browserName === "firefox",
-      "isMobile is not supported in Firefox",
-    );
-    test.skip(
-      browserName === "webkit",
-      "Radix Select hydration issue on webkit",
-    );
   });
 
   test("4.1 mobile sort button is visible, desktop dropdown is hidden", async ({

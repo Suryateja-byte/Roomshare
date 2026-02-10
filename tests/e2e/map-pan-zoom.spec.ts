@@ -269,8 +269,6 @@ test.describe("2.3: Zoom with touch pinch on mobile", () => {
   // Use mobile viewport settings
   test.use({
     viewport: { width: 393, height: 852 },
-    isMobile: true,
-    hasTouch: true,
   });
 
   test("touch interactions are enabled on mobile viewport", async ({ page }) => {
