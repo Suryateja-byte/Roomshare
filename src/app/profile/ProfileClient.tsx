@@ -271,7 +271,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                                         <span className="text-zinc-300 dark:text-zinc-600">Pending</span>
                                     )}
                                 </li>
-                                <hr className="border-zinc-100 dark:border-zinc-800" />
+                                <li role="separator" aria-hidden="true" className="border-t border-zinc-100 dark:border-zinc-800" />
                                 <li className="flex items-center justify-between text-sm">
                                     <span className="text-zinc-900 dark:text-white font-medium">Joined</span>
                                     <span className="text-zinc-500 dark:text-zinc-400">{joinedDate}</span>

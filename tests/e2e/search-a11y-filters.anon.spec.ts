@@ -15,7 +15,6 @@ import {
 } from "./helpers/test-utils";
 import {
   openFilterModal,
-  boundsQS,
   SEARCH_URL,
 } from "./helpers/filter-helpers";
 

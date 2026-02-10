@@ -281,7 +281,7 @@ export default function UserProfileClient({ user, isOwnProfile, averageRating, c
                                         <span className="text-zinc-300 dark:text-zinc-600">Not confirmed</span>
                                     )}
                                 </li>
-                                <hr className="border-zinc-100 dark:border-zinc-800" />
+                                <li role="separator" aria-hidden="true" className="border-t border-zinc-100 dark:border-zinc-800" />
                                 <li className="flex items-center justify-between text-sm">
                                     <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
                                         <Calendar className="w-4 h-4" /> Member since

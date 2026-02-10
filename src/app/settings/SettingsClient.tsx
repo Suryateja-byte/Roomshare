@@ -177,6 +177,9 @@ export default function SettingsClient({
                             </div>
                             <button
                                 onClick={() => handleToggle(option.key)}
+                                role="switch"
+                                aria-checked={preferences[option.key]}
+                                aria-label={`Toggle ${option.label}`}
                                 className={`relative w-11 h-6 rounded-full transition-colors ${preferences[option.key] ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-600'
                                     }`}
                             >
