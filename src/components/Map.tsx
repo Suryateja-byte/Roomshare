@@ -1797,6 +1797,7 @@ export default function MapComponent({
                                 keyboardFocusedId === position.listing.id && "z-50"
                             )}
                             data-listing-id={position.listing.id}
+                            data-testid={`map-pin-${position.listing.tier || "primary"}-${position.listing.id}`}
                             data-focus-state={hoveredId === position.listing.id ? "hovered" : activeId === position.listing.id ? "active" : hoveredId && hoveredId !== position.listing.id ? "dimmed" : "none"}
                             role="button"
                             tabIndex={0}

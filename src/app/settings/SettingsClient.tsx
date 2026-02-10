@@ -223,10 +223,11 @@ export default function SettingsClient({
                     </div>
                     <form onSubmit={handleChangePassword} className="p-6 space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            <label htmlFor="currentPassword" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                                 Current Password
                             </label>
                             <input
+                                id="currentPassword"
                                 type="password"
                                 value={currentPassword}
                                 onChange={(e) => setCurrentPassword(e.target.value)}
@@ -235,10 +236,11 @@ export default function SettingsClient({
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            <label htmlFor="newPassword" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                                 New Password
                             </label>
                             <input
+                                id="newPassword"
                                 type="password"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
@@ -249,10 +251,11 @@ export default function SettingsClient({
                             <PasswordStrengthMeter password={newPassword} className="mt-2" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                                 Confirm New Password
                             </label>
                             <input
+                                id="confirmPassword"
                                 type="password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -369,10 +372,11 @@ export default function SettingsClient({
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                                <label htmlFor="deleteConfirmText" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                                     Type DELETE to confirm
                                 </label>
                                 <input
+                                    id="deleteConfirmText"
                                     type="text"
                                     value={deleteConfirmText}
                                     onChange={(e) => setDeleteConfirmText(e.target.value)}

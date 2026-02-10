@@ -13,6 +13,7 @@ import {
   VALID_HOUSEHOLD_GENDERS,
   LEASE_DURATION_ALIASES,
   ROOM_TYPE_ALIASES,
+  getPriceParam,
 } from "@/lib/search-params";
 import { normalizeLanguages } from "@/lib/languages";
 
@@ -50,14 +51,6 @@ export const emptyFilterValues: BatchedFilterValues = {
 };
 
 // --- URL parsing helpers (matching SearchForm's logic) ---
-
-function clampPriceParam(raw: string | null): string {
-  if (!raw) return "";
-  const n = parseFloat(raw);
-  if (!Number.isFinite(n)) return "";
-  if (n < 0) return "0";
-  return raw;
-}
 
 function parseParamList(
   searchParams: URLSearchParams,
@@ -115,9 +108,13 @@ function parseEnumParam(
 export function readFiltersFromURL(
   searchParams: URLSearchParams,
 ): BatchedFilterValues {
+  // Use getPriceParam to support budget aliases (minBudget/maxBudget)
+  // with canonical params (minPrice/maxPrice) taking precedence
+  const parsedMin = getPriceParam(searchParams, "min");
+  const parsedMax = getPriceParam(searchParams, "max");
   return {
-    minPrice: clampPriceParam(searchParams.get("minPrice")),
-    maxPrice: clampPriceParam(searchParams.get("maxPrice")),
+    minPrice: parsedMin !== undefined ? String(parsedMin) : "",
+    maxPrice: parsedMax !== undefined ? String(parsedMax) : "",
     roomType: parseEnumParam(
       searchParams,
       "roomType",

@@ -382,6 +382,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                                                     setShowLanguageInput(false);
                                                 }}
                                                 placeholder="Type language..."
+                                                aria-label="Add a language"
                                                 className="w-24 px-2 py-1 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-400"
                                                 autoFocus
                                             />

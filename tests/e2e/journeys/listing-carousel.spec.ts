@@ -39,24 +39,26 @@ test.describe("Listing Card Carousel", () => {
       return;
     }
 
-    // Initially, navigation buttons should be hidden (opacity-0)
+    // ImageCarousel renders prev/next buttons directly (not in a wrapper).
+    // When hidden they carry opacity-0 + pointer-events-none on themselves.
     const nextButton = carouselRegion.locator(
       'button[aria-label="Next image"]',
     );
     await expect(nextButton).toHaveCount(1);
 
-    // The button's parent container should have opacity-0 initially
-    const controlsContainer = carouselRegion.locator(".pointer-events-none").first();
-    const initialClasses = await controlsContainer.getAttribute("class");
+    // Initially the button itself should be hidden (opacity-0, pointer-events-none)
+    const initialClasses = await nextButton.getAttribute("class");
     expect(initialClasses).toContain("opacity-0");
+    expect(initialClasses).toContain("pointer-events-none");
 
-    // Hover over the carousel
+    // Hover over the carousel to reveal controls
     await carouselRegion.hover();
     await page.waitForTimeout(timeouts.animation);
 
-    // Controls should now be visible (opacity-100)
-    const hoveredClasses = await controlsContainer.getAttribute("class");
+    // After hover the button should be visible (opacity-100, pointer-events-auto)
+    const hoveredClasses = await nextButton.getAttribute("class");
     expect(hoveredClasses).toContain("opacity-100");
+    expect(hoveredClasses).toContain("pointer-events-auto");
   });
 
   test(`${tags.anon} - Clicking next button changes image`, async ({
@@ -138,7 +140,7 @@ test.describe("Listing Card Carousel", () => {
     expect(page.url()).toBe(initialUrl);
   });
 
-  test(`${tags.anon} - Previous button appears after navigation`, async ({
+  test(`${tags.anon} - Previous button becomes visible after navigation`, async ({
     page,
   }) => {
     const carouselRegion = searchResultsContainer(page)
@@ -151,28 +153,38 @@ test.describe("Listing Card Carousel", () => {
       return;
     }
 
+    // ImageCarousel (Embla, loop:true) always renders both buttons in the DOM.
+    // Before hover they are hidden via opacity-0 / pointer-events-none.
+    const prevButton = carouselRegion.locator(
+      'button[aria-label="Previous image"]',
+    );
+    const nextButton = carouselRegion.locator(
+      'button[aria-label="Next image"]',
+    );
+
+    // Both buttons exist in the DOM even before hover
+    await expect(prevButton).toHaveCount(1);
+    await expect(nextButton).toHaveCount(1);
+
     // Hover to show controls
     await carouselRegion.hover();
     await page.waitForTimeout(timeouts.animation);
 
-    // Initially, previous button should not exist (we're on first image)
-    const prevButton = carouselRegion.locator(
-      'button[aria-label="Previous image"]',
-    );
-    await expect(prevButton).toHaveCount(0);
+    // After hover, both buttons should be visible (opacity-100)
+    const prevClasses = await prevButton.getAttribute("class");
+    expect(prevClasses).toContain("opacity-100");
 
-    // Click next to go to second image
-    const nextButton = carouselRegion.locator(
-      'button[aria-label="Next image"]',
-    );
+    // Click next to navigate (validates navigation still works)
     await nextButton.click();
     await page.waitForTimeout(timeouts.animation);
 
     // Keep hovering to ensure controls stay visible
     await carouselRegion.hover();
+    await page.waitForTimeout(timeouts.animation);
 
-    // Previous button should now be visible
-    await expect(prevButton).toHaveCount(1);
+    // Previous button should still be visible after navigation
+    const prevClassesAfter = await prevButton.getAttribute("class");
+    expect(prevClassesAfter).toContain("opacity-100");
   });
 
   test(`${tags.anon} ${tags.a11y} - Carousel has proper ARIA attributes`, async ({
@@ -200,10 +212,10 @@ test.describe("Listing Card Carousel", () => {
     const slideCount = await slides.count();
     expect(slideCount).toBeGreaterThan(0);
 
-    // First slide should have proper aria-label
+    // First slide should have proper aria-label (ImageCarousel uses "N of M")
     const firstSlide = slides.first();
     const slideLabel = await firstSlide.getAttribute("aria-label");
-    expect(slideLabel).toMatch(/Image \d+ of \d+/);
+    expect(slideLabel).toMatch(/\d+ of \d+/);
 
     // Dot navigation should have tablist role
     const tablist = carouselRegion.locator('[role="tablist"]');

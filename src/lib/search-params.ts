@@ -42,6 +42,9 @@ export interface RawSearchParams {
   q?: string | string[];
   minPrice?: string | string[];
   maxPrice?: string | string[];
+  // Budget aliases — canonical (minPrice/maxPrice) take precedence
+  minBudget?: string | string[];
+  maxBudget?: string | string[];
   amenities?: string | string[];
   moveInDate?: string | string[];
   leaseDuration?: string | string[];
@@ -323,13 +326,14 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     1,
   );
 
+  // Support budget aliases (minBudget/maxBudget) with canonical precedence
   const validMinPrice = safeParseFloat(
-    getFirstValue(raw.minPrice),
+    getFirstValue(raw.minPrice) ?? getFirstValue(raw.minBudget),
     0,
     MAX_SAFE_PRICE,
   );
   const validMaxPrice = safeParseFloat(
-    getFirstValue(raw.maxPrice),
+    getFirstValue(raw.maxPrice) ?? getFirstValue(raw.maxBudget),
     0,
     MAX_SAFE_PRICE,
   );

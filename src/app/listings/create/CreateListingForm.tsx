@@ -771,6 +771,7 @@ export default function CreateListingForm() {
                         <Input
                             type="text"
                             placeholder="Search languages..."
+                            aria-label="Search languages"
                             value={languageSearch}
                             onChange={(e) => setLanguageSearch(e.target.value)}
                             className="mb-3"

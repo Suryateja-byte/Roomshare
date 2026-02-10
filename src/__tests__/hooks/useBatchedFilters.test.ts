@@ -91,10 +91,11 @@ describe("readFiltersFromURL", () => {
     expect(result.languages).toEqual(["en", "es"]);
   });
 
-  it("clamps negative price to 0", () => {
+  it("rejects negative price values", () => {
     const params = new URLSearchParams({ minPrice: "-100" });
     const result = readFiltersFromURL(params);
-    expect(result.minPrice).toBe("0");
+    // getPriceParam rejects negative values (returns undefined → empty string)
+    expect(result.minPrice).toBe("");
   });
 
   it("rejects invalid price values", () => {

@@ -44,6 +44,12 @@ export function generateUniqueCoordinates(
  * @param coordinates - Array of coordinates for each listing
  * @returns Array of mock listing objects matching API response format
  */
+/**
+ * Default primary pin limit (must match marker-utils DEFAULT_PRIMARY_LIMIT).
+ * First `PRIMARY_PIN_LIMIT` listings get tier "primary", rest get "mini".
+ */
+const PRIMARY_PIN_LIMIT = 40;
+
 export function createMockListingsForTiering(
   ids: string[],
   coordinates: Array<{ lat: number; lng: number }>,
@@ -55,6 +61,7 @@ export function createMockListingsForTiering(
   location: { lat: number; lng: number };
   images: string[];
   ownerId: string;
+  tier: "primary" | "mini";
 }> {
   return ids.map((id, index) => ({
     id,
@@ -64,6 +71,10 @@ export function createMockListingsForTiering(
     location: coordinates[index % coordinates.length],
     images: [],
     ownerId: `owner-${index}`,
+    // Assign tier: first PRIMARY_PIN_LIMIT are primary, rest are mini
+    tier: (index < PRIMARY_PIN_LIMIT ? "primary" : "mini") as
+      | "primary"
+      | "mini",
   }));
 }
 
