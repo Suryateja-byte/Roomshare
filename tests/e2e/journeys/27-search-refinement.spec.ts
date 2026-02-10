@@ -85,7 +85,7 @@ test.describe("J43: Search → Detail → Back Preserves State", () => {
 
     // Step 2: Click a listing
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
 
     // Step 3: Go back
     await page.goBack();
@@ -121,14 +121,14 @@ test.describe("J44: Recently Viewed Tracking", () => {
 
     // Step 2: Visit first listing
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     const title1 = await page.locator("main h1, main h2").first().textContent().catch(() => "");
 
     // Step 3: Go back and visit second listing
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
     await nav.clickListingCard(1);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     const title2 = await page.locator("main h1, main h2").first().textContent().catch(() => "");
 
     // Step 4: Check recently viewed page if it exists

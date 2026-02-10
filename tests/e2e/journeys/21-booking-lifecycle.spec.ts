@@ -26,7 +26,7 @@ test.describe("J21: Full Booking Request Submission", () => {
 
     // Step 2: Navigate to a listing detail
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
 
     // Wait for listing detail to load
     await page.waitForLoadState('domcontentloaded');
@@ -212,7 +212,7 @@ test.describe("J24: Double-Booking Prevention", () => {
 
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
 
     const bookingBtn = page
       .locator("main")

@@ -23,7 +23,7 @@ test.describe("J35: View Public User Profile", () => {
     test.skip((await cards.count()) === 0, "No listings — skipping");
 
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Find and click host name/link
@@ -87,7 +87,7 @@ test.describe("J36: Block a User", () => {
     }
 
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Navigate to user profile — find host link

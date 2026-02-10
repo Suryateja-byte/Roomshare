@@ -27,7 +27,7 @@ test.describe("J31: Edit Listing and Verify", () => {
 
     // Step 2: Open listing detail
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState('domcontentloaded');
 
     // Step 3: Look for edit button (owner view)
@@ -104,7 +104,7 @@ test.describe("J32: Pause and Unpause Listing", () => {
     test.skip((await cards.count()) === 0, "Listing not found — skipping");
 
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Look for status toggle dropdown (shows "Active", "Paused", or "Rented")
@@ -160,7 +160,7 @@ test.describe("J33: Delete Listing with Confirmation", () => {
     test.skip((await cards.count()) === 0, "No owned listing found — skipping");
 
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Find delete button (rendered in owner sidebar)

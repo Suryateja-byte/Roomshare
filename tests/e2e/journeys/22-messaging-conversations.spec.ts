@@ -75,7 +75,7 @@ test.describe("J26: Start Conversation from Listing", () => {
 
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
 
     // Step 3: Click contact / message host button
     const contactBtn = page

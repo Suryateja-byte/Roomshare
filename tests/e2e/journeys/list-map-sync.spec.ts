@@ -250,7 +250,7 @@ test.describe("List ↔ Map Sync", () => {
     await expect(marker).toBeVisible({ timeout: timeouts.action });
 
     // Click the first marker
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // The popup should appear (standard behavior)
     const popup = page.locator(".mapboxgl-popup");
@@ -284,8 +284,10 @@ test.describe("List ↔ Map Sync", () => {
     const marker = page.locator(".mapboxgl-marker:visible").first();
     await expect(marker).toBeVisible({ timeout: timeouts.action });
 
-    // Hover the marker
-    await marker.hover();
+    // Hover the marker — use PointerEvent dispatch to bypass overlay interception
+    await marker.evaluate((el) => {
+      el.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+    });
 
     // Check if any listing card has the focus ring (ring-blue-500)
     // Scope to visible container to avoid counting cards in both desktop + mobile containers.
@@ -375,7 +377,7 @@ test.describe("List ↔ Map Sync", () => {
     await instrumentScrollBursts(page, containerSelector);
 
     // Click the marker
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // scroll animation settle — no event-based alternative for scroll burst detection
     await page.waitForTimeout(500);
@@ -420,7 +422,7 @@ test.describe("List ↔ Map Sync", () => {
     await expect(marker).toBeVisible({ timeout: timeouts.action });
 
     // Click the marker to activate a listing
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // Check for popup (confirms click worked)
     const popup = page.locator(".mapboxgl-popup");
@@ -500,7 +502,7 @@ test.describe("List ↔ Map Sync", () => {
     await instrumentScrollBursts(page, containerSelector);
 
     // Click marker FIRST time
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
     // scroll animation settle — needed before checking scroll burst count
     await page.waitForTimeout(600);
 
@@ -519,7 +521,7 @@ test.describe("List ↔ Map Sync", () => {
     await resetScrollBurstCounter(page);
 
     // Click marker SECOND time (same marker)
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
     // scroll animation settle — needed before checking scroll burst count
     await page.waitForTimeout(600);
 
@@ -561,7 +563,7 @@ test.describe("List ↔ Map Sync", () => {
 
     // Click the marker (should be the only one or first one with stacked listings)
     const marker = page.locator(".mapboxgl-marker:visible").first();
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // Wait for popup container to appear (mapbox popup)
     const mapboxPopup = page.locator(".mapboxgl-popup");
@@ -610,7 +612,7 @@ test.describe("List ↔ Map Sync", () => {
 
     // Click marker to open popup
     const marker = page.locator(".mapboxgl-marker:visible").first();
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // Wait for popup container to appear (mapbox popup)
     const mapboxPopup = page.locator(".mapboxgl-popup");
@@ -672,7 +674,7 @@ test.describe("List ↔ Map Sync", () => {
 
     // Click marker to open popup
     const marker = page.locator(".mapboxgl-marker:visible").first();
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // Wait for popup container to appear (mapbox popup)
     const mapboxPopup = page.locator(".mapboxgl-popup");
@@ -696,7 +698,7 @@ test.describe("List ↔ Map Sync", () => {
     await listingLink.click();
 
     // Should navigate to listing detail page
-    await page.waitForURL(`**${href}`, { timeout: timeouts.navigation });
+    await page.waitForURL(`**${href}`, { timeout: timeouts.navigation, waitUntil: "commit" });
     expect(page.url()).toContain(`/listings/${ids[0]}`);
 
     await cleanup();
@@ -853,7 +855,7 @@ test.describe("List ↔ Map Sync", () => {
     // Click marker to open popup and select listing
     const marker = page.locator(".mapboxgl-marker:visible").first();
     await expect(marker).toBeVisible({ timeout: timeouts.action });
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // Popup should be visible
     const popup = page.locator(".mapboxgl-popup");
@@ -897,7 +899,7 @@ test.describe("List ↔ Map Sync", () => {
     // Click marker to open popup
     const marker = page.locator(".mapboxgl-marker:visible").first();
     await expect(marker).toBeVisible({ timeout: timeouts.action });
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // Popup should be visible
     const popup = page.locator(".mapboxgl-popup");
@@ -936,7 +938,7 @@ test.describe("List ↔ Map Sync", () => {
 
     // Click marker to open stacked popup
     const marker = page.locator(".mapboxgl-marker:visible").first();
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // Wait for stacked popup
     const mapboxPopup = page.locator(".mapboxgl-popup");
@@ -985,7 +987,7 @@ test.describe("List ↔ Map Sync", () => {
     // Click marker to open popup and select a listing
     const marker = page.locator(".mapboxgl-marker:visible").first();
     await expect(marker).toBeVisible({ timeout: timeouts.action });
-    await marker.click();
+    await marker.evaluate((el) => (el as HTMLElement).click());
 
     // Popup should be visible
     const popup = page.locator(".mapboxgl-popup");

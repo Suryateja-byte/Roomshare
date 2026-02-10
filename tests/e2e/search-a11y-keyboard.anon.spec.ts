@@ -169,7 +169,7 @@ test.describe("Search A11y: Keyboard Navigation", () => {
     await page.keyboard.press("Enter");
 
     // Should navigate to the listing detail page
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     expect(page.url()).toContain("/listings/");
   });
 

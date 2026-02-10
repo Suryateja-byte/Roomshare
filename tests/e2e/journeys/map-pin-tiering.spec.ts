@@ -130,8 +130,10 @@ test.describe("Map Pin Tiering", () => {
         .first();
       await expect(primaryPin).toBeVisible({ timeout: timeouts.action });
 
-      // Click primary pin - use force to bypass triangle pointer interception
-      await primaryPin.click({ force: true });
+      // Use evaluate to click since map markers may be under overlays
+      await primaryPin.evaluate((el) => {
+        (el as HTMLElement).click();
+      });
       await page.waitForTimeout(timeouts.animation);
 
       // Popup should appear

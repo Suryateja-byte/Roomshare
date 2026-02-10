@@ -280,7 +280,7 @@ test.describe("Map Marker Interactions", () => {
       await expect(marker).toBeVisible({ timeout: timeouts.action });
 
       // Click marker
-      await marker.click();
+      await marker.evaluate((el) => (el as HTMLElement).click());
 
       // Popup should appear
       const popup = page.locator(".mapboxgl-popup");
@@ -312,7 +312,7 @@ test.describe("Map Marker Interactions", () => {
       }
 
       const marker = getFirstVisibleMarker(page);
-      await marker.click();
+      await marker.evaluate((el) => (el as HTMLElement).click());
       await waitForPopup(page);
 
       // Close via button
@@ -339,7 +339,7 @@ test.describe("Map Marker Interactions", () => {
       }
 
       const marker = getFirstVisibleMarker(page);
-      await marker.click();
+      await marker.evaluate((el) => (el as HTMLElement).click());
       await waitForPopup(page);
 
       // Get map canvas bounding box
@@ -374,7 +374,7 @@ test.describe("Map Marker Interactions", () => {
       }
 
       const marker = getFirstVisibleMarker(page);
-      await marker.click();
+      await marker.evaluate((el) => (el as HTMLElement).click());
       await waitForPopup(page);
 
       // Check for accessible close button
@@ -477,7 +477,7 @@ test.describe("Map Marker Interactions", () => {
       }
 
       const marker = getFirstVisibleMarker(page);
-      await marker.click();
+      await marker.evaluate((el) => (el as HTMLElement).click());
       await waitForPopup(page);
 
       // Find View Details button/link
@@ -496,7 +496,7 @@ test.describe("Map Marker Interactions", () => {
 
         // Click and verify navigation
         await viewDetailsLink.click();
-        await page.waitForURL(`**${href}`, { timeout: timeouts.navigation });
+        await page.waitForURL(`**${href}`, { timeout: timeouts.navigation, waitUntil: "commit" });
         expect(page.url()).toContain("/listings/");
       } else if (isStackedListing) {
         // For stacked popup, click the arrow/link to navigate
@@ -504,7 +504,7 @@ test.describe("Map Marker Interactions", () => {
         expect(href).toMatch(/^\/listings\//);
 
         await stackedItemLink.first().click();
-        await page.waitForURL(`**${href}`, { timeout: timeouts.navigation });
+        await page.waitForURL(`**${href}`, { timeout: timeouts.navigation, waitUntil: "commit" });
         expect(page.url()).toContain("/listings/");
       } else {
         test.skip(true, "No navigation link found in popup");
@@ -733,7 +733,7 @@ test.describe("Map Marker Interactions", () => {
       }
 
       const marker = getFirstVisibleMarker(page);
-      await marker.click();
+      await marker.evaluate((el) => (el as HTMLElement).click());
       await waitForPopup(page);
 
       // Press Escape
@@ -758,7 +758,7 @@ test.describe("Map Marker Interactions", () => {
       }
 
       const marker = getFirstVisibleMarker(page);
-      await marker.click();
+      await marker.evaluate((el) => (el as HTMLElement).click());
       await waitForPopup(page);
 
       // Check for highlighted card using evaluate (Tailwind v4 classes may not
@@ -934,7 +934,7 @@ test.describe("Map Marker Interactions", () => {
       }
 
       const marker = getFirstVisibleMarker(page);
-      await marker.click();
+      await marker.evaluate((el) => (el as HTMLElement).click());
       await waitForPopup(page);
 
       const popup = page.locator(".mapboxgl-popup");

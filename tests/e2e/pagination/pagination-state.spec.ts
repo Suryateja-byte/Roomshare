@@ -140,7 +140,7 @@ test.describe("Pagination URL State", () => {
 
       // Navigate directly to the listing detail page
       await page.goto(href!);
-      await page.waitForURL(/\/listings\//, { timeout: 15_000 });
+      await page.waitForURL(/\/listings\//, { timeout: 15_000, waitUntil: "commit" });
 
       // Go back to search results
       await page.goBack();

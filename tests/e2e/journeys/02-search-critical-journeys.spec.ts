@@ -225,7 +225,7 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Navigate to the listing page
     await page.goto(href!);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     expect(page.url()).toMatch(/\/listings\//);
   });
 
@@ -244,7 +244,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     const href = await firstCard.getAttribute("href");
     if (href) {
       await page.goto(href);
-      await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+      await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
 
       // Go back
       await page.goBack();

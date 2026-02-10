@@ -23,7 +23,7 @@ test.describe("J28: Write a Review", () => {
 
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
 
     // Step 3: Scroll to reviews section
@@ -92,7 +92,7 @@ test.describe("J29: Host Responds to Review", () => {
 
     // Step 2: Go to the listing
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
 
     // Step 3: Look for reviews section and a respond button
@@ -143,7 +143,7 @@ test.describe("J30: Review Summary Display", () => {
 
     // Step 2: Open listing
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
 
     // Step 3: Look for review-related content

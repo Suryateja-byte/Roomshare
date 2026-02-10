@@ -27,7 +27,7 @@ test.describe("J45: Report a Listing", () => {
 
     // Step 2: Go to listing
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState('domcontentloaded');
 
     // Step 3: Find report button (text is "Report this listing")
@@ -133,7 +133,7 @@ test.describe("J47: Rate Limit Feedback", () => {
     test.skip((await cards.count()) === 0, "No listings — skipping");
 
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState('domcontentloaded');
 
     // Step 2: Find an action button (save, book, contact)
@@ -236,7 +236,7 @@ test.describe("J50: Cross-Page Navigation Chain", () => {
     const cards = j50Container.locator(selectors.listingCard);
     if ((await cards.count()) > 0) {
       await nav.clickListingCard(0);
-      await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+      await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
       await expect(page.locator("body")).toBeVisible();
     }
 
