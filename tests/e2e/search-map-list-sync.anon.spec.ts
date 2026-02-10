@@ -184,25 +184,23 @@ async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
 }
 
 /**
- * Hover a listing card element. On mobile, the bottom sheet overlay intercepts
- * pointer events, so we use page.evaluate to dispatch mouseover directly.
- * React 18 uses native 'mouseover' (which bubbles) as dependency for
- * onMouseEnter (registerDirectEvent("onMouseEnter", ["mouseout", "mouseover"])).
- *
- * On desktop, Playwright's card.hover() sends real trusted mouse events
- * which work reliably with React's event delegation.
+ * Hover a listing card element. On mobile, the bottom sheet overlay (z-40)
+ * intercepts pointer events. We temporarily raise the card's z-index above
+ * the overlay, perform a real Playwright hover (trusted mouse events that
+ * React's event delegation processes correctly), then reset the z-index.
  */
 async function hoverCardElement(page: Page, card: import('@playwright/test').Locator): Promise<void> {
   const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
   if (isMobile) {
+    // Raise card above bottom sheet overlay for trusted mouse events
     await card.evaluate((el) => {
-      const rect = el.getBoundingClientRect();
-      el.dispatchEvent(new MouseEvent('mouseover', {
-        bubbles: true, cancelable: true,
-        relatedTarget: document.body,
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2,
-      }));
+      (el as HTMLElement).style.position = 'relative';
+      (el as HTMLElement).style.zIndex = '9999';
+    });
+    await card.hover();
+    await card.evaluate((el) => {
+      (el as HTMLElement).style.position = '';
+      (el as HTMLElement).style.zIndex = '';
     });
   } else {
     await card.hover();
@@ -210,18 +208,10 @@ async function hoverCardElement(page: Page, card: import('@playwright/test').Loc
 }
 
 /**
- * Un-hover a card element. On mobile, dispatches mouseout directly
- * since mouse.move(0,0) may be intercepted by the bottom sheet overlay.
+ * Un-hover a card element. Moves mouse to (0,0) to trigger real mouseleave.
  */
-async function unhoverCardElement(page: Page, card: import('@playwright/test').Locator): Promise<void> {
-  const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
-  if (isMobile) {
-    await card.evaluate((el) => {
-      el.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, cancelable: true }));
-    });
-  } else {
-    await page.mouse.move(0, 0);
-  }
+async function unhoverCardElement(page: Page, _card: import('@playwright/test').Locator): Promise<void> {
+  await page.mouse.move(0, 0);
 }
 
 /**
