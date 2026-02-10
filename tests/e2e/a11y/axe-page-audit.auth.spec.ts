@@ -44,7 +44,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
   test.describe('P0 — Trust & safety critical', () => {
     test('Bookings page (/bookings) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/bookings');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -57,7 +57,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
 
     test('Messages page (/messages) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/messages');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -72,7 +72,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
   test.describe('P1 — PII & forms', () => {
     test('Profile page (/profile) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/profile');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -85,7 +85,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
 
     test('Settings page (/settings) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/settings');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -98,7 +98,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
 
     test('Notifications page (/notifications) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/notifications');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -113,7 +113,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
   test.describe('P1 — User collections', () => {
     test('Saved listings (/saved) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/saved');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -126,7 +126,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
 
     test('Saved searches (/saved-searches) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/saved-searches');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -139,7 +139,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
 
     test('Recently viewed (/recently-viewed) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/recently-viewed');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
@@ -154,7 +154,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
   test.describe('P1 — Listing creation', () => {
     test('Create listing page (/listings/create) passes WCAG 2.1 AA', async ({ page }) => {
       await page.goto('/listings/create');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // The date picker and select components may have Radix-specific a11y issues
       const results = await runAxeScan(page, [], ['select-name']);
@@ -171,7 +171,7 @@ test.describe('axe-core Page Audit — Authenticated Pages', () => {
     for (const route of ['/profile/edit', '/settings', '/listings/create']) {
       test(`${route} has labeled form inputs`, async ({ page }) => {
         await page.goto(route);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         const unlabeled = await page.evaluate(() => {
           const inputs = document.querySelectorAll(

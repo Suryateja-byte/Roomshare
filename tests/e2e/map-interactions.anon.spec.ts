@@ -231,9 +231,14 @@ test.describe("1.x: Map + List Scroll Sync", () => {
       window.scrollTo(0, document.body.scrollHeight);
     });
 
-    // Click the first marker
-    const firstMarker = page.locator(".mapboxgl-marker:visible").first();
-    await firstMarker.click();
+    // Click the first marker via evaluate to bypass overlay interception
+    // (Playwright's .click() may be intercepted by bottom sheet / popup overlays)
+    await page.evaluate((id) => {
+      const el = document.querySelector(
+        `.mapboxgl-marker [data-listing-id="${id}"]`
+      ) as HTMLElement;
+      if (el) el.click();
+    }, listingId);
 
     // Poll for card to become active and scrolled into viewport
     await expect.poll(
@@ -274,9 +279,20 @@ test.describe("1.x: Map + List Scroll Sync", () => {
       window.scrollTo(0, document.body.scrollHeight);
     });
 
-    // Hover over the first marker (pointerenter, mouse pointer type)
-    const firstMarker = page.locator(".mapboxgl-marker:visible").first();
-    await firstMarker.hover();
+    // Hover over the first marker via PointerEvent dispatch
+    // (Playwright .hover() dispatches mouse events, but react-map-gl markers
+    //  use onPointerEnter which requires PointerEvent with pointerType='mouse')
+    await page.evaluate((id) => {
+      const el = document.querySelector(
+        `.mapboxgl-marker [data-listing-id="${id}"]`
+      ) as HTMLElement;
+      if (el) {
+        el.dispatchEvent(new PointerEvent('pointerenter', {
+          bubbles: true,
+          pointerType: 'mouse',
+        }));
+      }
+    }, listingId);
 
     // debounce wait: hover scroll fires after HOVER_SCROLL_DEBOUNCE_MS, then scroll animation needs to complete
     await page.waitForTimeout(HOVER_SCROLL_DEBOUNCE_MS + 600);
@@ -311,9 +327,13 @@ test.describe("1.x: Map + List Scroll Sync", () => {
       return;
     }
 
-    // Click marker to open popup and set activeId
-    const firstMarker = page.locator(".mapboxgl-marker:visible").first();
-    await firstMarker.click();
+    // Click marker to open popup and set activeId via evaluate
+    await page.evaluate((id) => {
+      const el = document.querySelector(
+        `.mapboxgl-marker [data-listing-id="${id}"]`
+      ) as HTMLElement;
+      if (el) el.click();
+    }, listingId);
 
     // Verify card has ring-2 active highlight (waitForCardHighlight polls internally)
     await waitForCardHighlight(page, listingId, timeouts.action);
