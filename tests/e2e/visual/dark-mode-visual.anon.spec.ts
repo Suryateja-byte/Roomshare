@@ -15,8 +15,12 @@ import {
 } from '../helpers/visual-helpers';
 
 test.describe('Dark Mode — Visual Regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     test.slow();
+    // Visual snapshot baselines only exist for chromium/chromium-anon — skip on Mobile Chrome
+    if (testInfo.project.name.includes('Mobile')) {
+      test.skip(true, 'No Mobile Chrome snapshot baselines — skip visual regression');
+    }
     // Set localStorage so next-themes applies .dark class on mount
     // (emulateMedia alone only sets CSS media query, not the class)
     await page.addInitScript(() => {

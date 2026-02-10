@@ -12,7 +12,12 @@ import { CreateListingPage, CreateListingData } from '../page-objects/create-lis
 
 test.describe('Create Listing — Visual Regression Tests', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
-  test.beforeEach(async () => { test.slow(); });
+  test.beforeEach(async ({}, testInfo) => {
+    test.slow();
+    if (testInfo.project.name.includes('Mobile')) {
+      test.skip(true, 'No Mobile Chrome snapshot baselines — skip visual regression');
+    }
+  });
 
   // ────────────────────────────────────────────────────────
   // Helpers
