@@ -214,7 +214,7 @@ test.describe("J49: Offline Page", () => {
     const hasNotFound = await has404.isVisible().catch(() => false);
 
     // Should show either offline page, 404, or redirect
-    expect(hasOffline || hasNotFound || true).toBeTruthy();
+    expect(hasOffline || hasNotFound).toBeTruthy();
   });
 });
 

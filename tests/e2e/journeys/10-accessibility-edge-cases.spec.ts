@@ -240,7 +240,7 @@ test.describe('Edge Case Journeys', () => {
       const hasEmptyState = await page.locator(selectors.emptyState).first().isVisible().catch(() => false);
 
       // One should be true
-      expect(hasBookings || hasEmptyState || true).toBeTruthy(); // Always pass - checking structure
+      expect(hasBookings || hasEmptyState).toBeTruthy();
     });
   });
 

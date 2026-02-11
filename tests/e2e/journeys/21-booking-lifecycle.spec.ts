@@ -182,14 +182,13 @@ test.describe("J23: Booking Cancellation", () => {
     await page.waitForLoadState('domcontentloaded');
     const stillCancelled = page.getByText(/cancelled|canceled/i).first();
     const persists = await stillCancelled.isVisible().catch(() => false);
-    // At minimum, page should load without error
-    await expect(page.locator("body")).toBeVisible();
+    expect(persists).toBeTruthy();
   });
 });
 
 // ─── J24: Double-Booking Prevention ───────────────────────────────────────────
 test.describe("J24: Double-Booking Prevention", () => {
-  test("submit booking → go back → submit again → expect error or duplicate prevention", async ({
+  test("fill dates → confirm booking → verify button disabled during submission", async ({
     page,
     nav,
   }) => {
@@ -200,14 +199,12 @@ test.describe("J24: Double-Booking Prevention", () => {
     let cards = searchResultsContainer(page).locator(selectors.listingCard);
     let count = await cards.count();
     if (count === 0) {
-      // Retry with fresh navigation
       await nav.goToSearch({ q: "Reviewer", bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
       cards = searchResultsContainer(page).locator(selectors.listingCard);
       count = await cards.count();
     }
     if (count === 0) {
-      // Last resort: search all listings in bounds
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
       cards = searchResultsContainer(page).locator(selectors.listingCard);
@@ -218,31 +215,74 @@ test.describe("J24: Double-Booking Prevention", () => {
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
-
-    const bookingBtn = page
-      .locator("main")
-      .getByRole("button", { name: /book|apply|request|reserve/i })
-      .first();
-    const canBook = await bookingBtn.isVisible().catch(() => false);
-    test.skip(!canBook, "No booking button — skipping");
-
-    // Step 3: Click booking button twice rapidly
-    await bookingBtn.click();
-
-    // Try to click again (should be disabled or show error)
-    const isDisabled = await bookingBtn.isDisabled().catch(() => false);
-    const secondClickResult = await bookingBtn.click().catch(() => "blocked");
-
     await page.waitForLoadState('domcontentloaded');
 
-    // Step 4: Verify some form of duplicate prevention
-    // Could be: disabled button, error toast, redirect, or just the form staying open
-    const errorToast = page.locator(selectors.toastError);
-    const hasError = await errorToast.isVisible().catch(() => false);
-    const buttonDisabled = await bookingBtn.isDisabled().catch(() => false);
-    const hasModal = await page.locator(selectors.modal).isVisible().catch(() => false);
+    const requestToBookBtn = page
+      .locator("main")
+      .getByRole("button", { name: /request to book/i })
+      .first();
+    const canBook = await requestToBookBtn.isVisible().catch(() => false);
+    test.skip(!canBook, "No 'Request to Book' button — skipping (owner view or unavailable)");
 
-    // Any of these indicates the app handled the double-click
-    expect(hasError || buttonDisabled || isDisabled || hasModal || true).toBeTruthy();
+    // Step 3: Fill start date — click date picker trigger, then click "Today"
+    const startDateTrigger = page.locator('#booking-start-date');
+    await startDateTrigger.scrollIntoViewIfNeeded();
+    await startDateTrigger.click();
+    const todayBtn = page.getByRole('button', { name: 'Today' });
+    await todayBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await todayBtn.click();
+    await page.waitForTimeout(500);
+
+    // Step 4: Fill end date — click date picker, navigate 2 months forward, select day 15
+    // This ensures >=30 days (MIN_BOOKING_DAYS) from today
+    const endDateTrigger = page.locator('#booking-end-date');
+    await endDateTrigger.scrollIntoViewIfNeeded();
+    await endDateTrigger.click();
+    await page.waitForTimeout(300);
+
+    const nextMonthBtn = page.locator('button[aria-label="Next month"]');
+    if (await nextMonthBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await nextMonthBtn.click();
+      await page.waitForTimeout(300);
+      await nextMonthBtn.click();
+      await page.waitForTimeout(300);
+    }
+
+    // Select day 15 from the calendar
+    const dayButtons = page
+      .locator('[data-radix-popper-content-wrapper] button, [class*="popover"] button')
+      .filter({ hasText: /^15$/ });
+    const dayButton = dayButtons.first();
+    if (await dayButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await dayButton.click();
+    } else {
+      // Fallback: use "Today" if day 15 isn't visible
+      const fallbackToday = page.getByRole('button', { name: 'Today' });
+      if (await fallbackToday.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await fallbackToday.click();
+      }
+    }
+    await page.waitForTimeout(500);
+
+    // Step 5: Click "Request to Book" → should open confirmation modal
+    await requestToBookBtn.click();
+
+    const confirmModal = page.locator('[role="dialog"][aria-modal="true"]');
+    const modalOpened = await confirmModal.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!modalOpened, "Confirmation modal did not open — dates may be invalid, skipping");
+
+    // Step 6: Click "Confirm Booking" in the modal
+    const confirmBookingBtn = confirmModal.getByRole('button', { name: /confirm booking/i });
+    await expect(confirmBookingBtn).toBeVisible({ timeout: 3000 });
+    await confirmBookingBtn.click();
+
+    // Step 7: Core assertion — after confirmSubmit, isLoading=true disables the button
+    // The "Request to Book" button should be disabled (isLoading || hasSubmittedSuccessfully)
+    await expect(requestToBookBtn).toBeDisabled({ timeout: 5000 });
+
+    // Step 8: Wait for server outcome (success toast/redirect, error toast, or already-submitted message)
+    const outcome = page.locator(selectors.toast)
+      .or(page.getByText(/success|already submitted|request sent|redirecting/i));
+    await outcome.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   });
 });
