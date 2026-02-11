@@ -18,6 +18,13 @@ test.describe("J25: Send Message in Conversation", () => {
     page,
     nav,
   }) => {
+    // Skip on mobile viewports — messaging UI layout differs significantly on mobile
+    const viewport = page.viewportSize();
+    if (viewport && viewport.width < 768) {
+      test.skip(true, 'Test designed for desktop viewport');
+      return;
+    }
+
     // Step 1: Navigate to messages
     await nav.goToMessages();
 

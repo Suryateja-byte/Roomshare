@@ -125,25 +125,30 @@ test.describe("30 Advanced Search Page Journeys", () => {
 
     const modal = await openFilterModal(page);
 
-    // Toggle multiple amenities
+    // Toggle multiple amenities — use retry to handle hydration race on Mobile Chrome
     const amenityFieldset = modal.locator('fieldset').filter({ hasText: /amenities/i });
     const amenityBtns = amenityFieldset.getByRole("button");
     const amenityCount = await amenityBtns.count();
 
     if (amenityCount >= 2) {
-      await amenityBtns.nth(0).click();
-      await amenityBtns.nth(1).click();
-      // Verify aria-pressed
-      await expect(amenityBtns.nth(0)).toHaveAttribute("aria-pressed", "true");
-      await expect(amenityBtns.nth(1)).toHaveAttribute("aria-pressed", "true");
+      await expect(async () => {
+        await amenityBtns.nth(0).click();
+        await expect(amenityBtns.nth(0)).toHaveAttribute("aria-pressed", "true");
+      }).toPass({ timeout: 15000 });
+      await expect(async () => {
+        await amenityBtns.nth(1).click();
+        await expect(amenityBtns.nth(1)).toHaveAttribute("aria-pressed", "true");
+      }).toPass({ timeout: 15000 });
     }
 
     // Toggle a house rule
     const rulesFieldset = modal.locator('fieldset').filter({ hasText: /house rules/i });
     const ruleBtns = rulesFieldset.getByRole("button");
     if (await ruleBtns.count() > 0) {
-      await ruleBtns.first().click();
-      await expect(ruleBtns.first()).toHaveAttribute("aria-pressed", "true");
+      await expect(async () => {
+        await ruleBtns.first().click();
+        await expect(ruleBtns.first()).toHaveAttribute("aria-pressed", "true");
+      }).toPass({ timeout: 15000 });
     }
 
     await applyFilters(page);
@@ -172,11 +177,11 @@ test.describe("30 Advanced Search Page Journeys", () => {
       .or(page.locator('button:has-text("Private")'));
     if (await privateTab.first().isVisible()) {
       await page.waitForTimeout(1000); // hydration settle
-      await privateTab.first().click();
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        { timeout: 30000, message: 'URL param "roomType" to be present' },
-      ).not.toBeNull();
+      await expect(async () => {
+        await privateTab.first().click();
+        const roomType = new URL(page.url(), "http://localhost").searchParams.get("roomType");
+        expect(roomType).not.toBeNull();
+      }).toPass({ timeout: 30000 });
     }
 
     // Change sort (desktop only)
@@ -258,13 +263,18 @@ test.describe("30 Advanced Search Page Journeys", () => {
       return;
     }
 
-    // Enter inverted prices: min > max
-    await minInput.fill("1500");
-    await minInput.blur();
-    await expect(minInput).toHaveValue("1500", { timeout: 5000 });
-    await maxInput.fill("500");
-    await maxInput.blur();
-    await expect(maxInput).toHaveValue("500", { timeout: 5000 });
+    // Enter inverted prices: min > max — use retry pattern for hydration race
+    await expect(async () => {
+      await minInput.click();
+      await minInput.fill("1500");
+      await expect(minInput).toHaveValue("1500");
+    }).toPass({ timeout: 15000 });
+
+    await expect(async () => {
+      await maxInput.click();
+      await maxInput.fill("500");
+      await expect(maxInput).toHaveValue("500");
+    }).toPass({ timeout: 15000 });
 
     // Submit form — wait for hydration before clicking submit
     const searchBtn = page.locator('button[type="submit"]').first();

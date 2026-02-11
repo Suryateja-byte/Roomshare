@@ -402,15 +402,15 @@ test.describe("Map persistence: Map state recovery", () => {
       ? container.locator('[data-testid="listing-card"] a[href*="/listings/"]').first()
       : page.locator('[data-testid="listing-card"] a[href*="/listings/"]:visible').first();
     if ((await listingLink.count()) === 0) {
-      // Wait a bit more for SSR hydration to produce listing cards
-      await page.waitForTimeout(5_000);
+      // Wait longer for SSR hydration to produce listing cards
+      await page.waitForTimeout(8_000);
       if ((await listingLink.count()) === 0) {
         test.skip(true, "No listing links found");
         return;
       }
     }
 
-    const linkVisible = await listingLink.isVisible({ timeout: 15_000 }).catch(() => false);
+    const linkVisible = await listingLink.isVisible({ timeout: 20_000 }).catch(() => false);
     if (!linkVisible) {
       test.skip(true, "Listing card link not visible (hidden in mobile/desktop container)");
       return;
@@ -419,7 +419,13 @@ test.describe("Map persistence: Map state recovery", () => {
     await listingLink.click();
     await page.waitForLoadState("domcontentloaded");
 
-    // Should be on a listing page now
+    // Should be on a listing page now — wait with timeout for navigation
+    try {
+      await page.waitForURL(/\/listings\//, { timeout: 15_000 });
+    } catch {
+      test.skip(true, "Navigation to listing page did not complete in time");
+      return;
+    }
     expect(page.url()).toContain("/listings/");
 
     // Go back

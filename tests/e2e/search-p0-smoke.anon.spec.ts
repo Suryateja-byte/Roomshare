@@ -167,9 +167,9 @@ test.describe("Search P0 Smoke Suite", () => {
     const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
     await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
 
-    // Look for the "Clear all" button in the applied filter chips area
-    // or in the zero-results "Clear all filters" button (ZeroResultsSuggestions renders a Button, not Link)
-    const clearAllBtn = page.locator('button:has-text("Clear all"), button:has-text("Clear all filters")');
+    // Look for the "Clear all" button — scope to visible container to avoid dual-container mismatch
+    const clearAllBtn = container.locator('button:has-text("Clear all"), button:has-text("Clear all filters")')
+      .or(page.locator('[data-testid="filter-bar-clear-all"]'));
     const clearVisible = await clearAllBtn.first().isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (clearVisible) {

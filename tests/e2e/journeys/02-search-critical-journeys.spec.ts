@@ -67,12 +67,17 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J3: Room type category tabs filter results", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+
+    // Wait for hydration before interacting with tabs
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Find category tabs
     const privateTab = page.getByRole("button", { name: /private/i })
       .or(page.locator('button:has-text("Private")'));
 
     if (await privateTab.first().isVisible()) {
+      await page.waitForTimeout(1000); // hydration settle
       // Retry click + URL assertion to handle hydration timing
       await expect(async () => {
         await privateTab.first().click();
@@ -126,11 +131,14 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     if (await clearAllBtn.first().isVisible({ timeout: 5000 }).catch(() => false)) {
       await clearAllBtn.first().click();
-      await page.waitForLoadState("domcontentloaded");
 
-      // Filters should be removed from URL
+      // Poll URL for filter removal (soft navigation may not trigger domcontentloaded)
+      await expect.poll(
+        () => new URL(page.url()).searchParams.has("minPrice"),
+        { timeout: 15000, message: "minPrice to be removed from URL after clear-all" },
+      ).toBe(false);
+
       const url = new URL(page.url());
-      expect(url.searchParams.has("minPrice")).toBeFalsy();
       expect(url.searchParams.has("amenities")).toBeFalsy();
     }
   });

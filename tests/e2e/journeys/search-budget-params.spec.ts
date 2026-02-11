@@ -259,8 +259,9 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      // Verify chips container is visible (use .first() for mobile which may have duplicate regions)
-      const chipsRegion = page
+      // Verify chips container is visible — scope to visible search container
+      // to avoid matching the CSS-hidden mobile/desktop duplicate
+      const chipsRegion = searchResultsContainer(page)
         .locator('[role="region"][aria-label="Applied filters"]')
         .first();
       await expect(chipsRegion).toBeVisible({ timeout: 30000 });
@@ -277,7 +278,8 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      const chipsRegion = page
+      // Scope to visible search container to avoid matching CSS-hidden duplicate
+      const chipsRegion = searchResultsContainer(page)
         .locator('[role="region"][aria-label="Applied filters"]')
         .first();
       await expect(chipsRegion).toBeVisible({ timeout: 30000 });

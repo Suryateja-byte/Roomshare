@@ -9,7 +9,7 @@
  * The viewport validation test (10.4) works in both v1 and v2 modes.
  */
 
-import { test, expect, tags, timeouts, SF_BOUNDS } from "./helpers/test-utils";
+import { test, expect, tags, timeouts, SF_BOUNDS, searchResultsContainer } from "./helpers/test-utils";
 import { waitForMapReady, pollForMarkers } from "./helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -86,10 +86,11 @@ test.describe("Map Error States and Accessibility", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Should show empty state or "no results" message
-      // Use visible-only locators to avoid matching the sr-only aria-live div
-      const emptyStateVisible = page.locator('[data-testid="empty-state"]');
-      const noMatchesHeading = page.getByRole("heading", { name: /no matches/i });
-      const noListingsText = page.locator('text=/no listings found|couldn.*find any listings/i');
+      // Scope to visible search container to avoid matching CSS-hidden mobile/desktop duplicate
+      const container = searchResultsContainer(page);
+      const emptyStateVisible = container.locator('[data-testid="empty-state"]');
+      const noMatchesHeading = container.getByRole("heading", { name: /no matches/i });
+      const noListingsText = container.getByText(/no listings found|couldn.*find any listings/i);
 
       // Either the empty state container, "No matches found" heading, or "no listings" text
       // Wait longer because SSR may initially render with stale data before client takes over
@@ -98,7 +99,7 @@ test.describe("Map Error States and Accessibility", () => {
       if (!emptyVisible) {
         // The query might have returned results from seed data or the empty state uses
         // a different pattern. Check if there are listing cards instead.
-        const hasCards = await page.locator('[data-testid="listing-card"]').count() > 0;
+        const hasCards = await container.locator('[data-testid="listing-card"]').count() > 0;
         if (hasCards) {
           test.skip(true, "Query returned results from seed data — cannot test empty state");
           return;
