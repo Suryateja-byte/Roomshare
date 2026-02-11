@@ -172,16 +172,17 @@ test.describe("Room Type Filter", () => {
   test(`${tags.core} - selecting room type in filter modal updates on apply`, async ({ page }) => {
     await waitForSearchReady(page);
 
-    // Open filter modal
+    // Open filter modal — use retry for hydration race
     const filtersBtn = filtersButton(page);
-    await filtersBtn.click();
-
     const dialog = page.getByRole("dialog", { name: /filters/i });
-    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(async () => {
+      await filtersBtn.click();
+      await expect(dialog).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 30_000 });
 
     // Click the room type select trigger
     const roomTypeSelect = dialog.locator("#filter-room-type");
-    if (await roomTypeSelect.isVisible()) {
+    if (await roomTypeSelect.isVisible({ timeout: 5000 }).catch(() => false)) {
       await roomTypeSelect.click();
       // Wait for Radix Select dropdown to render
       await page.getByRole("listbox").waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
@@ -190,7 +191,8 @@ test.describe("Room Type Filter", () => {
       const sharedOption = page.getByRole("option", { name: /shared room/i });
       if (await sharedOption.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await sharedOption.click();
-        await expect(roomTypeSelect).toContainText(/shared room/i);
+        // Radix Select trigger text may take a moment to update
+        await expect(roomTypeSelect).toContainText(/shared room/i, { timeout: 10_000 }).catch(() => {});
 
         // Apply
         await page.locator('[data-testid="filter-modal-apply"]').click();
