@@ -46,7 +46,13 @@ test.describe("Breathing Pending State (PR1)", () => {
       }
 
       // Add artificial delay to search API to make pending state observable
+      // Skip /api/search-count so the count preview resolves quickly and the
+      // Apply button DOM stabilises before we click it.
       await page.route("**/search**", async (route) => {
+        if (route.request().url().includes("/search-count")) {
+          await route.continue();
+          return;
+        }
         await new Promise((resolve) => setTimeout(resolve, 500));
         await route.continue();
       });
@@ -95,6 +101,11 @@ test.describe("Breathing Pending State (PR1)", () => {
       // Button text varies: "Show X listings", "Show Results", or a count
       const showButton = page.locator('[data-testid="filter-modal-apply"]');
       await expect(showButton).toBeVisible({ timeout: 5000 });
+      // Wait for the count-loading spinner inside the button to disappear so
+      // the button DOM is stable (no React unmount/remount mid-click).
+      await expect(
+        showButton.locator('.animate-spin')
+      ).not.toBeVisible({ timeout: 10_000 });
       await showButton.click();
 
       // Check for pending state indicators (may be too fast to catch)
