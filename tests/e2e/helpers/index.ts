@@ -72,3 +72,6 @@ export {
 
 // Filter test helpers for search filter E2E tests
 export * from "./filter-helpers";
+
+// Map tile mocking for CI stability (auto-applied via test fixture)
+export { mockMapTileRequests } from "./map-mock-helpers";

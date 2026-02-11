@@ -4,6 +4,7 @@ import { navigationHelpers } from "./navigation-helpers";
 import { networkHelpers, NetworkCondition } from "./network-helpers";
 import { assertionHelpers } from "./assertions";
 import { dataHelpers } from "./data-helpers";
+import { mockMapTileRequests } from "./map-mock-helpers";
 
 /**
  * Extended test fixture with custom helpers
@@ -14,7 +15,16 @@ export const test = base.extend<{
   network: ReturnType<typeof networkHelpers>;
   assert: ReturnType<typeof assertionHelpers>;
   data: typeof dataHelpers;
+  _mockMapTiles: void;
 }>({
+  // Auto-mock all external map tile/style/geocoding requests.
+  // Runs before every test; only intercepts external domains so
+  // non-map tests are unaffected (routes simply never match).
+  _mockMapTiles: [async ({ page }, use) => {
+    await mockMapTileRequests(page);
+    await use();
+  }, { auto: true }],
+
   auth: async ({}, use) => {
     await use(authHelpers);
   },
