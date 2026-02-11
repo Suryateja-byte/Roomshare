@@ -91,8 +91,9 @@ test.describe("Price Range Filter", () => {
   test(`${tags.core} - setting min price updates URL with minPrice param`, async ({ page }) => {
     await waitForSearchReady(page);
     // Wait for map "Search as I move" URL updates to settle — useBatchedFilters
-    // resets pending state whenever searchParams change (committed → pending sync)
-    await waitForUrlStable(page);
+    // resets pending state whenever searchParams change (committed → pending sync).
+    // Generous settle for CI runners where map bounds updates are slower.
+    await waitForUrlStable(page, 1500);
 
     await setInlineMinPrice(page, "500");
     await submitSearch(page);
@@ -104,7 +105,7 @@ test.describe("Price Range Filter", () => {
   // 2. Set max price -> URL gets maxPrice param
   test(`${tags.core} - setting max price updates URL with maxPrice param`, async ({ page }) => {
     await waitForSearchReady(page);
-    await waitForUrlStable(page);
+    await waitForUrlStable(page, 1500);
 
     await setInlineMaxPrice(page, "2000");
     await submitSearch(page);
@@ -116,7 +117,8 @@ test.describe("Price Range Filter", () => {
   // 3. Set both min and max -> URL has both params
   test(`${tags.core} - setting both min and max price updates URL with both params`, async ({ page }) => {
     await waitForSearchReady(page);
-    await waitForUrlStable(page);
+    // Generous settle — CI runners are slower; map bounds can take >500ms
+    await waitForUrlStable(page, 1500);
 
     await setInlineMinPrice(page, "500");
     await setInlineMaxPrice(page, "2000");

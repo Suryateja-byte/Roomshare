@@ -87,7 +87,8 @@ test.describe("Filter Race Conditions", () => {
     // Wait for search debounce (~600ms) + map "Search as I move" bounds update
     // to fully settle. useBatchedFilters resets pending state on any URL change,
     // so we need a generous settle window to avoid the toggle being wiped.
-    await waitForUrlStable(page, 1500);
+    // CI runners need extra time (map fly animation + geocode round-trip).
+    await waitForUrlStable(page, 2000);
 
     await openFilterModal(page);
 
