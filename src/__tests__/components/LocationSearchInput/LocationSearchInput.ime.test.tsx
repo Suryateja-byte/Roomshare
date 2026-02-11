@@ -20,20 +20,6 @@ jest.mock('@/lib/geocoding-cache', () => ({
   clearCache: jest.fn(),
 }));
 
-// Mock environment variable
-const MOCK_MAPBOX_TOKEN = 'pk.test_token_12345';
-const originalEnv = process.env;
-
-beforeAll(() => {
-  process.env = {
-    ...originalEnv,
-    NEXT_PUBLIC_MAPBOX_TOKEN: MOCK_MAPBOX_TOKEN,
-  };
-});
-
-afterAll(() => {
-  process.env = originalEnv;
-});
 
 // Controlled wrapper component that manages state for the LocationSearchInput
 // This is necessary because the component uses useDebounce(value, 300) where
@@ -76,7 +62,7 @@ describe('LocationSearchInput - IME Composition', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ features: [] }),
+      json: async () => ({ type: 'FeatureCollection', features: [] }),
     });
   });
 

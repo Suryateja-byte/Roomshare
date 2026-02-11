@@ -228,8 +228,8 @@ export const circuitBreakers = {
     successThreshold: 3,
   }),
 
-  mapboxGeocode: new CircuitBreaker({
-    name: 'mapbox-geocode',
+  nominatimGeocode: new CircuitBreaker({
+    name: 'nominatim-geocode',
     failureThreshold: 5,
     resetTimeout: 30000, // 30 seconds
     successThreshold: 2,

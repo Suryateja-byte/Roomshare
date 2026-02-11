@@ -21,24 +21,13 @@ global.AbortController = jest.fn().mockImplementation(() => ({
   abort: mockAbort,
 })) as unknown as typeof AbortController;
 
-// Mock environment variable
-const MOCK_MAPBOX_TOKEN = 'pk.test_token_12345';
-const originalEnv = process.env;
 
-beforeAll(() => {
-  process.env = {
-    ...originalEnv,
-    NEXT_PUBLIC_MAPBOX_TOKEN: MOCK_MAPBOX_TOKEN,
-  };
-});
-
-afterAll(() => {
-  process.env = originalEnv;
-});
-
-const mockSuggestions = [
-  { id: '1', place_name: 'San Francisco, CA, USA', center: [-122.4194, 37.7749], place_type: ['place'] },
-];
+const mockPhotonSuggestions = {
+  type: 'FeatureCollection',
+  features: [
+    { type: 'Feature', geometry: { type: 'Point', coordinates: [-122.4194, 37.7749] }, properties: { osm_id: 1, osm_type: 'R', name: 'San Francisco', state: 'CA', country: 'USA', type: 'city' } },
+  ],
+};
 
 // Stateful wrapper for controlled component testing
 const ControlledLocationInput = ({
@@ -85,7 +74,7 @@ describe('LocationSearchInput - API Error Handling', () => {
   };
 
   describe('429 Rate Limit Handling', () => {
-    it('shows rate limit message on 429', async () => {
+    it('shows error message on 429', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
@@ -99,76 +88,9 @@ describe('LocationSearchInput - API Error Handling', () => {
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
-        // Component shows rate limit message - due to useCallback/useEffect dependency chain,
-        // the message shown is from the isRateLimited check at the start of fetchSuggestions
-        expect(screen.getByText('Too many requests. Please wait a moment.')).toBeInTheDocument();
+        // searchPhoton throws 'Failed to fetch suggestions' for non-500 errors
+        expect(screen.getByText('Failed to fetch suggestions')).toBeInTheDocument();
       });
-    });
-
-    it('auto-retries after 2 seconds on 429', async () => {
-      // First call returns 429
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 429,
-        json: async () => ({ error: 'Rate limit exceeded' }),
-      });
-
-      // Retry returns success
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ features: mockSuggestions }),
-      });
-
-      renderInput();
-      const input = screen.getByRole('combobox');
-
-      await user.type(input, 'San Francisco');
-      jest.advanceTimersByTime(350);
-
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(1);
-      });
-
-      // Wait for rate limit reset and retry
-      act(() => {
-        jest.advanceTimersByTime(2100);
-      });
-
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(2);
-      });
-
-      // Should show results after retry - place name is split across elements
-      await waitFor(() => {
-        expect(screen.getByText('San Francisco')).toBeInTheDocument();
-      });
-    });
-
-    it('does not make new requests while rate limited', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 429,
-        json: async () => ({ error: 'Rate limit exceeded' }),
-      });
-
-      renderInput();
-      const input = screen.getByRole('combobox');
-
-      await user.type(input, 'San');
-      jest.advanceTimersByTime(350);
-
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(1);
-      });
-
-      // Try to type more while rate limited
-      await user.type(input, ' Francisco');
-      jest.advanceTimersByTime(350);
-
-      // Should not make additional requests while rate limited
-      // (only the first one and the auto-retry)
-      expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(2);
     });
   });
 
@@ -187,7 +109,8 @@ describe('LocationSearchInput - API Error Handling', () => {
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
-        expect(screen.getByText(/invalid/i)).toBeInTheDocument();
+        // searchPhoton throws 'Failed to fetch suggestions' for non-500 errors
+        expect(screen.getByText('Failed to fetch suggestions')).toBeInTheDocument();
       });
     });
   });
@@ -207,7 +130,8 @@ describe('LocationSearchInput - API Error Handling', () => {
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
-        expect(screen.getByText(/api key|authentication|unauthorized/i)).toBeInTheDocument();
+        // searchPhoton throws 'Failed to fetch suggestions' for non-500 errors
+        expect(screen.getByText('Failed to fetch suggestions')).toBeInTheDocument();
       });
     });
 
@@ -225,7 +149,8 @@ describe('LocationSearchInput - API Error Handling', () => {
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
-        expect(screen.getByText(/authentication failed/i)).toBeInTheDocument();
+        // searchPhoton throws 'Failed to fetch suggestions' for non-500 errors
+        expect(screen.getByText('Failed to fetch suggestions')).toBeInTheDocument();
       });
     });
   });
@@ -312,7 +237,7 @@ describe('LocationSearchInput - API Error Handling', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ features: mockSuggestions }),
+        json: async () => mockPhotonSuggestions,
       });
 
       renderInput();
@@ -338,11 +263,10 @@ describe('LocationSearchInput - API Error Handling', () => {
 
     it('ignores stale responses', async () => {
       const earlyResponse = {
-        features: [{ id: 'old', place_name: 'Old Result', center: [0, 0], place_type: ['place'] }],
+        type: 'FeatureCollection',
+        features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { osm_id: 99, osm_type: 'N', name: 'Old Result', country: 'XX', type: 'city' } }],
       };
-      const lateResponse = {
-        features: mockSuggestions,
-      };
+      const lateResponse = mockPhotonSuggestions;
 
       // First request - slow
       mockFetch.mockImplementationOnce(
@@ -393,7 +317,7 @@ describe('LocationSearchInput - API Error Handling', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ features: mockSuggestions }),
+        json: async () => mockPhotonSuggestions,
       });
 
       renderInput();
@@ -428,7 +352,7 @@ describe('LocationSearchInput - API Error Handling', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ features: mockSuggestions }),
+        json: async () => mockPhotonSuggestions,
       });
 
       renderInput();
@@ -461,7 +385,7 @@ describe('LocationSearchInput - API Error Handling', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ features: mockSuggestions }),
+        json: async () => mockPhotonSuggestions,
       });
 
       renderInput();
@@ -494,7 +418,7 @@ describe('LocationSearchInput - API Error Handling', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ features: mockSuggestions }),
+        json: async () => mockPhotonSuggestions,
       });
 
       renderInput();

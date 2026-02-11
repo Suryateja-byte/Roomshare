@@ -55,7 +55,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env = { ...originalEnv, NEXT_PUBLIC_MAPBOX_TOKEN: "test-token" };
+    process.env = { ...originalEnv };
   });
 
   afterEach(() => {
@@ -265,7 +265,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       let result = null;
       try {
         await fetch(
-          "https://api.mapbox.com/geocoding/v5/mapbox.places/test.json",
+          "https://nominatim.openstreetmap.org/search?q=test&format=jsonv2&limit=1",
         );
       } catch {
         result = null;
@@ -281,7 +281,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       });
 
       const response = await fetch(
-        "https://api.mapbox.com/geocoding/v5/mapbox.places/xyz123.json",
+        "https://nominatim.openstreetmap.org/search?q=xyz123&format=jsonv2&limit=1",
       );
       const data = await response.json();
 
@@ -296,7 +296,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       });
 
       const response = await fetch(
-        "https://api.mapbox.com/geocoding/v5/mapbox.places/test.json",
+        "https://nominatim.openstreetmap.org/search?q=test&format=jsonv2&limit=1",
       );
 
       expect(response.ok).toBe(false);
@@ -328,7 +328,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       });
 
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`,
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2`,
       );
       const data = await response.json();
 
@@ -348,7 +348,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       });
 
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`,
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2`,
       );
       const data = await response.json();
 

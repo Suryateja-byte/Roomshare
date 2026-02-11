@@ -4,22 +4,21 @@ import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { MapPin, Loader2, X, AlertCircle, SearchX } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import { getCachedResults, setCachedResults, type GeocodingResult } from '@/lib/geocoding-cache';
+import { searchPhoton, PHOTON_QUERY_MAX_LENGTH } from '@/lib/geocoding/photon';
 
-// Mapbox API limits
-const MAPBOX_QUERY_MAX_LENGTH = 256;
 const MIN_QUERY_LENGTH = 2;
 
 /**
  * Sanitizes user input for safe API requests
  * - Trims whitespace
  * - Removes control characters
- * - Enforces max length (Mapbox 256 char limit)
+ * - Enforces max length
  */
 function sanitizeQuery(input: string): string {
   return input
     .trim()
     .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
-    .slice(0, MAPBOX_QUERY_MAX_LENGTH);
+    .slice(0, PHOTON_QUERY_MAX_LENGTH);
 }
 
 interface LocationSuggestion {
@@ -63,14 +62,12 @@ export default function LocationSearchInput({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [error, setError] = useState<string | null>(null);
   const [noResults, setNoResults] = useState(false);
-  const [isRateLimited, setIsRateLimited] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
-  const rateLimitResetRef = useRef<NodeJS.Timeout | null>(null);
   const pendingQueryRef = useRef<string | null>(null);
   const isComposingRef = useRef(false);
 
@@ -81,16 +78,13 @@ export default function LocationSearchInput({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (rateLimitResetRef.current) {
-        clearTimeout(rateLimitResetRef.current);
-      }
       if (abortRef.current) {
         abortRef.current.abort();
       }
     };
   }, []);
 
-  // Fetch suggestions from Mapbox Geocoding API
+  // Fetch suggestions from Photon geocoding API
   const fetchSuggestions = useCallback(async (query: string) => {
     // Sanitize input
     const sanitized = sanitizeQuery(query);
@@ -123,19 +117,6 @@ export default function LocationSearchInput({
       return;
     }
 
-    // Don't fetch if rate limited
-    if (isRateLimited) {
-      setError('Too many requests. Please wait a moment.');
-      return;
-    }
-
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (!token) {
-      setError('Location search is temporarily unavailable');
-      console.error('Mapbox token is missing');
-      return;
-    }
-
     // Track this request
     const requestId = ++requestIdRef.current;
     pendingQueryRef.current = sanitized;
@@ -150,48 +131,12 @@ export default function LocationSearchInput({
     setIsLoading(true);
 
     try {
-      const encodedQuery = encodeURIComponent(sanitized);
-      // Focus on places, regions, localities, neighborhoods
-      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${token}&types=place,locality,neighborhood,address,region&limit=5&autocomplete=true`;
-
-      const response = await fetch(url, { signal: controller.signal });
-
-      // Handle rate limiting (429)
-      if (response.status === 429) {
-        setIsRateLimited(true);
-        setError('Rate limit reached. Retrying shortly...');
-        setShowSuggestions(true); // Show error in dropdown
-
-        // Auto-retry after 2 seconds
-        rateLimitResetRef.current = setTimeout(() => {
-          setIsRateLimited(false);
-          setError(null);
-          // Retry with the current value
-          if (pendingQueryRef.current === sanitized) {
-            pendingQueryRef.current = null;
-            fetchSuggestions(sanitized);
-          }
-        }, 2000);
-        return;
-      }
-
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Location service authentication failed');
-        } else if (response.status === 422) {
-          throw new Error('Invalid search query');
-        } else if (response.status >= 500) {
-          throw new Error('Location service is temporarily unavailable');
-        }
-        throw new Error('Failed to fetch suggestions');
-      }
-
-      const data = await response.json();
+      const results = await searchPhoton(sanitized, { signal: controller.signal });
 
       // Stale response check
       if (requestId !== requestIdRef.current) return;
 
-      const features = (data.features || []) as LocationSuggestion[];
+      const features = results as LocationSuggestion[];
 
       // Cache the results
       setCachedResults(sanitized, features as GeocodingResult[]);
@@ -235,7 +180,7 @@ export default function LocationSearchInput({
         setIsLoading(false);
       }
     }
-  }, [isRateLimited]);
+  }, []);
 
   // Fetch suggestions when debounced value changes (but not during IME composition)
   useEffect(() => {

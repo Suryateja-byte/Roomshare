@@ -10,6 +10,7 @@ import { Marker } from 'react-map-gl/maplibre';
 import { MapPin, X, Navigation } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { reverseGeocode } from '@/lib/geocoding/nominatim';
 
 export interface UserPinState {
     lng: number;
@@ -26,8 +27,6 @@ interface UserMarkerProps {
     pin: UserPinState | null;
     /** Set user pin */
     onSetPin: (pin: UserPinState | null) => void;
-    /** Mapbox access token */
-    mapboxToken: string;
     /** Currently hovered listing coordinates */
     hoveredListingCoords: { lat: number; lng: number } | null;
     /** Dark mode */
@@ -55,28 +54,23 @@ export function UserMarker({
     onToggleDropMode,
     pin,
     onSetPin,
-    mapboxToken,
     hoveredListingCoords,
     isDarkMode,
 }: UserMarkerProps) {
     const abortRef = useRef<AbortController | null>(null);
 
     // Reverse geocode when pin is placed
-    const reverseGeocode = useCallback(async (lng: number, lat: number): Promise<string | null> => {
+    const reverseGeocodePin = useCallback(async (lng: number, lat: number): Promise<string | null> => {
         abortRef.current?.abort();
         const controller = new AbortController();
         abortRef.current = controller;
 
         try {
-            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&types=address,poi&limit=1`;
-            const res = await fetch(url, { signal: controller.signal });
-            if (!res.ok) return null;
-            const data = await res.json();
-            return data.features?.[0]?.place_name ?? null;
+            return await reverseGeocode(lat, lng, { signal: controller.signal });
         } catch {
             return null;
         }
-    }, [mapboxToken]);
+    }, []);
 
     // Clean up on unmount
     useEffect(() => {
@@ -115,7 +109,7 @@ export function UserMarker({
                     draggable
                     onDragEnd={async (e) => {
                         const { lng, lat } = e.lngLat;
-                        const address = await reverseGeocode(lng, lat);
+                        const address = await reverseGeocodePin(lng, lat);
                         onSetPin({ lng, lat, address });
                     }}
                 >
@@ -169,7 +163,7 @@ export function UserMarker({
  * Hook for managing user pin state and drop-mode in the parent Map component.
  * Call `handleMapClick` from the Map's onClick when drop mode is active.
  */
-export function useUserPin(mapboxToken: string) {
+export function useUserPin() {
     const [isDropMode, setIsDropMode] = useState(false);
     const [pin, setPin] = useState<UserPinState | null>(null);
     const abortRef = useRef<AbortController | null>(null);
@@ -191,11 +185,8 @@ export function useUserPin(mapboxToken: string) {
         abortRef.current = controller;
 
         try {
-            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&types=address,poi&limit=1`;
-            const res = await fetch(url, { signal: controller.signal });
-            if (res.ok && !controller.signal.aborted) {
-                const data = await res.json();
-                const address = data.features?.[0]?.place_name ?? null;
+            const address = await reverseGeocode(lat, lng, { signal: controller.signal });
+            if (!controller.signal.aborted) {
                 setPin(prev => prev ? { ...prev, address } : null);
             }
         } catch {
@@ -203,7 +194,7 @@ export function useUserPin(mapboxToken: string) {
         }
 
         return true; // Handled
-    }, [isDropMode, mapboxToken]);
+    }, [isDropMode]);
 
     // Clean up on unmount
     useEffect(() => {

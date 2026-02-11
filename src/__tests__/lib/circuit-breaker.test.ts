@@ -414,10 +414,10 @@ describe('circuit-breaker', () => {
       expect(circuitBreakers.email.getState()).toBe('CLOSED');
     });
 
-    describe('mapboxGeocode breaker', () => {
+    describe('nominatimGeocode breaker', () => {
       it('should exist and start closed', () => {
-        expect(circuitBreakers.mapboxGeocode).toBeDefined();
-        expect(circuitBreakers.mapboxGeocode.getState()).toBe('CLOSED');
+        expect(circuitBreakers.nominatimGeocode).toBeDefined();
+        expect(circuitBreakers.nominatimGeocode.getState()).toBe('CLOSED');
       });
     });
 
