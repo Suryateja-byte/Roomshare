@@ -14,7 +14,7 @@
  * - pointer-events-none is on the overlay child, not the container itself
  */
 
-import { test, expect, tags, selectors, timeouts, searchResultsContainer, filtersButton } from "../helpers";
+import { test, expect, tags, selectors, timeouts, SF_BOUNDS, searchResultsContainer, filtersButton } from "../helpers";
 
 test.describe("Breathing Pending State (PR1)", () => {
   // Filter tests run as anonymous user
@@ -172,7 +172,7 @@ test.describe("Breathing Pending State (PR1)", () => {
       page,
       nav,
     }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for the page to finish loading
@@ -201,8 +201,8 @@ test.describe("Breathing Pending State (PR1)", () => {
     test(`${tags.anon} ${tags.a11y} - SlowTransitionBadge has proper role and aria-live`, async ({
       page,
     }) => {
-      // Navigate to search
-      await page.goto("/search");
+      // Navigate to search with bounds for reliable results
+      await page.goto(`/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`);
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for results to appear
@@ -231,7 +231,7 @@ test.describe("Breathing Pending State (PR1)", () => {
       page,
       nav,
     }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       const resultsContainer = searchResultsContainer(page);

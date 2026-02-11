@@ -6,7 +6,7 @@
  * and alert configurations.
  */
 
-import { test, expect, tags, selectors, searchResultsContainer } from "../helpers";
+import { test, expect, tags, selectors, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 test.describe("Favorites & Saved Searches Journeys", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
@@ -21,7 +21,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       nav,
     }) => {
       // Navigate to search with results
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Find favorite button on first listing
@@ -317,7 +317,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       nav,
     }) => {
       // First, view some listings to populate history
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Only click listing card if cards exist

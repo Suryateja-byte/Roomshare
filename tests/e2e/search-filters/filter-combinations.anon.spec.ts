@@ -242,7 +242,7 @@ test.describe("Filter Combinations", () => {
     await openFilterModal(page);
 
     // Apply without changing anything (just to test bounds persistence)
-    await applyFilters(page);
+    await applyFilters(page, { expectUrlChange: false });
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Bounds should still be there

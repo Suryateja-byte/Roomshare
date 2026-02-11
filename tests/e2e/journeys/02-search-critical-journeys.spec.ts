@@ -50,9 +50,10 @@ test.describe("20 Critical Search Page Journeys", () => {
     expect(url.searchParams.get("minPrice")).toBe("500");
     expect(url.searchParams.get("maxPrice")).toBe("1500");
 
-    // Verify price inputs reflect values
+    // Verify price inputs reflect values (wait for hydration to populate inputs)
     const minInput = page.getByLabel(/minimum budget/i);
     const maxInput = page.getByLabel(/maximum budget/i);
+    await expect.poll(() => minInput.inputValue(), { timeout: 10_000 }).not.toBe('');
     await expect(minInput).toHaveValue("500");
     await expect(maxInput).toHaveValue("1500");
 
@@ -408,8 +409,9 @@ test.describe("20 Critical Search Page Journeys", () => {
     expect(url.searchParams.get("minPrice")).toBe("700");
     expect(url.searchParams.get("sort")).toBe("price_asc");
 
-    // Verify price input still shows correct value
+    // Verify price input still shows correct value (wait for hydration)
     const minInput = page.getByLabel(/minimum budget/i);
+    await expect.poll(() => minInput.inputValue(), { timeout: 10_000 }).not.toBe('');
     await expect(minInput).toHaveValue("700");
   });
 

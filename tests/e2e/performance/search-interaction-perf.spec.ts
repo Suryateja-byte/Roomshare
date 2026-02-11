@@ -47,11 +47,17 @@ test.describe('Search Interaction Performance', () => {
       }
     });
 
-    // Wait for results to update
+    // Wait for results to update (Server Actions use /_next POST, not /api/search)
+    const countBefore = await page.locator('[data-testid="listing-card"]').count();
     await page.waitForResponse(
-      (resp) => resp.url().includes('/api/search') || resp.url().includes('/api/listings'),
-      { timeout: 30000 },
+      (resp) =>
+        resp.url().includes('/api/search') ||
+        resp.url().includes('/api/listings') ||
+        (resp.url().includes('/_next') && resp.request().method() === 'POST'),
+      { timeout: 15_000 },
     ).catch(() => null);
+    // Also wait for card count to potentially change (sort reorders, count may stay same)
+    await page.locator('[data-testid="listing-card"]').first().waitFor({ state: 'attached', timeout: 5_000 }).catch(() => {});
 
     const elapsed = Date.now() - start;
     expect(elapsed, `Sort change took ${elapsed}ms, budget is ${budget}ms`).toBeLessThan(budget);
@@ -68,14 +74,16 @@ test.describe('Search Interaction Performance', () => {
     const isVisible = await loadMore.isVisible({ timeout: 10_000 }).catch(() => false);
     test.skip(!isVisible, 'Load more button not visible');
 
+    const countBefore = await cards.count();
     const start = Date.now();
     await loadMore.click();
 
-    // Wait for new listings to appear
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/api/search') || resp.url().includes('/api/listings'),
-      { timeout: 30000 },
-    ).catch(() => null);
+    // Wait for new listings to appear via card count change detection
+    // Server Actions use /_next POST, not /api/search
+    await expect.poll(
+      () => page.locator('[data-testid="listing-card"]').count(),
+      { timeout: budget },
+    ).toBeGreaterThan(countBefore);
 
     const elapsed = Date.now() - start;
     expect(elapsed, `Load more took ${elapsed}ms, budget is ${budget}ms`).toBeLessThan(budget);
@@ -96,10 +104,13 @@ test.describe('Search Interaction Performance', () => {
     const start = Date.now();
     await chipRemove.click();
 
-    // Wait for search to re-execute
+    // Wait for search to re-execute (Server Actions use /_next POST, not /api/search)
     await page.waitForResponse(
-      (resp) => resp.url().includes('/api/search') || resp.url().includes('/api/listings'),
-      { timeout: 30000 },
+      (resp) =>
+        resp.url().includes('/api/search') ||
+        resp.url().includes('/api/listings') ||
+        (resp.url().includes('/_next') && resp.request().method() === 'POST'),
+      { timeout: 15_000 },
     ).catch(() => null);
 
     const elapsed = Date.now() - start;

@@ -173,21 +173,15 @@ test.describe("Search P0 Smoke Suite", () => {
     const clearVisible = await clearAllBtn.first().isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (clearVisible) {
-      // Use scrollIntoViewIfNeeded + force click to avoid timeout in webkit
-      // where the button may be partially obscured by map overlay or bottom sheet
-      await clearAllBtn.first().scrollIntoViewIfNeeded();
-      await clearAllBtn.first().click({ force: browserName === "webkit", timeout: 30_000 });
-      await page.waitForLoadState("domcontentloaded");
-
-      // After clearing, URL should not contain maxPrice or roomType
-      // Use expect.poll for webkit where URL update may be delayed
-      await expect.poll(
-        () => {
-          const url = page.url();
-          return !url.includes("maxPrice=") && !url.includes("roomType=");
-        },
-        { timeout: 30_000, message: "URL filter params should be removed after clearing" },
-      ).toBe(true);
+      // Retry click+verify pattern for webkit where the button may be partially
+      // obscured by map overlay or bottom sheet, causing intermittent flakes
+      await expect(async () => {
+        await clearAllBtn.first().scrollIntoViewIfNeeded();
+        await clearAllBtn.first().click({ force: browserName === "webkit", timeout: 5_000 });
+        // Verify the button disappears or URL updates (proving the click worked)
+        const url = page.url();
+        expect(!url.includes("maxPrice=") && !url.includes("roomType=")).toBe(true);
+      }).toPass({ timeout: 30_000 });
     } else {
       // If no clear button is visible (e.g., filters applied via URL but chips not rendered),
       // the test is inconclusive -- skip rather than fail

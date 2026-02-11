@@ -167,6 +167,39 @@ async function simulateMapPan(
 }
 
 /**
+ * Programmatic map pan via __e2eMapRef.panBy().
+ * Preferred over simulateMapPan in headless CI (no GPU required).
+ */
+async function programmaticMapPan(
+  page: Page,
+  deltaX = 100,
+  deltaY = 0,
+): Promise<boolean> {
+  const result = await page.evaluate(({ dx, dy }) => {
+    return new Promise<boolean>((resolve) => {
+      const map = (window as any).__e2eMapRef;
+      const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+      if (!map) { resolve(false); return; }
+      const centerBefore = map.getCenter();
+      if (setProgrammatic) setProgrammatic(false);
+      map.once("idle", () => {
+        const centerAfter = map.getCenter();
+        const moved =
+          Math.abs(centerAfter.lng - centerBefore.lng) > 0.0001 ||
+          Math.abs(centerAfter.lat - centerBefore.lat) > 0.0001;
+        resolve(moved);
+      });
+      map.panBy([dx, dy], { animate: false });
+      setTimeout(() => resolve(true), 10_000);
+    });
+  }, { dx: deltaX, dy: deltaY });
+  if (result) {
+    await waitForMapReady(page);
+  }
+  return result;
+}
+
+/**
  * Ensure "Search as I move" toggle is ON.
  */
 async function ensureSearchAsMoveOn(page: Page): Promise<void> {
@@ -691,7 +724,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       expect(initialBounds.minLng).not.toBeNull();
 
       // Pan map east (drag from center to left so the viewport shifts right/east)
-      const panned = await simulateMapPan(page, -150, 0);
+      const panned = await programmaticMapPan(page, -150, 0) || await simulateMapPan(page, -150, 0);
       if (!panned) {
         test.skip(true, "Map pan failed");
         return;

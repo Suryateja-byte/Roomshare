@@ -6,7 +6,7 @@
  * content moderation, and user management.
  */
 
-import { test, expect, tags, selectors, timeouts } from '../helpers';
+import { test, expect, tags, selectors, timeouts, SF_BOUNDS } from '../helpers';
 
 test.beforeEach(async () => {
   test.slow();
@@ -158,7 +158,7 @@ test.describe('Verification Journeys', () => {
     });
 
     test(`${tags.core} - Verified badge on listings`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
 
       // Look for verified indicators on listing cards
       const verifiedIndicator = page.locator('[data-testid="verified-host"]')
@@ -407,7 +407,7 @@ test.describe('Admin Journeys', () => {
 
   test.describe('J085-J086: Report handling', () => {
     test(`${tags.auth} - Submit content report`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await nav.clickListingCard(0);
 
       // Find report button

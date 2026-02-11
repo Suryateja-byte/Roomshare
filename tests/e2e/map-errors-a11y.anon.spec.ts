@@ -87,7 +87,7 @@ test.describe("Map Error States and Accessibility", () => {
 
       // Should show empty state or "no results" message
       const emptyState = page.locator(selectors.emptyState);
-      const noResultsText = page.getByText(/no.*results|no.*listings|nothing.*found/i);
+      const noResultsText = page.getByText(/no.*results|no.*listings|nothing.*found|no.*matches/i);
 
       // Either empty state component or no results message should be visible
       // Use .first() because the message appears in both mobile and desktop containers
@@ -391,7 +391,7 @@ test.describe("Map Error States and Accessibility", () => {
         await page.waitForLoadState("domcontentloaded");
 
         // Wait for listings to load
-        const listings = page.locator('a[href^="/listings/c"]');
+        const listings = page.locator('a[href^="/listings/"]');
         await expect(listings.first()).toBeAttached({ timeout: 30000 });
 
         // Check for bottom sheet with proper ARIA
@@ -426,7 +426,7 @@ test.describe("Map Error States and Accessibility", () => {
         await page.waitForLoadState("domcontentloaded");
 
         // Wait for listings
-        const listings = page.locator('a[href^="/listings/c"]');
+        const listings = page.locator('a[href^="/listings/"]');
         await expect(listings.first()).toBeAttached({ timeout: 30000 });
 
         const bottomSheet = page.locator('[role="region"][aria-label="Search results"]');

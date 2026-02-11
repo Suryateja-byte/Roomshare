@@ -183,6 +183,40 @@ async function simulateMapPan(
 }
 
 /**
+ * Programmatic map pan using the E2E map ref.
+ * Preferred over simulateMapPan in headless CI (no GPU required).
+ * Falls back to simulateMapPan on failure.
+ */
+async function programmaticMapPan(
+  page: Page,
+  deltaX = 100,
+  deltaY = 50,
+): Promise<boolean> {
+  const result = await page.evaluate(({ dx, dy }) => {
+    return new Promise<boolean>((resolve) => {
+      const map = (window as any).__e2eMapRef;
+      const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+      if (!map) { resolve(false); return; }
+      const centerBefore = map.getCenter();
+      if (setProgrammatic) setProgrammatic(false); // allow search-as-I-move to fire
+      map.once("idle", () => {
+        const centerAfter = map.getCenter();
+        const moved =
+          Math.abs(centerAfter.lng - centerBefore.lng) > 0.0001 ||
+          Math.abs(centerAfter.lat - centerBefore.lat) > 0.0001;
+        resolve(moved);
+      });
+      map.panBy([dx, dy], { animate: false });
+      setTimeout(() => resolve(true), 10000);
+    });
+  }, { dx: deltaX, dy: deltaY });
+  if (result) {
+    await waitForMapReady(page);
+  }
+  return result;
+}
+
+/**
  * Parse minLat/maxLat/minLng/maxLng from a URL query string.
  */
 function getUrlBounds(url: string) {
@@ -437,7 +471,7 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
     }
 
     const panDelta = Math.round(mapBox.width * 0.3);
-    const panned = await simulateMapPan(page, panDelta, 0);
+    const panned = await programmaticMapPan(page, panDelta, 0) || await simulateMapPan(page, panDelta, 0);
     if (!panned) {
       test.skip(true, "Map pan did not succeed");
       return;
@@ -547,7 +581,7 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     await turnToggleOff(page);
 
     // Pan map to shift bounds
-    const panned = await simulateMapPan(page, 150, 75);
+    const panned = await programmaticMapPan(page, 150, 75) || await simulateMapPan(page, 150, 75);
     if (!panned) {
       test.skip(true, "Map pan did not succeed");
       return;
@@ -599,7 +633,7 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     // Turn toggle OFF and pan map
     await turnToggleOff(page);
 
-    const panned = await simulateMapPan(page, 200, 100);
+    const panned = await programmaticMapPan(page, 200, 100) || await simulateMapPan(page, 200, 100);
     if (!panned) {
       test.skip(true, "Map pan did not succeed");
       return;

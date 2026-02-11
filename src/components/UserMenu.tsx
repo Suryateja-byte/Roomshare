@@ -47,7 +47,7 @@ export default function UserMenu({ user }: UserMenuProps) {
                                 Profile
                             </Link>
                             <button
-                                onClick={() => signOut()}
+                                onClick={() => signOut({ callbackUrl: '/' })}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-red-500/10 text-red-500 transition-colors"
                             >
                                 <LogOut className="w-4 h-4" />

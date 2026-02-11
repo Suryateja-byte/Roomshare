@@ -456,7 +456,7 @@ test.describe("Map + Filter Interactions", () => {
       // Get initial listing prices from card text content (no data-testid for prices)
       const getListingPrices = async (): Promise<string[]> => {
         return page.evaluate(() => {
-          const cards = document.querySelectorAll('[data-testid="listing-card"], a[href^="/listings/c"]');
+          const cards = document.querySelectorAll('[data-testid="listing-card"], a[href^="/listings/"]');
           const prices: string[] = [];
           cards.forEach((card) => {
             const match = card.textContent?.match(/\$[\d,]+/);

@@ -6,7 +6,7 @@
  * and review moderation.
  */
 
-import { test, expect, tags, selectors } from "../helpers";
+import { test, expect, tags, selectors, SF_BOUNDS } from "../helpers";
 
 test.describe("Reviews Journeys", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
@@ -20,7 +20,7 @@ test.describe("Reviews Journeys", () => {
       page,
       nav,
     }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Check if listing cards exist before clicking
@@ -58,7 +58,7 @@ test.describe("Reviews Journeys", () => {
     });
 
     test(`${tags.core} - Review pagination`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Check if listing cards exist before clicking
@@ -322,7 +322,7 @@ test.describe("Reviews Journeys", () => {
       page,
       nav,
     }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Check if listing cards exist before clicking
@@ -353,7 +353,7 @@ test.describe("Reviews Journeys", () => {
 
   test.describe("J063-J064: Review filtering and sorting", () => {
     test(`${tags.core} - Filter reviews by rating`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Check if listing cards exist before clicking
@@ -379,7 +379,7 @@ test.describe("Reviews Journeys", () => {
     });
 
     test(`${tags.core} - Sort reviews by date`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Check if listing cards exist before clicking
@@ -444,7 +444,7 @@ test.describe("Reviews Journeys", () => {
       page,
       nav,
     }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Check if listing cards exist before clicking

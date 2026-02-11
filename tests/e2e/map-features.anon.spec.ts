@@ -238,36 +238,7 @@ test.describe("Map controls (requires WebGL)", () => {
     }
   });
 
-  // 1.8: Map layers toggle
-  test("map style toggle buttons are present", async ({ page }) => {
-    expect(await page.locator('button').filter({ hasText: /Standard/i }).count()).toBeGreaterThanOrEqual(1);
-    expect(await page.locator('button').filter({ hasText: /Satellite/i }).count()).toBeGreaterThanOrEqual(1);
-  });
-
-  test("clicking satellite persists to sessionStorage", async ({ page }) => {
-    const satBtn = page.locator('button').filter({ hasText: /Satellite/i }).first();
-    await satBtn.click();
-    await expect.poll(
-      () => page.evaluate(() => sessionStorage.getItem("roomshare-map-style")),
-      { timeout: 5_000 },
-    ).toBe("satellite");
-  });
-
-  test("map style persists across navigation", async ({ page }) => {
-    const satBtn = page.locator('button').filter({ hasText: /Satellite/i }).first();
-    await satBtn.click();
-    await expect.poll(
-      () => page.evaluate(() => sessionStorage.getItem("roomshare-map-style")),
-      { timeout: 5_000 },
-    ).toBe("satellite");
-
-    await page.goto(SEARCH_URL);
-    await page.waitForLoadState("domcontentloaded");
-    await waitForMapReady(page);
-
-    const stored = await page.evaluate(() => sessionStorage.getItem("roomshare-map-style"));
-    expect(stored).toBe("satellite");
-  });
+  // 1.8: Satellite toggle removed during MapLibre migration (OpenFreeMap uses free tiles only)
 
   // Keyboard accessibility
   test("map controls are keyboard accessible", async ({ page }) => {

@@ -56,13 +56,19 @@ test.describe("Room Type Filter", () => {
     await waitForSearchReady(page);
 
     // Find the "Private" room type tab (CategoryTabs renders button with text "Private" and aria-pressed)
-    const privateTab = page.locator('button[aria-pressed]').filter({ hasText: /^Private$/i });
+    const privateTab = page.locator('button[aria-pressed]').filter({ hasText: /Private/i });
     const tabVisible = await privateTab.isVisible().catch(() => false);
 
     if (tabVisible) {
-      await privateTab.click();
+      // Wrap in retry: tab click may not trigger URL update immediately due to hydration
+      await expect(async () => {
+        await privateTab.click();
+        await expect.poll(
+          () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        ).not.toBeNull();
+      }).toPass({ timeout: 15_000 });
 
-      // Wait for URL to update via soft navigation
+      // Wait for URL to settle to correct value
       await expect.poll(
         () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
         { timeout: 30_000, message: 'URL param "roomType" to be "Private Room"' },
@@ -87,7 +93,13 @@ test.describe("Room Type Filter", () => {
     const tabVisible = await allTab.isVisible().catch(() => false);
 
     if (tabVisible) {
-      await allTab.click();
+      // Wrap in retry: tab click may not trigger URL update immediately due to hydration
+      await expect(async () => {
+        await allTab.click();
+        await expect.poll(
+          () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        ).toBeNull();
+      }).toPass({ timeout: 15_000 });
 
       await expect.poll(
         () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),

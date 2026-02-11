@@ -109,11 +109,16 @@ test.describe("Filter URL-UI Desync", () => {
     // Wait for page to fully settle after goBack before going forward.
     // Without this, Next.js router re-render may clear forward history.
     await page.waitForLoadState("domcontentloaded").catch(() => {});
-    await waitForUrlStable(page);
+    await waitForUrlStable(page, 1_000);
 
     // Go forward - wait for amenities=Wifi to return
     await page.goForward();
-    await waitForUrlParam(page, "amenities", "Wifi", 30_000);
+
+    // Use expect.poll for URL param check — handles Next.js soft navigation timing
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+      { timeout: 30_000, message: 'URL param "amenities" to be "Wifi" after goForward' },
+    ).toBe("Wifi");
 
     // Verify URL has amenities=Wifi
     const currentUrl = new URL(page.url());

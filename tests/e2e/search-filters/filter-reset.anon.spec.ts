@@ -154,10 +154,13 @@ test.describe("Filter Reset", () => {
     const regionVisible = await region.isVisible().catch(() => false);
     test.skip(!regionVisible, "Applied filters region not visible");
 
-    // "Clear all filters" button in the chip bar
+    // "Clear all filters" button in the chip bar — retry in case click doesn't register
     const clearAllBtn = chipsClearAllButton(page);
     await expect(clearAllBtn).toBeVisible({ timeout: timeouts.action });
-    await clearAllBtn.click();
+    await expect(async () => {
+      await clearAllBtn.click();
+      await expect(clearAllBtn).not.toBeVisible();
+    }).toPass({ timeout: 10_000 });
 
     // Wait for all filter params to be removed from URL via soft navigation
     await expect.poll(

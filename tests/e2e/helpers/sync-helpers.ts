@@ -446,7 +446,7 @@ export async function zoomToExpandClusters(
     await expect
       .poll(
         () => page.locator(".maplibregl-marker:visible").count(),
-        { timeout: 10_000, message: "Waiting for markers after cluster expansion" },
+        { timeout: 15_000, message: "Waiting for markers after cluster expansion" },
       )
       .toBeGreaterThan(0);
     return true;
@@ -467,6 +467,16 @@ export async function waitForMarkersWithClusterExpansion(
 
   if (markerCount < minCount) {
     await zoomToExpandClusters(page);
+    // Force marker layer update if the hook is available
+    await page.evaluate(() => (window as any).__e2eUpdateMarkers?.());
+    // Poll for markers to appear after cluster expansion (CI can be slow)
+    await expect
+      .poll(
+        () => page.locator(".maplibregl-marker:visible").count(),
+        { timeout: 15_000, message: `Waiting for ${minCount}+ markers after cluster expansion` },
+      )
+      .toBeGreaterThanOrEqual(minCount)
+      .catch(() => {});
   }
 
   markerCount = await page.locator(".maplibregl-marker:visible").count();

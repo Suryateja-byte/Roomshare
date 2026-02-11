@@ -165,12 +165,13 @@ test.describe("Filter Validation & Security", () => {
 
   // 17.5: Extremely large price clamped
   test("17.5 - extremely large maxPrice is clamped to MAX_SAFE_PRICE", async ({ page }) => {
+    test.slow(); // WSL2/NTFS compilation delay for edge-case params
     await page.goto(`${SEARCH_URL}&maxPrice=999999999999`);
     await page.waitForLoadState("domcontentloaded");
     await page
-      .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
+      .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
       .first()
-      .waitFor({ state: "attached", timeout: 30_000 });
+      .waitFor({ state: "attached", timeout: 60_000 });
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should not crash

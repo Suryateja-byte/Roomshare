@@ -8,7 +8,7 @@
  * - Single image cards don't show carousel controls
  */
 
-import { test, expect, selectors, timeouts, tags, searchResultsContainer } from "../helpers";
+import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 test.describe("Listing Card Carousel", () => {
   // Run as anonymous user
@@ -18,7 +18,7 @@ test.describe("Listing Card Carousel", () => {
     test.slow();
 
     // Navigate to search page with some results
-    await nav.goToSearch();
+    await nav.goToSearch({ bounds: SF_BOUNDS });
 
     // Wait for listings to load
     await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({

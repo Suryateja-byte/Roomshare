@@ -166,7 +166,7 @@ export const selectors = {
   prevPage: '[aria-label*="previous" i], [data-testid="prev-page"]',
 
   // Empty states
-  emptyState: '[data-testid="empty-state"], [class*="empty-state"]',
+  emptyState: '[data-testid="empty-state"], [class*="empty-state"], :text-matches("No matches found", "i")',
 
   // Map
   map: '[data-testid="map"], [class*="maplibregl"], .maplibregl-map',

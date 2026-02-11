@@ -155,7 +155,7 @@ test.describe("Discovery & Search Journeys", () => {
       assert,
     }) => {
       // Step 1: Navigate to search
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
 
       // Step 2: Click first listing
       await nav.clickListingCard(0);
@@ -265,7 +265,7 @@ test.describe("Discovery & Search Journeys", () => {
 
   test.describe("J005: Sort search results", () => {
     test(`${tags.anon} - Sort by price and date`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Find sort dropdown
@@ -299,7 +299,7 @@ test.describe("Discovery & Search Journeys", () => {
       page,
       nav,
     }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 
       // Find pagination
@@ -336,7 +336,7 @@ test.describe("Discovery & Search Journeys", () => {
       nav,
       assert,
     }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       // Check for main landmark and heading (core a11y checks)

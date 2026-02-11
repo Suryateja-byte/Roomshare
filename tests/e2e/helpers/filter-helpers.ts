@@ -292,8 +292,14 @@ export async function closeFilterModal(page: Page): Promise<void> {
 /**
  * Apply filters: click Apply, wait for dialog to close and URL to settle.
  * Replaces the old pattern that used waitForTimeout(1_500).
+ *
+ * @param opts.expectUrlChange - Set to false when applying without changing
+ *   any filter (e.g. re-applying same state). Defaults to true.
  */
-export async function applyFilters(page: Page): Promise<void> {
+export async function applyFilters(
+  page: Page,
+  opts?: { expectUrlChange?: boolean },
+): Promise<void> {
   const urlBefore = page.url();
   await applyButton(page).click();
 
@@ -301,10 +307,12 @@ export async function applyFilters(page: Page): Promise<void> {
   await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 
   // Increased timeout for CI (soft navigation can be slow on GitHub Actions)
-  await expect.poll(
-    () => page.url(),
-    { timeout: 30_000, message: "URL to change after applying filters" },
-  ).not.toBe(urlBefore);
+  if (opts?.expectUrlChange !== false) {
+    await expect.poll(
+      () => page.url(),
+      { timeout: 30_000, message: "URL to change after applying filters" },
+    ).not.toBe(urlBefore);
+  }
 }
 
 /**
@@ -320,10 +328,11 @@ export async function applyFilters(page: Page): Promise<void> {
 export async function applyFilter(
   page: Page,
   interactions: (dialog: Locator) => Promise<void>,
+  opts?: { expectUrlChange?: boolean },
 ): Promise<void> {
   const dialog = await openFilterModal(page);
   await interactions(dialog);
-  await applyFilters(page);
+  await applyFilters(page, opts);
 }
 
 // ---------------------------------------------------------------------------

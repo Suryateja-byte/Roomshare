@@ -19,9 +19,12 @@ test.describe('API Response Time Budgets', () => {
     test('/api/search responds under budget', async ({ page }) => {
       const searchUrl = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
-      // Intercept the search API call
+      // Intercept the search API or Server Action call (Next.js uses /_next POST for Server Actions)
       const responsePromise = page.waitForResponse(
-        (resp) => resp.url().includes('/api/search') || resp.url().includes('/api/listings'),
+        (resp) =>
+          resp.url().includes('/api/search') ||
+          resp.url().includes('/api/listings') ||
+          (resp.url().includes('/_next') && resp.request().method() === 'POST'),
         { timeout: 30000 },
       );
 
@@ -44,7 +47,10 @@ test.describe('API Response Time Budgets', () => {
       const searchUrl = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}&minPrice=500&maxPrice=2000`;
 
       const responsePromise = page.waitForResponse(
-        (resp) => resp.url().includes('/api/search') || resp.url().includes('/api/listings'),
+        (resp) =>
+          resp.url().includes('/api/search') ||
+          resp.url().includes('/api/listings') ||
+          (resp.url().includes('/_next') && resp.request().method() === 'POST'),
         { timeout: 30000 },
       );
 
@@ -70,7 +76,7 @@ test.describe('API Response Time Budgets', () => {
       const budget = process.env.CI ? 8000 : 2000;
 
       // First get a listing ID
-      await page.goto('/search');
+      await page.goto(`/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`);
       await page.waitForLoadState('domcontentloaded');
 
       const firstCard = page.locator('[data-testid="listing-card"]').first();
@@ -78,9 +84,12 @@ test.describe('API Response Time Budgets', () => {
       const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
       test.skip(!listingId, 'No listings available');
 
-      // Navigate and intercept the listing API call
+      // Navigate and intercept the listing API call (or Server Action)
       const responsePromise = page.waitForResponse(
-        (resp) => resp.url().includes(`/api/listings/${listingId}`) || resp.url().includes(`/listings/${listingId}`),
+        (resp) =>
+          resp.url().includes(`/api/listings/${listingId}`) ||
+          resp.url().includes(`/listings/${listingId}`) ||
+          (resp.url().includes('/_next') && resp.request().method() === 'POST'),
         { timeout: 30000 },
       );
 
