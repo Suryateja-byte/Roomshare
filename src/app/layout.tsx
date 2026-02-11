@@ -57,9 +57,8 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Preconnect to external origins for faster resource loading */}
-        {/* Mapbox - maps, tiles, and geocoding API */}
-        <link rel="preconnect" href="https://api.mapbox.com" />
-        <link rel="preconnect" href="https://events.mapbox.com" />
+        {/* OpenFreeMap - map tiles and glyphs */}
+        <link rel="preconnect" href="https://tiles.openfreemap.org" />
         {/* Supabase - storage for listing images */}
         <link rel="preconnect" href="https://qolpgfdmkqvxraafucvu.supabase.co" />
         {/* Unsplash - fallback images */}

@@ -65,6 +65,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Skip cross-origin map tile/glyph/sprite requests — let the browser handle them directly
+  if (url.hostname === "tiles.openfreemap.org" || url.hostname === "tiles.stadiamaps.com") {
+    return;
+  }
+
   // Skip API requests - always go to network
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(networkFirst(request));
