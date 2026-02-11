@@ -2,19 +2,18 @@
 
 /**
  * BoundaryLayer — fetches and renders neighborhood/locality boundary polygons
- * when the search query matches a named area. Uses Mapbox Geocoding API to
- * get boundary GeoJSON, rendered as a faint shaded fill layer.
+ * when the search query matches a named area. Uses Nominatim to get actual
+ * boundary GeoJSON polygons (upgrade from Mapbox bbox rectangles).
  */
 
 import { Source, Layer } from 'react-map-gl/maplibre';
 import type { LayerProps } from 'react-map-gl/maplibre';
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { searchBoundary } from '@/lib/geocoding/nominatim';
 
 interface BoundaryLayerProps {
     /** Search query text (e.g. "Mission District, SF") */
     query: string | null;
-    /** Mapbox access token */
-    mapboxToken: string;
     /** Dark mode flag */
     isDarkMode: boolean;
 }
@@ -49,7 +48,7 @@ function getBoundaryLineLayer(isDarkMode: boolean): LayerProps {
     };
 }
 
-export function BoundaryLayer({ query, mapboxToken, isDarkMode }: BoundaryLayerProps) {
+export function BoundaryLayer({ query, isDarkMode }: BoundaryLayerProps) {
     const [geojson, setGeojson] = useState<BoundaryGeoJSON>(EMPTY_GEOJSON);
     const abortRef = useRef<AbortController | null>(null);
     const lastQueryRef = useRef<string | null>(null);
@@ -73,46 +72,58 @@ export function BoundaryLayer({ query, mapboxToken, isDarkMode }: BoundaryLayerP
 
         const fetchBoundary = async () => {
             try {
-                // Use Mapbox Geocoding v5 API to find neighborhood/locality boundaries
-                const encoded = encodeURIComponent(query.trim());
-                const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${mapboxToken}&types=neighborhood,locality,place&limit=1`;
+                const result = await searchBoundary(query.trim(), { signal: controller.signal });
 
-                const res = await fetch(url, { signal: controller.signal });
-                if (!res.ok || controller.signal.aborted) return;
+                if (!result || controller.signal.aborted) {
+                    if (!controller.signal.aborted) {
+                        setGeojson(EMPTY_GEOJSON);
+                    }
+                    return;
+                }
 
-                const data = await res.json();
-                const feature = data.features?.[0];
+                let boundaryGeojson: BoundaryGeoJSON;
 
-                if (!feature?.bbox) {
+                if (result.geometry && (result.geometry.type === 'Polygon' || result.geometry.type === 'MultiPolygon')) {
+                    // Use actual polygon geometry from Nominatim (upgrade!)
+                    boundaryGeojson = {
+                        type: 'FeatureCollection',
+                        features: [{
+                            type: 'Feature',
+                            geometry: result.geometry as Polygon,
+                            properties: {
+                                name: result.displayName,
+                            },
+                        }],
+                    };
+                } else if (result.bbox) {
+                    // Fallback: construct bbox rectangle (same as old Mapbox behavior)
+                    const [minLng, minLat, maxLng, maxLat] = result.bbox;
+                    boundaryGeojson = {
+                        type: 'FeatureCollection',
+                        features: [{
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Polygon' as const,
+                                coordinates: [[
+                                    [minLng, minLat],
+                                    [maxLng, minLat],
+                                    [maxLng, maxLat],
+                                    [minLng, maxLat],
+                                    [minLng, minLat],
+                                ]],
+                            },
+                            properties: {
+                                name: result.displayName,
+                            },
+                        }],
+                    };
+                } else {
                     setGeojson(EMPTY_GEOJSON);
                     return;
                 }
 
-                // Mapbox geocoding doesn't return polygon geometry directly,
-                // so we create a bounding box polygon from the bbox
-                const [minLng, minLat, maxLng, maxLat] = feature.bbox;
-                const bboxPolygon: BoundaryGeoJSON = {
-                    type: 'FeatureCollection',
-                    features: [{
-                        type: 'Feature',
-                        geometry: {
-                            type: 'Polygon' as const,
-                            coordinates: [[
-                                [minLng, minLat],
-                                [maxLng, minLat],
-                                [maxLng, maxLat],
-                                [minLng, maxLat],
-                                [minLng, minLat],
-                            ]],
-                        },
-                        properties: {
-                            name: feature.place_name || query,
-                        },
-                    }],
-                };
-
                 if (!controller.signal.aborted) {
-                    setGeojson(bboxPolygon);
+                    setGeojson(boundaryGeojson);
                 }
             } catch (err) {
                 if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -123,7 +134,7 @@ export function BoundaryLayer({ query, mapboxToken, isDarkMode }: BoundaryLayerP
         fetchBoundary();
 
         return () => controller.abort();
-    }, [query, mapboxToken]);
+    }, [query]);
 
     const fillLayer = useMemo(() => getBoundaryFillLayer(isDarkMode), [isDarkMode]);
     const lineLayer = useMemo(() => getBoundaryLineLayer(isDarkMode), [isDarkMode]);

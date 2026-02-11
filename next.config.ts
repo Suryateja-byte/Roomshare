@@ -92,7 +92,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https:",
               "object-src 'none'",
               "font-src 'self' https://tiles.openfreemap.org",
-              "connect-src 'self' https://api.mapbox.com https://tiles.openfreemap.org https://maps.googleapis.com https://places.googleapis.com https://*.supabase.co https://api.groq.com wss://*.supabase.co https://api.radar.io https://tiles.stadiamaps.com https://api.stadiamaps.com",
+              "connect-src 'self' https://photon.komoot.io https://nominatim.openstreetmap.org https://tiles.openfreemap.org https://maps.googleapis.com https://places.googleapis.com https://*.supabase.co https://api.groq.com wss://*.supabase.co https://api.radar.io https://tiles.stadiamaps.com https://api.stadiamaps.com",
               "worker-src 'self' blob:",
               "child-src blob:",
               "frame-src 'self' https://accounts.google.com",

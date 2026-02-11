@@ -1,57 +1,47 @@
 import { geocodeAddress } from '@/lib/geocoding'
 
-// Mock fetch globally
-const mockFetch = jest.fn()
-global.fetch = mockFetch
+// Mock the Nominatim adapter
+const mockForwardGeocode = jest.fn()
+jest.mock('@/lib/geocoding/nominatim', () => ({
+  forwardGeocode: (...args: unknown[]) => mockForwardGeocode(...args),
+}))
+
+// Mock the circuit breaker to just execute the callback directly
+jest.mock('@/lib/circuit-breaker', () => ({
+  circuitBreakers: {
+    nominatimGeocode: {
+      execute: (fn: () => Promise<unknown>) => fn(),
+    },
+  },
+  isCircuitOpenError: jest.fn(() => false),
+}))
+
+// Mock the logger
+jest.mock('@/lib/logger', () => ({
+  logger: {
+    sync: {
+      warn: jest.fn(),
+      error: jest.fn(),
+    },
+  },
+}))
 
 describe('geocodeAddress', () => {
-  const originalEnv = process.env
-
   beforeEach(() => {
     jest.clearAllMocks()
-    process.env = { ...originalEnv, NEXT_PUBLIC_MAPBOX_TOKEN: 'test-token' }
-  })
-
-  afterEach(() => {
-    process.env = originalEnv
   })
 
   it('should return coordinates for valid address', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        features: [
-          {
-            center: [-122.4194, 37.7749],
-          },
-        ],
-      }),
-    })
+    mockForwardGeocode.mockResolvedValueOnce({ lat: 37.7749, lng: -122.4194 })
 
     const result = await geocodeAddress('123 Main St, San Francisco, CA')
 
     expect(result).toEqual({ lat: 37.7749, lng: -122.4194 })
-    // Check that fetch was called with correct URL (fetchWithTimeout passes options as second arg)
-    const calledUrl = mockFetch.mock.calls[0][0]
-    expect(calledUrl).toContain('api.mapbox.com/geocoding/v5/mapbox.places')
-  })
-
-  it('should return null when no Mapbox token', async () => {
-    delete process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-
-    const result = await geocodeAddress('123 Main St')
-
-    expect(result).toBeNull()
-    expect(mockFetch).not.toHaveBeenCalled()
+    expect(mockForwardGeocode).toHaveBeenCalledWith('123 Main St, San Francisco, CA')
   })
 
   it('should return null when no results found', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        features: [],
-      }),
-    })
+    mockForwardGeocode.mockResolvedValueOnce(null)
 
     const result = await geocodeAddress('Invalid Address XYZ123')
 
@@ -59,11 +49,7 @@ describe('geocodeAddress', () => {
   })
 
   it('should return null on API error', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-    })
+    mockForwardGeocode.mockRejectedValueOnce(new Error('Request failed'))
 
     const result = await geocodeAddress('123 Main St')
 
@@ -71,52 +57,27 @@ describe('geocodeAddress', () => {
   })
 
   it('should return null on network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    mockForwardGeocode.mockRejectedValueOnce(new Error('Network error'))
 
     const result = await geocodeAddress('123 Main St')
 
     expect(result).toBeNull()
   })
 
-  it('should encode address properly', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        features: [{ center: [-122.4194, 37.7749] }],
-      }),
-    })
+  it('should pass address to forwardGeocode', async () => {
+    mockForwardGeocode.mockResolvedValueOnce({ lat: 37.7749, lng: -122.4194 })
 
     await geocodeAddress('123 Main St, Apt #5')
 
-    // Check that fetch was called with properly encoded URL (fetchWithTimeout passes options as second arg)
-    const calledUrl = mockFetch.mock.calls[0][0]
-    expect(calledUrl).toContain(encodeURIComponent('123 Main St, Apt #5'))
+    expect(mockForwardGeocode).toHaveBeenCalledWith('123 Main St, Apt #5')
   })
 
-  it('should handle response with missing features', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
+  it('should handle undefined return from forwardGeocode', async () => {
+    mockForwardGeocode.mockResolvedValueOnce(undefined)
 
     const result = await geocodeAddress('123 Main St')
 
+    // forwardGeocode returns undefined, which is falsy, so geocodeAddress returns null
     expect(result).toBeNull()
-  })
-
-  it('should use correct API URL format', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        features: [{ center: [0, 0] }],
-      }),
-    })
-
-    await geocodeAddress('test')
-
-    const calledUrl = mockFetch.mock.calls[0][0]
-    expect(calledUrl).toContain('api.mapbox.com/geocoding/v5/mapbox.places')
-    expect(calledUrl).toContain('access_token=test-token')
-    expect(calledUrl).toContain('limit=1')
   })
 })

@@ -26,27 +26,65 @@ const TRANSPARENT_1X1_PNG = Buffer.from(
 /** Empty sprite JSON */
 const EMPTY_SPRITE_JSON = JSON.stringify({});
 
-/** Mock geocoding response — single SF feature, enough for BoundaryLayer */
-const MOCK_GEOCODING_RESPONSE = JSON.stringify({
+/** Mock Photon autocomplete response — GeoJSON FeatureCollection */
+const MOCK_PHOTON_RESPONSE = JSON.stringify({
   type: 'FeatureCollection',
   features: [
     {
-      id: 'place.sf',
       type: 'Feature',
-      place_type: ['place'],
-      text: 'San Francisco',
-      place_name: 'San Francisco, California, United States',
-      center: [-122.4194, 37.7749],
       geometry: { type: 'Point', coordinates: [-122.4194, 37.7749] },
-      bbox: [-122.5164, 37.7066, -122.3570, 37.8324],
-      properties: {},
-      context: [
-        { id: 'region.ca', text: 'California' },
-        { id: 'country.us', text: 'United States' },
-      ],
+      properties: {
+        osm_id: 240109189,
+        osm_type: 'R',
+        name: 'San Francisco',
+        state: 'California',
+        country: 'United States',
+        type: 'city',
+        extent: [-122.5164, 37.7066, -122.3570, 37.8324],
+      },
     },
   ],
-  attribution: 'mock',
+});
+
+/** Mock Nominatim search response — used for forward geocoding + boundary */
+const MOCK_NOMINATIM_SEARCH_RESPONSE = JSON.stringify([
+  {
+    place_id: 240109189,
+    licence: 'mock',
+    osm_type: 'relation',
+    osm_id: 111968,
+    lat: '37.7749295',
+    lon: '-122.4194155',
+    display_name: 'San Francisco, California, United States',
+    boundingbox: ['37.7066', '37.8324', '-122.5164', '-122.3570'],
+    geojson: {
+      type: 'Polygon',
+      coordinates: [[
+        [-122.5164, 37.7066],
+        [-122.3570, 37.7066],
+        [-122.3570, 37.8324],
+        [-122.5164, 37.8324],
+        [-122.5164, 37.7066],
+      ]],
+    },
+  },
+]);
+
+/** Mock Nominatim reverse response */
+const MOCK_NOMINATIM_REVERSE_RESPONSE = JSON.stringify({
+  place_id: 240109189,
+  licence: 'mock',
+  osm_type: 'relation',
+  osm_id: 111968,
+  lat: '37.7749295',
+  lon: '-122.4194155',
+  display_name: 'San Francisco, California, United States',
+  address: {
+    city: 'San Francisco',
+    state: 'California',
+    country: 'United States',
+    country_code: 'us',
+  },
 });
 
 /**
@@ -125,17 +163,30 @@ export async function mockMapTileRequests(page: Page): Promise<void> {
     });
   });
 
-  // --- Mapbox geocoding API ---
-  await page.route('**/api.mapbox.com/geocoding/**', async (route) => {
+  // --- Photon autocomplete API ---
+  await page.route('**/photon.komoot.io/api**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: MOCK_GEOCODING_RESPONSE,
+      body: MOCK_PHOTON_RESPONSE,
     });
   });
 
-  // --- Mapbox font glyphs (if any remain) ---
-  await page.route('**/api.mapbox.com/fonts/**', async (route) => {
-    await route.fulfill({ status: 204, body: '' });
+  // --- Nominatim search + reverse geocoding ---
+  await page.route('**/nominatim.openstreetmap.org/**', async (route) => {
+    const url = route.request().url();
+    if (url.includes('/reverse')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: MOCK_NOMINATIM_REVERSE_RESPONSE,
+      });
+    } else {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: MOCK_NOMINATIM_SEARCH_RESPONSE,
+      });
+    }
   });
 }

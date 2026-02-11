@@ -1457,8 +1457,8 @@ export default function MapComponent({
         onMoveEndProp,
     ]);
 
-    // User pin (drop-a-pin) state — token still needed for geocoding
-    const { isDropMode, toggleDropMode, pin: userPin, setPin: setUserPin, handleMapClick: handleUserPinClick } = useUserPin(process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '');
+    // User pin (drop-a-pin) state — uses Nominatim reverse geocoding (no token needed)
+    const { isDropMode, toggleDropMode, pin: userPin, setPin: setUserPin, handleMapClick: handleUserPinClick } = useUserPin();
 
     // Get hovered listing coords for distance display
     const hoveredListingCoords = useMemo(() => {
@@ -1744,7 +1744,6 @@ export default function MapComponent({
                 {/* Boundary polygon for named search areas */}
                 <BoundaryLayer
                     query={searchParams.get('q')}
-                    mapboxToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''}
                     isDarkMode={isDarkMode}
                 />
 
@@ -2045,7 +2044,6 @@ export default function MapComponent({
                     onToggleDropMode={toggleDropMode}
                     pin={userPin}
                     onSetPin={setUserPin}
-                    mapboxToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''}
                     hoveredListingCoords={hoveredListingCoords}
                     isDarkMode={isDarkMode}
                 />

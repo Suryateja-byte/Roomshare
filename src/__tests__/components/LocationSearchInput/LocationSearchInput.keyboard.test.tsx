@@ -14,26 +14,15 @@ import { clearCache } from '@/lib/geocoding-cache';
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-// Mock environment variable
-const MOCK_MAPBOX_TOKEN = 'pk.test_token_12345';
-const originalEnv = process.env;
 
-beforeAll(() => {
-  process.env = {
-    ...originalEnv,
-    NEXT_PUBLIC_MAPBOX_TOKEN: MOCK_MAPBOX_TOKEN,
-  };
-});
-
-afterAll(() => {
-  process.env = originalEnv;
-});
-
-const mockSuggestions = [
-  { id: '1', place_name: 'San Francisco, CA, USA', center: [-122.4194, 37.7749], place_type: ['place'] },
-  { id: '2', place_name: 'San Jose, CA, USA', center: [-121.8863, 37.3382], place_type: ['place'] },
-  { id: '3', place_name: 'San Diego, CA, USA', center: [-117.1611, 32.7157], place_type: ['place'] },
-];
+const mockPhotonSuggestions = {
+  type: 'FeatureCollection',
+  features: [
+    { type: 'Feature', geometry: { type: 'Point', coordinates: [-122.4194, 37.7749] }, properties: { osm_id: 1, osm_type: 'R', name: 'San Francisco', state: 'CA', country: 'USA', type: 'city' } },
+    { type: 'Feature', geometry: { type: 'Point', coordinates: [-121.8863, 37.3382] }, properties: { osm_id: 2, osm_type: 'R', name: 'San Jose', state: 'CA', country: 'USA', type: 'city' } },
+    { type: 'Feature', geometry: { type: 'Point', coordinates: [-117.1611, 32.7157] }, properties: { osm_id: 3, osm_type: 'R', name: 'San Diego', state: 'CA', country: 'USA', type: 'city' } },
+  ],
+};
 
 // Stateful wrapper for controlled component testing
 const ControlledLocationInput = ({
@@ -66,7 +55,7 @@ describe('LocationSearchInput - Keyboard Navigation', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ features: mockSuggestions }),
+      json: async () => mockPhotonSuggestions,
     });
   });
 

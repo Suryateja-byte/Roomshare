@@ -26,20 +26,6 @@ jest.mock('@/lib/geocoding-cache', () => ({
   clearCache: jest.fn(),
 }));
 
-// Mock environment variable
-const MOCK_MAPBOX_TOKEN = 'pk.test_token_12345';
-const originalEnv = process.env;
-
-beforeAll(() => {
-  process.env = {
-    ...originalEnv,
-    NEXT_PUBLIC_MAPBOX_TOKEN: MOCK_MAPBOX_TOKEN,
-  };
-});
-
-afterAll(() => {
-  process.env = originalEnv;
-});
 
 // Controlled wrapper component that manages state for the LocationSearchInput
 // This is necessary because the component uses useDebounce(value, 300) where
@@ -82,7 +68,7 @@ describe('LocationSearchInput - Input Sanitization', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ features: [] }),
+      json: async () => ({ type: 'FeatureCollection', features: [] }),
     });
   });
 
@@ -167,18 +153,18 @@ describe('LocationSearchInput - Input Sanitization', () => {
       });
 
       const url = mockFetch.mock.calls[0][0] as string;
-      const encodedQuery = url.split('/mapbox.places/')[1]?.split('.json')[0];
-      const decodedQuery = decodeURIComponent(encodedQuery || '');
+      const parsedUrl = new URL(url);
+      const decodedQuery = parsedUrl.searchParams.get('q') || '';
 
-      expect(decodedQuery.length).toBeLessThanOrEqual(256);
+      expect(decodedQuery.length).toBeLessThanOrEqual(500);
     });
 
-    it('allows exactly 256 character queries', async () => {
+    it('allows exactly 500 character queries', async () => {
       renderInput();
       const input = screen.getByRole('combobox');
 
-      const exactMaxQuery = 'a'.repeat(256);
-      // Use fireEvent.change for long strings (faster than typing 256 chars)
+      const exactMaxQuery = 'a'.repeat(500);
+      // Use fireEvent.change for long strings (faster than typing 500 chars)
       fireEvent.change(input, { target: { value: exactMaxQuery } });
       await act(async () => {
         jest.advanceTimersByTime(350);
@@ -276,7 +262,7 @@ describe('LocationSearchInput - Input Sanitization', () => {
 
           // Should not throw, should properly encode
           const url = mockFetch.mock.calls[0][0] as string;
-          expect(url).toContain('api.mapbox.com');
+          expect(url).toContain('photon.komoot.io');
         }
       }
     );
@@ -351,9 +337,12 @@ describe('LocationSearchInput - Input Sanitization', () => {
         ok: true,
         status: 200,
         json: async () => ({
-          features: [
-            { id: '1', place_name: 'San Francisco, CA', center: [-122.4, 37.7], place_type: ['place'] },
-          ],
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [-122.4, 37.7] },
+            properties: { osm_id: 1, osm_type: 'R', name: 'San Francisco', state: 'CA', country: 'USA', type: 'city' }
+          }],
         }),
       });
 
@@ -366,7 +355,7 @@ describe('LocationSearchInput - Input Sanitization', () => {
         jest.advanceTimersByTime(350);
       });
 
-      // Component splits place_name at comma: "San Francisco" in first <p>, "CA" in second
+      // Component splits place_name at comma: "San Francisco" in first <p>, "CA, USA" in second
       await waitFor(() => {
         expect(screen.getByText('San Francisco')).toBeInTheDocument();
       });

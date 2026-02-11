@@ -424,7 +424,7 @@ describe('Map Touch Gestures', () => {
     mockIsProgrammaticMoveRef.current = false;
     mockQuerySourceFeaturesData = listingsToFeatures(mockListings);
     capturedMapProps = {};
-    process.env.NEXT_PUBLIC_MAPBOX_TOKEN = 'test-token';
+    // No Mapbox token needed — geocoding uses free Photon + Nominatim
   });
 
   afterEach(() => {

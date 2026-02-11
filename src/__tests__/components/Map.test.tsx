@@ -377,7 +377,7 @@ describe('Map Component', () => {
     mockQuerySourceFeaturesData = listingsToFeatures(mockListings);
 
     // Set up env
-    process.env.NEXT_PUBLIC_MAPBOX_TOKEN = 'test-token';
+    // No Mapbox token needed — geocoding uses free Photon + Nominatim
   });
 
   afterEach(() => {

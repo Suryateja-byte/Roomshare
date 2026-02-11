@@ -23,8 +23,7 @@ const serverEnvSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   FROM_EMAIL: z.string().optional(),
 
-  // Geocoding (optional - gracefully degrades)
-  MAPBOX_ACCESS_TOKEN: z.string().optional(),
+  // Geocoding uses Photon + Nominatim (free, no API key needed)
 
   // Redis Rate Limiting (optional - falls back to DB)
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
@@ -205,8 +204,8 @@ export const features = {
     return !!e.RESEND_API_KEY;
   },
   get geocoding() {
-    const e = getServerEnv();
-    return !!e.MAPBOX_ACCESS_TOKEN;
+    // Geocoding is always available (Photon + Nominatim, no API key needed)
+    return true;
   },
   get redis() {
     const e = getServerEnv();
@@ -313,9 +312,6 @@ export function logStartupWarnings(): void {
     warnings.push(
       "Redis not configured - using database-backed rate limiting (slower)",
     );
-  }
-  if (!features.geocoding) {
-    warnings.push("MAPBOX_ACCESS_TOKEN not configured - geocoding disabled");
   }
   if (!features.cronAuth) {
     warnings.push("CRON_SECRET not configured - cron endpoints unprotected");
