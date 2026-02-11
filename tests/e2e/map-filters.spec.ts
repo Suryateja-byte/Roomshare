@@ -151,14 +151,14 @@ async function clearAllFilters(page: Page) {
 
   if (clearVisible) {
     await clearBtn.first().click();
-    // Wait for URL to update (filters removed)
-    await page.waitForURL(
-      (url) => {
-        const params = new URL(url).searchParams;
+    // Wait for URL to update (filters removed) — use expect.poll for soft navigation
+    await expect.poll(
+      () => {
+        const params = new URL(page.url(), "http://localhost").searchParams;
         return !params.has("roomType") && !params.has("maxPrice") && !params.has("amenities");
       },
-      { timeout: 10_000 }
-    );
+      { timeout: 10_000, message: "URL filter params to be removed after clearing" },
+    ).toBe(true);
     await waitForMapReady(page);
   }
 }

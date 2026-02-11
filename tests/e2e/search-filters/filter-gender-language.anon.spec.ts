@@ -63,10 +63,10 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // Verify URL contains genderPreference=FEMALE_ONLY
-    await page.waitForURL(
-      (url) => new URL(url).searchParams.get("genderPreference") === "FEMALE_ONLY",
-      { timeout: 30_000 },
-    );
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("genderPreference"),
+      { timeout: 30_000, message: 'URL param "genderPreference" to be "FEMALE_ONLY"' },
+    ).toBe("FEMALE_ONLY");
 
     expect(getUrlParam(page, "genderPreference")).toBe("FEMALE_ONLY");
   });
@@ -83,10 +83,10 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // Verify URL contains householdGender=MIXED
-    await page.waitForURL(
-      (url) => new URL(url).searchParams.get("householdGender") === "MIXED",
-      { timeout: 30_000 },
-    );
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("householdGender"),
+      { timeout: 30_000, message: 'URL param "householdGender" to be "MIXED"' },
+    ).toBe("MIXED");
 
     expect(getUrlParam(page, "householdGender")).toBe("MIXED");
   });
@@ -136,13 +136,13 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // Verify URL contains language codes (es for Spanish, fr for French)
-    await page.waitForURL(
-      (url) => {
-        const languages = new URL(url).searchParams.get("languages");
+    await expect.poll(
+      () => {
+        const languages = new URL(page.url(), "http://localhost").searchParams.get("languages");
         return languages !== null && languages.includes("es") && languages.includes("fr");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "languages" to contain "es" and "fr"' },
+    ).toBe(true);
 
     const languages = getUrlParam(page, "languages") ?? "";
     expect(languages).toContain("es");
@@ -176,13 +176,13 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // URL should now have only French (fr), not Spanish (es)
-    await page.waitForURL(
-      (url) => {
-        const languages = new URL(url).searchParams.get("languages") ?? "";
+    await expect.poll(
+      () => {
+        const languages = new URL(page.url(), "http://localhost").searchParams.get("languages") ?? "";
         return !languages.includes("es");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "languages" to not contain "es"' },
+    ).toBe(true);
 
     const languages = getUrlParam(page, "languages") ?? "";
     expect(languages).not.toContain("es");

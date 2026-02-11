@@ -70,9 +70,9 @@ test.describe("3.1: Category Icon Bar", () => {
 
     await firstButton.click();
 
-    await page.waitForURL(
-      (url) => {
-        const p = new URL(url).searchParams;
+    await expect.poll(
+      () => {
+        const p = new URL(page.url(), "http://localhost").searchParams;
         return (
           p.has("amenities") ||
           p.has("houseRules") ||
@@ -81,8 +81,8 @@ test.describe("3.1: Category Icon Bar", () => {
           p.has("maxPrice")
         );
       },
-      { timeout: 10_000 },
-    );
+      { timeout: 10_000, message: "URL to have at least one filter param after category click" },
+    ).toBe(true);
   });
 });
 
@@ -160,13 +160,13 @@ test.describe("3.6: Applied Filter Chips", () => {
 
     if (clearVisible) {
       await clearAll.click();
-      await page.waitForURL(
-        (url) => {
-          const p = new URL(url).searchParams;
+      await expect.poll(
+        () => {
+          const p = new URL(page.url(), "http://localhost").searchParams;
           return !p.has("roomType") && !p.has("amenities");
         },
-        { timeout: 10_000 },
-      );
+        { timeout: 10_000, message: "URL to have no roomType/amenities params after clear all" },
+      ).toBe(true);
     }
     expect(await page.title()).toBeTruthy();
   });

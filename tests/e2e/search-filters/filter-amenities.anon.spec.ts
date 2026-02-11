@@ -63,13 +63,13 @@ test.describe("Amenities Filter", () => {
     await applyFilters(page);
 
     // URL should have amenities=Wifi
-    await page.waitForURL(
-      (url) => {
-        const amenities = new URL(url).searchParams.get("amenities");
+    await expect.poll(
+      () => {
+        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities");
         return amenities !== null && amenities.includes("Wifi");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "amenities" to contain "Wifi"' },
+    ).toBe(true);
 
     expect(getUrlParam(page, "amenities")).toContain("Wifi");
   });
@@ -86,13 +86,13 @@ test.describe("Amenities Filter", () => {
     // Apply
     await applyFilters(page);
 
-    await page.waitForURL(
-      (url) => {
-        const amenities = new URL(url).searchParams.get("amenities");
+    await expect.poll(
+      () => {
+        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities");
         return amenities !== null && amenities.includes("Wifi") && amenities.includes("Parking");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "amenities" to contain "Wifi" and "Parking"' },
+    ).toBe(true);
 
     const amenities = getUrlParam(page, "amenities") ?? "";
     expect(amenities).toContain("Wifi");
@@ -120,13 +120,13 @@ test.describe("Amenities Filter", () => {
     await applyFilters(page);
 
     // URL should have Parking but not Wifi
-    await page.waitForURL(
-      (url) => {
-        const amenities = new URL(url).searchParams.get("amenities") ?? "";
+    await expect.poll(
+      () => {
+        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
         return !amenities.includes("Wifi");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "amenities" to not contain "Wifi"' },
+    ).toBe(true);
 
     const amenities = getUrlParam(page, "amenities") ?? "";
     expect(amenities).not.toContain("Wifi");

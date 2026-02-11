@@ -100,11 +100,11 @@ test.describe("Near Matches & Low Results Guidance", () => {
     });
     await includeNearMatchesBtn.click();
 
-    // Wait for URL to contain nearMatches=1
-    await page.waitForURL(
-      (url) => new URL(url).searchParams.get("nearMatches") === "1",
-      { timeout: 30_000 }
-    );
+    // Wait for URL to contain nearMatches=1 via soft navigation
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("nearMatches"),
+      { timeout: 30_000, message: 'URL param "nearMatches" to be "1"' },
+    ).toBe("1");
 
     // Verify URL has nearMatches=1
     const currentUrl = new URL(page.url());
@@ -213,11 +213,11 @@ test.describe("Near Matches & Low Results Guidance", () => {
       await suggestionButtons.first().click();
     }
 
-    // Wait for URL to change
-    await page.waitForURL(
-      (url) => url.href !== initialUrl.href,
-      { timeout: 10_000 }
-    );
+    // Wait for URL to change via soft navigation
+    await expect.poll(
+      () => page.url(),
+      { timeout: 10_000, message: "URL to change after suggestion click" },
+    ).not.toBe(initialUrl.href);
 
     // Verify that at least one filter param was removed from the URL
     const newUrl = new URL(page.url());

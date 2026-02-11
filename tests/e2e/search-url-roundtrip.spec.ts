@@ -253,13 +253,13 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
         await clearAllBtn.click();
 
         // Wait for URL to update
-        await page.waitForURL(
-          (url) => {
-            const params = new URL(url).searchParams;
+        await expect.poll(
+          () => {
+            const params = new URL(page.url(), "http://localhost").searchParams;
             return !params.has("maxPrice") && !params.has("roomType");
           },
-          { timeout: 10_000 },
-        );
+          { timeout: 10_000, message: "URL to have no maxPrice/roomType params after clear" },
+        ).toBe(true);
 
         // Verify params are gone
         await assertUrlExcludesParams(page, ["maxPrice", "roomType"]);

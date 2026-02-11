@@ -73,11 +73,11 @@ test.describe("Active Filter Chips", () => {
     if (removeVisible) {
       await removeRoomType.click();
 
-      // Wait for URL to update
-      await page.waitForURL(
-        (url) => !new URL(url).searchParams.has("roomType"),
-        { timeout: 30_000 },
-      );
+      // Wait for URL to update via soft navigation
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 30_000, message: 'URL param "roomType" to be absent' },
+      ).toBeNull();
 
       // roomType should be removed but amenities should remain
       expect(getUrlParam(page, "roomType")).toBeNull();
@@ -100,14 +100,14 @@ test.describe("Active Filter Chips", () => {
     await expect(clearAllBtn).toBeVisible({ timeout: 10_000 });
     await clearAllBtn.click();
 
-    // Wait for filters to be cleared from URL
-    await page.waitForURL(
-      (url) => {
-        const params = new URL(url).searchParams;
+    // Wait for filters to be cleared from URL via soft navigation
+    await expect.poll(
+      () => {
+        const params = new URL(page.url(), "http://localhost").searchParams;
         return !params.has("roomType") && !params.has("amenities") && !params.has("maxPrice");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: "URL to have no filter params after clear all" },
+    ).toBe(true);
 
     // All filters removed
     expect(getUrlParam(page, "roomType")).toBeNull();
@@ -184,14 +184,14 @@ test.describe("Active Filter Chips", () => {
     if (removeVisible) {
       await removeWifi.click();
 
-      // Wait for URL to lose Wifi
-      await page.waitForURL(
-        (url) => {
-          const amenities = new URL(url).searchParams.get("amenities") ?? "";
+      // Wait for URL to lose Wifi via soft navigation
+      await expect.poll(
+        () => {
+          const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
           return !amenities.includes("Wifi");
         },
-        { timeout: 30_000 },
-      );
+        { timeout: 30_000, message: 'URL param "amenities" to not contain "Wifi"' },
+      ).toBe(true);
 
       // Parking should remain
       const amenities = getUrlParam(page, "amenities") ?? "";
@@ -255,13 +255,13 @@ test.describe("Active Filter Chips", () => {
     if (removeVisible) {
       await removePrice.click();
 
-      await page.waitForURL(
-        (url) => {
-          const params = new URL(url).searchParams;
+      await expect.poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
           return !params.has("minPrice") && !params.has("maxPrice");
         },
-        { timeout: 30_000 },
-      );
+        { timeout: 30_000, message: "URL to have no price params after removing price chip" },
+      ).toBe(true);
 
       expect(getUrlParam(page, "minPrice")).toBeNull();
       expect(getUrlParam(page, "maxPrice")).toBeNull();
@@ -282,10 +282,10 @@ test.describe("Active Filter Chips", () => {
     await expect(clearAllBtn).toBeVisible({ timeout: 10_000 });
     await clearAllBtn.click();
 
-    await page.waitForURL(
-      (url) => !new URL(url).searchParams.has("roomType"),
-      { timeout: 30_000 },
-    );
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+      { timeout: 30_000, message: 'URL param "roomType" to be absent after clear all' },
+    ).toBeNull();
 
     // Bounds should be preserved
     expect(getUrlParam(page, "minLat")).toBeTruthy();

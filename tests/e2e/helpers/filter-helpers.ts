@@ -81,7 +81,7 @@ export function buildSearchUrl(params?: Record<string, string>): string {
 
 /**
  * Wait for URL to contain a param with optional value match.
- * Uses page.waitForURL for auto-retry.
+ * Uses expect.poll() to detect Next.js soft navigation (pushState/replaceState).
  */
 export async function waitForUrlParam(
   page: Page,
@@ -89,28 +89,32 @@ export async function waitForUrlParam(
   value?: string,
   timeout = 30_000,
 ): Promise<void> {
-  await page.waitForURL(
-    (url) => {
-      const param = new URL(url).searchParams.get(key);
-      if (value !== undefined) return param === value;
-      return param !== null;
-    },
-    { timeout },
-  );
+  if (value !== undefined) {
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get(key),
+      { timeout, message: `URL param "${key}" to be "${value}"` },
+    ).toBe(value);
+  } else {
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get(key),
+      { timeout, message: `URL param "${key}" to be present` },
+    ).not.toBeNull();
+  }
 }
 
 /**
  * Wait for URL to NOT contain a param.
+ * Uses expect.poll() to detect Next.js soft navigation (pushState/replaceState).
  */
 export async function waitForNoUrlParam(
   page: Page,
   key: string,
   timeout = 30_000,
 ): Promise<void> {
-  await page.waitForURL(
-    (url) => !new URL(url).searchParams.has(key),
-    { timeout },
-  );
+  await expect.poll(
+    () => new URL(page.url(), "http://localhost").searchParams.get(key),
+    { timeout, message: `URL param "${key}" to be absent` },
+  ).toBeNull();
 }
 
 /**
@@ -296,12 +300,11 @@ export async function applyFilters(page: Page): Promise<void> {
   // Wait for modal to close
   await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
 
-  // Wait for URL to change (filter commit navigates)
-  try {
-    await page.waitForURL((url) => url.toString() !== urlBefore, { timeout: 10_000 });
-  } catch {
-    // URL might not change if no filters were modified — that's OK
-  }
+  // Wait for URL to change via soft navigation (pushState/replaceState)
+  await expect.poll(
+    () => page.url(),
+    { timeout: 10_000, message: "URL to change after applying filters" },
+  ).not.toBe(urlBefore);
 }
 
 /**

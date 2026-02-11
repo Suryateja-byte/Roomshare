@@ -78,14 +78,14 @@ test.describe("Category Bar", () => {
 
     await furnishedBtn.click();
 
-    // Wait for URL to contain the amenity
-    await page.waitForURL(
-      (url) => {
-        const amenities = new URL(url).searchParams.get("amenities") ?? "";
+    // Wait for URL to contain the amenity via soft navigation
+    await expect.poll(
+      () => {
+        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
         return amenities.includes("Furnished");
       },
-      { timeout: timeouts.action },
-    );
+      { timeout: timeouts.action, message: 'URL param "amenities" to contain "Furnished"' },
+    ).toBe(true);
 
     // Button should now be pressed
     await expect(furnishedBtn).toHaveAttribute("aria-pressed", "true");
@@ -114,14 +114,14 @@ test.describe("Category Bar", () => {
     // Click to toggle off
     await furnishedBtn.click();
 
-    // Wait for amenities param to be removed from URL
-    await page.waitForURL(
-      (url) => {
-        const amenities = new URL(url).searchParams.get("amenities");
+    // Wait for amenities param to be removed from URL via soft navigation
+    await expect.poll(
+      () => {
+        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities");
         return !amenities || !amenities.includes("Furnished");
       },
-      { timeout: timeouts.action },
-    );
+      { timeout: timeouts.action, message: 'URL param "amenities" to not contain "Furnished"' },
+    ).toBe(true);
 
     // Button reverts to unpressed
     await expect(furnishedBtn).toHaveAttribute("aria-pressed", "false");
@@ -232,16 +232,15 @@ test.describe("Category Bar", () => {
       // Press Enter to activate the focused category
       await page.keyboard.press("Enter");
 
-      // Wait for URL to update with any valid category filter param
-      // (the first focusable category may be amenities, roomType, leaseDuration, or houseRules)
-      await page.waitForURL(
-        (url) => {
-          const params = new URL(url).searchParams;
+      // Wait for URL to update with any valid category filter param via soft navigation
+      await expect.poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
           return params.has("amenities") || params.has("roomType") ||
             params.has("leaseDuration") || params.has("houseRules");
         },
-        { timeout: 30_000 },
-      );
+        { timeout: 30_000, message: "URL to contain a category filter param" },
+      ).toBe(true);
 
       // Verify some category param was set
       const params = new URL(page.url()).searchParams;
@@ -267,14 +266,14 @@ test.describe("Category Bar", () => {
     // Click a category
     await furnishedBtn.click();
 
-    // Wait for URL to include the amenity
-    await page.waitForURL(
-      (url) => {
-        const amenities = new URL(url).searchParams.get("amenities") ?? "";
+    // Wait for URL to include the amenity via soft navigation
+    await expect.poll(
+      () => {
+        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
         return amenities.includes("Furnished");
       },
-      { timeout: timeouts.action },
-    );
+      { timeout: timeouts.action, message: 'URL param "amenities" to contain "Furnished"' },
+    ).toBe(true);
 
     // Pagination params should be stripped
     expect(getUrlParam(page, "page")).toBeNull();

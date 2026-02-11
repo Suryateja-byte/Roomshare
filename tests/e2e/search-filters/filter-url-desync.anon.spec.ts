@@ -55,10 +55,10 @@ test.describe("Filter URL-UI Desync", () => {
     await page.goBack();
 
     // Wait for URL to NOT contain amenities param
-    await page.waitForURL(
-      (url) => !new URL(url).searchParams.has("amenities"),
-      { timeout: 30_000 }
-    );
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+      { timeout: 30_000, message: 'URL param "amenities" to be absent after goBack' },
+    ).toBeNull();
 
     // Verify URL no longer has amenities param
     const currentUrl = new URL(page.url());
@@ -101,10 +101,10 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Go back - wait for amenities gone
     await page.goBack();
-    await page.waitForURL(
-      (url) => !new URL(url).searchParams.has("amenities"),
-      { timeout: 30_000 }
-    );
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+      { timeout: 30_000, message: 'URL param "amenities" to be absent after goBack' },
+    ).toBeNull();
 
     // Wait for page to fully settle after goBack before going forward.
     // Without this, Next.js router re-render may clear forward history.
@@ -286,13 +286,13 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Go back once - should return to amenities=Wifi only
     await page.goBack();
-    await page.waitForURL(
-      (url) => {
-        const params = new URL(url).searchParams;
+    await expect.poll(
+      () => {
+        const params = new URL(page.url(), "http://localhost").searchParams;
         return params.has("amenities") && !params.has("roomType");
       },
-      { timeout: 30_000 }
-    );
+      { timeout: 30_000, message: "URL to have amenities but not roomType after goBack" },
+    ).toBe(true);
 
     // Verify URL has amenities=Wifi but no roomType
     let currentUrl = new URL(page.url());
@@ -301,13 +301,13 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Go back again - should return to no filters
     await page.goBack();
-    await page.waitForURL(
-      (url) => {
-        const params = new URL(url).searchParams;
+    await expect.poll(
+      () => {
+        const params = new URL(page.url(), "http://localhost").searchParams;
         return !params.has("amenities") && !params.has("roomType");
       },
-      { timeout: 30_000 }
-    );
+      { timeout: 30_000, message: "URL to have neither amenities nor roomType after goBack" },
+    ).toBe(true);
 
     // Verify URL has neither amenities nor roomType
     currentUrl = new URL(page.url());

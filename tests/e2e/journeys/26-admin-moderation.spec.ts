@@ -58,6 +58,9 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
 
 test.beforeEach(async () => {
   test.slow();
+  if (!process.env.E2E_ADMIN_EMAIL) {
+    test.skip(true, 'Admin credentials not configured in CI');
+  }
 });
 
 // ─── J38: Admin Dashboard Overview ────────────────────────────────────────────

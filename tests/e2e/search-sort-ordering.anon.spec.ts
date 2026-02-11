@@ -194,14 +194,16 @@ async function selectDesktopSort(
   await pickDesktopSortOption(page, label);
 
   if (expectedUrlParam) {
-    await expect(page).toHaveURL(new RegExp(`sort=${expectedUrlParam}`), {
-      timeout: 15_000,
-    });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
+      { timeout: 15_000, message: `URL param "sort" to be "${expectedUrlParam}"` },
+    ).toBe(expectedUrlParam);
   } else {
     // "Recommended" removes the sort param entirely.
-    await page.waitForURL((url) => !url.searchParams.has("sort"), {
-      timeout: 15_000,
-    });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
+      { timeout: 15_000, message: 'URL param "sort" to be absent' },
+    ).toBeNull();
   }
 }
 
@@ -592,6 +594,12 @@ test.describe("Group 4: Mobile Sort", () => {
   // positioning bugs in Desktop WebKit. Viewport size alone triggers mobile layout.
   test.use({
     viewport: { width: 393, height: 852 },
+  });
+
+  test.beforeEach(async ({ browserName }) => {
+    if (browserName === 'webkit') {
+      test.skip(true, 'webkit-anon uses Desktop Safari viewport — mobile sort tests invalid');
+    }
   });
 
   /**

@@ -53,13 +53,10 @@ test.describe("Lease Duration Filter", () => {
       await selectDropdownOption(page, "filter-lease", new RegExp(`^${duration}$`, "i"));
       await applyFilters(page);
 
-      await page.waitForURL(
-        (url) => {
-          const param = new URL(url).searchParams.get("leaseDuration");
-          return param !== null && param === duration;
-        },
-        { timeout: 30_000 },
-      );
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("leaseDuration"),
+        { timeout: 30_000, message: `URL param "leaseDuration" to be "${duration}"` },
+      ).toBe(duration);
 
       expect(getUrlParam(page, "leaseDuration")).toBe(duration);
     }
@@ -83,10 +80,10 @@ test.describe("Lease Duration Filter", () => {
 
     await applyFilters(page);
 
-    await page.waitForURL(
-      (url) => !new URL(url).searchParams.has("leaseDuration"),
-      { timeout: 30_000 },
-    );
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("leaseDuration"),
+      { timeout: 30_000, message: 'URL param "leaseDuration" to be absent' },
+    ).toBeNull();
 
     expect(getUrlParam(page, "leaseDuration")).toBeNull();
   });

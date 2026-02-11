@@ -169,6 +169,12 @@ test.describe('Admin Journeys', () => {
   // Current test user is NOT an admin, so admin routes redirect to '/'
   test.use({ storageState: 'playwright/.auth/user.json' });
 
+  test.beforeEach(async () => {
+    if (!process.env.E2E_ADMIN_EMAIL) {
+      test.skip(true, 'Admin credentials not configured in CI');
+    }
+  });
+
   /**
    * Helper: navigate to an admin route and wait for the final destination.
    * Admin routes redirect non-admin users to '/' (home) or '/login' via server-side redirect.

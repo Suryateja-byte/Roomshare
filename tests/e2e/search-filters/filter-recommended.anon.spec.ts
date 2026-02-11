@@ -88,14 +88,14 @@ test.describe("Recommended Filters", () => {
     await expect(furnishedPill).toBeVisible({ timeout: 10_000 });
     await furnishedPill.click();
 
-    // Wait for URL to update with amenities param
-    await page.waitForURL(
-      (url) => {
-        const amenities = new URL(url).searchParams.get("amenities") ?? "";
+    // Wait for URL to update with amenities param via soft navigation
+    await expect.poll(
+      () => {
+        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
         return amenities.includes("Furnished");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "amenities" to contain "Furnished"' },
+    ).toBe(true);
 
     // URL should contain the amenity
     const amenities = getUrlParam(page, "amenities") ?? "";
@@ -138,14 +138,14 @@ test.describe("Recommended Filters", () => {
 
     await wifiPill.click();
 
-    // Wait for URL to update
-    await page.waitForURL(
-      (url) => {
-        const amenities = new URL(url).searchParams.get("amenities") ?? "";
+    // Wait for URL to update via soft navigation
+    await expect.poll(
+      () => {
+        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
         return amenities.includes("Wifi");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "amenities" to contain "Wifi"' },
+    ).toBe(true);
 
     // Pagination params should be reset
     expect(getUrlParam(page, "cursor")).toBeNull();

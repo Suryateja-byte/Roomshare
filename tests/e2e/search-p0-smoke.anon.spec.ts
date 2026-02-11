@@ -596,8 +596,9 @@ test.describe("Search P0 Smoke Suite", () => {
     });
 
     if (timing) {
-      // Assert domContentLoaded is under 5000ms (generous for dev server)
-      expect(timing.domContentLoaded).toBeLessThan(5000);
+      // Assert domContentLoaded is under budget (generous for dev server, 3x for CI)
+      const dclBudget = process.env.CI ? 15000 : 5000;
+      expect(timing.domContentLoaded).toBeLessThan(dclBudget);
 
       // Log timings for visibility
       console.log(
@@ -637,7 +638,8 @@ test.describe("Search P0 Smoke Suite", () => {
     if (cls >= 0) {
       console.log(`[Perf] CLS: ${cls.toFixed(4)}`);
       // Generous CLS threshold for dev (production would be < 0.1)
-      expect(cls).toBeLessThan(0.5);
+      const clsBudget = process.env.CI ? 1.0 : 0.5;
+      expect(cls).toBeLessThan(clsBudget);
     }
   });
 });

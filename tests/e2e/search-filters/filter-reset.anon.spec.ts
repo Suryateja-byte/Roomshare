@@ -115,14 +115,14 @@ test.describe("Filter Reset", () => {
 
     await clearLink.click();
 
-    // Wait for filter params to be stripped from URL
-    await page.waitForURL(
-      (url) => {
-        const params = new URL(url).searchParams;
+    // Wait for filter params to be stripped from URL via soft navigation
+    await expect.poll(
+      () => {
+        const params = new URL(page.url(), "http://localhost").searchParams;
         return !params.has("minPrice") && !params.has("maxPrice");
       },
-      { timeout: timeouts.action },
-    );
+      { timeout: timeouts.action, message: "URL to have no price params after clear" },
+    ).toBe(true);
 
     // Bounds must be preserved
     expect(getUrlParam(page, "minLat")).toBeTruthy();
@@ -159,17 +159,14 @@ test.describe("Filter Reset", () => {
     await expect(clearAllBtn).toBeVisible({ timeout: timeouts.action });
     await clearAllBtn.click();
 
-    // Wait for all filter params to be removed from URL
-    await page.waitForURL(
-      (url) => {
-        const params = new URL(url).searchParams;
-        return (
-          !params.has("amenities") &&
-          !params.has("roomType")
-        );
+    // Wait for all filter params to be removed from URL via soft navigation
+    await expect.poll(
+      () => {
+        const params = new URL(page.url(), "http://localhost").searchParams;
+        return !params.has("amenities") && !params.has("roomType");
       },
-      { timeout: timeouts.action },
-    );
+      { timeout: timeouts.action, message: "URL to have no filter params after clear all" },
+    ).toBe(true);
 
     // All chips should be gone -- region should disappear
     await expect(region).not.toBeVisible({ timeout: timeouts.action });
@@ -212,14 +209,14 @@ test.describe("Filter Reset", () => {
       await pageBodyClearAll.click();
     }
 
-    // Wait for filter params to be cleaned
-    await page.waitForURL(
-      (url) => {
-        const params = new URL(url).searchParams;
+    // Wait for filter params to be cleaned via soft navigation
+    await expect.poll(
+      () => {
+        const params = new URL(page.url(), "http://localhost").searchParams;
         return !params.has("minPrice") && !params.has("maxPrice");
       },
-      { timeout: timeouts.action },
-    );
+      { timeout: timeouts.action, message: "URL to have no price params after clear" },
+    ).toBe(true);
 
     // Wait for listing cards to appear (results refreshed)
     const listingCards = container.locator(selectors.listingCard);

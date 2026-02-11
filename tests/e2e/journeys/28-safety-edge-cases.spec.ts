@@ -208,7 +208,7 @@ test.describe("J49: Offline Page", () => {
 
     // If the page exists, look for retry or offline messaging
     const offlineContent = page.getByText(/offline|connection|retry|no internet/i);
-    const has404 = page.getByText(/404|not found/i);
+    const has404 = page.getByText(/404|not found|couldn't find|doesn't exist/i);
 
     const hasOffline = await offlineContent.isVisible().catch(() => false);
     const hasNotFound = await has404.isVisible().catch(() => false);

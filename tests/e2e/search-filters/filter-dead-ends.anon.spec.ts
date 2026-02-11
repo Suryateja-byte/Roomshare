@@ -65,10 +65,11 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
 
       await firstSuggestion.click();
 
-      // Wait for URL to change (filter removed)
-      await page.waitForURL((url) => url.toString() !== currentUrl, {
-        timeout: 30_000,
-      });
+      // Wait for URL to change (filter removed) via soft navigation
+      await expect.poll(
+        () => page.url(),
+        { timeout: 30_000, message: "URL to change after suggestion click" },
+      ).not.toBe(currentUrl);
 
       // Verify we're still on search page
       expect(page.url()).toContain("/search");
@@ -207,10 +208,11 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     });
     await wifiRemoveButton.click();
 
-    // Wait for URL to update
-    await page.waitForURL((url) => !url.toString().includes("Wifi"), {
-      timeout: 30_000,
-    });
+    // Wait for URL to update via soft navigation
+    await expect.poll(
+      () => page.url().includes("Wifi"),
+      { timeout: 30_000, message: "URL to not contain Wifi" },
+    ).toBe(false);
 
     // Verify URL still has Parking and roomType
     let amenities = getUrlParam(page, "amenities");
@@ -231,10 +233,10 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     await parkingRemoveButton.click();
 
     // Wait for URL update - amenities param should be deleted when last value removed
-    await page.waitForURL(
-      (url) => !new URL(url).searchParams.has("amenities"),
-      { timeout: 30_000 }
-    );
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+      { timeout: 30_000, message: 'URL param "amenities" to be absent' },
+    ).toBeNull();
 
     // Verify amenities param is gone
     amenities = getUrlParam(page, "amenities");
@@ -254,10 +256,10 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     await roomTypeRemoveButton.click();
 
     // Wait for URL update - no filters
-    await page.waitForURL(
-      (url) => !new URL(url).searchParams.has("roomType"),
-      { timeout: 30_000 }
-    );
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+      { timeout: 30_000, message: 'URL param "roomType" to be absent' },
+    ).toBeNull();
 
     // Verify no filter params in URL
     expect(getUrlParam(page, "amenities")).toBeNull();
@@ -305,11 +307,11 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     });
     await clearAllButton.click({ force: true });
 
-    // Wait for URL to update (amenities and roomType removed)
-    await page.waitForURL(
-      (url) => !new URL(url).searchParams.has("amenities"),
-      { timeout: 30_000 }
-    );
+    // Wait for URL to update (amenities and roomType removed) via soft navigation
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+      { timeout: 30_000, message: 'URL param "amenities" to be absent after clear all' },
+    ).toBeNull();
 
     // Verify filters were removed
     expect(getUrlParam(page, "amenities")).toBeNull();

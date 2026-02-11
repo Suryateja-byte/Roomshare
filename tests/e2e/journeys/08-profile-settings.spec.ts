@@ -49,7 +49,7 @@ test.describe('Profile & Settings Journeys', () => {
 
       // Public profile should show limited info
       const publicProfile = page.getByRole('heading');
-      const notFound = page.getByText(/not found|404/i);
+      const notFound = page.getByText(/not found|404|couldn't find|doesn't exist/i);
 
       await expect(publicProfile.or(notFound).first()).toBeVisible({ timeout: 10000 });
     });

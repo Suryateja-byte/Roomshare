@@ -55,13 +55,13 @@ test.describe("House Rules Filter", () => {
     await applyFilters(page);
 
     // URL should have houseRules=Pets allowed
-    await page.waitForURL(
-      (url) => {
-        const param = new URL(url).searchParams.get("houseRules");
+    await expect.poll(
+      () => {
+        const param = new URL(page.url(), "http://localhost").searchParams.get("houseRules");
         return param !== null && param.includes("Pets allowed");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "houseRules" to contain "Pets allowed"' },
+    ).toBe(true);
 
     const houseRules = getUrlParam(page, "houseRules") ?? "";
     expect(houseRules).toContain("Pets allowed");
@@ -86,13 +86,13 @@ test.describe("House Rules Filter", () => {
     await applyFilters(page);
 
     // URL should have both rules comma-separated
-    await page.waitForURL(
-      (url) => {
-        const param = new URL(url).searchParams.get("houseRules");
+    await expect.poll(
+      () => {
+        const param = new URL(page.url(), "http://localhost").searchParams.get("houseRules");
         return param !== null && param.includes("Pets allowed") && param.includes("Couples allowed");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "houseRules" to contain both "Pets allowed" and "Couples allowed"' },
+    ).toBe(true);
 
     const houseRules = getUrlParam(page, "houseRules") ?? "";
     expect(houseRules).toContain("Pets allowed");
@@ -139,13 +139,13 @@ test.describe("House Rules Filter", () => {
     await applyFilters(page);
 
     // URL should have only Pets allowed
-    await page.waitForURL(
-      (url) => {
-        const param = new URL(url).searchParams.get("houseRules") ?? "";
+    await expect.poll(
+      () => {
+        const param = new URL(page.url(), "http://localhost").searchParams.get("houseRules") ?? "";
         return param.includes("Pets allowed") && !param.includes("Smoking allowed");
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "houseRules" to contain "Pets allowed" but not "Smoking allowed"' },
+    ).toBe(true);
 
     const houseRules = getUrlParam(page, "houseRules") ?? "";
     expect(houseRules).toContain("Pets allowed");

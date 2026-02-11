@@ -283,17 +283,18 @@ test.describe("Budget URL Param Aliases", () => {
       await removeButton.click();
 
       // Wait for URL to update - should have no price params
-      await page.waitForURL(
-        (url) => {
+      await expect.poll(
+        () => {
+          const search = page.url();
           return (
-            !url.search.includes("minPrice") &&
-            !url.search.includes("maxPrice") &&
-            !url.search.includes("minBudget") &&
-            !url.search.includes("maxBudget")
+            !search.includes("minPrice") &&
+            !search.includes("maxPrice") &&
+            !search.includes("minBudget") &&
+            !search.includes("maxBudget")
           );
         },
-        { timeout: 5000 },
-      );
+        { timeout: 5000, message: "URL to have no price/budget params after chip removal" },
+      ).toBe(true);
 
       // Chips region should be hidden (no more filters)
       await expect(chipsRegion).not.toBeVisible();

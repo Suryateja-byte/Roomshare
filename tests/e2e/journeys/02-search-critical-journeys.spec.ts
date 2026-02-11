@@ -75,7 +75,10 @@ test.describe("20 Critical Search Page Journeys", () => {
       await privateTab.first().click();
 
       // URL should update with roomType (debounced navigation — allow extra time under CI load)
-      await page.waitForURL(/roomType/i, { timeout: 15000 });
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 15000, message: 'URL param "roomType" to be present' },
+      ).not.toBeNull();
     }
   });
 
@@ -100,7 +103,10 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Apply and verify URL updates
     await applyFilters(page);
-    await page.waitForURL(/amenities/i, { timeout: 10000 });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+      { timeout: 10000, message: 'URL param "amenities" to be present' },
+    ).not.toBeNull();
     expect(page.url()).toMatch(/amenities/i);
   });
 
@@ -149,7 +155,10 @@ test.describe("20 Critical Search Page Journeys", () => {
 
         if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
           await option.first().click();
-          await page.waitForURL(/sort=price_asc/, { timeout: 10000 });
+          await expect.poll(
+            () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
+            { timeout: 10000, message: 'URL param "sort" to be "price_asc"' },
+          ).toBe("price_asc");
         }
       }
     }
@@ -245,7 +254,10 @@ test.describe("20 Critical Search Page Journeys", () => {
 
       // Go back
       await page.goBack();
-      await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
+      await expect.poll(
+        () => new URL(page.url()).pathname,
+        { timeout: timeouts.navigation, message: "URL pathname to be /search after goBack" },
+      ).toContain("/search");
 
       // Filters should be preserved
       const url = new URL(page.url());
@@ -279,7 +291,10 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Apply
     await applyFilters(page);
-    await page.waitForURL(/leaseDuration/i, { timeout: 10000 });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("leaseDuration"),
+      { timeout: 10000, message: 'URL param "leaseDuration" to be present' },
+    ).not.toBeNull();
 
     expect(page.url()).toMatch(/leaseDuration/i);
   });
@@ -304,7 +319,10 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Apply and verify
     await applyFilters(page);
-    await page.waitForURL(/houseRules/i, { timeout: 10000 });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("houseRules"),
+      { timeout: 10000, message: 'URL param "houseRules" to be present' },
+    ).not.toBeNull();
     expect(page.url()).toMatch(/houseRules/i);
   });
 
@@ -330,7 +348,10 @@ test.describe("20 Critical Search Page Journeys", () => {
     }
 
     await applyFilters(page);
-    await page.waitForURL(/genderPreference/i, { timeout: 10000 });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("genderPreference"),
+      { timeout: 10000, message: 'URL param "genderPreference" to be present' },
+    ).not.toBeNull();
     expect(page.url()).toMatch(/genderPreference/i);
   });
 

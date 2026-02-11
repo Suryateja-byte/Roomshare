@@ -213,10 +213,10 @@ test.describe("Filter State Persistence", () => {
       await removePrice.click();
 
       // Wait for the price param to be removed from the URL
-      await page.waitForURL(
-        (url) => !new URL(url).searchParams.has("minPrice"),
-        { timeout: 30_000 },
-      );
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.has("minPrice"),
+        { timeout: 30_000, message: 'URL param "minPrice" to be absent' },
+      ).toBe(false);
 
       // Price filter should be gone
       expect(getUrlParam(page, "minPrice")).toBeNull();
@@ -242,10 +242,10 @@ test.describe("Filter State Persistence", () => {
       if (await removeWifi.isVisible().catch(() => false)) {
         await removeWifi.click();
 
-        await page.waitForURL(
-          (url) => !new URL(url).searchParams.has("amenities"),
-          { timeout: 30_000 },
-        );
+        await expect.poll(
+          () => new URL(page.url(), "http://localhost").searchParams.has("amenities"),
+          { timeout: 30_000, message: 'URL param "amenities" to be absent' },
+        ).toBe(false);
 
         // Amenity removed, sort preserved
         expect(getUrlParam(page, "amenities")).toBeNull();

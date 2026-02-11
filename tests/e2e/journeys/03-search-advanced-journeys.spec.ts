@@ -72,7 +72,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
     }
 
     await applyFilters(page);
-    await page.waitForURL(/minPrice=800/, { timeout: 30000, waitUntil: "commit" });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("minPrice"),
+      { timeout: 30000, message: 'URL param "minPrice" to be "800"' },
+    ).toBe("800");
 
     const url = new URL(page.url());
     expect(url.searchParams.get("minPrice")).toBe("800");
@@ -103,7 +106,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
     }
 
     await applyFilters(page);
-    await page.waitForURL(/genderPreference/i, { timeout: 15000, waitUntil: "commit" });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("genderPreference"),
+      { timeout: 15000, message: 'URL param "genderPreference" to be present' },
+    ).not.toBeNull();
 
     const url = new URL(page.url());
     expect(url.searchParams.get("genderPreference")).toBe("FEMALE_ONLY");
@@ -141,7 +147,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
     }
 
     await applyFilters(page);
-    await page.waitForURL(/amenities/i, { timeout: 15000, waitUntil: "commit" });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+      { timeout: 15000, message: 'URL param "amenities" to be present' },
+    ).not.toBeNull();
 
     // URL should contain amenities array
     expect(page.url()).toMatch(/amenities/i);
@@ -163,7 +172,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
       .or(page.locator('button:has-text("Private")'));
     if (await privateTab.first().isVisible()) {
       await privateTab.first().click();
-      await page.waitForURL(/roomType/i, { timeout: 15000, waitUntil: "commit" });
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 15000, message: 'URL param "roomType" to be present' },
+      ).not.toBeNull();
     }
 
     // Change sort (desktop only)
@@ -176,7 +188,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
           .or(page.locator('[role="option"]').filter({ hasText: /Low to High/i }));
         if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
           await option.first().click();
-          await page.waitForURL(/sort=price_asc/, { timeout: 15000, waitUntil: "commit" });
+          await expect.poll(
+            () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
+            { timeout: 15000, message: 'URL param "sort" to be "price_asc"' },
+          ).toBe("price_asc");
         }
       }
     }
@@ -207,7 +222,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
     if (await clearBtn.first().isVisible({ timeout: 5000 }).catch(() => false)) {
       await clearBtn.first().click();
       // Wait for navigation to clear filters
-      await page.waitForURL((url) => !url.searchParams.has("minPrice"), { timeout: 15000, waitUntil: "commit" });
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("minPrice"),
+        { timeout: 15000, message: 'URL param "minPrice" to be absent after clear' },
+      ).toBeNull();
 
       const url2 = new URL(page.url());
       expect(url2.searchParams.has("minPrice")).toBeFalsy();
@@ -247,7 +265,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await searchBtn.click();
 
     // Wait for navigation — prices should be swapped in URL
-    await page.waitForURL(/minPrice/, { timeout: 15000, waitUntil: "commit" });
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("minPrice"),
+      { timeout: 15000, message: 'URL param "minPrice" to be present' },
+    ).not.toBeNull();
 
     const url = new URL(page.url());
     const minPrice = parseInt(url.searchParams.get("minPrice") || "0");
@@ -654,12 +675,11 @@ test.describe("30 Advanced Search Page Journeys", () => {
       const urlBefore = page.url();
       // Remove the first pill
       await pills.first().click();
-      // Wait for URL to change after pill removal
-      try {
-        await page.waitForURL((url) => url.toString() !== urlBefore, { timeout: 15000, waitUntil: "commit" });
-      } catch {
-        // URL may not change if pill removal didn't trigger navigation
-      }
+      // Wait for URL to change after pill removal via soft navigation
+      await expect.poll(
+        () => page.url(),
+        { timeout: 15000, message: "URL to change after pill removal" },
+      ).not.toBe(urlBefore);
       await page.waitForLoadState("domcontentloaded");
 
       // Other filters should still be in URL
@@ -687,18 +707,24 @@ test.describe("30 Advanced Search Page Journeys", () => {
       .or(page.locator('button:has-text("Private")'));
     if (await privateTab.first().isVisible()) {
       await privateTab.first().click();
-      await page.waitForURL(/roomType/i, { timeout: 15000, waitUntil: "commit" });
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 15000, message: 'URL param "roomType" to be present' },
+      ).not.toBeNull();
 
       // Go back — URL should no longer have roomType
       await page.goBack();
-      await page.waitForLoadState("domcontentloaded");
-      await expect(async () => {
-        expect(page.url()).not.toMatch(/roomType/i);
-      }).toPass({ timeout: 15000 });
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 15000, message: 'URL param "roomType" to be absent after goBack' },
+      ).toBeNull();
 
       // Go forward
       await page.goForward();
-      await page.waitForURL(/roomType/i, { timeout: 15000, waitUntil: "commit" });
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 15000, message: 'URL param "roomType" to be present after goForward' },
+      ).not.toBeNull();
     }
   });
 
@@ -719,7 +745,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
         .or(page.locator('[role="option"]').filter({ hasText: /Newest/i }));
       if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
         await option.first().click();
-        await page.waitForURL(/sort=newest/, { timeout: 15000, waitUntil: "commit" });
+        await expect.poll(
+          () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
+          { timeout: 15000, message: 'URL param "sort" to be "newest"' },
+        ).toBe("newest");
 
         // Page param should be reset
         const url = new URL(page.url());
@@ -850,7 +879,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
       await privateTab.first().click();
       // Loading state may flash briefly — just verify page settles.
       // Use longer timeout for CI environments.
-      await page.waitForURL(/roomType/i, { timeout: 30000, waitUntil: "commit" });
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 30000, message: 'URL param "roomType" to be present' },
+      ).not.toBeNull();
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
     }
   });

@@ -98,8 +98,10 @@ test.describe("Mobile Filter Experience", () => {
       await expect(bottomSheet).toBeVisible();
 
       // Verify URL has amenities parameter
-      await page.waitForURL(/amenities=Wifi/, { timeout: 30_000 });
-      expectUrlParam(page, "amenities", "Wifi");
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        { timeout: 30_000, message: 'URL param "amenities" to be "Wifi"' },
+      ).toBe("Wifi");
 
       // Verify snap position is reasonable (not broken)
       const snap = await getSheetSnapIndex(page);
@@ -206,7 +208,10 @@ test.describe("Mobile Filter Experience", () => {
       }
 
       // Wait for URL to update with sort param
-      await page.waitForURL(/[?&]sort=/, { timeout: 30_000 });
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
+        { timeout: 30_000, message: 'URL param "sort" to be present' },
+      ).not.toBeNull();
 
       // Verify sort param is present
       const sortParam = getUrlParam(page, "sort");

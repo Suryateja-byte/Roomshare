@@ -126,11 +126,11 @@ test.describe("Filter Combinations", () => {
       // Apply filters (handles modal close + URL settle)
       await applyFilters(page);
 
-      // Wait for URL to update
-      await page.waitForURL(
-        (url) => new URL(url).searchParams.has("amenities"),
-        { timeout: 30_000 },
-      );
+      // Wait for URL to update via soft navigation
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        { timeout: 30_000, message: 'URL param "amenities" to be present' },
+      ).not.toBeNull();
 
       // Both room type and amenity should be in URL
       expect(getUrlParam(page, "roomType")).toBe("Private Room");
@@ -155,10 +155,10 @@ test.describe("Filter Combinations", () => {
     if (removeVisible) {
       await removeRoomType.click();
 
-      await page.waitForURL(
-        (url) => !new URL(url).searchParams.has("roomType"),
-        { timeout: 30_000 },
-      );
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 30_000, message: 'URL param "roomType" to be absent' },
+      ).toBeNull();
 
       // roomType removed, others preserved
       expect(getUrlParam(page, "roomType")).toBeNull();
@@ -211,11 +211,11 @@ test.describe("Filter Combinations", () => {
       // Apply filters (handles modal close + URL settle)
       await applyFilters(page);
 
-      // Wait for navigation
-      await page.waitForURL(
-        (url) => new URL(url).searchParams.has("amenities"),
-        { timeout: 30_000 },
-      );
+      // Wait for navigation via soft navigation
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        { timeout: 30_000, message: 'URL param "amenities" to be present' },
+      ).not.toBeNull();
 
       // page param should have been removed by commit()
       const params = getUrlParams(page);

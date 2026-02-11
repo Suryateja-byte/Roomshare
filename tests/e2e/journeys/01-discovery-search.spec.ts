@@ -208,8 +208,8 @@ test.describe("Discovery & Search Journeys", () => {
       // Should show 404 or not found state
       await expect(
         page
-          .getByText(/not found|404|doesn't exist/i)
-          .or(page.locator('h1:has-text("404")')),
+          .getByText(/not found|404|doesn't exist|couldn't find/i)
+          .or(page.getByRole('heading', { name: /couldn't find|oops|not found|404/i })),
       ).toBeVisible({ timeout: 10000 });
     });
   });

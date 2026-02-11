@@ -62,11 +62,11 @@ test.describe("Room Type Filter", () => {
     if (tabVisible) {
       await privateTab.click();
 
-      // Wait for URL to update
-      await page.waitForURL(
-        (url) => new URL(url).searchParams.get("roomType") === "Private Room",
-        { timeout: 30_000 },
-      );
+      // Wait for URL to update via soft navigation
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 30_000, message: 'URL param "roomType" to be "Private Room"' },
+      ).toBe("Private Room");
 
       expect(getUrlParam(page, "roomType")).toBe("Private Room");
     } else {
@@ -89,10 +89,10 @@ test.describe("Room Type Filter", () => {
     if (tabVisible) {
       await allTab.click();
 
-      await page.waitForURL(
-        (url) => !new URL(url).searchParams.has("roomType"),
-        { timeout: 30_000 },
-      );
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 30_000, message: 'URL param "roomType" to be absent' },
+      ).toBeNull();
 
       expect(getUrlParam(page, "roomType")).toBeNull();
     } else {
@@ -184,10 +184,10 @@ test.describe("Room Type Filter", () => {
         await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
         // URL should have roomType=Shared Room
-        await page.waitForURL(
-          (url) => new URL(url).searchParams.get("roomType") === "Shared Room",
-          { timeout: 30_000 },
-        );
+        await expect.poll(
+          () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+          { timeout: 30_000, message: 'URL param "roomType" to be "Shared Room"' },
+        ).toBe("Shared Room");
       }
     }
   });
@@ -235,10 +235,10 @@ test.describe("Room Type Filter", () => {
 
       await tab.click();
 
-      await page.waitForURL(
-        (url) => new URL(url).searchParams.get("roomType") === param,
-        { timeout: 30_000 },
-      );
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 30_000, message: `URL param "roomType" to be "${param}"` },
+      ).toBe(param);
 
       expect(getUrlParam(page, "roomType")).toBe(param);
     }

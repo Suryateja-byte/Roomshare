@@ -94,10 +94,11 @@ test.describe("Breathing Pending State (PR1)", () => {
         console.log("Info: Transition completed too fast to observe pending state");
       }
 
-      // Wait for transition to complete (URL should include Parking amenity)
-      await page.waitForURL((url) => url.search.includes("amenities="), {
-        timeout: 10000,
-      });
+      // Wait for transition to complete (URL should include amenities param)
+      await expect.poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        { timeout: 10000, message: 'URL param "amenities" to be present' },
+      ).not.toBeNull();
 
       // After transition, the wrapper should NOT be busy
       if (await ariaBusyWrapper.count() > 0) {

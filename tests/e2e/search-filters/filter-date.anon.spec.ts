@@ -104,13 +104,13 @@ test.describe("Move-In Date Filter", () => {
     await applyFilters(page);
 
     // Verify URL contains a moveInDate param in YYYY-MM-DD format
-    await page.waitForURL(
-      (url) => {
-        const moveInDate = new URL(url).searchParams.get("moveInDate");
+    await expect.poll(
+      () => {
+        const moveInDate = new URL(page.url(), "http://localhost").searchParams.get("moveInDate");
         return moveInDate !== null && /^\d{4}-\d{2}-\d{2}$/.test(moveInDate);
       },
-      { timeout: 30_000 },
-    );
+      { timeout: 30_000, message: 'URL param "moveInDate" to be in YYYY-MM-DD format' },
+    ).toBe(true);
 
     const moveInDate = getUrlParam(page, "moveInDate");
     expect(moveInDate).toBeTruthy();
