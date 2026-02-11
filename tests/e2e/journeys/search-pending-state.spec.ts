@@ -35,7 +35,7 @@ test.describe("Breathing Pending State (PR1)", () => {
 
       // Wait for initial results to load
       const resultsContainer = searchResultsContainer(page);
-      await expect(resultsContainer).toBeVisible({ timeout: 15000 });
+      await expect(resultsContainer).toBeVisible({ timeout: 30000 });
 
       // The aria-busy wrapper is inside the results container (SearchResultsLoadingWrapper)
       const ariaBusyWrapper = resultsContainer.locator('[aria-busy]').first();
@@ -208,7 +208,7 @@ test.describe("Breathing Pending State (PR1)", () => {
       // Wait for results to appear
       await expect(
         page.getByRole("heading", { level: 1 }).first(),
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30000 });
 
       // The SearchResultsLoadingWrapper includes a <span class="sr-only" aria-live="polite" role="status">
       // This span is always present (for SR announcements), but may be visually hidden.

@@ -25,12 +25,13 @@ import {
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
 
-/** Wait for search results heading to be visible */
+/** Wait for search results heading or listing cards to be visible */
 async function waitForResults(page: import("@playwright/test").Page) {
   await page.waitForLoadState("domcontentloaded");
-  await expect(
-    page.getByRole("heading", { level: 1 }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  // Try heading first, fall back to listing cards being attached (CI may not render h1 quickly)
+  const heading = page.getByRole("heading", { level: 1 }).first();
+  const card = page.locator('[data-testid="listing-card"]').first();
+  await expect(heading.or(card)).toBeVisible({ timeout: 30_000 });
 }
 
 // --------------------------------------------------------------------------

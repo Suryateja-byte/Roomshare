@@ -335,7 +335,7 @@ test.describe("Mobile Map and Sheet", () => {
     const markers = page.locator(mobileSelectors.mapMarker);
     const markerCount = await markers
       .first()
-      .waitFor({ state: "attached", timeout: 15_000 })
+      .waitFor({ state: "attached", timeout: 30_000 })
       .then(() => markers.count())
       .catch(() => 0);
 
@@ -498,7 +498,7 @@ test.describe("Mobile Filter Interaction", () => {
     // Use waitFor instead of isVisible (which returns immediately)
     const modalOpened = await modal
       .first()
-      .waitFor({ state: "visible", timeout: 15_000 })
+      .waitFor({ state: "visible", timeout: 30_000 })
       .then(() => true)
       .catch(() => false);
 
@@ -529,7 +529,7 @@ test.describe("Mobile Filter Interaction", () => {
     // Use specific selector for filter modal (not just any dialog)
     const modal = page.locator('[role="dialog"][aria-labelledby="filter-drawer-title"]');
     const modalOpened = await modal
-      .waitFor({ state: "visible", timeout: 15_000 })
+      .waitFor({ state: "visible", timeout: 30_000 })
       .then(() => true)
       .catch(() => false);
     if (!modalOpened) {

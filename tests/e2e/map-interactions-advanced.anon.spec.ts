@@ -700,7 +700,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       // Poll for debounced URL bounds update after pan
       await expect.poll(
         () => getUrlBounds(page.url()).minLng,
-        { timeout: 15_000, message: 'Waiting for URL bounds to update after pan' },
+        { timeout: 30_000, message: 'Waiting for URL bounds to update after pan' },
       ).not.toBe(initialBounds.minLng);
 
       // Parse new URL bounds

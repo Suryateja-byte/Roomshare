@@ -107,8 +107,8 @@ test.describe('Accessibility Journeys', () => {
       };
 
       // At least main and navigation should exist
-      await expect(landmarks.main.first()).toBeAttached({ timeout: 15000 });
-      await expect(landmarks.navigation.first()).toBeAttached({ timeout: 15000 });
+      await expect(landmarks.main.first()).toBeAttached({ timeout: 30000 });
+      await expect(landmarks.navigation.first()).toBeAttached({ timeout: 30000 });
     });
 
     test(`${tags.a11y} - Images have alt text`, async ({ page, nav }) => {
@@ -218,7 +218,7 @@ test.describe('Edge Case Journeys', () => {
         page.locator(selectors.emptyState)
           .or(page.getByText(/no.*results|no.*listings|nothing.*found/i))
           .first()
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30000 });
     });
 
     test(`${tags.auth} - Empty bookings list`, async ({ page, nav }) => {
@@ -256,7 +256,7 @@ test.describe('Edge Case Journeys', () => {
       await expect(
         page.getByText(/404|not found|page.*exist|does not exist|couldn't find/i).first()
           .or(page.getByRole('heading', { name: /couldn't find|oops|not found|404/i }))
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30000 });
 
       // Should have navigation back home (link text varies by implementation)
       const homeLink = page.getByRole('link', { name: /home|back|return/i })
@@ -281,7 +281,7 @@ test.describe('Edge Case Journeys', () => {
       await expect(
         page.getByText(/not found|error|invalid|does not exist|404|couldn't find/i).first()
           .or(page.getByRole('heading', { name: /couldn't find|oops|not found|error|404/i }))
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30000 });
     });
 
     test(`${tags.auth} ${tags.offline} - Network error handling`, async ({ page, nav, network }) => {
@@ -546,7 +546,7 @@ test.describe('Edge Case Journeys', () => {
 
       // Page should remain functional
       const heading = page.getByRole('heading').first();
-      await expect(heading).toBeVisible({ timeout: 15000 });
+      await expect(heading).toBeVisible({ timeout: 30000 });
     });
   });
 

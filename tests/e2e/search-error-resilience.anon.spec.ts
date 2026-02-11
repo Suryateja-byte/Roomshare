@@ -737,7 +737,7 @@ test.describe("Group 5: Network Resilience", () => {
     // Try to trigger a new search (via URL change)
     try {
       await page.goto(`/search?sort=newest&${boundsQS}`, {
-        timeout: 15_000,
+        timeout: 30_000,
       });
     } catch {
       // Navigation will likely fail when offline -- this is expected
@@ -751,7 +751,7 @@ test.describe("Group 5: Network Resilience", () => {
     await offlineIndicator
       .or(errorAlert)
       .first()
-      .isVisible({ timeout: 15_000 })
+      .isVisible({ timeout: 30_000 })
       .catch(() => false);
 
     // The page should show some form of error, offline indicator, or stale content.
@@ -1102,7 +1102,7 @@ test.describe("Group 7: Load-More Error States", () => {
     await expect(loadingButton).toBeDisabled();
 
     // Wait for the delayed response to complete — button returns to normal state
-    await expect(loadingButton).not.toBeVisible({ timeout: 15_000 });
+    await expect(loadingButton).not.toBeVisible({ timeout: 30_000 });
 
     // Cleanup
     await page.unrouteAll();

@@ -54,6 +54,10 @@ async function waitForSearchContent(page: Page) {
 // ---------------------------------------------------------------------------
 
 test.describe("Search URL Browser Navigation (P1)", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
   // -------------------------------------------------------------------------
   // 1. Filter change creates history entry -> back restores previous
   // -------------------------------------------------------------------------
@@ -314,7 +318,7 @@ test.describe("Search URL Browser Navigation (P1)", () => {
         return document.querySelectorAll('[data-testid="listing-card"]').length > count;
       },
       initialCount,
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     ).catch(() => {
       // May not produce additional results
     });

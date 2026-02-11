@@ -51,11 +51,11 @@ export const authHelpers = {
     await page.getByRole('button', { name: /sign in|log in|login/i }).first().click();
 
     // Wait for redirect away from login
-    // Login uses window.location.href = '/' (full page navigation), use waitUntil: "commit"
-    await page.waitForURL((url) => !url.pathname.includes('/login'), {
-      timeout: 30000,
-      waitUntil: 'commit',
-    });
+    // Login uses window.location.href = '/' (full page navigation)
+    await expect.poll(
+      () => !new URL(page.url()).pathname.includes('/login'),
+      { timeout: 30000, message: 'Expected to navigate away from login after auth' }
+    ).toBe(true);
   },
 
   /**
@@ -135,7 +135,7 @@ export const authHelpers = {
     await logoutOption.first().click();
 
     // Verify logged out
-    await expect(page).toHaveURL(/\/(login)?$/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/(login)?$/, { timeout: 30000 });
   },
 
   /**

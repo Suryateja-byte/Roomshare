@@ -181,7 +181,7 @@ test.describe('Nearby Places Attribution Compliance', () => {
     // Wait for MapLibre map to fully render (it loads asynchronously via dynamic import)
     // First wait for the map canvas container which indicates MapLibre has initialized
     const mapCanvas = page.locator('.maplibregl-canvas-container, .mapboxgl-canvas-container, .maplibregl-map, .mapboxgl-map');
-    await mapCanvas.first().waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
+    await mapCanvas.first().waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {});
 
     const mapLoaded = await mapCanvas.count() > 0;
     if (!mapLoaded) {

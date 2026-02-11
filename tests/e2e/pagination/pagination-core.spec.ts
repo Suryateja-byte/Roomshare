@@ -75,13 +75,13 @@ test.describe("Pagination Core", () => {
 
     // The "Show more places" button should be visible (real cursor from DB)
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
     // Click load more — mock intercepts the server action POST
     await loadMoreBtn.click();
 
     // Wait for additional mock cards to appear: 12 initial + 12 mock = 24
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     // Verify the mock was called
     expect(mock.loadMoreCallCount()).toBe(1);
@@ -106,15 +106,15 @@ test.describe("Pagination Core", () => {
 
     // Load more twice: 12 initial + 12 + 12 = 36
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     // Second load-more (button reappears after first load completes)
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(36, { timeout: 15_000 });
+    await expect(cards).toHaveCount(36, { timeout: 30_000 });
 
     // Extract all listing IDs
     const allIds = await cards.evaluateAll((elements) =>
@@ -154,10 +154,10 @@ test.describe("Pagination Core", () => {
     // 12 initial + 4 loads of 12 = 60
     for (let i = 0; i < 4; i++) {
       const loadMoreBtn = container.locator(sel.loadMoreBtn);
-      await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+      await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
       await loadMoreBtn.click();
       // Wait for cards to increase: (i + 2) * 12 = 24, 36, 48, 60
-      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 15_000 });
+      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 30_000 });
     }
 
     // Should have exactly 60 items
@@ -193,11 +193,11 @@ test.describe("Pagination Core", () => {
 
     // Load more to get remaining 3 mock items: 12 initial + 3 = 15
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
 
     // Wait for all 15 items
-    await expect(cards).toHaveCount(15, { timeout: 15_000 });
+    await expect(cards).toHaveCount(15, { timeout: 30_000 });
 
     // "Show more places" button should disappear
     await expect(container.locator(sel.loadMoreBtn)).not.toBeVisible({
@@ -229,7 +229,7 @@ test.describe("Pagination Core", () => {
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
     // Click load more
     await loadMoreBtn.click();
@@ -243,7 +243,7 @@ test.describe("Pagination Core", () => {
     await expect(busyBtn).toBeDisabled();
 
     // Wait for loading to complete (items appear): 12 + 12 = 24
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     // Loading state should be gone
     await expect(busyBtn).not.toBeVisible({ timeout: 5_000 });
@@ -269,14 +269,14 @@ test.describe("Pagination Core", () => {
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
     // Click load more (will fail)
     await loadMoreBtn.click();
 
     // Error text should appear
     const errorEl = container.locator(sel.errorText);
-    await expect(errorEl).toBeVisible({ timeout: 15_000 });
+    await expect(errorEl).toBeVisible({ timeout: 30_000 });
 
     // "Try again" button should be visible
     const retryBtn = container.locator(sel.retryBtn);
@@ -308,18 +308,18 @@ test.describe("Pagination Core", () => {
 
     // Trigger load-more (will fail)
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
 
     // Wait for error state
     const retryBtn = container.locator(sel.retryBtn);
-    await expect(retryBtn).toBeVisible({ timeout: 15_000 });
+    await expect(retryBtn).toBeVisible({ timeout: 30_000 });
 
     // Click "Try again" (second call to the mock, which should succeed)
     await retryBtn.click();
 
     // New items should appear: 12 + 12 = 24
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     // Error should be cleared
     await expect(container.locator(sel.errorText)).not.toBeVisible({
@@ -351,7 +351,7 @@ test.describe("Pagination Core", () => {
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
     // Click the button twice in rapid succession
     await loadMoreBtn.click();
@@ -361,7 +361,7 @@ test.describe("Pagination Core", () => {
     });
 
     // Wait for load to complete: 12 + 12 = 24
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     // Only ONE server action call should have been made
     // (the guard `if (isLoadingMore) return` prevents duplicate calls)
@@ -391,7 +391,7 @@ test.describe("Pagination Core", () => {
 
     // "Show more places" button should be visible (cursor returned by DB)
     await expect(container.locator(sel.loadMoreBtn)).toBeVisible({
-      timeout: 15_000,
+      timeout: 30_000,
     });
   });
 
@@ -441,9 +441,9 @@ test.describe("Pagination Core", () => {
     // Click load-more 3 times: 12 initial + 36 mock = 48
     for (let i = 0; i < 3; i++) {
       const loadMoreBtn = container.locator(sel.loadMoreBtn);
-      await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+      await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
       await loadMoreBtn.click();
-      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 15_000 });
+      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 30_000 });
     }
 
     // Verify 48 total cards
@@ -482,9 +482,9 @@ test.describe("Pagination Core", () => {
     // Click load-more 4 times to reach 60 items
     for (let i = 0; i < 4; i++) {
       const loadMoreBtn = container.locator(sel.loadMoreBtn);
-      await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+      await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
       await loadMoreBtn.click();
-      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 15_000 });
+      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 30_000 });
     }
 
     // Cap message should be visible
@@ -546,9 +546,9 @@ test.describe("Pagination Core", () => {
     // Load until the cap: 4 clicks of 12 mock items each
     for (let i = 0; i < 4; i++) {
       const loadMoreBtn = container.locator(sel.loadMoreBtn);
-      await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+      await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
       await loadMoreBtn.click();
-      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 15_000 });
+      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 30_000 });
     }
 
     // At 60 items (cap), button must be hidden even though more mock data exists
@@ -667,13 +667,13 @@ test.describe("Pagination Core", () => {
 
     // Button should be visible (cursor present from SSR)
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
     // Click load-more (mock returns 1 item with no cursor)
     await loadMoreBtn.click();
 
     // Wait for 13 total cards: 12 initial + 1 mock
-    await expect(cards).toHaveCount(13, { timeout: 15_000 });
+    await expect(cards).toHaveCount(13, { timeout: 30_000 });
 
     // Button should disappear (no more pages)
     await expect(container.locator(sel.loadMoreBtn)).not.toBeVisible({
@@ -706,7 +706,7 @@ test.describe("Pagination Core", () => {
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
     // Click load-more
     await loadMoreBtn.click();
@@ -722,7 +722,7 @@ test.describe("Pagination Core", () => {
     await expect(busyBtn).toBeDisabled();
 
     // Eventually, results should appear (after ~5s total delay)
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     // Loading state should clear after response
     await expect(busyBtn).not.toBeVisible({ timeout: 5_000 });

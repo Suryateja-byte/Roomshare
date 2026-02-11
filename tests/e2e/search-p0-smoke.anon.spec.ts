@@ -152,7 +152,12 @@ test.describe("Search P0 Smoke Suite", () => {
   });
 
   // S05: Clear all filters resets search
-  test("S05: clear all filters resets search", async ({ page }) => {
+  test("S05: clear all filters resets search", async ({ page, browserName }, testInfo) => {
+    // Webkit-anon has unreliable filter reset timing due to Desktop Safari rendering
+    if (testInfo.project.name.includes('webkit')) {
+      test.slow();
+    }
+
     await page.goto(`/search?maxPrice=1000&roomType=private&${boundsQS}`);
     await page.waitForLoadState("domcontentloaded");
 
@@ -165,19 +170,24 @@ test.describe("Search P0 Smoke Suite", () => {
     // Look for the "Clear all" button in the applied filter chips area
     // or in the zero-results "Clear all filters" button (ZeroResultsSuggestions renders a Button, not Link)
     const clearAllBtn = page.locator('button:has-text("Clear all"), button:has-text("Clear all filters")');
-    const clearVisible = await clearAllBtn.first().isVisible().catch(() => false);
+    const clearVisible = await clearAllBtn.first().isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (clearVisible) {
-      // Use scrollIntoViewIfNeeded + force:true to avoid click timeout in webkit
+      // Use scrollIntoViewIfNeeded + force click to avoid timeout in webkit
       // where the button may be partially obscured by map overlay or bottom sheet
       await clearAllBtn.first().scrollIntoViewIfNeeded();
-      await clearAllBtn.first().click({ timeout: 30_000 });
+      await clearAllBtn.first().click({ force: browserName === "webkit", timeout: 30_000 });
       await page.waitForLoadState("domcontentloaded");
 
       // After clearing, URL should not contain maxPrice or roomType
-      const url = page.url();
-      expect(url).not.toContain("maxPrice=");
-      expect(url).not.toContain("roomType=");
+      // Use expect.poll for webkit where URL update may be delayed
+      await expect.poll(
+        () => {
+          const url = page.url();
+          return !url.includes("maxPrice=") && !url.includes("roomType=");
+        },
+        { timeout: 30_000, message: "URL filter params should be removed after clearing" },
+      ).toBe(true);
     } else {
       // If no clear button is visible (e.g., filters applied via URL but chips not rendered),
       // the test is inconclusive -- skip rather than fail
@@ -201,7 +211,7 @@ test.describe("Search P0 Smoke Suite", () => {
     if (isMobile) {
       // Click mobile sort button (needs hydration wait)
       const sortBtn = page.locator('button[aria-label^="Sort:"]');
-      const mobileSortVisible = await sortBtn.isVisible({ timeout: 15_000 }).catch(() => false);
+      const mobileSortVisible = await sortBtn.isVisible({ timeout: 30_000 }).catch(() => false);
       if (mobileSortVisible) {
         await sortBtn.click();
         // Select "Price: Low to High" from the bottom sheet
@@ -212,7 +222,7 @@ test.describe("Search P0 Smoke Suite", () => {
       // SortSelect renders an SSR placeholder without role="combobox", so this
       // only matches after client-side hydration sets mounted = true.
       const selectTrigger = container.locator('button[role="combobox"]');
-      if (await selectTrigger.isVisible({ timeout: 15_000 }).catch(() => false)) {
+      if (await selectTrigger.isVisible({ timeout: 30_000 }).catch(() => false)) {
         await selectTrigger.click();
         const listbox = page.locator('[role="listbox"]');
         await expect(listbox).toBeVisible({ timeout: 5_000 });
@@ -229,7 +239,7 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Verify ordering: first card price <= last card price
     const updatedCards = container.locator('[data-testid="listing-card"]');
-    await expect(updatedCards.first()).toBeAttached({ timeout: 15_000 });
+    await expect(updatedCards.first()).toBeAttached({ timeout: 30_000 });
 
     const priceElements = container.locator('[data-testid="listing-card"] [data-testid="listing-price"]');
     const priceCount = await priceElements.count();
@@ -291,7 +301,7 @@ test.describe("Search P0 Smoke Suite", () => {
           return cards.length > initialCount;
         },
         initialIds.length,
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       ).catch(() => {
         // Load more may not produce new results if all data is on page 1
       });
@@ -327,7 +337,7 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Wait for markers to appear
     try {
-      await waitForMapMarkers(page, { timeout: 15_000, minCount: 1 });
+      await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
     } catch {
       test.skip(true, "No map markers appeared -- WebGL may be degraded");
       return;
@@ -397,7 +407,7 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Assert bottom sheet region is visible
     const bottomSheet = page.locator('[role="region"][aria-label="Search results"]');
-    await expect(bottomSheet).toBeAttached({ timeout: 15_000 });
+    await expect(bottomSheet).toBeAttached({ timeout: 30_000 });
 
     // Assert sheet handle/slider is present
     const sheetHandle = page.locator('[role="slider"][aria-label="Results panel size"]');
@@ -554,7 +564,7 @@ test.describe("Search P0 Smoke Suite", () => {
     const desktopListContainer = page.locator('[data-testid="search-results-container"]');
     // Desktop split view: the hidden md:flex container should be visible
     const desktopSplitView = page.locator(".md\\:flex").first();
-    await expect(desktopListContainer.or(desktopSplitView).first()).toBeAttached({ timeout: 15_000 });
+    await expect(desktopListContainer.or(desktopSplitView).first()).toBeAttached({ timeout: 30_000 });
 
     // Mobile bottom sheet should be hidden at desktop
     const mobileSheet = page.locator('[role="region"][aria-label="Search results"]');

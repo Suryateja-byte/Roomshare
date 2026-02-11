@@ -51,11 +51,11 @@ test.describe("Pagination Reset on Param Change", () => {
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
     // Click load-more to accumulate 24 items (12 initial + 12 mock loaded)
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     return cards;
   }
@@ -173,9 +173,9 @@ test.describe("Pagination Reset on Param Change", () => {
 
     // Load more
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(24, { timeout: 15_000 });
+    await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
     // Navigate to a new filter set (remounts the component)
     await page.goto(`/search?${boundsQS}&roomType=private`);

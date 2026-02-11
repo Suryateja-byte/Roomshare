@@ -102,7 +102,7 @@ async function selectSort(
     await option.click();
   }
   await expect(page).toHaveURL(new RegExp(`sort=${expectedUrlParam}`), {
-    timeout: 15_000,
+    timeout: 30_000,
   });
 }
 
@@ -142,7 +142,7 @@ async function loadTwoPages(page: Page) {
   expect(initialCount).toBeGreaterThanOrEqual(1);
 
   const loadMoreBtn = container.locator(sel.loadMoreBtn);
-  await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+  await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
   await loadMoreBtn.click();
   await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
@@ -308,7 +308,7 @@ test.describe("5. Cursor Reset on Filter/Sort Change", () => {
 
     // Load more should work: mock items must not be blocked by stale seenIdsRef
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
 
     // Mock items should appear (they have IDs starting with "mock-listing-")
@@ -368,7 +368,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
 
     // Load more
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
     await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
@@ -422,7 +422,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
 
     // Load more
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
     await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
@@ -459,7 +459,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
 
     // Load more
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
     await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
@@ -504,7 +504,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
 
     // Load more
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
     await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 

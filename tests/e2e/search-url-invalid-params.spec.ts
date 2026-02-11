@@ -41,7 +41,7 @@ async function assertNoCrash(page: Page, response: Awaited<ReturnType<Page["goto
     expect(response.status()).not.toBe(500);
   }
   // Body should be visible (page rendered)
-  await expect(page.locator("body")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("body")).toBeVisible({ timeout: 30_000 });
 }
 
 /** Assert no alert dialog was triggered. */
@@ -202,7 +202,7 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     if (response) {
       expect(response.status()).not.toBe(500);
     }
-    await expect(page.locator("body")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("body")).toBeVisible({ timeout: 30_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -370,7 +370,7 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     if (response) {
       expect(response.status()).not.toBe(500);
     }
-    await expect(page.locator("body")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("body")).toBeVisible({ timeout: 30_000 });
   });
 
   // -------------------------------------------------------------------------

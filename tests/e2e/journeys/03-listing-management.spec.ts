@@ -63,7 +63,7 @@ test.describe("Listing Management Journeys", () => {
             await saveButton.click();
 
             // Verify redirect and updated data
-            await page.waitForURL(/\/listings\/(?!.*edit)/, { timeout: 15000, waitUntil: "commit" });
+            await page.waitForURL(/\/listings\/(?!.*edit)/, { timeout: 30000, waitUntil: "commit" });
             await expect(page.getByRole("heading", { level: 1 }).first()).toContainText(
               "Updated Listing Title",
             );

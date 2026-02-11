@@ -387,7 +387,7 @@ test.describe("Search API v2 Endpoint", () => {
       const cardOrEmptyState = listingCards
         .first()
         .or(page.getByText(/no listings|no matches found/i));
-      await expect(cardOrEmptyState).toBeVisible({ timeout: 15000 });
+      await expect(cardOrEmptyState).toBeVisible({ timeout: 30000 });
     });
 
     // Skip map test if Mapbox token not configured (test environment)

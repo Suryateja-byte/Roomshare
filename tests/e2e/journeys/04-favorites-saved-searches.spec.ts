@@ -185,7 +185,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
           // Should show success
           await expect(
             page.locator(selectors.toast).or(page.getByText(/saved|created/i)).first(),
-          ).toBeVisible({ timeout: 5000 });
+          ).toBeVisible({ timeout: 30000 });
         }
       }
     });

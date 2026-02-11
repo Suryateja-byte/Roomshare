@@ -33,7 +33,7 @@ test.describe("Search Pagination Journey", () => {
 
     // Wait for listings to load
     const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
-    await expect(listingCard).toBeVisible({ timeout: 15000 });
+    await expect(listingCard).toBeVisible({ timeout: 30000 });
 
     // Capture first listing ID on page 1
     const firstListingPage1 = await searchResultsContainer(page)
@@ -124,7 +124,7 @@ test.describe("Search Pagination Journey", () => {
 
     // Wait for listings
     const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
-    await expect(listingCard).toBeVisible({ timeout: 15000 });
+    await expect(listingCard).toBeVisible({ timeout: 30000 });
 
     // Step 2: Navigate to page 2 if possible
     const pagination = page.locator(selectors.pagination);
@@ -209,7 +209,7 @@ test.describe("Search Pagination Journey", () => {
 
     // Wait for listings
     const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
-    await expect(listingCard).toBeVisible({ timeout: 15000 });
+    await expect(listingCard).toBeVisible({ timeout: 30000 });
 
     // Step 2: Navigate to page 2
     const pagination = page.locator(selectors.pagination);
@@ -238,7 +238,7 @@ test.describe("Search Pagination Journey", () => {
 
       // Wait for listings to load after refresh
       await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
-        timeout: 15000,
+        timeout: 30000,
       });
 
       // Step 5: Verify URL is preserved

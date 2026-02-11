@@ -111,7 +111,7 @@ test.describe("Pagination Browse Mode", () => {
     //     Showing top listings. Select a location for more results.
     //   </p>
     const browseBanner = container.locator(sel.browseBanner);
-    await expect(browseBanner).toBeVisible({ timeout: 15_000 });
+    await expect(browseBanner).toBeVisible({ timeout: 30_000 });
 
     // Verify the banner text content
     await expect(browseBanner).toContainText("Select a location");

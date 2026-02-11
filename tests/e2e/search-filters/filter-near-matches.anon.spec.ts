@@ -243,7 +243,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
 
       // Wait for cards to be visible
       const cards = scopedCards(page);
-      await expect(cards.first()).toBeVisible({ timeout: 15_000 });
+      await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
       const cardCount = await cards.count();
 

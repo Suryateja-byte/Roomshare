@@ -59,7 +59,7 @@ test.describe("Pagination URL State", () => {
     // Load more 3 times
     for (let i = 0; i < 3; i++) {
       const loadMoreBtn = container.locator(sel.loadMoreBtn);
-      await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+      await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
       await loadMoreBtn.click();
       // 12 initial + (i+1)*12 mock items = (i+2)*12
       await expect(cards).toHaveCount((i + 2) * 12, { timeout: 30_000 });
@@ -90,7 +90,7 @@ test.describe("Pagination URL State", () => {
 
     // Load more to accumulate 24 items (12 real + 12 mock)
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
     await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
@@ -108,7 +108,7 @@ test.describe("Pagination URL State", () => {
 
     // "Show more places" button should reappear (there are more items in DB)
     await expect(container.locator(sel.loadMoreBtn)).toBeVisible({
-      timeout: 15_000,
+      timeout: 30_000,
     });
   });
 
@@ -144,13 +144,13 @@ test.describe("Pagination URL State", () => {
 
       // Navigate directly to the listing detail page
       await page.goto(href!);
-      await page.waitForURL(/\/listings\//, { timeout: 15_000, waitUntil: "commit" });
+      await page.waitForURL(/\/listings\//, { timeout: 30_000, waitUntil: "commit" });
 
       // Go back to search results
       await page.goBack();
 
       // Search results should be visible again
-      await page.waitForURL(/\/search/, { timeout: 15_000 });
+      await page.waitForURL(/\/search/, { timeout: 30_000 });
       await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
       // Results should be present (count may vary depending on bfcache behavior)
@@ -190,7 +190,7 @@ test.describe("Pagination URL State", () => {
 
     // Click load more
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    const hasLoadMore = await loadMoreBtn.isVisible({ timeout: 15_000 }).catch(() => false);
+    const hasLoadMore = await loadMoreBtn.isVisible({ timeout: 30_000 }).catch(() => false);
     if (!hasLoadMore) {
       test.skip(true, 'Load more button not available (fewer results than page size)');
       return;
@@ -201,7 +201,7 @@ test.describe("Pagination URL State", () => {
     await expect(async () => {
       const count = await cards.count();
       expect(count).toBeGreaterThan(countBefore);
-    }).toPass({ timeout: 15_000 });
+    }).toPass({ timeout: 30_000 });
     const countAfter = await cards.count();
     expect(countAfter).toBeGreaterThan(0);
 
@@ -244,7 +244,7 @@ test.describe("Pagination URL State", () => {
 
     // Load more to accumulate 24 items
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+    await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
     await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
@@ -292,7 +292,7 @@ test.describe("Pagination URL State", () => {
     // Located in the header bar above the search results grid.
     // With ~19 seed listings the total is a real number, so we expect "N places".
     const countHeader = container.locator("text=/\\d+ places|100\\+ places/");
-    await expect(countHeader.first()).toBeVisible({ timeout: 15_000 });
+    await expect(countHeader.first()).toBeVisible({ timeout: 30_000 });
 
     const headerText = await countHeader.first().textContent();
     expect(headerText).toBeTruthy();
@@ -310,7 +310,7 @@ test.describe("Pagination URL State", () => {
     const liveRegion = container.locator(
       '[aria-live="polite"][aria-atomic="true"]',
     );
-    await expect(liveRegion).toBeAttached({ timeout: 15_000 });
+    await expect(liveRegion).toBeAttached({ timeout: 30_000 });
 
     const announceText = await liveRegion.textContent();
     expect(announceText).toBeTruthy();

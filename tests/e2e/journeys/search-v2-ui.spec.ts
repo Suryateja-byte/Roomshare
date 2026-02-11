@@ -36,7 +36,7 @@ test.describe("Search V2 UI Integration", () => {
     const cardOrEmptyState = cards
       .first()
       .or(page.getByText(/no (matches|results|listings)/i));
-    await expect(cardOrEmptyState).toBeVisible({ timeout: 15000 });
+    await expect(cardOrEmptyState).toBeVisible({ timeout: 30000 });
 
     const cardCount = await cards.count();
     // Either we have cards or we have empty state message

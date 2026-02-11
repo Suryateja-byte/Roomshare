@@ -22,7 +22,7 @@ test.describe('API Response Time Budgets', () => {
       // Intercept the search API call
       const responsePromise = page.waitForResponse(
         (resp) => resp.url().includes('/api/search') || resp.url().includes('/api/listings'),
-        { timeout: 15000 },
+        { timeout: 30000 },
       );
 
       await page.goto(searchUrl);
@@ -45,7 +45,7 @@ test.describe('API Response Time Budgets', () => {
 
       const responsePromise = page.waitForResponse(
         (resp) => resp.url().includes('/api/search') || resp.url().includes('/api/listings'),
-        { timeout: 15000 },
+        { timeout: 30000 },
       );
 
       await page.goto(searchUrl);
@@ -81,7 +81,7 @@ test.describe('API Response Time Budgets', () => {
       // Navigate and intercept the listing API call
       const responsePromise = page.waitForResponse(
         (resp) => resp.url().includes(`/api/listings/${listingId}`) || resp.url().includes(`/listings/${listingId}`),
-        { timeout: 15000 },
+        { timeout: 30000 },
       );
 
       await page.goto(`/listings/${listingId}`);

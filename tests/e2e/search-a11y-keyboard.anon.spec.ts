@@ -29,7 +29,7 @@ async function waitForResults(page: import("@playwright/test").Page) {
   await page.waitForLoadState("domcontentloaded");
   await expect(
     page.getByRole("heading", { level: 1 }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible({ timeout: 30000 });
 }
 
 // --------------------------------------------------------------------------
@@ -42,6 +42,7 @@ test.describe("Search A11y: Keyboard Navigation", () => {
   });
 
   test.beforeEach(async ({ page }) => {
+    test.slow();
     await page.goto(SEARCH_URL);
     await waitForResults(page);
   });

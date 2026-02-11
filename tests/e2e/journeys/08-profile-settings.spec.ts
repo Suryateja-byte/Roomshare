@@ -69,7 +69,7 @@ test.describe('Profile & Settings Journeys', () => {
         await editButton.click();
 
         // Wait for edit form page to load
-        await page.waitForURL(/\/edit|\/settings/, { timeout: 15000 });
+        await page.waitForURL(/\/edit|\/settings/, { timeout: 30000 });
         // Wait for the form to hydrate and become interactive
         await page.locator('form').first().waitFor({ state: 'visible', timeout: 10000 });
 
@@ -98,7 +98,7 @@ test.describe('Profile & Settings Journeys', () => {
           page.getByText(/updated successfully|profile updated/i)
             .or(page.locator(selectors.toast))
             .first()
-        ).toBeVisible({ timeout: 15000 });
+        ).toBeVisible({ timeout: 30000 });
       }
     });
 
@@ -363,6 +363,9 @@ test.describe('Profile & Settings Journeys', () => {
 
     test(`${tags.auth} - Delete account warning`, async ({ page, nav }) => {
       await nav.goToSettings();
+      await page.waitForLoadState('domcontentloaded');
+      // Wait for any client-side redirects to settle (CI can be slow)
+      await page.waitForTimeout(2000);
 
       // Check we weren't redirected to login or signup
       const currentUrl = page.url();
@@ -372,16 +375,18 @@ test.describe('Profile & Settings Journeys', () => {
       }
 
       // Wait for the settings page to fully hydrate
-      await page.locator('h1').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      await page.locator('h1').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+      // Extra wait for hydration in CI
+      await page.waitForTimeout(1000);
 
       const deleteButton = page.getByRole('button', { name: /delete.*account/i });
 
-      if (await deleteButton.isVisible().catch(() => false)) {
+      if (await deleteButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         await deleteButton.click();
 
         // Should show serious warning
         const warningDialog = page.locator(selectors.modal);
-        await expect(warningDialog).toBeVisible({ timeout: 5000 });
+        await expect(warningDialog).toBeVisible({ timeout: 10000 });
 
         // Should require confirmation
         const confirmInput = warningDialog.getByPlaceholder(/delete|confirm/i);

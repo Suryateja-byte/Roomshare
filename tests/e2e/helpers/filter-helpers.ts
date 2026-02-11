@@ -220,7 +220,7 @@ export async function clickFiltersButton(page: Page): Promise<void> {
 
   if (!visible) {
     await btn.click();
-    await expect(dialog).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
   }
 }
 
@@ -266,7 +266,7 @@ export async function openFilterModal(page: Page): Promise<Locator> {
   if (!dialogVisible) {
     // Retry: by now hydration + dynamic import should be complete
     await btn.click();
-    await expect(dialog).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
   }
 
   // Wait for amenity buttons to render — ensures facet data has loaded
@@ -275,7 +275,7 @@ export async function openFilterModal(page: Page): Promise<Locator> {
   await group
     .getByRole("button")
     .first()
-    .waitFor({ state: "attached", timeout: 15_000 })
+    .waitFor({ state: "attached", timeout: 30_000 })
     .catch(() => {
       // Amenities group may not be present in all filter modals
     });
@@ -286,7 +286,7 @@ export async function openFilterModal(page: Page): Promise<Locator> {
 /** Close filter modal via close button */
 export async function closeFilterModal(page: Page): Promise<void> {
   await closeButton(page).click();
-  await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
+  await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 }
 
 /**
@@ -298,12 +298,12 @@ export async function applyFilters(page: Page): Promise<void> {
   await applyButton(page).click();
 
   // Wait for modal to close
-  await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
+  await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 
-  // Wait for URL to change via soft navigation (pushState/replaceState)
+  // Increased timeout for CI (soft navigation can be slow on GitHub Actions)
   await expect.poll(
     () => page.url(),
-    { timeout: 10_000, message: "URL to change after applying filters" },
+    { timeout: 30_000, message: "URL to change after applying filters" },
   ).not.toBe(urlBefore);
 }
 

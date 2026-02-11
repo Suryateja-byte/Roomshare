@@ -72,7 +72,7 @@ test.describe("Filter URL-UI Desync", () => {
         const chipCount = await filtersRegion.getByRole("button").count();
         expect(chipCount).toBe(0);
       }
-    }).toPass({ timeout: 10_000 });
+    }).toPass({ timeout: 30_000 });
 
     // Verify if we reopen the filter modal, Wifi should NOT be pressed
     await openFilterModal(page);

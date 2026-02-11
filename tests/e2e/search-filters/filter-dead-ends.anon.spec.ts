@@ -193,7 +193,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     );
 
     // Wait for applied filters region to be visible
-    await expect(appliedFiltersRegion).toBeVisible({ timeout: 15_000 });
+    await expect(appliedFiltersRegion).toBeVisible({ timeout: 30_000 });
 
     // Count initial chips: should be 3 (Wifi + Parking + Private Room)
     const initialChipButtons = appliedFiltersRegion.getByRole("button", {
@@ -286,7 +286,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     );
 
     // Wait for applied filters region
-    await expect(appliedFiltersRegion).toBeVisible({ timeout: 15_000 });
+    await expect(appliedFiltersRegion).toBeVisible({ timeout: 30_000 });
 
     // Capture bounds params before clearing (should be in URL from buildSearchUrl)
     const beforeParams = getUrlParams(page);

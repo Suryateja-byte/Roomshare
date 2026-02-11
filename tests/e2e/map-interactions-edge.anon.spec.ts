@@ -350,16 +350,18 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
 
     test(`${tags.anon} 10.2 - MapErrorBanner on fetch failure (V1 path) (P2)`, async ({
       page,
-      network,
     }) => {
       // NOTE: This test only works in V1 mode where map data is fetched from
       // /api/map-listings. In V2 mode, data is provided via SearchV2DataContext
       // and this API route is not used.
 
       // Mock /api/map-listings to return 500
-      await network.mockApiResponse("**/api/map-listings*", {
-        status: 500,
-        body: { error: "Internal server error" },
+      await page.route("**/api/map-listings*", async (route) => {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Internal server error" }),
+        });
       });
 
       await page.goto(SEARCH_URL);

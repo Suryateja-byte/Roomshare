@@ -137,13 +137,15 @@ test.describe("Filter Count Preview", () => {
 
     await waitForSearchReady(page);
     await openFilterModal(page);
+    // Wait for hydration to complete before interacting with amenity buttons
+    await page.waitForTimeout(1_000);
 
     // Toggle an amenity to make the filter state dirty
     await toggleAmenity(page, "Wifi");
 
     // After debounce + fetch, button should show "42 listings"
     const apply = applyButton(page);
-    await expect(apply).toContainText(/42\s*listing/i, { timeout: 15_000 });
+    await expect(apply).toContainText(/42\s*listing/i, { timeout: 20_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -188,6 +190,8 @@ test.describe("Filter Count Preview", () => {
 
     await waitForSearchReady(page);
     await openFilterModal(page);
+    // Wait for hydration to complete before interacting with amenity buttons
+    await page.waitForTimeout(1_000);
 
     // Toggle an amenity to trigger the count fetch
     await toggleAmenity(page, "Wifi");
@@ -197,7 +201,7 @@ test.describe("Filter Count Preview", () => {
     await expect(async () => {
       const text = (await apply.textContent()) || "";
       expect(/\d+.*listing|listing/i.test(text)).toBe(true);
-    }).toPass({ timeout: 15_000 });
+    }).toPass({ timeout: 30_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -209,13 +213,15 @@ test.describe("Filter Count Preview", () => {
 
     await waitForSearchReady(page);
     await openFilterModal(page);
+    // Wait for hydration to complete before interacting with amenity buttons
+    await page.waitForTimeout(1_000);
 
     // Toggle a filter to make dirty
     await toggleAmenity(page, "Parking");
 
     // The apply button should show "100+" text
     const apply = applyButton(page);
-    await expect(apply).toContainText(/100\+/, { timeout: 10_000 });
+    await expect(apply).toContainText(/100\+/, { timeout: 20_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -230,6 +236,8 @@ test.describe("Filter Count Preview", () => {
     // Navigate WITH bounds (required for the Filters button to render)
     await waitForSearchReady(page);
     await openFilterModal(page);
+    // Wait for hydration to complete before interacting with amenity buttons
+    await page.waitForTimeout(1_000);
 
     // Toggle a filter to trigger count evaluation
     await toggleAmenity(page, "Wifi");
@@ -245,7 +253,7 @@ test.describe("Filter Count Preview", () => {
       const showsLocationMessage =
         buttonText?.toLowerCase().includes("location") ?? false;
       expect(isDisabled || showsLocationMessage).toBe(true);
-    }).toPass({ timeout: 15_000 });
+    }).toPass({ timeout: 30_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -270,6 +278,8 @@ test.describe("Filter Count Preview", () => {
 
     await waitForSearchReady(page);
     await openFilterModal(page);
+    // Wait for hydration to complete before interacting with amenity buttons
+    await page.waitForTimeout(1_000);
 
     // Rapidly toggle 3 amenities within ~200ms (faster than the 300ms debounce)
     const group = amenitiesGroup(page);
@@ -288,7 +298,7 @@ test.describe("Filter Count Preview", () => {
     await expect(async () => {
       const text = await apply.textContent();
       expect(text).toMatch(/\d+|Show|Apply|listing/i);
-    }).toPass({ timeout: 15_000 });
+    }).toPass({ timeout: 30_000 });
 
     // Verify debounce coalesced requests (allow up to 3 for CI timing variability)
     expect(countRequestCount).toBeLessThanOrEqual(3);

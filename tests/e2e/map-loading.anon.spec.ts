@@ -111,7 +111,7 @@ test.describe("1.1: Map loads without JavaScript errors", () => {
 
     // Verify map container is present
     const mapContainer = page.locator(selectors.map);
-    await expect(mapContainer.first()).toBeVisible({ timeout: 15_000 });
+    await expect(mapContainer.first()).toBeVisible({ timeout: 30_000 });
 
     // Filter and check for real errors
     const realErrors = filterBenignErrors(consoleErrors);
@@ -143,12 +143,12 @@ test.describe("1.2: Map displays markers for listings in bounds", () => {
 
     // Wait for map container
     const mapContainer = page.locator(selectors.map);
-    await expect(mapContainer.first()).toBeVisible({ timeout: 15_000 });
+    await expect(mapContainer.first()).toBeVisible({ timeout: 30_000 });
 
     // Try to find markers - may not appear in headless without WebGL
     try {
       const markerCount = await waitForMapMarkers(page, {
-        timeout: 15_000,
+        timeout: 30_000,
         minCount: 1,
       });
       expect(markerCount).toBeGreaterThanOrEqual(1);
@@ -273,7 +273,7 @@ test.describe("1.4: Map initializes to URL bounds", () => {
 
     // Wait for map to be ready
     const mapContainer = page.locator(selectors.map);
-    await expect(mapContainer.first()).toBeVisible({ timeout: 15_000 });
+    await expect(mapContainer.first()).toBeVisible({ timeout: 30_000 });
     await waitForMapReady(page);
 
     // Get map center via Mapbox GL JS instance
@@ -321,7 +321,7 @@ test.describe("1.4: Map initializes to URL bounds", () => {
     // The initialViewState should use URL bounds
     // We verify by checking the map is visible and no errors occurred
     const mapContainer = page.locator(selectors.map);
-    await expect(mapContainer.first()).toBeVisible({ timeout: 15_000 });
+    await expect(mapContainer.first()).toBeVisible({ timeout: 30_000 });
 
     // Verify the URL still has bounds params
     const url = page.url();
@@ -345,7 +345,7 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
 
     // Map should still load
     const mapContainer = page.locator(selectors.map);
-    await expect(mapContainer.first()).toBeVisible({ timeout: 15_000 });
+    await expect(mapContainer.first()).toBeVisible({ timeout: 30_000 });
 
     // Page should be functional
     const bodyVisible = await page.locator("body").isVisible();

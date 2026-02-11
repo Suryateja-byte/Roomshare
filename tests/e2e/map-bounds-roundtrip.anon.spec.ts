@@ -235,7 +235,7 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     await page.waitForFunction(
       (prev) => window.location.href !== prev,
       page.url(),
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     ).catch(() => {});
 
     const newBounds = getUrlBounds(page.url());
@@ -273,7 +273,7 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     await page.waitForFunction(
       (prev) => window.location.href !== prev,
       page.url(),
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     ).catch(() => {});
 
     const url = new URL(page.url(), "http://localhost");
@@ -327,7 +327,7 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     await page.waitForFunction(
       (prev) => window.location.href !== prev,
       page.url(),
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     ).catch(() => {});
 
     // History length should NOT have increased (replaceState, not pushState)
@@ -486,7 +486,7 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     await page.waitForFunction(
       (prev) => window.location.href !== prev,
       page.url(),
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     ).catch(() => {});
 
     // Read new bounds from URL
@@ -612,7 +612,7 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
     await page.waitForFunction(
       (prev) => window.location.href !== prev,
       page.url(),
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     ).catch(() => {});
 
     const afterPanUrl = new URL(page.url(), "http://localhost");

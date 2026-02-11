@@ -26,7 +26,7 @@ test.describe("J7: Login Page (Unauthenticated)", () => {
       .getByLabel(/email/i)
       .or(page.locator('input[type="email"]'))
       .or(page.locator('input[name="email"]'));
-    await expect(emailField.first()).toBeVisible({ timeout: 15000 });
+    await expect(emailField.first()).toBeVisible({ timeout: 30000 });
 
     // Should have password field
     const passwordField = page
@@ -55,7 +55,7 @@ test.describe("J7: Login Page (Unauthenticated)", () => {
     const signupLink = page
       .getByRole("link", { name: /sign ?up|create|register/i })
       .or(page.locator('a[href*="/signup"]'));
-    await expect(signupLink.first()).toBeVisible({ timeout: 15000 });
+    await expect(signupLink.first()).toBeVisible({ timeout: 30000 });
   });
 });
 
@@ -71,7 +71,7 @@ test.describe("J8: Signup Page (Unauthenticated)", () => {
     const emailField = page
       .getByLabel(/email/i)
       .or(page.locator('input[type="email"]'));
-    await expect(emailField.first()).toBeVisible({ timeout: 15000 });
+    await expect(emailField.first()).toBeVisible({ timeout: 30000 });
 
     // Should have password field
     const passwordField = page
@@ -98,7 +98,7 @@ test.describe("J9: Forgot Password Page (Unauthenticated)", () => {
       .getByLabel(/email/i)
       .or(page.locator('input[type="email"]'))
       .or(page.locator('input[name="email"]'));
-    await expect(emailField.first()).toBeVisible({ timeout: 15000 });
+    await expect(emailField.first()).toBeVisible({ timeout: 30000 });
 
     // Should have submit button
     const submitBtn = page

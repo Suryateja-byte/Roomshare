@@ -92,7 +92,7 @@ test.describe("Map smoke test", () => {
     const cardsContainer = searchResultsContainer(page);
     const cards = cardsContainer.locator(selectors.listingCard);
     try {
-      await cards.first().waitFor({ state: "attached", timeout: 15_000 });
+      await cards.first().waitFor({ state: "attached", timeout: 30_000 });
       const count = await cards.count();
       expect(count).toBeGreaterThanOrEqual(1);
     } catch {

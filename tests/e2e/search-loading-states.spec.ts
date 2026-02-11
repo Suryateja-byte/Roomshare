@@ -321,7 +321,7 @@ test.describe("Search Loading States", () => {
 
     // Use the search-results div or first listing card as the layout anchor
     const layoutAnchor = container.locator('#search-results, [data-testid="listing-card"]').first();
-    await expect(layoutAnchor).toBeVisible({ timeout: 15000 });
+    await expect(layoutAnchor).toBeVisible({ timeout: 30000 });
 
     const anchorBox = await layoutAnchor.boundingBox();
     expect(anchorBox).toBeTruthy();

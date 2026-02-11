@@ -145,7 +145,7 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
       try {
         await page.waitForFunction(
           () => !!(window as any).__e2eMapRef,
-          { timeout: 15000 }
+          { timeout: 30000 }
         );
         // Zoom in programmatically to the stacked coords and wait for idle
         await page.evaluate(

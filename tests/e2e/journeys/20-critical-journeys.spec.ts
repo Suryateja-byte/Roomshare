@@ -44,7 +44,7 @@ test.describe("J1: Home Page Load & Hero CTA", () => {
 
     // Should have a heading (client component — wait for hydration)
     const heading = page.locator("h1").first();
-    await expect(heading).toBeVisible({ timeout: 15000 });
+    await expect(heading).toBeVisible({ timeout: 30000 });
 
     // Should have navigation
     await expect(page.locator(selectors.navbar).first()).toBeVisible({ timeout: 10000 });
@@ -357,7 +357,7 @@ test.describe("J11: Messaging — Conversation List", () => {
       .or(main.locator('[data-testid="conversation-list"]'))
       .or(main.getByText(/no.*message|no.*conversation|inbox|start a conversation/i));
 
-    await expect(messagesUI.first()).toBeVisible({ timeout: 15000 });
+    await expect(messagesUI.first()).toBeVisible({ timeout: 30000 });
     await assert.pageLoaded();
   });
 });
@@ -388,7 +388,7 @@ test.describe("J12: Profile View & Edit", () => {
       .or(page.getByRole("link", { name: /edit/i }))
       .or(page.locator('[data-testid="profile"]'));
 
-    await expect(profileContent.first()).toBeVisible({ timeout: 15000 });
+    await expect(profileContent.first()).toBeVisible({ timeout: 30000 });
     await assert.pageLoaded();
   });
 
@@ -461,7 +461,7 @@ test.describe("J14: Favorites — Save & View", () => {
       .or(main.locator(selectors.emptyState))
       .or(main.getByText(/saved|favorite|no saved/i));
 
-    await expect(content.first()).toBeVisible({ timeout: 15000 });
+    await expect(content.first()).toBeVisible({ timeout: 30000 });
     await assert.pageLoaded();
   });
 
@@ -511,7 +511,7 @@ test.describe("J15: Saved Searches", () => {
       .or(main.locator(selectors.emptyState))
       .or(main.getByText(/saved search|no saved/i));
 
-    await expect(content.first()).toBeVisible({ timeout: 15000 });
+    await expect(content.first()).toBeVisible({ timeout: 30000 });
     await assert.pageLoaded();
   });
 });
@@ -537,7 +537,7 @@ test.describe("J16: Notifications Page", () => {
       .or(main.locator(selectors.emptyState))
       .or(main.getByText(/notification|no notification/i));
 
-    await expect(content.first()).toBeVisible({ timeout: 15000 });
+    await expect(content.first()).toBeVisible({ timeout: 30000 });
     await assert.pageLoaded();
   });
 });
@@ -701,7 +701,7 @@ test.describe("J20: Error Handling & 404", () => {
       .or(main.locator(selectors.emptyState))
       .or(main.getByText(/recently viewed|no recent/i));
 
-    await expect(content.first()).toBeVisible({ timeout: 15000 });
+    await expect(content.first()).toBeVisible({ timeout: 30000 });
   });
 
   test("about page loads", async ({ page }) => {
@@ -710,7 +710,7 @@ test.describe("J20: Error Handling & 404", () => {
     const heading = page
       .getByRole("heading", { level: 1 })
       .or(page.getByRole("heading", { name: /about/i }));
-    await expect(heading.first()).toBeVisible({ timeout: 15000 });
+    await expect(heading.first()).toBeVisible({ timeout: 30000 });
   });
 
   test("terms page loads", async ({ page }) => {
@@ -719,7 +719,7 @@ test.describe("J20: Error Handling & 404", () => {
     const heading = page
       .getByRole("heading", { name: /terms/i })
       .or(page.getByText(/terms of service|terms of use|terms and conditions/i));
-    await expect(heading.first()).toBeVisible({ timeout: 15000 });
+    await expect(heading.first()).toBeVisible({ timeout: 30000 });
   });
 
   test("privacy page loads", async ({ page }) => {
@@ -728,6 +728,6 @@ test.describe("J20: Error Handling & 404", () => {
     const heading = page
       .getByRole("heading", { name: /privacy/i })
       .or(page.getByText(/privacy policy/i));
-    await expect(heading.first()).toBeVisible({ timeout: 15000 });
+    await expect(heading.first()).toBeVisible({ timeout: 30000 });
   });
 });

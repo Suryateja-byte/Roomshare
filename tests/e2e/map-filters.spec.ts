@@ -230,7 +230,7 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for map markers to appear
       let initialMarkerCount: number;
       try {
-        initialMarkerCount = await waitForMapMarkers(page, { timeout: 15_000, minCount: 1 });
+        initialMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
       } catch {
         // If no markers appear (WebGL issue), skip the test
         test.skip(true, "Map markers not rendered (WebGL may be unavailable)");
@@ -266,7 +266,7 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for map markers
       let initialMarkerCount: number;
       try {
-        initialMarkerCount = await waitForMapMarkers(page, { timeout: 15_000, minCount: 1 });
+        initialMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
       } catch {
         test.skip(true, "Map markers not rendered (WebGL may be unavailable)");
         return;
@@ -328,7 +328,7 @@ test.describe("Map + Filter Interactions", () => {
       await waitForSearchPageReady(page);
       let unfilteredBaseline: number;
       try {
-        unfilteredBaseline = await waitForMapMarkers(page, { timeout: 15_000, minCount: 1 });
+        unfilteredBaseline = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
       } catch {
         test.skip(true, "Map markers not rendered (WebGL may be unavailable)");
         return;
@@ -350,7 +350,7 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render after navigation (same wait as baseline)
       let unfilteredMarkerCount: number;
       try {
-        unfilteredMarkerCount = await waitForMapMarkers(page, { timeout: 15_000, minCount: 1 });
+        unfilteredMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
       } catch {
         unfilteredMarkerCount = await getMarkerCount(page);
       }
@@ -413,7 +413,7 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render before measuring
       let initialMarkerCount: number;
       try {
-        initialMarkerCount = await waitForMapMarkers(page, { timeout: 15_000, minCount: 1 });
+        initialMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
       } catch {
         // If markers don't appear, use 0 but the test may be unreliable
         initialMarkerCount = await getMarkerCount(page);
@@ -434,7 +434,7 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render after sort navigation, then compare
       let afterSortMarkerCount: number;
       try {
-        afterSortMarkerCount = await waitForMapMarkers(page, { timeout: 15_000, minCount: 1 });
+        afterSortMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
       } catch {
         afterSortMarkerCount = await getMarkerCount(page);
       }
@@ -472,7 +472,7 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render before measuring
       let initialMarkerCount: number;
       try {
-        initialMarkerCount = await waitForMapMarkers(page, { timeout: 15_000, minCount: 1 });
+        initialMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
       } catch {
         initialMarkerCount = await getMarkerCount(page);
       }
@@ -494,7 +494,7 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render after sort navigation, then compare
       let afterSortMarkerCount: number;
       try {
-        afterSortMarkerCount = await waitForMapMarkers(page, { timeout: 15_000, minCount: 1 });
+        afterSortMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
       } catch {
         afterSortMarkerCount = await getMarkerCount(page);
       }

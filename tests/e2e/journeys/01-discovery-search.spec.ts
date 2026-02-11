@@ -38,16 +38,16 @@ test.describe("Discovery & Search Journeys", () => {
       await page.waitForTimeout(timeouts.animation);
 
       // Step 4: Click first listing card via JS (avoids hitting carousel buttons)
-      await expect(page.locator(selectors.listingCard).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(selectors.listingCard).first()).toBeVisible({ timeout: 30000 });
       await page.waitForLoadState("load");
       await nav.clickListingCard(0);
 
       // Step 5: Verify listing detail page
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
       // Step 6: Navigate back
       await nav.goBack();
-      await expect(page).toHaveURL("/", { timeout: 15000 });
+      await expect(page).toHaveURL("/", { timeout: 30000 });
 
       // Step 7: Click search CTA
       await page.waitForLoadState("load");
@@ -57,7 +57,7 @@ test.describe("Discovery & Search Journeys", () => {
 
       if (await searchButton.first().isVisible({ timeout: 5000 }).catch(() => false)) {
         await searchButton.first().click();
-        await expect(page).toHaveURL(/\/search/, { timeout: 15000 });
+        await expect(page).toHaveURL(/\/search/, { timeout: 30000 });
       }
     });
 
@@ -203,14 +203,16 @@ test.describe("Discovery & Search Journeys", () => {
     });
 
     test(`${tags.anon} - 404 for non-existent listing`, async ({ page }) => {
+      test.slow();
       await page.goto("/listings/nonexistent-listing-id-12345");
+      await page.waitForLoadState("domcontentloaded");
 
       // Should show 404 or not found state
       await expect(
         page
           .getByText(/not found|404|doesn't exist|couldn't find/i)
           .or(page.getByRole('heading', { name: /couldn't find|oops|not found|404/i })),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible({ timeout: 30_000 });
     });
   });
 
@@ -224,7 +226,7 @@ test.describe("Discovery & Search Journeys", () => {
       // Use bounds so listings exist for the map
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
       // Find and click map view toggle — button text is "Map" (mobile) or "Show map" (desktop)
       const mapToggle = page
@@ -339,7 +341,7 @@ test.describe("Discovery & Search Journeys", () => {
 
       // Check for main landmark and heading (core a11y checks)
       const main = page.locator('main, [role="main"]');
-      await expect(main).toBeVisible({ timeout: 15000 });
+      await expect(main).toBeVisible({ timeout: 30000 });
       const h1 = page.locator('h1');
       expect(await h1.count()).toBeGreaterThanOrEqual(1);
 

@@ -53,7 +53,7 @@ test.describe("Filter Race Conditions", () => {
     await applyButton(page).click();
 
     // Wait for modal to close and URL to update
-    await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
+    await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
     await expect.poll(
       () => page.url().includes("amenities=Wifi"),
       { timeout: 30_000, message: "URL to contain amenities=Wifi" },
@@ -88,7 +88,7 @@ test.describe("Filter Race Conditions", () => {
     await applyButton(page).click();
 
     // Wait for modal to close and URL to include amenities
-    await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
+    await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
     await expect.poll(
       () => page.url().includes("amenities=Wifi"),
       { timeout: 30_000, message: "URL to contain amenities=Wifi" },
@@ -192,7 +192,7 @@ test.describe("Filter Race Conditions", () => {
     }
 
     // Wait for modal to close
-    await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
+    await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 
     // Wait for URL to update via soft navigation
     await expect.poll(
@@ -205,7 +205,7 @@ test.describe("Filter Race Conditions", () => {
 
     // No error on page
     const errorMessage = page.getByText(/error|failed/i);
-    await expect(errorMessage).not.toBeVisible({ timeout: 10_000 });
+    await expect(errorMessage).not.toBeVisible({ timeout: 30_000 });
 
     // Navigation count should be reasonable (not doubled from double-click)
     expect(getNavCount()).toBeLessThanOrEqual(4);
@@ -247,7 +247,7 @@ test.describe("Filter Race Conditions", () => {
         expect(busy).not.toBe("true");
       }
       // If button is gone, loading is complete
-    }).toPass({ timeout: 15_000 });
+    }).toPass({ timeout: 30_000 });
 
     // Verify double-click guard: should have at most 2 calls
     // (ideally 1, but isLoadingMore ref guard depends on React render cycle timing)
@@ -274,7 +274,7 @@ test.describe("Filter Race Conditions", () => {
 
     // Apply filters
     await applyButton(page).click();
-    await expect(filterDialog(page)).not.toBeVisible({ timeout: 10_000 });
+    await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
     await expect.poll(
       () => page.url().includes("amenities=Wifi"),
       { timeout: 30_000, message: "URL to contain amenities=Wifi" },

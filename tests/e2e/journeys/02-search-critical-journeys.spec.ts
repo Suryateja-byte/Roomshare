@@ -25,14 +25,14 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // H1 heading with result count
     const heading = page.getByRole("heading", { level: 1 }).first();
-    await expect(heading).toBeVisible({ timeout: 15000 });
+    await expect(heading).toBeVisible({ timeout: 30000 });
     const headingText = await heading.textContent();
     expect(headingText).toMatch(/\d+\+?\s+place/i);
 
     // Listing cards scoped to visible container (avoids double-counting from dual mobile/desktop containers)
     const j1Container = searchResultsContainer(page);
     const cards = j1Container.locator(selectors.listingCard);
-    await cards.first().waitFor({ state: "attached", timeout: 15000 });
+    await cards.first().waitFor({ state: "attached", timeout: 30000 });
     const count = await cards.count();
     expect(count).toBeGreaterThan(0);
     // Scoped to visible container, count should match ITEMS_PER_PAGE
@@ -57,7 +57,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await expect(maxInput).toHaveValue("1500");
 
     // Results heading should be visible
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
   });
 
   // ─────────────────────────────────────────────────
@@ -77,7 +77,7 @@ test.describe("20 Critical Search Page Journeys", () => {
       // URL should update with roomType (debounced navigation — allow extra time under CI load)
       await expect.poll(
         () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        { timeout: 15000, message: 'URL param "roomType" to be present' },
+        { timeout: 30000, message: 'URL param "roomType" to be present' },
       ).not.toBeNull();
     }
   });
@@ -88,7 +88,7 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J4: Filter modal - select amenities and apply", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Open more filters (uses retry-click for hydration race)
     const modal = await openFilterModal(page);
@@ -205,7 +205,7 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Should show "No matches found" or "0 places"
     const zeroIndicator = page.getByText(/no matches|0 place/i);
-    await zeroIndicator.first().waitFor({ state: "attached", timeout: 15000 });
+    await zeroIndicator.first().waitFor({ state: "attached", timeout: 30000 });
 
     // "Clear all filters" link should be available
     const clearLink = page.getByRole("link", { name: /clear all filters/i })
@@ -221,7 +221,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
-    await firstCard.waitFor({ state: "attached", timeout: 15000 });
+    await firstCard.waitFor({ state: "attached", timeout: 30000 });
 
     // Get href from the <a> link inside the listing card div
     const cardLink = firstCard.locator('a[href^="/listings/"]').first();
@@ -241,7 +241,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     // Start with filters
     await page.goto(`${SEARCH_URL_WITH_BOUNDS}&minPrice=800&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Click a listing
     const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
@@ -272,7 +272,7 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J11: Lease duration filter works", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Open filter modal (uses retry-click for hydration race)
     const modal = await openFilterModal(page);
@@ -305,7 +305,7 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J12: House rules filter toggles work", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Open filter modal (uses retry-click for hydration race)
     const modal = await openFilterModal(page);
@@ -332,7 +332,7 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J13: Gender preference filter works", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Open filter modal (uses retry-click for hydration race)
     const modal = await openFilterModal(page);
@@ -382,7 +382,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const heading = page.getByRole("heading", { level: 1 }).first();
-    await expect(heading).toBeVisible({ timeout: 15000 });
+    await expect(heading).toBeVisible({ timeout: 30000 });
 
     // Heading should mention the query
     const text = await heading.textContent();
@@ -397,7 +397,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Verify initial state
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Refresh
     await page.reload();
@@ -456,7 +456,7 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Should show "Please select a location" or browse mode
     const locationPrompt = page.getByText(/select a location|showing top listings/i);
-    await expect(locationPrompt.first()).toBeVisible({ timeout: 15000 });
+    await expect(locationPrompt.first()).toBeVisible({ timeout: 30000 });
   });
 
   // ─────────────────────────────────────────────────
@@ -521,7 +521,7 @@ test.describe("20 Critical Search Page Journeys", () => {
   test(`${tags.a11y} J-A11Y: Search page meets accessibility basics`, async ({ page, nav, assert }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
     // Basic a11y checks
     await assert.basicA11y();

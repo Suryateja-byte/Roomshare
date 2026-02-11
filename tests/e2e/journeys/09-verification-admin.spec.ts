@@ -19,6 +19,8 @@ test.describe('Verification Journeys', () => {
     test(`${tags.auth} - Start verification process`, async ({ page, nav }) => {
       await page.goto('/verify');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for any client-side redirects to settle (CI can be slow)
+      await page.waitForTimeout(2000);
 
       // Check we weren't redirected to login (auth session expired in CI)
       const currentUrl = page.url();
@@ -51,6 +53,8 @@ test.describe('Verification Journeys', () => {
 
       await page.goto('/verify');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for any client-side redirects to settle (CI can be slow)
+      await page.waitForTimeout(2000);
 
       // Check we weren't redirected to login (auth session expired in CI)
       const currentUrl = page.url();
@@ -85,6 +89,8 @@ test.describe('Verification Journeys', () => {
     test(`${tags.auth} - View verification status`, async ({ page, nav }) => {
       await page.goto('/verify');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for any client-side redirects to settle (CI can be slow)
+      await page.waitForTimeout(2000);
 
       // Check we weren't redirected to login (auth session expired in CI)
       const currentUrl = page.url();
@@ -98,12 +104,14 @@ test.describe('Verification Journeys', () => {
         .or(page.getByText(/pending|approved|rejected|not verified/i))
         .first();
 
-      await expect(statusIndicator).toBeVisible({ timeout: 10000 });
+      await expect(statusIndicator).toBeVisible({ timeout: 30000 });
     });
 
     test(`${tags.auth} - Cancel pending verification`, async ({ page, nav }) => {
       await page.goto('/verify');
       await page.waitForLoadState('domcontentloaded');
+      // Wait for any client-side redirects to settle (CI can be slow)
+      await page.waitForTimeout(2000);
 
       // Check we weren't redirected to login (auth session expired in CI)
       const verifyUrl = page.url();

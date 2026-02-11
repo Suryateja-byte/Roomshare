@@ -200,7 +200,7 @@ export function navigationHelpers(page: Page) {
     async clickListingCard(index = 0) {
       // Wait for listing cards to appear
       const cards = page.locator('[data-testid="listing-card"]');
-      await cards.first().waitFor({ state: 'attached', timeout: 15000 });
+      await cards.first().waitFor({ state: 'attached', timeout: 30000 });
 
       const count = await cards.count();
       if (count === 0 || index >= count) {

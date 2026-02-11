@@ -11,7 +11,7 @@ async function waitForResults(page: import("@playwright/test").Page) {
   await page.waitForLoadState("domcontentloaded");
   await expect(
     page.getByRole("heading", { level: 1 }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible({ timeout: 30000 });
 }
 
 test.describe("Accessibility & Performance", () => {

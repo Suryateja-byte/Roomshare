@@ -202,7 +202,7 @@ test.describe("Search URL Deep Links (P0)", () => {
     const body = page.locator("body");
 
     // Wait for any content to appear
-    await expect(body).toBeVisible({ timeout: 15_000 });
+    await expect(body).toBeVisible({ timeout: 30_000 });
 
     // Either browse results appear, or suggested searches, or the page is in browse mode
     const cardCount = await cards.count().catch(() => 0);

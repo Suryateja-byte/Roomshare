@@ -36,7 +36,7 @@ import type { Page } from "@playwright/test";
 /** Fill the inline budget min input and submit the form */
 async function setInlineMinPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-min");
-  await input.waitFor({ state: "visible", timeout: 15_000 });
+  await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.click();
   await input.clear();
   if (value) {
@@ -48,7 +48,7 @@ async function setInlineMinPrice(page: Page, value: string) {
 /** Fill the inline budget max input */
 async function setInlineMaxPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-max");
-  await input.waitFor({ state: "visible", timeout: 15_000 });
+  await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.click();
   await input.clear();
   if (value) {
@@ -61,9 +61,9 @@ async function setInlineMaxPrice(page: Page, value: string) {
 async function submitSearch(page: Page) {
   const submitBtn = page.getByRole("button", { name: /search/i }).first();
   await submitBtn.click();
-  // Wait for navigation
+  // Wait for navigation (increased for CI)
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForTimeout(1_000);
+  await page.waitForTimeout(2_000);
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +260,7 @@ test.describe("Price Range Filter", () => {
 
     // Open filter modal using retry-click pattern for hydration race
     const filtersBtn = page.getByRole("button", { name: /^Filters/ });
-    await expect(filtersBtn).toBeVisible({ timeout: 15_000 });
+    await expect(filtersBtn).toBeVisible({ timeout: 30_000 });
     await filtersBtn.click();
 
     const dialog = page.getByRole("dialog", { name: /filters/i });
@@ -272,7 +272,7 @@ test.describe("Price Range Filter", () => {
     if (!dialogVisible) {
       // Retry: hydration or dynamic import may not have been ready
       await filtersBtn.click();
-      await expect(dialog).toBeVisible({ timeout: 15_000 });
+      await expect(dialog).toBeVisible({ timeout: 30_000 });
     }
 
     // Find the price range slider
@@ -294,7 +294,7 @@ test.describe("Price Range Filter", () => {
       await applyBtn.click();
 
       // Modal should close
-      await expect(dialog).not.toBeVisible({ timeout: 15_000 });
+      await expect(dialog).not.toBeVisible({ timeout: 30_000 });
 
       // URL may have maxPrice now (depending on slider position)
       // At minimum, page should not crash

@@ -246,7 +246,7 @@ test.describe('axe-core — Dynamic UI States', () => {
       // Wait for content to attach (empty state or heading)
       await page.locator('[data-testid="empty-state"], h1, h2, h3, [data-testid="listing-card"]')
         .first()
-        .waitFor({ state: 'attached', timeout: 15_000 })
+        .waitFor({ state: 'attached', timeout: 30_000 })
         .catch(() => {});
 
       const results = await runAxeScan(page);

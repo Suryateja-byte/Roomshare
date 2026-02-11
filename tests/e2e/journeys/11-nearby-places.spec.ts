@@ -92,7 +92,7 @@ async function navigateToTestListing(page: Page): Promise<boolean> {
   await page.goto('/search');
   await page.waitForLoadState('domcontentloaded');
   const firstCard = page.locator(selectors.listingCard).first();
-  await firstCard.waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
+  await firstCard.waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {});
   const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
   if (!listingId) return false;
   await page.goto(`/listings/${listingId}`);

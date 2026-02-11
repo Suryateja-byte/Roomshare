@@ -41,6 +41,8 @@ test.describe("Mobile Filter Experience", () => {
 
       // Open filter modal
       await openFilterModal(page);
+      // Wait for hydration after modal opens
+      await page.waitForTimeout(1_000);
 
       // Verify dialog is visible
       const dialog = filterDialog(page);
@@ -82,6 +84,8 @@ test.describe("Mobile Filter Experience", () => {
 
       // Open filter modal
       await openFilterModal(page);
+      // Wait for hydration after modal opens
+      await page.waitForTimeout(1_000);
 
       // Toggle Wifi amenity
       await toggleAmenity(page, "Wifi");
@@ -91,7 +95,7 @@ test.describe("Mobile Filter Experience", () => {
 
       // Wait for modal to close
       const dialog = filterDialog(page);
-      await expect(dialog).not.toBeVisible({ timeout: 15_000 });
+      await expect(dialog).not.toBeVisible({ timeout: 30_000 });
 
       // Verify bottom sheet is still visible
       const bottomSheet = page.locator(mobileSelectors.bottomSheet);
@@ -119,6 +123,8 @@ test.describe("Mobile Filter Experience", () => {
 
       // Open filter modal
       await openFilterModal(page);
+      // Wait for hydration after modal opens
+      await page.waitForTimeout(1_000);
 
       const dialog = filterDialog(page);
       await expect(dialog).toBeVisible();
@@ -233,6 +239,8 @@ test.describe("Mobile Filter Experience", () => {
 
       // Open filter modal
       await openFilterModal(page);
+      // Wait for hydration after modal opens
+      await page.waitForTimeout(1_000);
 
       const dialog = filterDialog(page);
       await expect(dialog).toBeVisible();

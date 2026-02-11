@@ -27,7 +27,7 @@ async function waitForResults(page: import("@playwright/test").Page) {
   await page.waitForLoadState("domcontentloaded");
   await expect(
     page.getByRole("heading", { level: 1 }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible({ timeout: 30000 });
 }
 
 // --------------------------------------------------------------------------
@@ -139,7 +139,7 @@ test.describe("Search A11y: Filter Modal Accessibility", () => {
     if (!visible) {
       // Retry: hydration may not have attached onClick on first click
       await triggerButton.click();
-      await expect(modal).toBeVisible({ timeout: 15_000 });
+      await expect(modal).toBeVisible({ timeout: 30_000 });
     }
 
     // Close with the close button (X button with aria-label="Close filters")

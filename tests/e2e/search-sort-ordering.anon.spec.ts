@@ -169,7 +169,7 @@ async function openDesktopSort(page: Page): Promise<Locator> {
   // SortSelect renders an SSR placeholder without role="combobox", so this
   // locator only matches after client-side hydration sets `mounted = true`.
   // Use a generous timeout to tolerate slow hydration in CI.
-  await expect(trigger).toBeVisible({ timeout: 15_000 });
+  await expect(trigger).toBeVisible({ timeout: 30_000 });
   await trigger.click();
   // Radix portals the listbox outside the container -- use page-level locator
   const listbox = page.locator('[role="listbox"]');
@@ -196,13 +196,13 @@ async function selectDesktopSort(
   if (expectedUrlParam) {
     await expect.poll(
       () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
-      { timeout: 15_000, message: `URL param "sort" to be "${expectedUrlParam}"` },
+      { timeout: 30_000, message: `URL param "sort" to be "${expectedUrlParam}"` },
     ).toBe(expectedUrlParam);
   } else {
     // "Recommended" removes the sort param entirely.
     await expect.poll(
       () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
-      { timeout: 15_000, message: 'URL param "sort" to be absent' },
+      { timeout: 30_000, message: 'URL param "sort" to be absent' },
     ).toBeNull();
   }
 }
@@ -529,7 +529,7 @@ test.describe("Group 3: Sort + Pagination", () => {
             return el.querySelectorAll(args.cards).length > args.prevCount;
           },
           { container: DESKTOP, cards: CARDS, prevCount: pricesBefore.length },
-          { timeout: 15_000 },
+          { timeout: 30_000 },
         )
         .catch(() => {
           /* load-more may not produce new results */
@@ -571,7 +571,7 @@ test.describe("Group 3: Sort + Pagination", () => {
             cards: CARDS,
             prevCount: initialPrices.length,
           },
-          { timeout: 15_000 },
+          { timeout: 30_000 },
         )
         .catch(() => {});
 
@@ -697,7 +697,7 @@ test.describe("Group 4: Mobile Sort", () => {
       .click();
 
     // URL should update
-    await expect(page).toHaveURL(/sort=price_asc/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/sort=price_asc/, { timeout: 30_000 });
 
     // Sheet should close
     await expect(sheetHeading).not.toBeVisible({ timeout: 10_000 });

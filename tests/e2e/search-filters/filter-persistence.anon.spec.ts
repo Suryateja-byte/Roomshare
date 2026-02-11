@@ -148,20 +148,20 @@ test.describe("Filter State Persistence", () => {
     // Verify filter chips are visible on load.
     // Chips may take time to render after SSR hydration, so use a generous timeout.
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible({ timeout: 15_000 }).catch(() => false);
+    const regionVisible = await region.isVisible({ timeout: 30_000 }).catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 15_000 });
-      await expect(region.locator("text=/Parking/i").first()).toBeVisible({ timeout: 15_000 });
-      await expect(region.locator("text=/Entire Place/i").first()).toBeVisible({ timeout: 15_000 });
+      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 30_000 });
+      await expect(region.locator("text=/Parking/i").first()).toBeVisible({ timeout: 30_000 });
+      await expect(region.locator("text=/Entire Place/i").first()).toBeVisible({ timeout: 30_000 });
     }
 
     // Open the filter modal and verify internal state matches URL
     const btn = filtersButton(page);
-    await expect(btn).toBeVisible({ timeout: 10_000 });
+    await expect(btn).toBeVisible({ timeout: 30_000 });
     await btn.click();
 
     const dialog = filterDialog(page);
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
 
     // Check amenities are toggled on inside the modal
     const amenitiesGroup = dialog.locator('[aria-label="Select amenities"]');

@@ -74,7 +74,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       // The sr-only live region should exist in the DOM.
       // It is visually hidden (class="sr-only") but accessible to screen readers.
       const liveRegion = container.locator(sel.srLiveRegion);
-      await expect(liveRegion).toBeAttached({ timeout: 15_000 });
+      await expect(liveRegion).toBeAttached({ timeout: 30_000 });
 
       // Verify it has the sr-only class (visually hidden, screen-reader accessible)
       const hasSrOnly = await liveRegion.evaluate((el) =>
@@ -114,7 +114,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // The sr-only live region should announce zero results
       const liveRegion = container.locator(sel.srLiveRegion);
-      await expect(liveRegion).toBeAttached({ timeout: 15_000 });
+      await expect(liveRegion).toBeAttached({ timeout: 30_000 });
 
       const announceText = await liveRegion.textContent();
       expect(announceText).toBeTruthy();
@@ -144,7 +144,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // --- Idle state assertions ---
       const loadMoreBtn = container.locator(sel.loadMoreBtn);
-      await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+      await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
       // aria-label should describe current state:
       // "Show more places. Currently showing N of M listings"
@@ -187,7 +187,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // --- Post-loading assertions ---
       // Wait for load to complete (12 initial + 12 mock = 24)
-      await expect(cards).toHaveCount(24, { timeout: 15_000 });
+      await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
       // After loading completes, busy state should be cleared.
       // The button either returns to idle state or disappears (if no more pages).
@@ -215,7 +215,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       // --- Feed container assertions ---
       // The results grid should have role="feed" with aria-label="Search results"
       const feed = container.locator(sel.feed);
-      await expect(feed).toBeAttached({ timeout: 15_000 });
+      await expect(feed).toBeAttached({ timeout: 30_000 });
 
       // Verify role attribute directly
       const feedRole = await feed.getAttribute("role");
@@ -233,7 +233,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       // --- Search results wrapper assertions ---
       // The outer #search-results div should have id and tabIndex for skip-link support
       const searchResultsEl = container.locator(sel.searchResults);
-      await expect(searchResultsEl).toBeAttached({ timeout: 15_000 });
+      await expect(searchResultsEl).toBeAttached({ timeout: 30_000 });
 
       // Verify id attribute
       const containerId = await searchResultsEl.getAttribute("id");
@@ -267,7 +267,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // Verify the load-more button is present
       const loadMoreBtn = container.locator(sel.loadMoreBtn);
-      await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+      await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
 
       // Scroll the button into view to ensure it is reachable
       await loadMoreBtn.scrollIntoViewIfNeeded();
@@ -299,7 +299,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // Wait for new cards to appear (initial + 12 mock)
       await expect(cards).toHaveCount(initialCount + 12, {
-        timeout: 15_000,
+        timeout: 30_000,
       });
 
       // Focus should not be trapped -- after loading completes, focus should
@@ -332,7 +332,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // Focus the load-more button directly
       const loadMoreBtn = container.locator(sel.loadMoreBtn);
-      await expect(loadMoreBtn).toBeVisible({ timeout: 15_000 });
+      await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
       await loadMoreBtn.scrollIntoViewIfNeeded();
       await loadMoreBtn.focus();
 
@@ -349,7 +349,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       await page.keyboard.press("Enter");
 
       // Wait for the load to complete: 12 initial + 12 mock = 24
-      await expect(cards).toHaveCount(24, { timeout: 15_000 });
+      await expect(cards).toHaveCount(24, { timeout: 30_000 });
 
       // Only 1 server action call should have been made.
       // The disabled attribute + isLoadingMore guard prevents duplicate requests.

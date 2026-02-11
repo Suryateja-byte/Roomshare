@@ -202,7 +202,7 @@ test.describe("Map persistence: Map survives changes", () => {
     await navigateWithFilter(page, "maxPrice", "2000");
 
     // Wait for map ref to be re-established after navigation
-    await waitForMapRef(page, 15_000);
+    await waitForMapRef(page, 30_000);
 
     const afterZoom = await getMapZoom(page);
     expect(afterZoom).not.toBeNull();
@@ -229,7 +229,7 @@ test.describe("Map persistence: Map survives changes", () => {
     // Apply a filter
     await navigateWithFilter(page, "maxPrice", "2000");
 
-    await waitForMapRef(page, 15_000);
+    await waitForMapRef(page, 30_000);
 
     const afterCenter = await getMapCenter(page);
     expect(afterCenter).not.toBeNull();
@@ -269,7 +269,7 @@ test.describe("Map persistence: Map survives changes", () => {
     expect(afterState?.mapInitCount).toBe(initialState.mapInitCount);
 
     // Zoom and center should be preserved
-    await waitForMapRef(page, 15_000);
+    await waitForMapRef(page, 30_000);
     const afterZoom = await getMapZoom(page);
     const afterCenter = await getMapCenter(page);
 
@@ -515,7 +515,7 @@ test.describe("Map persistence: Lazy loading", () => {
       .catch(() => false);
 
     const mapVisible = await page.locator(selectors.map).first()
-      .waitFor({ state: "visible", timeout: 15_000 })
+      .waitFor({ state: "visible", timeout: 30_000 })
       .then(() => true)
       .catch(() => false);
 
@@ -528,7 +528,7 @@ test.describe("Map persistence: Lazy loading", () => {
 
     // Map container should be visible after page load
     const mapContainer = page.locator(selectors.map);
-    await expect(mapContainer.first()).toBeVisible({ timeout: 15_000 });
+    await expect(mapContainer.first()).toBeVisible({ timeout: 30_000 });
 
     // Loading text should no longer be visible
     const loadingText = page.getByText("Loading map...");

@@ -116,9 +116,9 @@ export function assertionHelpers(page: Page) {
 
       if (isMobile) {
         // On mobile, nav items are behind a hamburger — check attached instead of visible
-        await expect(userMenu.first()).toBeAttached({ timeout: 15000 });
+        await expect(userMenu.first()).toBeAttached({ timeout: 30000 });
       } else {
-        await expect(userMenu.first()).toBeVisible({ timeout: 15000 });
+        await expect(userMenu.first()).toBeVisible({ timeout: 30000 });
       }
     },
 
@@ -130,7 +130,7 @@ export function assertionHelpers(page: Page) {
         .getByRole('link', { name: /log ?in|sign ?in/i })
         .or(page.locator('a[href*="/login"]'));
 
-      await expect(loginButton.first()).toBeVisible({ timeout: 15000 });
+      await expect(loginButton.first()).toBeVisible({ timeout: 30000 });
     },
 
     /**
@@ -138,7 +138,7 @@ export function assertionHelpers(page: Page) {
      */
     async mapLoaded() {
       const map = page.locator(selectors.map);
-      await expect(map).toBeVisible({ timeout: 15000 });
+      await expect(map).toBeVisible({ timeout: 30000 });
     },
 
     /**

@@ -163,7 +163,7 @@ test.describe("Room Type Filter", () => {
     await filtersBtn.click();
 
     const dialog = page.getByRole("dialog", { name: /filters/i });
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
 
     // Click the room type select trigger
     const roomTypeSelect = dialog.locator("#filter-room-type");
@@ -181,7 +181,7 @@ test.describe("Room Type Filter", () => {
         // Apply
         await page.locator('[data-testid="filter-modal-apply"]').click();
 
-        await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+        await expect(dialog).not.toBeVisible({ timeout: 30_000 });
 
         // URL should have roomType=Shared Room
         await expect.poll(

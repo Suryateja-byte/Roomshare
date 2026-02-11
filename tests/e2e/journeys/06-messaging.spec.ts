@@ -78,7 +78,7 @@ test.describe('Messaging Journeys', () => {
       const messagesHeading = page.getByRole('heading', { name: /message|inbox|conversation/i }).first()
         .or(page.getByRole('heading', { level: 1 }).first())
         .or(page.locator('main h1, main h2').first());
-      await expect(messagesHeading.first()).toBeVisible({ timeout: 15000 });
+      await expect(messagesHeading.first()).toBeVisible({ timeout: 30000 });
 
       // Should show conversation list, empty state, or at minimum the main content
       const conversationList = page.locator('[data-testid="conversation-list"], [class*="conversation"], a[href^="/messages/"]');

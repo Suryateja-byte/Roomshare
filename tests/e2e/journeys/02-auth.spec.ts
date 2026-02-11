@@ -62,10 +62,10 @@ test.describe('Authentication Journeys', () => {
 
       // Step 8-9: Wait for redirect and verify logged in
       // Signup redirects to /login?registered=true via router.push
-      await page.waitForURL((url) => !url.pathname.includes('/signup'), {
-        timeout: 30000,
-        waitUntil: 'commit',
-      });
+      await expect.poll(
+        () => !new URL(page.url()).pathname.includes('/signup'),
+        { timeout: 30000, message: 'Expected to navigate away from signup' }
+      ).toBe(true);
 
       // Should redirect to login (with registered=true), verify email page, or onboarding
       const currentUrl = page.url();
@@ -112,7 +112,7 @@ test.describe('Authentication Journeys', () => {
       await expect(
         page.getByText(/already exists|already registered|account exists/i).first()
           .or(page.locator('[role="alert"]').first())
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30000 });
     });
 
     test(`${tags.auth} - Weak password validation`, async ({ page }) => {
@@ -165,11 +165,11 @@ test.describe('Authentication Journeys', () => {
       await page.getByRole('button', { name: /log in|sign in/i }).first().click();
 
       // Step 5: Wait for redirect
-      // Login uses window.location.href = '/' (full page navigation), use waitUntil: "commit"
-      await page.waitForURL((url) => !url.pathname.includes('/login'), {
-        timeout: 30000,
-        waitUntil: 'commit',
-      });
+      // Login uses window.location.href = '/' (full page navigation)
+      await expect.poll(
+        () => !new URL(page.url()).pathname.includes('/login'),
+        { timeout: 30000, message: 'Expected to navigate away from login' }
+      ).toBe(true);
 
       // Step 6: Verify logged in
       await assert.isLoggedIn();
@@ -197,7 +197,7 @@ test.describe('Authentication Journeys', () => {
       await expect(
         page.getByText(/invalid|incorrect|wrong|failed/i).first()
           .or(page.locator('[role="alert"]').first())
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30000 });
 
       // Should stay on login page
       await expect(page).toHaveURL(/\/login/);
@@ -246,7 +246,7 @@ test.describe('Authentication Journeys', () => {
       await expect(
         page.getByText(/check.*email|sent|instructions/i).first()
           .or(page.locator('[data-testid="success-message"]').first())
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30000 });
 
       // Step 5-7: Test with non-existent email (should show same message - no enumeration)
       // After success, click "Try another email" to return to the form
@@ -257,7 +257,7 @@ test.describe('Authentication Journeys', () => {
       // Should show same success-like message
       await expect(
         page.getByText(/check.*email|sent|instructions/i).first()
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30000 });
     });
   });
 
@@ -300,10 +300,10 @@ test.describe('Authentication Journeys', () => {
 
       // Login form redirects to home after successful login (via window.location.href).
       // Use a longer timeout — CI can be slow for full page navigation.
-      await page.waitForURL((url) => !url.pathname.includes('/login'), {
-        timeout: 60000,
-        waitUntil: 'commit',
-      });
+      await expect.poll(
+        () => !new URL(page.url()).pathname.includes('/login'),
+        { timeout: 60000, message: 'Expected to navigate away from login after auth' }
+      ).toBe(true);
     });
   });
 
@@ -327,9 +327,9 @@ test.describe('Authentication Journeys', () => {
       const isMobile = viewport ? viewport.width < 768 : false;
 
       if (isMobile) {
-        await expect(userMenu.first()).toBeAttached({ timeout: 15000 });
+        await expect(userMenu.first()).toBeAttached({ timeout: 30000 });
       } else {
-        await expect(userMenu.first()).toBeVisible({ timeout: 15000 });
+        await expect(userMenu.first()).toBeVisible({ timeout: 30000 });
       }
 
       await newPage.close();

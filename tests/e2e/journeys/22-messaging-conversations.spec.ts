@@ -40,7 +40,7 @@ test.describe("J25: Send Message in Conversation", () => {
     test.skip(!hasConversations, "No conversations found — skipping");
 
     // Step 3: Click first conversation
-    await conversationItem.first().click({ timeout: 15000 });
+    await conversationItem.first().click({ timeout: 30000 });
     await page.waitForTimeout(1500);
 
     // Step 4: Type and send a message
@@ -60,7 +60,7 @@ test.describe("J25: Send Message in Conversation", () => {
       .getByRole("button", { name: /send/i })
       .or(page.locator('[data-testid="send-button"]'))
       .or(page.locator('button[type="submit"]'));
-    await sendBtn.first().click({ timeout: 15000 });
+    await sendBtn.first().click({ timeout: 30000 });
     await page.waitForTimeout(2000);
 
     // Step 5: Verify message appears in thread
@@ -87,7 +87,10 @@ test.describe("J26: Start Conversation from Listing", () => {
 
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
+    await expect.poll(
+      () => new URL(page.url()).pathname.includes('/listings/'),
+      { timeout: timeouts.navigation, message: 'Expected to navigate to listing detail page' }
+    ).toBe(true);
 
     // Step 3: Click contact / message host button
     const contactBtn = page

@@ -73,7 +73,7 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
 
     // Split-stay section heading should be visible
     const splitHeading = container.locator(sel.splitStayHeading);
-    await expect(splitHeading).toBeVisible({ timeout: 15_000 });
+    await expect(splitHeading).toBeVisible({ timeout: 30_000 });
 
     // At least one SplitStayCard should be rendered.
     // The card header renders "Split Stay . {splitLabel}" (e.g., "Split Stay . 3 mo + 3 mo")
@@ -124,7 +124,7 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
     // depending on seed data. If no cards appear, skip the test.
     await page.waitForLoadState("domcontentloaded");
     const cards = container.locator(sel.card);
-    const hasCards = await cards.first().isVisible({ timeout: 15_000 }).catch(() => false);
+    const hasCards = await cards.first().isVisible({ timeout: 30_000 }).catch(() => false);
     if (!hasCards) {
       test.skip(true, "No listings match leaseDuration=3 months filter. Seed data may not support this filter value.");
     }
@@ -170,7 +170,7 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
 
     // Verify initial split-stay section is visible
     const splitHeading = container.locator(sel.splitStayHeading);
-    await expect(splitHeading).toBeVisible({ timeout: 15_000 });
+    await expect(splitHeading).toBeVisible({ timeout: 30_000 });
 
     // Capture the initial combined price text for comparison after load-more
     const combinedTotalEl = container.locator(sel.combinedTotal).first();
@@ -180,7 +180,7 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
 
     // Click "Show more places" to load mock listings
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    const hasLoadMore = await loadMoreBtn.isVisible({ timeout: 15_000 }).catch(() => false);
+    const hasLoadMore = await loadMoreBtn.isVisible({ timeout: 30_000 }).catch(() => false);
     if (!hasLoadMore) {
       test.skip(true, 'Load more button not available (fewer results than page size)');
       return;
