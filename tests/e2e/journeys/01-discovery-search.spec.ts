@@ -139,7 +139,7 @@ test.describe("Discovery & Search Journeys", () => {
       // If h3 not found, fall back to checking the h1 count indicator
       const h1Indicator = page.getByRole("heading", {
         level: 1,
-        name: /0 places/i,
+        name: /^0\s+place/i,
       });
 
       await expect(emptyHeading.or(h1Indicator).first()).toBeVisible({

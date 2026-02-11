@@ -89,8 +89,10 @@ test.describe("Room Type Filter", () => {
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
     // Click the "All" tab (CategoryTabs renders button with text "All" and aria-pressed)
+    // Wait for hydration — tabs may not be interactive immediately
+    await page.waitForTimeout(2_000);
     const allTab = page.locator('button[aria-pressed]').filter({ hasText: /^All$/i });
-    const tabVisible = await allTab.isVisible().catch(() => false);
+    const tabVisible = await allTab.isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (tabVisible) {
       // Wrap in retry: tab click may not trigger URL update immediately due to hydration
@@ -99,7 +101,7 @@ test.describe("Room Type Filter", () => {
         await expect.poll(
           () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
         ).toBeNull();
-      }).toPass({ timeout: 15_000 });
+      }).toPass({ timeout: 20_000 });
 
       await expect.poll(
         () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),

@@ -381,6 +381,9 @@ test.describe('Profile & Settings Journeys', () => {
 
       const deleteButton = page.getByRole('button', { name: /delete.*account/i });
 
+      // On mobile viewports, the delete button may be below the fold
+      await deleteButton.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+
       if (await deleteButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         await deleteButton.click();
 

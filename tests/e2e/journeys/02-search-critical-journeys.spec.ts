@@ -119,10 +119,12 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Find "Clear all" button (filter bar or filter modal)
+    // On mobile, wait for the heading first so the page is ready
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
     const clearAllBtn = page.locator('[data-testid="filter-bar-clear-all"]')
       .or(page.getByRole("button", { name: /clear all/i }));
 
-    if (await clearAllBtn.first().isVisible()) {
+    if (await clearAllBtn.first().isVisible({ timeout: 5000 }).catch(() => false)) {
       await clearAllBtn.first().click();
       await page.waitForLoadState("domcontentloaded");
 
@@ -204,7 +206,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Should show "No matches found" or "0 places"
-    const zeroIndicator = page.getByText(/no matches|0 place/i);
+    const zeroIndicator = searchResultsContainer(page).getByText(/no\s+matches/i)
+      .or(page.getByRole("heading", { level: 1, name: /^0\s+place/i }));
     await zeroIndicator.first().waitFor({ state: "attached", timeout: 30000 });
 
     // "Clear all filters" link should be available
@@ -501,7 +504,7 @@ test.describe("20 Critical Search Page Journeys", () => {
     // Listing cards or empty state should exist after page renders
     await expect(async () => {
       const cardCount = await searchResultsContainer(page).locator(selectors.listingCard).count();
-      const hasEmpty = await page.getByText(/no matches|no listings|0 places/i).isVisible().catch(() => false);
+      const hasEmpty = await searchResultsContainer(page).getByText(/no\s+matches|no listings/i).isVisible().catch(() => false);
       expect(cardCount > 0 || hasEmpty).toBeTruthy();
     }).toPass({ timeout: 30000 });
 

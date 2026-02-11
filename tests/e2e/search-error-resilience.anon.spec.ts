@@ -169,7 +169,7 @@ test.describe("Group 1: Zero Results State", () => {
     const noMatchesHeading = container.locator('h2:has-text("No matches found")');
     const noListingsHeading = container.locator('h3:has-text("No listings found")');
     const noExactHeading = container.locator('h3:has-text("No exact matches")');
-    const zeroPlaces = container.locator('h1:has-text("0 places")');
+    const zeroPlaces = container.locator('h1').filter({ hasText: /^0\s+place/i });
 
     // Either the zero-results heading or the "0 places" count should appear
     await expect(

@@ -34,7 +34,7 @@ test.describe("Budget URL Param Aliases", () => {
 
       // Wait for listing cards to load (or zero results)
       const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = page.getByText(/no matches|0 places/i);
+      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
       await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
 
       // Get all visible listing prices
@@ -67,7 +67,7 @@ test.describe("Budget URL Param Aliases", () => {
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = page.getByText(/no matches|0 places/i);
+      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
       await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices are within range
@@ -128,7 +128,7 @@ test.describe("Budget URL Param Aliases", () => {
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = page.getByText(/no matches|0 places/i);
+      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
       await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices respect canonical minPrice=700, not alias minBudget=500
@@ -160,7 +160,7 @@ test.describe("Budget URL Param Aliases", () => {
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = page.getByText(/no matches|0 places/i);
+      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
       await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices respect canonical maxPrice=1200
@@ -195,7 +195,7 @@ test.describe("Budget URL Param Aliases", () => {
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = page.getByText(/no matches|0 places/i);
+      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
       await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices are in range
@@ -227,7 +227,7 @@ test.describe("Budget URL Param Aliases", () => {
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = page.getByText(/no matches|0 places/i);
+      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
       await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices are in range

@@ -229,7 +229,10 @@ test.describe("Map controls (requires WebGL)", () => {
 
   test("POIs master toggle activates all categories", async ({ page }) => {
     const poiMasterBtn = page.locator('button[aria-label*="Show all POIs"]');
-    if ((await poiMasterBtn.count()) === 0) return;
+    if ((await poiMasterBtn.count()) === 0) {
+      test.skip(true, "POI master toggle button not found in DOM");
+      return;
+    }
 
     const poiVisible = await poiMasterBtn.isVisible({ timeout: 5_000 }).catch(() => false);
     if (!poiVisible) {
@@ -239,13 +242,23 @@ test.describe("Map controls (requires WebGL)", () => {
 
     await poiMasterBtn.click();
 
+    // After clicking master toggle, category buttons should be pressed
+    // Use try/catch since these buttons may not exist in all UI configurations
     const transitBtn = page.locator('button[aria-pressed]').filter({ hasText: /Transit/i }).first();
     const parksBtn = page.locator('button[aria-pressed]').filter({ hasText: /Parks/i }).first();
 
-    if ((await transitBtn.count()) > 0) {
+    const hasTransit = (await transitBtn.count()) > 0;
+    const hasParks = (await parksBtn.count()) > 0;
+
+    if (!hasTransit && !hasParks) {
+      test.skip(true, "No category buttons found after master toggle click");
+      return;
+    }
+
+    if (hasTransit) {
       await expect(transitBtn).toHaveAttribute("aria-pressed", "true", { timeout: 10_000 });
     }
-    if ((await parksBtn.count()) > 0) {
+    if (hasParks) {
       await expect(parksBtn).toHaveAttribute("aria-pressed", "true", { timeout: 10_000 });
     }
   });

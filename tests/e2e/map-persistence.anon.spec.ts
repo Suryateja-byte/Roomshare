@@ -394,17 +394,23 @@ test.describe("Map persistence: Map state recovery", () => {
     // Find a listing card link and navigate to it
     // Listing URLs may start with /listings/c or just /listings/
     // Scope to visible container to avoid matching hidden mobile/desktop duplicates
+    // Wait for listing cards to render after SSR hydration
+    await page.waitForTimeout(3_000);
     const container = page.locator('[data-testid="search-results-container"]');
     const hasContainer = (await container.count()) > 0;
     const listingLink = hasContainer
       ? container.locator('[data-testid="listing-card"] a[href*="/listings/"]').first()
       : page.locator('[data-testid="listing-card"] a[href*="/listings/"]:visible').first();
     if ((await listingLink.count()) === 0) {
-      test.skip(true, "No listing links found");
-      return;
+      // Wait a bit more for SSR hydration to produce listing cards
+      await page.waitForTimeout(5_000);
+      if ((await listingLink.count()) === 0) {
+        test.skip(true, "No listing links found");
+        return;
+      }
     }
 
-    const linkVisible = await listingLink.isVisible({ timeout: 5_000 }).catch(() => false);
+    const linkVisible = await listingLink.isVisible({ timeout: 15_000 }).catch(() => false);
     if (!linkVisible) {
       test.skip(true, "Listing card link not visible (hidden in mobile/desktop container)");
       return;
