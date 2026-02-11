@@ -165,8 +165,8 @@ test.describe("Favorites & Saved Searches Journeys", () => {
         return;
       }
 
-      // Navigate to search with filters
-      await nav.goToSearch({ minPrice: 500, maxPrice: 2000 });
+      // Navigate to search with filters (include bounds so results load)
+      await nav.goToSearch({ bounds: SF_BOUNDS, minPrice: 500, maxPrice: 2000 });
       await page.waitForLoadState("domcontentloaded");
 
       // Find save search button
