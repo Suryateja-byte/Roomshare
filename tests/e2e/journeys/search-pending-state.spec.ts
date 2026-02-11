@@ -14,7 +14,8 @@
  * - pointer-events-none is on the overlay child, not the container itself
  */
 
-import { test, expect, tags, selectors, timeouts, SF_BOUNDS, searchResultsContainer, filtersButton } from "../helpers";
+import { test, expect, tags, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import { openFilterModal, toggleAmenity, applyButton, filterDialog, waitForUrlParam } from "../helpers/filter-helpers";
 
 test.describe("Breathing Pending State (PR1)", () => {
   // Filter tests run as anonymous user
@@ -57,56 +58,34 @@ test.describe("Breathing Pending State (PR1)", () => {
         await route.continue();
       });
 
-      // Open filter drawer and apply a different filter to trigger transition
-      const filterButton = filtersButton(page);
-      const filterBtnVisible = await filterButton.isVisible({ timeout: 10000 }).catch(() => false);
-      if (!filterBtnVisible) {
-        // Filters button may not be visible on certain viewports — skip gracefully
+      // Open filter modal (handles hydration retry + waits for facet data)
+      try {
+        await openFilterModal(page);
+      } catch {
         await page.unroute("**/search**");
-        test.skip(true, 'Filters button not visible on this viewport');
-        return;
-      }
-      await filterButton.click();
-
-      // Wait for filter drawer to open (retry click if needed for hydration)
-      const filterDlg = page.getByRole("dialog", { name: /filters/i });
-      let dialogOpened = await filterDlg.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
-      if (!dialogOpened) {
-        await filterButton.click();
-        dialogOpened = await filterDlg.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
-      }
-      if (!dialogOpened) {
-        await page.unroute("**/search**");
-        test.skip(true, 'Filter dialog did not open');
+        test.skip(true, "Filter modal did not open on this viewport");
         return;
       }
 
-      // Change a filter by clicking an amenity button
-      // Scope to filterDlg to avoid strict mode violation — SearchViewToggle
-      // renders recommended filters in both mobile and desktop containers,
-      // so page-level getByRole finds 2 "Parking" buttons.
-      const parkingButton = filterDlg.getByRole("button", {
-        name: "Parking",
-        exact: true,
-      });
-      const parkingVisible = await parkingButton.isVisible({ timeout: 5000 }).catch(() => false);
-      if (!parkingVisible) {
+      // Toggle Parking amenity (scoped to amenities group for reliable mobile scrolling)
+      try {
+        await toggleAmenity(page, "Parking");
+      } catch {
         await page.unroute("**/search**");
-        test.skip(true, 'Parking amenity button not found in filter dialog');
+        test.skip(true, "Parking amenity button not available");
         return;
       }
-      await parkingButton.click();
 
-      // Wait for Show/Apply button and click it
-      // Button text varies: "Show X listings", "Show Results", or a count
-      const showButton = page.locator('[data-testid="filter-modal-apply"]');
+      // Wait for Apply button spinner to disappear (DOM stability)
+      const showButton = applyButton(page);
       await expect(showButton).toBeVisible({ timeout: 5000 });
-      // Wait for the count-loading spinner inside the button to disappear so
-      // the button DOM is stable (no React unmount/remount mid-click).
       await expect(
         showButton.locator('.animate-spin')
       ).not.toBeVisible({ timeout: 10_000 });
       await showButton.click();
+
+      // Wait for filter dialog to close
+      await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 
       // Check for pending state indicators (may be too fast to catch)
       // SearchResultsLoadingWrapper adds aria-busy="true" and a translucent overlay
@@ -122,10 +101,7 @@ test.describe("Breathing Pending State (PR1)", () => {
       }
 
       // Wait for transition to complete (URL should include amenities param)
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-        { timeout: 10000, message: 'URL param "amenities" to be present' },
-      ).not.toBeNull();
+      await waitForUrlParam(page, "amenities", undefined, 30_000);
 
       // After transition, the wrapper should NOT be busy
       if (await ariaBusyWrapper.count() > 0) {
