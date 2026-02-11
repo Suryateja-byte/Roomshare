@@ -34,11 +34,11 @@ async function waitForSearchPage(page: import("@playwright/test").Page) {
 // Helper: check if map canvas is visible with non-zero dimensions (WebGL loaded and rendering)
 async function isMapAvailable(page: import("@playwright/test").Page) {
   try {
-    const canvas = page.locator(".mapboxgl-canvas:visible").first();
+    const canvas = page.locator(".maplibregl-canvas:visible").first();
     await canvas.waitFor({ state: "visible", timeout: 5_000 });
     // Verify canvas has non-zero dimensions (WebGL actually rendered)
     const hasSize = await page.evaluate(() => {
-      const c = document.querySelector(".mapboxgl-canvas");
+      const c = document.querySelector(".maplibregl-canvas");
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;

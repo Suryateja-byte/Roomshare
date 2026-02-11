@@ -145,7 +145,7 @@ export async function setupPinTieringMock(page: Page): Promise<{
       await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
 
       // Wait for VISIBLE map canvas (page has both mobile and desktop maps)
-      const mapCanvas = page.locator(".mapboxgl-canvas:visible").first();
+      const mapCanvas = page.locator(".maplibregl-canvas:visible").first();
       await mapCanvas.waitFor({ state: "visible", timeout: 30000 });
 
       // Brief pause for React to complete marker rendering

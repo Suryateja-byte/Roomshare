@@ -632,15 +632,6 @@ input:autofill {
   gap: 4px;
 }
 
-/* Mapbox GL Controls - Attribution button accessibility (44px minimum touch target) */
-.mapboxgl-ctrl-attrib-button {
-  min-width: 44px !important;
-  min-height: 44px !important;
-  width: 44px !important;
-  height: 44px !important;
-  background-size: 20px 20px !important;
-  background-position: center !important;
-}
 
 /* Hide scrollbar utility (explicit class for specific elements) */
 .hide-scrollbar::-webkit-scrollbar {

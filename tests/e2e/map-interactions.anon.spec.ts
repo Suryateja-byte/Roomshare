@@ -50,10 +50,10 @@ const sel = {
   searchAsMoveToggle: 'button[role="switch"]:has-text("Search as I move")',
   searchThisAreaBtn: 'button:has-text("Search this area")',
   resetMapBtn: 'button[aria-label="Reset map view"]',
-  mapCanvas: ".mapboxgl-canvas",
+  mapCanvas: ".maplibregl-canvas",
   mapContainer: selectors.map,
   listingCard: '[data-testid="listing-card"]',
-  popup: ".mapboxgl-popup",
+  popup: ".maplibregl-popup",
   loadingMap: 'text="Loading map..."',
 } as const;
 
@@ -81,7 +81,7 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
 async function isMapFullyLoaded(page: Page): Promise<boolean> {
   try {
     return await page.evaluate(() => {
-      const canvas = document.querySelector(".mapboxgl-canvas");
+      const canvas = document.querySelector(".maplibregl-canvas");
       if (!canvas) return false;
       const rect = canvas.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return false;
@@ -272,7 +272,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     // (Playwright's .click() may be intercepted by bottom sheet / popup overlays)
     const markerClicked = await page.evaluate((id) => {
       const el = document.querySelector(
-        `.mapboxgl-marker [data-listing-id="${id}"]`
+        `.maplibregl-marker [data-listing-id="${id}"]`
       ) as HTMLElement;
       if (el) { el.click(); return true; }
       return false;
@@ -336,7 +336,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     //  use onPointerEnter which requires PointerEvent with pointerType='mouse')
     await page.evaluate((id) => {
       const el = document.querySelector(
-        `.mapboxgl-marker [data-listing-id="${id}"]`
+        `.maplibregl-marker [data-listing-id="${id}"]`
       ) as HTMLElement;
       if (el) {
         el.dispatchEvent(new PointerEvent('pointerenter', {
@@ -382,7 +382,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     // Click marker to open popup and set activeId via evaluate
     await page.evaluate((id) => {
       const el = document.querySelector(
-        `.mapboxgl-marker [data-listing-id="${id}"]`
+        `.maplibregl-marker [data-listing-id="${id}"]`
       ) as HTMLElement;
       if (el) el.click();
     }, listingId);

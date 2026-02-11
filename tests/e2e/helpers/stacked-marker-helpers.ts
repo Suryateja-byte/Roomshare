@@ -214,7 +214,7 @@ export async function waitForStackedMarker(
   await page.waitForTimeout(500);
 
   // Wait for marker to be visible
-  await page.locator(".mapboxgl-marker:visible").first().waitFor({
+  await page.locator(".maplibregl-marker:visible").first().waitFor({
     state: "visible",
     timeout,
   });

@@ -68,7 +68,7 @@ test.describe("Search V2 UI Integration", () => {
 
     // Try to wait for map canvas - may fail in test environments without Mapbox token
     // Use .first() without visibility filter since the minimap is the only one that may load
-    const mapCanvas = page.locator(".mapboxgl-canvas").first();
+    const mapCanvas = page.locator(".maplibregl-canvas").first();
 
     // Wait up to 45s for map to initialize
     // If map doesn't load (e.g., missing Mapbox token), this will timeout

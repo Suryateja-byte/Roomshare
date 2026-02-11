@@ -408,7 +408,7 @@ test.describe("Search API v2 Endpoint", () => {
 
       // Wait for map container to be visible
       // Note: Use .first() because SearchLayoutView may render map in multiple containers
-      const mapContainer = page.locator(".mapboxgl-map").first();
+      const mapContainer = page.locator(".maplibregl-map").first();
 
       // Map may not render if Mapbox token is missing in test environment
       // Check for either map container OR the loading fallback

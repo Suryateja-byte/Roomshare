@@ -58,8 +58,8 @@ export async function emulateReducedMotion(page: Page): Promise<void> {
  */
 export function defaultMasks(page: Page): Locator[] {
   return [
-    page.locator('.mapboxgl-canvas'),
-    page.locator('.mapboxgl-map'),
+    page.locator('.maplibregl-canvas'),
+    page.locator('.maplibregl-map'),
     page.locator('.maplibregl-canvas'),
     page.locator('.maplibregl-map'),
   ];

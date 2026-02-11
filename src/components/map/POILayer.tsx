@@ -17,20 +17,24 @@ interface POILayerProps {
     isMapLoaded: boolean;
 }
 
-// Mapbox built-in layer IDs for POI categories
+// OpenMapTiles (Liberty style) layer IDs for POI categories
 const TRANSIT_LAYERS = [
-    'transit-label',
-    'transit-station-label',
-    'transit-line',
+    'poi_transit',
+    'road_transit_rail',
+    'road_transit_rail_hatching',
 ];
 
 const LANDMARK_LAYERS = [
-    'poi-label',
+    'poi_r1',
+    'poi_r7',
+    'poi_r20',
 ];
 
 const PARK_LAYERS = [
-    'landuse',
-    'national-park',
+    'park',
+    'park_outline',
+    'landcover_wood',
+    'landcover_grass',
 ];
 
 type POICategory = 'transit' | 'landmarks' | 'parks';

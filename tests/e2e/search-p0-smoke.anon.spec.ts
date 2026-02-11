@@ -142,7 +142,7 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Wait for either cards or zero results heading
     await expect(
-      cards.first().or(zeroResults),
+      cards.or(zeroResults).first(),
     ).toBeAttached({ timeout: 30_000 });
 
     // Both outcomes are valid: results with the filter applied, or no matches
@@ -165,7 +165,7 @@ test.describe("Search P0 Smoke Suite", () => {
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
     const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-    await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
+    await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
 
     // Look for the "Clear all" button in the applied filter chips area
     // or in the zero-results "Clear all filters" button (ZeroResultsSuggestions renders a Button, not Link)
@@ -327,7 +327,7 @@ test.describe("Search P0 Smoke Suite", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Check if map is rendered (WebGL may not be available in headless)
-    const mapContainer = page.locator(".mapboxgl-map, .mapboxgl-canvas");
+    const mapContainer = page.locator(".maplibregl-map, .maplibregl-canvas");
     const mapVisible = await mapContainer.first().isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (!mapVisible) {
@@ -344,7 +344,7 @@ test.describe("Search P0 Smoke Suite", () => {
     }
 
     // Click the first visible marker
-    const markers = page.locator(".mapboxgl-marker");
+    const markers = page.locator(".maplibregl-marker");
     const markerCount = await markers.count();
     if (markerCount === 0) {
       test.skip(true, "No markers found on map");
@@ -354,7 +354,7 @@ test.describe("Search P0 Smoke Suite", () => {
     await markers.first().click();
 
     // Assert popup appears
-    const popup = page.locator(".mapboxgl-popup");
+    const popup = page.locator(".maplibregl-popup");
     await expect(popup).toBeVisible({ timeout: 5_000 });
   });
 
@@ -364,7 +364,7 @@ test.describe("Search P0 Smoke Suite", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // The toggle is rendered inside the map component
-    const mapContainer = page.locator(".mapboxgl-map");
+    const mapContainer = page.locator(".maplibregl-map");
     const mapVisible = await mapContainer.first().isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (!mapVisible) {
@@ -428,7 +428,7 @@ test.describe("Search P0 Smoke Suite", () => {
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
     const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-    await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
+    await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
 
     // Verify the URL still contains all the search parameters
     const currentUrl = page.url();
@@ -476,7 +476,7 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Wait for any outcome: results, error boundary, or rate limit
     await expect(
-      cards.first().or(errorBoundary).or(rateLimitMsg),
+      cards.or(errorBoundary).or(rateLimitMsg).first(),
     ).toBeAttached({ timeout: 30_000 });
 
     // If error boundary triggered, verify recovery via "Try again"
@@ -512,7 +512,7 @@ test.describe("Search P0 Smoke Suite", () => {
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
     const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-    await expect(cards.first().or(zeroResults)).toBeAttached({ timeout: 30_000 });
+    await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
 
     // Assert URL preserves all params
     const currentUrl = page.url();
@@ -583,7 +583,7 @@ test.describe("Search P0 Smoke Suite", () => {
     await expect(mobileSheet).toBeAttached({ timeout: 10_000 });
 
     // Map should also be present on mobile (behind the sheet)
-    const mapContainer = page.locator(".mapboxgl-map, .mapboxgl-canvas, [data-testid=\"map\"]");
+    const mapContainer = page.locator(".maplibregl-map, .maplibregl-canvas, [data-testid=\"map\"]");
     // Map may or may not render depending on WebGL -- just check that the page is not broken
     const bodyVisible = await page.locator("body").isVisible();
     expect(bodyVisible).toBe(true);

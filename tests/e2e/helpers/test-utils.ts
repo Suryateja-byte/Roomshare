@@ -64,7 +64,7 @@ export const A11Y_CONFIG = {
   standard: 'WCAG 2.1 AA' as const,
   tags: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] as const,
   /** Elements to always exclude from axe scans (map canvases are third-party) */
-  globalExcludes: ['.mapboxgl-canvas', '.maplibregl-canvas', '.maplibregl-ctrl-group'] as const,
+  globalExcludes: ['.maplibregl-canvas', '.maplibregl-canvas', '.maplibregl-ctrl-group'] as const,
   /** Rules with known acceptable violations */
   knownExclusions: ['color-contrast', 'aria-prohibited-attr'] as const,
 } as const;
@@ -159,8 +159,8 @@ export const selectors = {
   emptyState: '[data-testid="empty-state"], [class*="empty-state"]',
 
   // Map
-  map: '[data-testid="map"], [class*="mapboxgl"], .mapboxgl-map',
-  mapMarker: '.mapboxgl-marker, [data-testid="map-marker"]',
+  map: '[data-testid="map"], [class*="maplibregl"], .maplibregl-map',
+  mapMarker: '.maplibregl-marker, [data-testid="map-marker"]',
 } as const;
 
 /**
@@ -205,7 +205,7 @@ export async function waitForMapReady(
   if (mapRefReady) return;
 
   // Phase 2: Fall back to waiting for map container or canvas in DOM
-  await page.locator('.mapboxgl-map, .mapboxgl-canvas, [data-testid="map"]')
+  await page.locator('.maplibregl-map, .maplibregl-canvas, [data-testid="map"]')
     .first()
     .waitFor({ state: 'attached', timeout: Math.min(timeout, 5_000) })
     .catch(() => {

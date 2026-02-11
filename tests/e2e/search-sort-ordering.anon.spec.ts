@@ -62,7 +62,7 @@ async function waitForResults(page: Page) {
   const container = page.locator(DESKTOP);
   const cards = container.locator(CARDS);
   const zeroResults = container.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-  await expect(cards.first().or(zeroResults.first())).toBeAttached({ timeout: 30_000 });
+  await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
   return { cards, zeroResults };
 }
 
@@ -94,7 +94,7 @@ async function waitForMobileResults(page: Page) {
   const container = page.locator(MOBILE);
   const cards = container.locator(CARDS);
   const zeroResults = container.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-  await expect(cards.first().or(zeroResults.first())).toBeAttached({ timeout: 30_000 });
+  await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
   return { cards, zeroResults };
 }
 

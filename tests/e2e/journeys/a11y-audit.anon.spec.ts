@@ -51,9 +51,9 @@ test.describe('Accessibility Audit (axe-core)', () => {
       const results = await new AxeBuilder({ page })
         .withTags(WCAG_AA_TAGS)
         .exclude('.maplibregl-canvas')
-        .exclude('.mapboxgl-canvas')
+        .exclude('.maplibregl-canvas')
         .exclude('.maplibregl-ctrl-group')
-        .exclude('.mapboxgl-ctrl-group')
+        .exclude('.maplibregl-ctrl-group')
         .exclude('[data-sonner-toast]')
         .analyze();
 
@@ -83,9 +83,9 @@ test.describe('Accessibility Audit (axe-core)', () => {
       const results = await new AxeBuilder({ page })
         .withTags(WCAG_AA_TAGS)
         .exclude('.maplibregl-canvas')
-        .exclude('.mapboxgl-canvas')
+        .exclude('.maplibregl-canvas')
         .exclude('.maplibregl-ctrl-group')
-        .exclude('.mapboxgl-ctrl-group')
+        .exclude('.maplibregl-ctrl-group')
         .exclude('[data-sonner-toast]')
         .analyze();
 

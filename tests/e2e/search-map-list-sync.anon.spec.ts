@@ -96,7 +96,7 @@ async function getNthMarkerIdOrNull(
  * Click a map marker by its listing ID using dual strategy inside page.evaluate,
  * then verify the click triggered handleMarkerClick → setActive(listingId).
  *
- * Strategy 1: wrapper.click() on the .mapboxgl-marker wrapper element, which has
+ * Strategy 1: wrapper.click() on the .maplibregl-marker wrapper element, which has
  * react-map-gl's native addEventListener('click') handler (marker.js:26).
  * Strategy 2: focus + keydown Enter on the inner div, which triggers the React
  * onKeyDown handler (Map.tsx:1841 → handleMarkerClick).
@@ -114,11 +114,11 @@ async function clickMarkerByListingId(page: Page, listingId: string): Promise<vo
   await expect(async () => {
     const result = await page.evaluate((id) => {
       const inner = document.querySelector(
-        `.mapboxgl-marker [data-listing-id="${id}"]`,
+        `.maplibregl-marker [data-listing-id="${id}"]`,
       ) as HTMLElement | null;
       if (!inner?.isConnected) return 'not-found';
-      // Strategy 1: Click the .mapboxgl-marker wrapper (react-map-gl native handler)
-      const wrapper = inner.closest('.mapboxgl-marker') as HTMLElement;
+      // Strategy 1: Click the .maplibregl-marker wrapper (react-map-gl native handler)
+      const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
       if (wrapper) wrapper.click();
       // Strategy 2: Keyboard Enter on inner div (React onKeyDown handler)
       inner.focus();
@@ -155,10 +155,10 @@ async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
 async function clickMarkerFast(page: Page, listingId: string): Promise<void> {
   await page.evaluate((id) => {
     const inner = document.querySelector(
-      `.mapboxgl-marker [data-listing-id="${id}"]`,
+      `.maplibregl-marker [data-listing-id="${id}"]`,
     ) as HTMLElement | null;
     if (!inner?.isConnected) return;
-    const wrapper = inner.closest('.mapboxgl-marker') as HTMLElement;
+    const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
     if (wrapper) wrapper.click();
     inner.focus();
     inner.dispatchEvent(new KeyboardEvent('keydown', {
@@ -171,7 +171,7 @@ async function clickMarkerFast(page: Page, listingId: string): Promise<void> {
  * Hover a map marker by listing ID using page.evaluate + PointerEvent dispatch,
  * then verify the hover triggered setHovered(listingId) → marker scales up.
  *
- * Dispatches 'pointerover' on the .mapboxgl-marker WRAPPER element (where
+ * Dispatches 'pointerover' on the .maplibregl-marker WRAPPER element (where
  * react-map-gl attaches onPointerEnter). React 18 uses pointerover/pointerout
  * for enter/leave delegation. Setting relatedTarget to document.body (outside
  * the marker tree) ensures React's enter/leave diffing correctly identifies
@@ -183,11 +183,11 @@ async function hoverMarkerByListingId(page: Page, listingId: string): Promise<vo
   await expect(async () => {
     const hovered = await page.evaluate((id) => {
       const inner = document.querySelector(
-        `.mapboxgl-marker [data-listing-id="${id}"]`,
+        `.maplibregl-marker [data-listing-id="${id}"]`,
       ) as HTMLElement | null;
       if (!inner?.isConnected) return false;
       // Target the wrapper where onPointerEnter is attached
-      const wrapper = inner.closest('.mapboxgl-marker') as HTMLElement;
+      const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
       if (!wrapper) return false;
       const rect = wrapper.getBoundingClientRect();
       wrapper.dispatchEvent(new PointerEvent('pointerover', {
@@ -229,10 +229,10 @@ async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
 async function hoverMarkerFast(page: Page, listingId: string): Promise<void> {
   await page.evaluate((id) => {
     const inner = document.querySelector(
-      `.mapboxgl-marker [data-listing-id="${id}"]`,
+      `.maplibregl-marker [data-listing-id="${id}"]`,
     ) as HTMLElement | null;
     if (!inner?.isConnected) return;
-    const wrapper = inner.closest('.mapboxgl-marker') as HTMLElement;
+    const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
     if (!wrapper) return;
     const rect = wrapper.getBoundingClientRect();
     wrapper.dispatchEvent(new PointerEvent('pointerover', {
@@ -431,7 +431,7 @@ test.describe("Map-List Synchronization", () => {
       await clickMarkerByIndex(page, 0);
 
       // Popup should appear
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
       await expect(popup).toBeVisible({ timeout: timeouts.action });
 
       // Card should have highlight simultaneously
@@ -453,7 +453,7 @@ test.describe("Map-List Synchronization", () => {
       await clickMarkerByIndex(page, 0);
       await waitForCardHighlight(page, listingId);
 
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
       await expect(popup).toBeVisible({ timeout: timeouts.action });
 
       // Close popup via close button
@@ -732,7 +732,7 @@ test.describe("Map-List Synchronization", () => {
       await waitForCardHighlight(page, listingId);
 
       // Click on map canvas background (corner area, away from markers)
-      const mapCanvas = page.locator(".mapboxgl-canvas:visible").first();
+      const mapCanvas = page.locator(".maplibregl-canvas:visible").first();
       const box = await mapCanvas.boundingBox();
       expect(box).toBeTruthy();
 
@@ -742,7 +742,7 @@ test.describe("Map-List Synchronization", () => {
       // After background click, the popup closes (setSelectedListing(null))
       // Note: activeId may or may not be cleared depending on implementation
       // The popup closing is the primary observable behavior here
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
       const popupCount = await popup.count();
       // Either popup closed or a new one opened (if we hit another marker)
       expect(popupCount).toBeLessThanOrEqual(1);
@@ -793,7 +793,7 @@ test.describe("Map-List Synchronization", () => {
       // Get initial counts
       const initialCardCount = await searchResultsContainer(page).locator(selectors.listingCard).count();
       const initialMarkerCount = await page
-        .locator(".mapboxgl-marker:visible")
+        .locator(".maplibregl-marker:visible")
         .count();
 
       // Apply a price filter via URL navigation (simplest approach)
@@ -856,7 +856,7 @@ test.describe("Map-List Synchronization", () => {
 
       // If markers are visible, sync should still work
       const markerCount = await page
-        .locator(".mapboxgl-marker:visible")
+        .locator(".maplibregl-marker:visible")
         .count();
       if (markerCount > 0) {
         // Markers should still be rendered (sort does not affect map markers)
@@ -902,12 +902,12 @@ test.describe("Map-List Synchronization", () => {
       await waitForMapReady(page);
       // Wait for markers to appear after pan
       await expect(
-        page.locator('.mapboxgl-marker:visible').first()
+        page.locator('.maplibregl-marker:visible').first()
       ).toBeVisible({ timeout: timeouts.navigation });
 
       // Page should still have markers and cards
       const newMarkerCount = await page
-        .locator(".mapboxgl-marker:visible")
+        .locator(".maplibregl-marker:visible")
         .count();
       const newCardCount = await searchResultsContainer(page).locator(selectors.listingCard).count();
 
@@ -1037,7 +1037,7 @@ test.describe("Map-List Synchronization", () => {
 
       // Markers should still exist
       const afterZoomCount = await page
-        .locator(".mapboxgl-marker:visible")
+        .locator(".maplibregl-marker:visible")
         .count();
       expect(afterZoomCount).toBeGreaterThanOrEqual(0); // May change due to clustering
     });
@@ -1066,7 +1066,7 @@ test.describe("Map-List Synchronization", () => {
       await zoomToExpandClusters(page);
 
       const markerCount = await page
-        .locator(".mapboxgl-marker:visible")
+        .locator(".maplibregl-marker:visible")
         .count();
       if (markerCount === 0) test.skip(true, "No markers on mobile");
 
@@ -1360,7 +1360,7 @@ test.describe("Map-List Synchronization", () => {
       await clickMarkerByIndex(page, 0);
       await waitForCardHighlight(page, listingId);
 
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
       await expect(popup).toBeVisible({ timeout: timeouts.action });
 
       // Press Escape

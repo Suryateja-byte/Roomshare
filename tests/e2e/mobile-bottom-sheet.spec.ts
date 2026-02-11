@@ -22,7 +22,7 @@ test.use({
 const selectors = {
   bottomSheet: '[role="region"][aria-label="Search results"]',
   bottomSheetHandle: '[role="slider"][aria-label="Results panel size"]',
-  mapContainer: '[data-testid="map"], .mapboxgl-map',
+  mapContainer: '[data-testid="map"], .maplibregl-map',
   listingCard: '[data-testid="listing-card"]',
   expandButton: 'button[aria-label="Expand results"]',
   collapseButton: 'button[aria-label="Collapse results"]',

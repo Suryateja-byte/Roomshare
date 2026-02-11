@@ -29,9 +29,9 @@ const SEARCH_URL = `/search?${boundsQS}`;
 async function waitForResults(page: import("@playwright/test").Page) {
   await page.waitForLoadState("domcontentloaded");
   // Try heading first, fall back to listing cards being attached (CI may not render h1 quickly)
-  const heading = page.getByRole("heading", { level: 1 }).first();
-  const card = page.locator('[data-testid="listing-card"]').first();
-  await expect(heading.or(card)).toBeVisible({ timeout: 30_000 });
+  const heading = page.getByRole("heading", { level: 1 });
+  const card = page.locator('[data-testid="listing-card"]');
+  await expect(heading.or(card).first()).toBeVisible({ timeout: 30_000 });
 }
 
 // --------------------------------------------------------------------------

@@ -34,9 +34,9 @@ export const mobileSelectors = {
   /** Listing card elements */
   listingCard: '[data-testid="listing-card"]',
   /** Map container */
-  mapContainer: '[data-testid="map"], .mapboxgl-map',
+  mapContainer: '[data-testid="map"], .maplibregl-map',
   /** Map markers */
-  mapMarker: ".mapboxgl-marker, [data-testid=\"map-marker\"]",
+  mapMarker: ".maplibregl-marker, [data-testid=\"map-marker\"]",
   /** Floating toggle button (map/list) */
   floatingToggle:
     'button[aria-label="Show map"], button[aria-label="Show list"]',

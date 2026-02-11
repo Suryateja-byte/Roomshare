@@ -6,8 +6,8 @@
  * get boundary GeoJSON, rendered as a faint shaded fill layer.
  */
 
-import { Source, Layer } from 'react-map-gl';
-import type { LayerProps } from 'react-map-gl';
+import { Source, Layer } from 'react-map-gl/maplibre';
+import type { LayerProps } from 'react-map-gl/maplibre';
 import { useEffect, useState, useMemo, useRef } from 'react';
 
 interface BoundaryLayerProps {

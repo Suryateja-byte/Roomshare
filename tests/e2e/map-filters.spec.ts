@@ -52,7 +52,7 @@ async function waitForSearchPageReady(page: Page) {
  * Get the current count of visible map markers
  */
 async function getMarkerCount(page: Page): Promise<number> {
-  const markers = page.locator(".mapboxgl-marker:visible");
+  const markers = page.locator(".maplibregl-marker:visible");
   return markers.count();
 }
 
@@ -62,10 +62,10 @@ async function getMarkerCount(page: Page): Promise<number> {
  */
 async function getMapInstanceId(page: Page): Promise<string | null> {
   return page.evaluate(() => {
-    const mapContainer = document.querySelector(".mapboxgl-map");
+    const mapContainer = document.querySelector(".maplibregl-map");
     if (!mapContainer) return null;
     // Use a stable identifier - the map canvas element's dataset or a unique property
-    const canvas = mapContainer.querySelector(".mapboxgl-canvas");
+    const canvas = mapContainer.querySelector(".maplibregl-canvas");
     if (canvas) {
       // Return a hash of the canvas dimensions and position as a pseudo-ID
       const rect = canvas.getBoundingClientRect();
@@ -585,7 +585,7 @@ test.describe("Map + Filter Interactions", () => {
       await waitForSearchPageReady(page);
 
       // Check if map exists
-      const map = page.locator(".mapboxgl-canvas:visible").first();
+      const map = page.locator(".maplibregl-canvas:visible").first();
       const mapVisible = await map.isVisible().catch(() => false);
 
       if (!mapVisible) {

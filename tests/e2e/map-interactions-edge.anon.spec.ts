@@ -139,7 +139,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       await waitForMapReady(page);
 
       // Verify that mapbox-gl chunk OR canvas (proof of Mapbox) is present on search page
-      const mapCanvas = page.locator(".mapboxgl-canvas");
+      const mapCanvas = page.locator(".maplibregl-canvas");
       const mapContainer = page.locator(selectors.map);
       const mapVisible =
         (await mapCanvas.count()) > 0 || (await mapContainer.count()) > 0;
@@ -220,7 +220,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       }
 
       // After loading completes, either canvas or loading placeholder should have appeared
-      const mapCanvas = page.locator(".mapboxgl-canvas");
+      const mapCanvas = page.locator(".maplibregl-canvas");
       const canvasVisible = await mapCanvas.isVisible().catch(() => false);
 
       if (loadingWasVisible) {
@@ -611,7 +611,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       }
 
       // Wait for map to settle before checking markers
-      const markers = page.locator(".mapboxgl-marker");
+      const markers = page.locator(".maplibregl-marker");
       await waitForMapReady(page);
       const markerCount = await markers.count();
 
@@ -629,7 +629,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         // Pattern for coordinates with 6+ decimal places (e.g., 37.761234 or -122.421234)
         const coordPattern = /-?\d{1,3}\.\d{6,}/;
 
-        const markers = Array.from(document.querySelectorAll(".mapboxgl-marker"));
+        const markers = Array.from(document.querySelectorAll(".maplibregl-marker"));
         const exposedCoords: string[] = [];
 
         for (const marker of markers) {
@@ -673,11 +673,11 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       expect(coordinateExposure).toHaveLength(0);
 
       // Also check popup content if a popup is open
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
       if ((await popup.count()) > 0) {
         const popupCoordExposure = await page.evaluate(() => {
           const coordPairPattern = /-?\d{1,3}\.\d{6,}\s*,\s*-?\d{1,3}\.\d{6,}/;
-          const popups = Array.from(document.querySelectorAll(".mapboxgl-popup"));
+          const popups = Array.from(document.querySelectorAll(".maplibregl-popup"));
           const exposed: string[] = [];
 
           for (const popup of popups) {

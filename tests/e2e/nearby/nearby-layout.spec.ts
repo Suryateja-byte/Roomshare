@@ -79,7 +79,7 @@ test.describe("Nearby Places Layout", () => {
     // Check if map container exists and has proper dimensions
     // TODO: add data-testid="map" to the Map component wrapper
     const mapContainer = page
-      .locator('.maplibregl-map, .mapboxgl-map')
+      .locator('.maplibregl-map, .maplibregl-map')
       .first();
 
     if ((await mapContainer.count()) > 0) {
@@ -133,7 +133,7 @@ test.describe("Nearby Places Layout", () => {
 
     // Check that map has minimum dimensions
     const mapContainer = page
-      .locator('.maplibregl-map, .mapboxgl-map')
+      .locator('.maplibregl-map, .maplibregl-map')
       .first();
     if ((await mapContainer.count()) > 0) {
       const mapStyles = await mapContainer.evaluate((el) => {
@@ -169,7 +169,7 @@ test.describe("Nearby Places Layout", () => {
       .first();
     const mapControls = page
       .locator(
-        '.maplibregl-ctrl-top-right, .mapboxgl-ctrl-top-right',
+        '.maplibregl-ctrl-top-right, .maplibregl-ctrl-top-right',
       )
       .first();
 
@@ -219,7 +219,7 @@ test.describe("Nearby Places Layout", () => {
 
     // Try to click on a marker to open popup
     const mapCanvas = page
-      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .locator(".maplibregl-canvas, .maplibregl-canvas")
       .first();
 
     if ((await mapCanvas.count()) > 0) {
@@ -230,7 +230,7 @@ test.describe("Nearby Places Layout", () => {
 
         // Check popup z-index
         const popup = page.locator(
-          '.maplibregl-popup, .mapboxgl-popup',
+          '.maplibregl-popup, .maplibregl-popup',
         );
         if (await popup.isVisible().catch(() => false)) {
           const popupZ = await popup.evaluate((el) => {
@@ -251,7 +251,7 @@ test.describe("Nearby Places Layout", () => {
     if (!found) { test.skip(true, "No listings available"); return; }
 
     const mapCanvas = page
-      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .locator(".maplibregl-canvas, .maplibregl-canvas")
       .first();
 
     if ((await mapCanvas.count()) > 0) {
@@ -326,7 +326,7 @@ test.describe("Nearby Places Layout", () => {
     if (!found) { test.skip(true, "No listings available"); return; }
 
     const mapCanvas = page
-      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .locator(".maplibregl-canvas, .maplibregl-canvas")
       .first();
 
     if ((await mapCanvas.count()) > 0) {
@@ -340,7 +340,7 @@ test.describe("Nearby Places Layout", () => {
       expect(touchAction).toBeDefined();
 
       // Check that overscroll behavior is controlled
-      const container = page.locator(".maplibregl-map, .mapboxgl-map").first();
+      const container = page.locator(".maplibregl-map, .maplibregl-map").first();
       if ((await container.count()) > 0) {
         const overscroll = await container.evaluate((el) => {
           return window.getComputedStyle(el).overscrollBehavior;
@@ -359,7 +359,7 @@ test.describe("Nearby Places Layout", () => {
     if (!found) { test.skip(true, "No listings available"); return; }
 
     const mapCanvas = page
-      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .locator(".maplibregl-canvas, .maplibregl-canvas")
       .first();
 
     if ((await mapCanvas.count()) > 0) {
@@ -416,7 +416,7 @@ test.describe("Nearby Places Layout", () => {
 
     // Check canvas resolution
     const mapCanvas = page
-      .locator(".maplibregl-canvas, .mapboxgl-canvas")
+      .locator(".maplibregl-canvas, .maplibregl-canvas")
       .first();
 
     if ((await mapCanvas.count()) > 0) {
@@ -523,7 +523,7 @@ test.describe("Nearby Places Mobile Layout", () => {
 
       // Map should be visible
       const mapContainer = page
-        .locator('.maplibregl-map, .mapboxgl-map')
+        .locator('.maplibregl-map, .maplibregl-map')
         .first();
       const mapVisible = await mapContainer.isVisible().catch(() => false);
 

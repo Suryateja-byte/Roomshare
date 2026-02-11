@@ -237,7 +237,7 @@ test.describe("Discovery & Search Journeys", () => {
         await mapToggle.first().click();
         await page.waitForTimeout(2000); // Map initialization takes time
 
-        // Wait for map to render — Mapbox GL adds .mapboxgl-map class, or use role="region" aria-label
+        // Wait for map to render — Mapbox GL adds .maplibregl-map class, or use role="region" aria-label
         const map = page.locator(selectors.map)
           .or(page.locator('[role="region"][aria-label*="map" i]'));
         await expect(map.first()).toBeVisible({ timeout: 20000 });

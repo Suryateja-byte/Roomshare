@@ -8,8 +8,8 @@
  * Uses a Mapbox `circle` layer on top of GeoJSON point features.
  */
 
-import { Source, Layer } from 'react-map-gl';
-import type { LayerProps } from 'react-map-gl';
+import { Source, Layer } from 'react-map-gl/maplibre';
+import type { LayerProps } from 'react-map-gl/maplibre';
 import { useMemo } from 'react';
 
 interface PrivacyCircleProps {

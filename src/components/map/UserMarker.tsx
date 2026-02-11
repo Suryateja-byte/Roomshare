@@ -6,7 +6,7 @@
  * State is session-only (not persisted).
  */
 
-import { Marker } from 'react-map-gl';
+import { Marker } from 'react-map-gl/maplibre';
 import { MapPin, X, Navigation } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';

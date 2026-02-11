@@ -25,7 +25,7 @@ const toggleSelectors = {
   showMapButton: 'button[aria-label="Show map"]',
   showListButton: 'button[aria-label="Show list"]',
   bottomSheet: '[role="region"][aria-label="Search results"]',
-  mapContainer: '[data-testid="map"], .mapboxgl-map',
+  mapContainer: '[data-testid="map"], .maplibregl-map',
 } as const;
 
 test.beforeEach(async ({}, testInfo) => {

@@ -11,12 +11,11 @@
  * - Dark/light mode support
  */
 
-import '@/lib/mapbox-init'; // Must be first - initializes worker
-import ReactMapGL, { Marker, Popup, Source, Layer, type LayerProps } from 'react-map-gl';
-import type { GeoJSONSource } from 'react-map-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import ReactMapGL, { Marker, Popup, Source, Layer, type LayerProps } from 'react-map-gl/maplibre';
+import type { GeoJSONSource } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Loader2, MapPin } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { getWalkabilityRings, formatDistance } from '@/lib/geo/distance';
 import type { POI } from '@/lib/places/types';
 
@@ -70,7 +69,7 @@ const clusterCountLayer: LayerProps = {
   filter: ['has', 'point_count'],
   layout: {
     'text-field': '{point_count_abbreviated}',
-    'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+    'text-font': ['Noto Sans Regular'],
     'text-size': 12,
   },
   paint: { 'text-color': '#ffffff' },
@@ -82,7 +81,7 @@ const clusterCountLayerDark: LayerProps = {
   filter: ['has', 'point_count'],
   layout: {
     'text-field': '{point_count_abbreviated}',
-    'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+    'text-font': ['Noto Sans Regular'],
     'text-size': 12,
   },
   paint: { 'text-color': '#18181b' },
@@ -112,7 +111,7 @@ const walkabilityRingLabelLayer: LayerProps = {
   type: 'symbol',
   layout: {
     'text-field': ['concat', ['get', 'minutes'], ' min'],
-    'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+    'text-font': ['Noto Sans Regular'],
     'text-size': 11,
     'symbol-placement': 'line',
     'text-max-angle': 30,
@@ -254,7 +253,7 @@ export function NeighborhoodMap({
   }, [pois]);
 
   // Handle cluster click to zoom
-  const onClusterClick = useCallback((event: any) => {
+  const onClusterClick = useCallback(async (event: any) => {
     const feature = event.features?.[0];
     if (!feature || !mapRef.current) return;
 
@@ -267,18 +266,13 @@ export function NeighborhoodMap({
     if (!mapboxSource) return;
 
     try {
-      mapboxSource.getClusterExpansionZoom(
-        clusterId,
-        (err: Error | null, zoom: number) => {
-          if (err || !feature.geometry || feature.geometry.type !== 'Point')
-            return;
-          mapRef.current?.flyTo({
-            center: feature.geometry.coordinates as [number, number],
-            zoom: zoom,
-            duration: 500,
-          });
-        }
-      );
+      const zoom = await mapboxSource.getClusterExpansionZoom(clusterId);
+      if (!feature.geometry || feature.geometry.type !== 'Point') return;
+      mapRef.current?.flyTo({
+        center: feature.geometry.coordinates as [number, number],
+        zoom: zoom,
+        duration: 500,
+      });
     } catch (error) {
       console.warn('Cluster expansion failed', error);
     }
@@ -328,7 +322,6 @@ export function NeighborhoodMap({
 
       <ReactMapGL
         ref={mapRef}
-        mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         {...viewState}
         onMove={(evt) => setViewState(evt.viewState)}
         onLoad={() => setIsMapLoaded(true)}
@@ -339,8 +332,8 @@ export function NeighborhoodMap({
         style={{ width: '100%', height: '100%' }}
         mapStyle={
           isDarkMode
-            ? 'mapbox://styles/mapbox/dark-v11'
-            : 'mapbox://styles/mapbox/streets-v11'
+            ? '/map-styles/liberty-dark.json'
+            : 'https://tiles.openfreemap.org/styles/liberty'
         }
       >
         {/* Walkability rings */}
@@ -445,10 +438,10 @@ export function NeighborhoodMap({
             }}
             closeButton={true}
             closeOnClick={false}
-            className={`z-50 [&_.mapboxgl-popup-content]:rounded-lg [&_.mapboxgl-popup-content]:p-0 ${
+            className={`z-50 [&_.maplibregl-popup-content]:rounded-lg [&_.maplibregl-popup-content]:p-0 ${
               isDarkMode
-                ? '[&_.mapboxgl-popup-tip]:border-t-zinc-800'
-                : '[&_.mapboxgl-popup-tip]:border-t-white'
+                ? '[&_.maplibregl-popup-tip]:border-t-zinc-800'
+                : '[&_.maplibregl-popup-tip]:border-t-white'
             }`}
             maxWidth="250px"
           >
@@ -513,12 +506,6 @@ export function NeighborhoodMap({
         </div>
       )}
 
-      {/* Mapbox token warning */}
-      {!process.env.NEXT_PUBLIC_MAPBOX_TOKEN && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white z-50 pointer-events-none">
-          <div className="bg-destructive p-4 rounded-lg">Mapbox Token Missing</div>
-        </div>
-      )}
     </div>
   );
 }

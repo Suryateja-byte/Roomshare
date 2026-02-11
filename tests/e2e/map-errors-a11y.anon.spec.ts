@@ -256,7 +256,7 @@ test.describe("Map Error States and Accessibility", () => {
       await waitForMapReady(page);
 
       // Check if map container with proper ARIA exists
-      const mapContainer = page.locator('.mapboxgl-map').first();
+      const mapContainer = page.locator('.maplibregl-map').first();
       const mapContainerVisible = await mapContainer.isVisible({ timeout: 5000 }).catch(() => false);
 
       if (mapContainerVisible) {
@@ -312,7 +312,7 @@ test.describe("Map Error States and Accessibility", () => {
       await pollForMarkers(page, 1).catch(() => {});
 
       // Check if markers are present
-      const markers = page.locator(".mapboxgl-marker");
+      const markers = page.locator(".maplibregl-marker");
       const markerCount = await markers.count();
 
       if (markerCount === 0) {
@@ -328,7 +328,7 @@ test.describe("Map Error States and Accessibility", () => {
       await page.keyboard.press("Enter");
 
       // Check if popup appeared
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
       if (await popup.isVisible({ timeout: 2000 }).catch(() => false)) {
         // Popup should contain focusable elements
         const popupContent = popup.locator("a, button, [tabindex]");
@@ -352,7 +352,7 @@ test.describe("Map Error States and Accessibility", () => {
       await pollForMarkers(page, 1).catch(() => {});
 
       // Check for markers
-      const markers = page.locator(".mapboxgl-marker");
+      const markers = page.locator(".maplibregl-marker");
       const markerCount = await markers.count();
 
       if (markerCount === 0) {
@@ -364,7 +364,7 @@ test.describe("Map Error States and Accessibility", () => {
       await markers.first().click();
 
       // Check if popup is visible
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
       if (await popup.isVisible({ timeout: 2000 }).catch(() => false)) {
         // Screen reader announcement should update with selected listing info
         const srAnnouncement = page.locator('.sr-only[role="status"][aria-live="polite"]').first();

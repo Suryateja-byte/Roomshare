@@ -72,9 +72,7 @@ function createMockMapInstance() {
     removeSource: jest.fn(),
     removeLayer: jest.fn(),
     getSource: jest.fn(() => ({
-      getClusterExpansionZoom: jest.fn((clusterId: number, callback: (err: Error | null, zoom: number) => void) => {
-        callback(null, 14);
-      }),
+      getClusterExpansionZoom: jest.fn(() => Promise.resolve(14)),
     })),
     // Return mock features to simulate unclustered listings
     querySourceFeatures: jest.fn(() => mockQuerySourceFeaturesData),
@@ -109,7 +107,7 @@ function listingsToFeatures(listings: typeof mockListings) {
 }
 
 // Mock react-map-gl
-jest.mock('react-map-gl', () => {
+jest.mock('react-map-gl/maplibre', () => {
   const React = require('react');
   
   const MockMap = React.forwardRef(({ 
@@ -221,11 +219,8 @@ jest.mock('react-map-gl', () => {
   };
 });
 
-// Mock mapbox-gl CSS
-jest.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}));
-
-// Mock mapbox-init
-jest.mock('@/lib/mapbox-init', () => ({}));
+// Mock maplibre-gl CSS
+jest.mock('maplibre-gl/dist/maplibre-gl.css', () => ({}));
 
 // Mock haptics
 jest.mock('@/lib/haptics', () => ({
@@ -417,14 +412,6 @@ describe('Map Component', () => {
       await waitFor(() => {
         expect(screen.queryByText(/loading map/i)).not.toBeInTheDocument();
       });
-    });
-
-    it('shows error when mapbox token is missing', () => {
-      delete process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-      
-      render(<MapComponent listings={mockListings} />);
-      
-      expect(screen.getByText(/mapbox token missing/i)).toBeInTheDocument();
     });
 
     it('renders search-as-move toggle button', async () => {
@@ -878,20 +865,6 @@ describe('Map Component', () => {
       });
       
       expect(mockSetSearchAsMove).toHaveBeenCalled();
-    });
-  });
-
-  describe('map style toggle', () => {
-    it('renders map style toggle buttons', async () => {
-      render(<MapComponent listings={mockListings} />);
-      
-      await act(async () => {
-        jest.advanceTimersByTime(100);
-      });
-      
-      expect(screen.getByRole('radio', { name: /standard/i })).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: /satellite/i })).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: /transit/i })).toBeInTheDocument();
     });
   });
 

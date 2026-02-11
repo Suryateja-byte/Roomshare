@@ -76,7 +76,7 @@ async function isMapFullyLoaded(page: Page): Promise<boolean> {
   try {
     // Check if mapboxgl-canvas exists and has non-zero dimensions
     const hasCanvas = await page.evaluate(() => {
-      const canvas = document.querySelector(".mapboxgl-canvas");
+      const canvas = document.querySelector(".maplibregl-canvas");
       if (!canvas) return false;
       const rect = canvas.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
