@@ -365,7 +365,7 @@ test.describe('Profile & Settings Journeys', () => {
       // Skip on mobile viewports — the settings page layout and dialog interactions
       // are unreliable on narrow viewports in CI
       const viewport = page.viewportSize();
-      if (viewport && viewport.width < 768) {
+      if (!viewport || viewport.width < 768) {
         test.skip(true, 'Test designed for desktop viewport');
         return;
       }

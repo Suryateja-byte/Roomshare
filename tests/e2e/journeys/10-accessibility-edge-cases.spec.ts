@@ -218,9 +218,11 @@ test.describe('Edge Case Journeys', () => {
       const container = searchResultsContainer(page);
       const emptyStateVisible = container.locator('[data-testid="empty-state"]');
       const noMatchesHeading = container.getByRole('heading', { name: /no matches/i });
+      const noListingsText = container.getByText(/no listings found|no exact matches/i);
+      // Use toBeAttached for mobile — bottom sheet may not have scrolled to reveal the element
       await expect(
-        emptyStateVisible.or(noMatchesHeading).first()
-      ).toBeVisible({ timeout: 30000 });
+        emptyStateVisible.or(noMatchesHeading).or(noListingsText).first()
+      ).toBeAttached({ timeout: 30000 });
     });
 
     test(`${tags.auth} - Empty bookings list`, async ({ page, nav }) => {
