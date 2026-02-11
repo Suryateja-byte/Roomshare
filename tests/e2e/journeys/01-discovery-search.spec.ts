@@ -207,11 +207,13 @@ test.describe("Discovery & Search Journeys", () => {
       await page.goto("/listings/nonexistent-listing-id-12345");
       await page.waitForLoadState("domcontentloaded");
 
-      // Should show 404 or not found state
+      // Should show 404 or not found state — use .first() to avoid strict mode violation
+      // (both heading and paragraph may match the text pattern)
       await expect(
         page
           .getByText(/not found|404|doesn't exist|couldn't find/i)
-          .or(page.getByRole('heading', { name: /couldn't find|oops|not found|404/i })),
+          .or(page.getByRole('heading', { name: /couldn't find|oops|not found|404/i }))
+          .first(),
       ).toBeVisible({ timeout: 30_000 });
     });
   });

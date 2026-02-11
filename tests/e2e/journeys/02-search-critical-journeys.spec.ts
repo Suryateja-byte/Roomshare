@@ -73,13 +73,12 @@ test.describe("20 Critical Search Page Journeys", () => {
       .or(page.locator('button:has-text("Private")'));
 
     if (await privateTab.first().isVisible()) {
-      await privateTab.first().click();
-
-      // URL should update with roomType (debounced navigation — allow extra time under CI load)
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        { timeout: 30000, message: 'URL param "roomType" to be present' },
-      ).not.toBeNull();
+      // Retry click + URL assertion to handle hydration timing
+      await expect(async () => {
+        await privateTab.first().click();
+        const roomType = new URL(page.url(), "http://localhost").searchParams.get("roomType");
+        expect(roomType).not.toBeNull();
+      }).toPass({ timeout: 30000 });
     }
   });
 

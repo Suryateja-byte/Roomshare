@@ -734,7 +734,8 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       // Check if toggle is currently ON (aria-checked="true")
       const isToggleOn = await toggle.first().getAttribute("aria-checked");
       if (isToggleOn === "true") {
-        await toggle.first().click();
+        // Use force:true because a location-warning banner may overlay the toggle
+        await toggle.first().click({ force: true });
         await expect(toggle.first()).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
       }
 

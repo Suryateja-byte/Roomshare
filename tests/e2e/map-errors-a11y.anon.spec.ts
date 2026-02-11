@@ -9,7 +9,7 @@
  * The viewport validation test (10.4) works in both v1 and v2 modes.
  */
 
-import { test, expect, tags, timeouts, SF_BOUNDS, selectors } from "./helpers/test-utils";
+import { test, expect, tags, timeouts, SF_BOUNDS } from "./helpers/test-utils";
 import { waitForMapReady, pollForMarkers } from "./helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -86,12 +86,12 @@ test.describe("Map Error States and Accessibility", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Should show empty state or "no results" message
-      const emptyState = page.locator(selectors.emptyState);
-      const noResultsText = page.getByText(/no.*results|no.*listings|nothing.*found|no.*matches/i);
+      // Use visible-only locators to avoid matching the sr-only aria-live div
+      const emptyStateVisible = page.locator('[data-testid="empty-state"]');
+      const noMatchesHeading = page.getByRole("heading", { name: /no matches/i });
 
-      // Either empty state component or no results message should be visible
-      // Use .first() because the message appears in both mobile and desktop containers
-      await expect(emptyState.or(noResultsText).first()).toBeVisible({ timeout: timeouts.action });
+      // Either the empty state container or the "No matches found" heading should be visible
+      await expect(emptyStateVisible.or(noMatchesHeading).first()).toBeVisible({ timeout: timeouts.action });
 
       // Map should still be interactive (not crashed)
       const mapContainer = page.locator('[role="region"][aria-label*="map" i]');

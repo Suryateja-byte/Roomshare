@@ -161,6 +161,11 @@ test.describe("Filter State Persistence", () => {
     await btn.click();
 
     const dialog = filterDialog(page);
+    // Retry click if dialog didn't open (hydration race: SSR button renders before onClick attached)
+    const dialogVisible = await dialog.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+    if (!dialogVisible) {
+      await btn.click();
+    }
     await expect(dialog).toBeVisible({ timeout: 30_000 });
 
     // Check amenities are toggled on inside the modal

@@ -178,10 +178,12 @@ test.describe("Search P0 Smoke Suite", () => {
       await expect(async () => {
         await clearAllBtn.first().scrollIntoViewIfNeeded();
         await clearAllBtn.first().click({ force: browserName === "webkit", timeout: 5_000 });
+        // Allow soft navigation to propagate (WebKit is slower on Next.js client nav)
+        await page.waitForTimeout(1_000);
         // Verify the button disappears or URL updates (proving the click worked)
         const url = page.url();
         expect(!url.includes("maxPrice=") && !url.includes("roomType=")).toBe(true);
-      }).toPass({ timeout: 30_000 });
+      }).toPass({ timeout: 45_000 });
     } else {
       // If no clear button is visible (e.g., filters applied via URL but chips not rendered),
       // the test is inconclusive -- skip rather than fail

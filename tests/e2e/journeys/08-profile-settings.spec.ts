@@ -384,16 +384,17 @@ test.describe('Profile & Settings Journeys', () => {
       if (await deleteButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         await deleteButton.click();
 
-        // Should show serious warning
-        const warningDialog = page.locator(selectors.modal);
-        await expect(warningDialog).toBeVisible({ timeout: 10000 });
+        // Should show serious warning — use a specific locator to avoid matching the mobile nav dialog
+        const warningDialog = page.locator('[role="dialog"][aria-modal="true"]')
+          .or(page.locator('[data-testid="modal"]:visible'));
+        await expect(warningDialog.first()).toBeVisible({ timeout: 10000 });
 
         // Should require confirmation
-        const confirmInput = warningDialog.getByPlaceholder(/delete|confirm/i);
+        const confirmInput = warningDialog.first().getByPlaceholder(/delete|confirm/i);
         const isSerious = await confirmInput.isVisible().catch(() => false);
 
         // Cancel
-        const cancelButton = warningDialog.getByRole('button', { name: /cancel|no/i });
+        const cancelButton = warningDialog.first().getByRole('button', { name: /cancel|no/i });
         if (await cancelButton.isVisible()) {
           await cancelButton.click();
         }

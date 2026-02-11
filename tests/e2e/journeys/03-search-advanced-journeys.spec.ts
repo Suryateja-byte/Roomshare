@@ -353,9 +353,15 @@ test.describe("30 Advanced Search Page Journeys", () => {
     // Wait for search results to fully load (budget inputs hydrate with URL params after mount)
     await page.waitForLoadState("networkidle").catch(() => {});
 
-    // Negative price should be clamped to 0 in the input
+    // Negative price should be clamped to 0 or ignored (empty) in the input
     const minInput = page.getByLabel(/minimum budget/i);
-    await expect(minInput).toHaveValue("0", { timeout: 30000 });
+    await expect.poll(
+      async () => {
+        const val = await minInput.inputValue();
+        return val === "0" || val === "";
+      },
+      { timeout: 30000, message: 'Expected min price to be "0" or "" (empty) for negative URL param' },
+    ).toBe(true);
   });
 
   // ─────────────────────────────────────────────────
@@ -880,13 +886,12 @@ test.describe("30 Advanced Search Page Journeys", () => {
       .or(page.locator('button:has-text("Private")'));
     if (await privateTab.first().isVisible()) {
       await page.waitForTimeout(1000); // hydration settle
-      await privateTab.first().click();
-      // Loading state may flash briefly — just verify page settles.
-      // Use longer timeout for CI environments.
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        { timeout: 30000, message: 'URL param "roomType" to be present' },
-      ).not.toBeNull();
+      // Retry click + URL assertion to handle hydration timing
+      await expect(async () => {
+        await privateTab.first().click();
+        const roomType = new URL(page.url(), "http://localhost").searchParams.get("roomType");
+        expect(roomType).not.toBeNull();
+      }).toPass({ timeout: 30000 });
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
     }
   });

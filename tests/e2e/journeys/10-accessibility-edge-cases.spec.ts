@@ -213,11 +213,12 @@ test.describe('Edge Case Journeys', () => {
       await nav.goToSearch({ q: 'xyznonexistentlisting123456789' });
       await page.waitForLoadState('domcontentloaded');
 
-      // Should show empty state
+      // Should show empty state — use visible-only locators to avoid matching
+      // the sr-only aria-live div that contains "No listings found" text
+      const emptyStateVisible = page.locator('[data-testid="empty-state"]');
+      const noMatchesHeading = page.getByRole('heading', { name: /no matches/i });
       await expect(
-        page.locator(selectors.emptyState)
-          .or(page.getByText(/no.*results|no.*listings|nothing.*found/i))
-          .first()
+        emptyStateVisible.or(noMatchesHeading).first()
       ).toBeVisible({ timeout: 30000 });
     });
 

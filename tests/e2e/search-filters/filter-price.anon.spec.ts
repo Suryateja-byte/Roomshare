@@ -38,6 +38,7 @@ async function setInlineMinPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-min");
   await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.click();
+  await page.waitForTimeout(500);
   await input.clear();
   if (value) {
     await input.pressSequentially(value, { delay: 50 });
@@ -50,6 +51,7 @@ async function setInlineMaxPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-max");
   await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.click();
+  await page.waitForTimeout(500);
   await input.clear();
   if (value) {
     await input.pressSequentially(value, { delay: 50 });
@@ -64,6 +66,7 @@ async function submitSearch(page: Page) {
   // Wait for navigation (increased for CI)
   await page.waitForLoadState("domcontentloaded");
   await page.waitForTimeout(2_000);
+  await page.waitForLoadState("networkidle").catch(() => {});
 }
 
 // ---------------------------------------------------------------------------

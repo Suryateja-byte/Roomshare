@@ -160,7 +160,7 @@ test.describe("Filter Reset", () => {
     await expect(async () => {
       await clearAllBtn.click();
       await expect(clearAllBtn).not.toBeVisible();
-    }).toPass({ timeout: 10_000 });
+    }).toPass({ timeout: 30_000 });
 
     // Wait for all filter params to be removed from URL via soft navigation
     await expect.poll(

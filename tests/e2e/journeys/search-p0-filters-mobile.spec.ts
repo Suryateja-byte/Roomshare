@@ -30,7 +30,12 @@ test.describe("P0-1: Mobile Filters Accessibility", () => {
     // 3) Assert a REAL open state - dialog must be visible with Filters heading
     // Use the named dialog to avoid strict mode violation from nested dialog elements
     const filterDialog = page.getByRole("dialog", { name: /filters/i });
-    await expect(filterDialog).toBeVisible({ timeout: 5000 });
+    // Retry click if dialog didn't open (hydration race: SSR button renders before onClick attached)
+    const dialogOpened = await filterDialog.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+    if (!dialogOpened) {
+      await filtersButton.click();
+    }
+    await expect(filterDialog).toBeVisible({ timeout: 10_000 });
 
     // Heading "Filters" inside the dialog confirms it opened correctly
     const filtersHeading = filterDialog.getByRole("heading", {
@@ -53,7 +58,12 @@ test.describe("P0-1: Mobile Filters Accessibility", () => {
 
     // Verify open - use named dialog to avoid strict mode violation from nested elements
     const filterDialog = page.getByRole("dialog", { name: /filters/i });
-    await expect(filterDialog).toBeVisible({ timeout: 5000 });
+    // Retry click if dialog didn't open (hydration race)
+    const dialogOpened = await filterDialog.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+    if (!dialogOpened) {
+      await filtersButton.click();
+    }
+    await expect(filterDialog).toBeVisible({ timeout: 10_000 });
 
     // Close via close button
     const closeButton = filterDialog.getByRole("button", {

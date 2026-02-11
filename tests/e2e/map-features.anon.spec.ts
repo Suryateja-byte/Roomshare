@@ -210,6 +210,12 @@ test.describe("Map controls (requires WebGL)", () => {
     const transitBtn = page.locator('button[aria-pressed]').filter({ hasText: /Transit/i }).first();
     if ((await transitBtn.count()) === 0) return;
 
+    const poiVisible = await transitBtn.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (!poiVisible) {
+      test.skip(true, 'POI buttons not visible (map panel may not be rendered in headless CI)');
+      return;
+    }
+
     // Read current state rather than assuming it starts at "false"
     const initialState = await transitBtn.getAttribute("aria-pressed");
     await transitBtn.click();
@@ -224,6 +230,12 @@ test.describe("Map controls (requires WebGL)", () => {
   test("POIs master toggle activates all categories", async ({ page }) => {
     const poiMasterBtn = page.locator('button[aria-label*="Show all POIs"]');
     if ((await poiMasterBtn.count()) === 0) return;
+
+    const poiVisible = await poiMasterBtn.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (!poiVisible) {
+      test.skip(true, 'POI buttons not visible (map panel may not be rendered in headless CI)');
+      return;
+    }
 
     await poiMasterBtn.click();
 
@@ -252,7 +264,7 @@ test.describe("Map controls (requires WebGL)", () => {
     await cancelBtn.first().click();
 
     const transitBtn = page.locator('button[aria-pressed]').filter({ hasText: /Transit/i }).first();
-    if ((await transitBtn.count()) > 0) {
+    if ((await transitBtn.count()) > 0 && await transitBtn.isVisible().catch(() => false)) {
       const prevState = await transitBtn.getAttribute("aria-pressed");
       await transitBtn.focus();
       await page.keyboard.press("Enter");

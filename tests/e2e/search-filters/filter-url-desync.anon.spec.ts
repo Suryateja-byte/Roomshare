@@ -94,7 +94,10 @@ test.describe("Filter URL-UI Desync", () => {
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiButton = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
     await wifiButton.click();
-    await applyFilters(page);
+    // Use expectUrlChange: false to avoid flaky "URL to change" assertion —
+    // the URL may already contain bounds updates from map init, or the soft
+    // navigation may resolve before the poll starts. We verify via waitForUrlParam below.
+    await applyFilters(page, { expectUrlChange: false });
 
     // Wait for amenities=Wifi in URL
     await waitForUrlParam(page, "amenities", "Wifi");
