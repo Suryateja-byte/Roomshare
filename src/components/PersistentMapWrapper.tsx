@@ -8,7 +8,7 @@
  * map listings data via the /api/map-listings endpoint.
  *
  * Key benefits:
- * - Map stays mounted across /search navigations (no Mapbox re-init = no extra billing)
+ * - Map stays mounted across /search navigations (no map re-init)
  * - Uses useSearchParams() to react to URL changes
  * - Fetches data independently of the server component page
  *
@@ -34,7 +34,7 @@ import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 
 // CRITICAL: Lazy import - only loads when component renders
-// This defers the 944KB mapbox-gl bundle until user opts to see map
+// This defers the maplibre-gl bundle until user opts to see map
 const LazyDynamicMap = lazy(() => import("./DynamicMap"));
 
 // Maximum viewport span (matches server-side validation)
@@ -607,7 +607,7 @@ export default function PersistentMapWrapper({
   const showV2LoadingOverlay = isV2Enabled && !hasV2Data && hasAnyV2Data;
 
   // CRITICAL: Don't render map component if shouldRenderMap is false
-  // This prevents Mapbox GL JS from loading (saves ~944KB and Mapbox billing)
+  // This prevents MapLibre GL JS from loading until needed
   if (!shouldRenderMap) {
     return null;
   }

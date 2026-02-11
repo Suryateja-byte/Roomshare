@@ -38,8 +38,8 @@ test.describe("Search Visual Regression", () => {
     // The map uses Mapbox tiles which are non-deterministic
     await expect(page).toHaveScreenshot("search-desktop-layout.png", {
       mask: [
-        page.locator(".mapboxgl-canvas"),
-        page.locator(".mapboxgl-map"),
+        page.locator(".maplibregl-canvas"),
+        page.locator(".maplibregl-map"),
         page.locator('[class*="map"]').filter({ hasNot: page.locator('a[href^="/listings/"]') }),
       ],
       maxDiffPixelRatio: 0.02,
@@ -123,8 +123,8 @@ test.describe("Search Visual Regression", () => {
     // Screenshot the empty state (mask the map)
     await expect(page).toHaveScreenshot("search-empty-state.png", {
       mask: [
-        page.locator(".mapboxgl-canvas"),
-        page.locator(".mapboxgl-map"),
+        page.locator(".maplibregl-canvas"),
+        page.locator(".maplibregl-map"),
       ],
       maxDiffPixelRatio: 0.02,
     });

@@ -180,7 +180,7 @@ test.describe('Nearby Places Attribution Compliance', () => {
 
     // Wait for MapLibre map to fully render (it loads asynchronously via dynamic import)
     // First wait for the map canvas container which indicates MapLibre has initialized
-    const mapCanvas = page.locator('.maplibregl-canvas-container, .mapboxgl-canvas-container, .maplibregl-map, .mapboxgl-map');
+    const mapCanvas = page.locator('.maplibregl-canvas-container, .maplibregl-canvas-container, .maplibregl-map, .maplibregl-map');
     await mapCanvas.first().waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {});
 
     const mapLoaded = await mapCanvas.count() > 0;
@@ -192,7 +192,7 @@ test.describe('Nearby Places Attribution Compliance', () => {
 
     // MapLibre adds attribution control after style JSON loads — wait for it
     // The control uses class "maplibregl-ctrl-attrib" (or "mapboxgl-ctrl-attrib")
-    const attributionControl = page.locator('.maplibregl-ctrl-attrib, .mapboxgl-ctrl-attrib');
+    const attributionControl = page.locator('.maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib');
     await attributionControl.first().waitFor({ state: 'attached', timeout: 10_000 }).catch(() => {});
 
     const exists = await attributionControl.count() > 0;
@@ -211,7 +211,7 @@ test.describe('Nearby Places Attribution Compliance', () => {
       // which contain the substring "attrib". Also check for Leaflet-style attribution
       // and any element whose class contains "attribution" or "attrib".
       const anyAttribution = await page.locator(
-        '.maplibregl-ctrl-attrib, .mapboxgl-ctrl-attrib, .leaflet-control-attribution, [class*="attribution"], [class*="attrib"]'
+        '.maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib, .leaflet-control-attribution, [class*="attribution"], [class*="attrib"]'
       ).count();
       expect(anyAttribution).toBeGreaterThan(0);
     }
@@ -290,7 +290,7 @@ test.describe('Nearby Places Attribution Compliance', () => {
     expect(blockingViolations.length).toBe(0);
 
     // Verify map markers are rendered (SVG should work)
-    const mapContainer = page.locator('.maplibregl-canvas-container, .mapboxgl-canvas-container');
+    const mapContainer = page.locator('.maplibregl-canvas-container, .maplibregl-canvas-container');
     const hasMap = await mapContainer.count() > 0;
 
     // Map should be present and rendered

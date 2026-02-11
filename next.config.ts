@@ -77,7 +77,6 @@ const nextConfig: NextConfig = {
       "'unsafe-inline'",
       ...(isDev ? ["'unsafe-eval'"] : []),
       "https://maps.googleapis.com",
-      "https://api.mapbox.com",
     ].join(' ');
 
     return [
@@ -89,12 +88,13 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               scriptSrc,
-              "style-src 'self' 'unsafe-inline' https://api.mapbox.com",
+              "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "object-src 'none'",
-              "font-src 'self' https://fonts.mapbox.com",
-              "connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://tiles.mapbox.com https://*.tiles.mapbox.com https://fonts.mapbox.com https://maps.googleapis.com https://places.googleapis.com https://*.supabase.co https://api.groq.com wss://*.supabase.co https://api.radar.io https://tiles.stadiamaps.com https://api.stadiamaps.com",
-              "worker-src 'self' blob: https://api.mapbox.com",
+              "font-src 'self' https://tiles.openfreemap.org",
+              "connect-src 'self' https://api.mapbox.com https://tiles.openfreemap.org https://maps.googleapis.com https://places.googleapis.com https://*.supabase.co https://api.groq.com wss://*.supabase.co https://api.radar.io https://tiles.stadiamaps.com https://api.stadiamaps.com",
+              "worker-src 'self' blob:",
+              "child-src blob:",
               "frame-src 'self' https://accounts.google.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",

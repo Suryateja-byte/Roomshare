@@ -38,8 +38,8 @@ export async function getMarkerState(
     const markers = Array.from(
       document.querySelectorAll(`[data-listing-id="${id}"]`),
     );
-    // Find the one inside a .mapboxgl-marker (not the listing card)
-    const markerEl = markers.find((el) => el.closest(".mapboxgl-marker"));
+    // Find the one inside a .maplibregl-marker (not the listing card)
+    const markerEl = markers.find((el) => el.closest(".maplibregl-marker"));
     if (!markerEl) {
       return {
         isActive: false,
@@ -291,7 +291,7 @@ export async function getMarkerListingId(
 ): Promise<string | null> {
   return page.evaluate((idx) => {
     const visible = Array.from(
-      document.querySelectorAll(".mapboxgl-marker"),
+      document.querySelectorAll(".maplibregl-marker"),
     ).filter((m) => {
       const rect = m.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
@@ -309,7 +309,7 @@ export async function getAllMarkerListingIds(
   page: Page,
 ): Promise<string[]> {
   return page.evaluate(() => {
-    return Array.from(document.querySelectorAll(".mapboxgl-marker"))
+    return Array.from(document.querySelectorAll(".maplibregl-marker"))
       .filter((m) => {
         const rect = m.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
@@ -371,7 +371,7 @@ export async function waitForMapRef(
  */
 export async function isMapAvailable(page: Page): Promise<boolean> {
   try {
-    await page.locator(".mapboxgl-canvas:visible").first().waitFor({
+    await page.locator(".maplibregl-canvas:visible").first().waitFor({
       state: "visible",
       timeout: 5000,
     });
@@ -389,7 +389,7 @@ export async function zoomToExpandClusters(
   page: Page,
 ): Promise<boolean> {
   // Check if individual markers are already visible
-  const existingCount = await page.locator(".mapboxgl-marker:visible").count();
+  const existingCount = await page.locator(".maplibregl-marker:visible").count();
   if (existingCount > 0) return true;
 
   const hasMapRef = await waitForMapRef(page);
@@ -445,13 +445,13 @@ export async function zoomToExpandClusters(
   try {
     await expect
       .poll(
-        () => page.locator(".mapboxgl-marker:visible").count(),
-        { timeout: 10_000, message: "Waiting for markers after cluster expansion" },
+        () => page.locator(".maplibregl-marker:visible").count(),
+        { timeout: 15_000, message: "Waiting for markers after cluster expansion" },
       )
       .toBeGreaterThan(0);
     return true;
   } catch {
-    return (await page.locator(".mapboxgl-marker:visible").count()) > 0;
+    return (await page.locator(".maplibregl-marker:visible").count()) > 0;
   }
 }
 
@@ -463,13 +463,23 @@ export async function waitForMarkersWithClusterExpansion(
   options?: { minCount?: number },
 ): Promise<number> {
   const minCount = options?.minCount ?? 1;
-  let markerCount = await page.locator(".mapboxgl-marker:visible").count();
+  let markerCount = await page.locator(".maplibregl-marker:visible").count();
 
   if (markerCount < minCount) {
     await zoomToExpandClusters(page);
+    // Force marker layer update if the hook is available
+    await page.evaluate(() => (window as any).__e2eUpdateMarkers?.());
+    // Poll for markers to appear after cluster expansion (CI can be slow)
+    await expect
+      .poll(
+        () => page.locator(".maplibregl-marker:visible").count(),
+        { timeout: 15_000, message: `Waiting for ${minCount}+ markers after cluster expansion` },
+      )
+      .toBeGreaterThanOrEqual(minCount)
+      .catch(() => {});
   }
 
-  markerCount = await page.locator(".mapboxgl-marker:visible").count();
+  markerCount = await page.locator(".maplibregl-marker:visible").count();
   return markerCount;
 }
 
@@ -504,7 +514,7 @@ export async function pollForMarkers(
 ): Promise<void> {
   await expect
     .poll(
-      () => page.locator(".mapboxgl-marker:visible").count(),
+      () => page.locator(".maplibregl-marker:visible").count(),
       { timeout, message: `Expected at least ${minCount} visible map markers` },
     )
     .toBeGreaterThanOrEqual(minCount);

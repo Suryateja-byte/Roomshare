@@ -87,8 +87,10 @@ test.describe("Filter State Persistence", () => {
 
     // Step 2: Navigate away — click a listing card to go to a detail page
     const container = searchResultsContainer(page);
+    // Wait longer for listing cards to render (CI can be slow with SSR hydration)
+    await page.waitForTimeout(3_000);
     const listingCard = container.locator(selectors.listingCard).first();
-    const hasListing = await listingCard.isVisible({ timeout: 5_000 }).catch(() => false);
+    const hasListing = await listingCard.isVisible({ timeout: 15_000 }).catch(() => false);
 
     if (hasListing) {
       // Click the listing to navigate to the detail page
@@ -161,6 +163,11 @@ test.describe("Filter State Persistence", () => {
     await btn.click();
 
     const dialog = filterDialog(page);
+    // Retry click if dialog didn't open (hydration race: SSR button renders before onClick attached)
+    const dialogVisible = await dialog.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+    if (!dialogVisible) {
+      await btn.click();
+    }
     await expect(dialog).toBeVisible({ timeout: 30_000 });
 
     // Check amenities are toggled on inside the modal

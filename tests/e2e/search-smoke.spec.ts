@@ -33,7 +33,7 @@ test.describe("REG-001: Search page loads", () => {
 
     // Verify listing links are present in the DOM — scope to visible container
     const container = searchResultsContainer(page);
-    const cards = container.locator('a[href^="/listings/c"]');
+    const cards = container.locator('a[href^="/listings/"]');
     const count = await cards.count();
     expect(count).toBeGreaterThanOrEqual(1);
 

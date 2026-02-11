@@ -77,7 +77,7 @@ async function isMapVisible(page: Page): Promise<boolean> {
 async function isMapFullyLoaded(page: Page): Promise<boolean> {
   try {
     const hasCanvas = await page.evaluate(() => {
-      const canvas = document.querySelector(".mapboxgl-canvas");
+      const canvas = document.querySelector(".maplibregl-canvas");
       if (!canvas) return false;
       const rect = canvas.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;

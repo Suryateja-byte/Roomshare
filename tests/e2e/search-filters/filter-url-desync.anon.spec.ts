@@ -94,7 +94,10 @@ test.describe("Filter URL-UI Desync", () => {
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiButton = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
     await wifiButton.click();
-    await applyFilters(page);
+    // Use expectUrlChange: false to avoid flaky "URL to change" assertion —
+    // the URL may already contain bounds updates from map init, or the soft
+    // navigation may resolve before the poll starts. We verify via waitForUrlParam below.
+    await applyFilters(page, { expectUrlChange: false });
 
     // Wait for amenities=Wifi in URL
     await waitForUrlParam(page, "amenities", "Wifi");
@@ -109,11 +112,16 @@ test.describe("Filter URL-UI Desync", () => {
     // Wait for page to fully settle after goBack before going forward.
     // Without this, Next.js router re-render may clear forward history.
     await page.waitForLoadState("domcontentloaded").catch(() => {});
-    await waitForUrlStable(page);
+    await waitForUrlStable(page, 1_000);
 
     // Go forward - wait for amenities=Wifi to return
     await page.goForward();
-    await waitForUrlParam(page, "amenities", "Wifi", 30_000);
+
+    // Use expect.poll for URL param check — handles Next.js soft navigation timing
+    await expect.poll(
+      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+      { timeout: 30_000, message: 'URL param "amenities" to be "Wifi" after goForward' },
+    ).toBe("Wifi");
 
     // Verify URL has amenities=Wifi
     const currentUrl = new URL(page.url());

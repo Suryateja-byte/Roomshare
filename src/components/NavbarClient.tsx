@@ -355,7 +355,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                             text="Log out"
                                             danger
                                             onClick={() => {
-                                                signOut();
+                                                signOut({ callbackUrl: '/' });
                                                 setIsProfileOpen(false);
                                             }}
                                         />
@@ -489,7 +489,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                         {user && (
                             <button
                                 onClick={() => {
-                                    signOut();
+                                    signOut({ callbackUrl: '/' });
                                     setIsMobileMenuOpen(false);
                                 }}
                                 className="w-full flex items-center justify-center gap-2 text-red-600 dark:text-red-500 py-3 font-medium hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl mt-4"

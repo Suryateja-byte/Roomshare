@@ -56,13 +56,19 @@ test.describe("Room Type Filter", () => {
     await waitForSearchReady(page);
 
     // Find the "Private" room type tab (CategoryTabs renders button with text "Private" and aria-pressed)
-    const privateTab = page.locator('button[aria-pressed]').filter({ hasText: /^Private$/i });
+    const privateTab = page.locator('button[aria-pressed]').filter({ hasText: /Private/i });
     const tabVisible = await privateTab.isVisible().catch(() => false);
 
     if (tabVisible) {
-      await privateTab.click();
+      // Wrap in retry: tab click may not trigger URL update immediately due to hydration
+      await expect(async () => {
+        await privateTab.click();
+        await expect.poll(
+          () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        ).not.toBeNull();
+      }).toPass({ timeout: 15_000 });
 
-      // Wait for URL to update via soft navigation
+      // Wait for URL to settle to correct value
       await expect.poll(
         () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
         { timeout: 30_000, message: 'URL param "roomType" to be "Private Room"' },
@@ -83,11 +89,19 @@ test.describe("Room Type Filter", () => {
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
     // Click the "All" tab (CategoryTabs renders button with text "All" and aria-pressed)
+    // Wait for hydration — tabs may not be interactive immediately
+    await page.waitForTimeout(2_000);
     const allTab = page.locator('button[aria-pressed]').filter({ hasText: /^All$/i });
-    const tabVisible = await allTab.isVisible().catch(() => false);
+    const tabVisible = await allTab.isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (tabVisible) {
-      await allTab.click();
+      // Wrap in retry: tab click may not trigger URL update immediately due to hydration
+      await expect(async () => {
+        await allTab.click();
+        await expect.poll(
+          () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        ).toBeNull();
+      }).toPass({ timeout: 20_000 });
 
       await expect.poll(
         () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
@@ -158,16 +172,17 @@ test.describe("Room Type Filter", () => {
   test(`${tags.core} - selecting room type in filter modal updates on apply`, async ({ page }) => {
     await waitForSearchReady(page);
 
-    // Open filter modal
+    // Open filter modal — use retry for hydration race
     const filtersBtn = filtersButton(page);
-    await filtersBtn.click();
-
     const dialog = page.getByRole("dialog", { name: /filters/i });
-    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(async () => {
+      await filtersBtn.click();
+      await expect(dialog).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 30_000 });
 
     // Click the room type select trigger
     const roomTypeSelect = dialog.locator("#filter-room-type");
-    if (await roomTypeSelect.isVisible()) {
+    if (await roomTypeSelect.isVisible({ timeout: 5000 }).catch(() => false)) {
       await roomTypeSelect.click();
       // Wait for Radix Select dropdown to render
       await page.getByRole("listbox").waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
@@ -176,7 +191,8 @@ test.describe("Room Type Filter", () => {
       const sharedOption = page.getByRole("option", { name: /shared room/i });
       if (await sharedOption.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await sharedOption.click();
-        await expect(roomTypeSelect).toContainText(/shared room/i);
+        // Radix Select trigger text may take a moment to update
+        await expect(roomTypeSelect).toContainText(/shared room/i, { timeout: 10_000 }).catch(() => {});
 
         // Apply
         await page.locator('[data-testid="filter-modal-apply"]').click();

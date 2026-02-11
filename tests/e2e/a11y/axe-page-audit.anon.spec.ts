@@ -17,7 +17,7 @@ import { A11Y_CONFIG, selectors } from '../helpers/test-utils';
  */
 const CI_EXTRA_EXCLUDES = [
   '.maplibregl-ctrl-group',
-  '.mapboxgl-ctrl-group',
+  '.maplibregl-ctrl-group',
   '[data-sonner-toast]',
   '[data-radix-popper-content-wrapper]',
 ] as const;

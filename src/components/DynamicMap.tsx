@@ -11,7 +11,7 @@ export type {
     MapComponentProps,
 } from '@/components/Map';
 
-// Dynamic import for Map component - defers 944KB mapbox-gl bundle until needed
+// Dynamic import for Map component - defers maplibre-gl bundle until needed
 const MapComponent = dynamic(() => import('@/components/Map'), {
     ssr: false,
     loading: () => (

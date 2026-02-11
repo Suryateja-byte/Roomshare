@@ -131,7 +131,7 @@ test.describe('Nearby Places Accessibility', () => {
     }
 
     // Find and click a map marker to open popup
-    const mapContainer = page.locator('.maplibregl-canvas, .mapboxgl-canvas, [class*="map"]').first();
+    const mapContainer = page.locator('.maplibregl-canvas, .maplibregl-canvas, [class*="map"]').first();
 
     if (await mapContainer.count() > 0) {
       // Click on the map area where markers might be
@@ -142,7 +142,7 @@ test.describe('Nearby Places Accessibility', () => {
         await page.waitForTimeout(500);
 
         // Check if a popup is visible
-        const popup = page.locator('.maplibregl-popup, .mapboxgl-popup, [class*="popup"]');
+        const popup = page.locator('.maplibregl-popup, .maplibregl-popup, [class*="popup"]');
         const popupVisible = await popup.isVisible().catch(() => false);
 
         if (popupVisible) {

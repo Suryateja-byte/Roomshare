@@ -72,9 +72,7 @@ function createMockMapInstance() {
     removeSource: jest.fn(),
     removeLayer: jest.fn(),
     getSource: jest.fn(() => ({
-      getClusterExpansionZoom: jest.fn((clusterId: number, callback: (err: Error | null, zoom: number) => void) => {
-        callback(null, 14);
-      }),
+      getClusterExpansionZoom: jest.fn(() => Promise.resolve(14)),
     })),
     // Return mock features to simulate unclustered listings
     querySourceFeatures: jest.fn(() => mockQuerySourceFeaturesData),
@@ -87,6 +85,7 @@ function createMockMapInstance() {
     triggerRepaint: jest.fn(),
     resize: jest.fn(),
     loaded: jest.fn(() => true),
+    isSourceLoaded: jest.fn(() => true),
     getCanvas: jest.fn(() => ({ tabIndex: 0 })),
   };
 }
@@ -109,7 +108,7 @@ function listingsToFeatures(listings: typeof mockListings) {
 }
 
 // Mock react-map-gl
-jest.mock('react-map-gl', () => {
+jest.mock('react-map-gl/maplibre', () => {
   const React = require('react');
   
   const MockMap = React.forwardRef(({ 
@@ -221,11 +220,8 @@ jest.mock('react-map-gl', () => {
   };
 });
 
-// Mock mapbox-gl CSS
-jest.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}));
-
-// Mock mapbox-init
-jest.mock('@/lib/mapbox-init', () => ({}));
+// Mock maplibre-gl CSS
+jest.mock('maplibre-gl/dist/maplibre-gl.css', () => ({}));
 
 // Mock haptics
 jest.mock('@/lib/haptics', () => ({
@@ -417,14 +413,6 @@ describe('Map Component', () => {
       await waitFor(() => {
         expect(screen.queryByText(/loading map/i)).not.toBeInTheDocument();
       });
-    });
-
-    it('shows error when mapbox token is missing', () => {
-      delete process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-      
-      render(<MapComponent listings={mockListings} />);
-      
-      expect(screen.getByText(/mapbox token missing/i)).toBeInTheDocument();
     });
 
     it('renders search-as-move toggle button', async () => {
@@ -716,6 +704,59 @@ describe('Map Component', () => {
     });
   });
 
+  describe('marker retry mechanism', () => {
+    it('retries updateUnclusteredListings when querySourceFeatures initially returns empty', async () => {
+      // Start with empty features to simulate source not ready
+      mockQuerySourceFeaturesData = [];
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // At this point, unclustered should be empty
+      expect(screen.queryAllByTestId('map-marker')).toHaveLength(0);
+
+      // Now simulate source becoming ready
+      mockQuerySourceFeaturesData = listingsToFeatures(mockListings);
+
+      // Advance past first retry delay (200ms)
+      await act(async () => {
+        jest.advanceTimersByTime(250);
+      });
+
+      // Markers should appear after retry
+      await waitFor(() => {
+        expect(screen.getAllByTestId('map-marker')).toHaveLength(mockListings.length);
+      });
+    });
+
+    it('fires sourcedata handler on content sourceDataType', async () => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // Clear calls from initialization
+      mockMapInstance.querySourceFeatures.mockClear();
+
+      // Fire sourcedata with sourceDataType: 'content'
+      const sourcedataCallbacks = onCallbacks['sourcedata'] || [];
+      expect(sourcedataCallbacks.length).toBeGreaterThan(0);
+
+      await act(async () => {
+        for (const cb of sourcedataCallbacks) {
+          cb({ sourceId: 'listings', sourceDataType: 'content', isSourceLoaded: false });
+        }
+      });
+
+      // Should have called querySourceFeatures via updateUnclusteredListings
+      expect(mockMapInstance.querySourceFeatures).toHaveBeenCalled();
+    });
+  });
+
   describe('cluster expansion', () => {
     it('should expand cluster on click', async () => {
       render(<MapComponent listings={mockListings} />);
@@ -878,20 +919,6 @@ describe('Map Component', () => {
       });
       
       expect(mockSetSearchAsMove).toHaveBeenCalled();
-    });
-  });
-
-  describe('map style toggle', () => {
-    it('renders map style toggle buttons', async () => {
-      render(<MapComponent listings={mockListings} />);
-      
-      await act(async () => {
-        jest.advanceTimersByTime(100);
-      });
-      
-      expect(screen.getByRole('radio', { name: /standard/i })).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: /satellite/i })).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: /transit/i })).toBeInTheDocument();
     });
   });
 

@@ -7,7 +7,7 @@
  * opens this popup showing all listings at that location in a scrollable list.
  */
 
-import { Popup } from "react-map-gl";
+import { Popup } from "react-map-gl/maplibre";
 import Link from "next/link";
 import Image from "next/image";
 import { X, Home, ChevronRight } from "lucide-react";
@@ -41,10 +41,10 @@ export function StackedListingPopup({
       onClose={onClose}
       closeOnClick={false}
       maxWidth="320px"
-      className={`z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${
+      className={`z-50 [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden ${
         isDarkMode
-          ? "[&_.mapboxgl-popup-tip]:border-t-zinc-900"
-          : "[&_.mapboxgl-popup-tip]:border-t-white"
+          ? "[&_.maplibregl-popup-tip]:border-t-zinc-900"
+          : "[&_.maplibregl-popup-tip]:border-t-white"
       }`}
     >
       <div

@@ -107,7 +107,7 @@ test.describe("Search A11y: Landmarks & Semantic Structure", () => {
     // MobileBottomSheet has role="region" aria-label="Search results"
     // Check for map container via data-testid or class patterns
     const mapContainer = page.locator(
-      '[data-testid="map"], .mapboxgl-map, .maplibregl-map, [role="application"]'
+      '[data-testid="map"], .maplibregl-map, .maplibregl-map, [role="application"]'
     );
 
     // Map may not render on all viewport sizes, so check if present first
@@ -118,7 +118,7 @@ test.describe("Search A11y: Landmarks & Semantic Structure", () => {
       if (isVisible) {
         // Mapbox canvas should have some accessible identification
         // The mapboxgl-canvas typically has role="region" or is contained in one
-        const canvas = page.locator('.mapboxgl-canvas, .maplibregl-canvas');
+        const canvas = page.locator('.maplibregl-canvas, .maplibregl-canvas');
         if (await canvas.count() > 0) {
           // Canvas should have aria-label or be inside a labeled container
           const parentRole = await canvas.first().evaluate((el) => {

@@ -44,7 +44,7 @@ async function waitForSearchContent(page: Page) {
   const container = searchResultsContainer(page);
   const cards = container.locator('[data-testid="listing-card"]');
   const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-  await expect(cards.first().or(zeroResults.first())).toBeAttached({ timeout: 30_000 });
+  await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
 }
 
 // ---------------------------------------------------------------------------

@@ -118,12 +118,12 @@ test.describe("2.3: Total price toggle", () => {
       return;
     }
 
-    // Toggle via dispatchEvent (element may be off-screen in split layout)
-    await toggle.first().dispatchEvent("click");
-
-    // Verify state changed
-    const newChecked = await toggle.first().getAttribute("aria-checked");
-    expect(newChecked).not.toBe(initialChecked);
+    // Toggle via click with retry — hydration may delay the React handler
+    await expect(async () => {
+      await toggle.first().dispatchEvent("click");
+      const newChecked = await toggle.first().getAttribute("aria-checked");
+      expect(newChecked).not.toBe(initialChecked);
+    }).toPass({ timeout: 10_000 });
   });
 
   test("toggle label text is visible", async ({ page }) => {

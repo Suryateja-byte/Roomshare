@@ -6,7 +6,7 @@
  * and booking status updates.
  */
 
-import { test, expect, tags, selectors, timeouts } from '../helpers';
+import { test, expect, tags, selectors, timeouts, SF_BOUNDS } from '../helpers';
 
 test.describe('Booking Journeys', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
@@ -18,7 +18,7 @@ test.describe('Booking Journeys', () => {
   test.describe('J037: Submit booking request', () => {
     test(`${tags.auth} - Request to book a listing`, async ({ page, nav, data }) => {
       // Navigate to a listing
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       // Check if listing cards exist before clicking
@@ -234,7 +234,7 @@ test.describe('Booking Journeys', () => {
 
   test.describe('J043-J044: Booking calendar', () => {
     test(`${tags.auth} - View booking calendar on listing`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       // Check if listing cards exist before clicking
@@ -261,7 +261,7 @@ test.describe('Booking Journeys', () => {
     });
 
     test(`${tags.auth} - Date picker validation`, async ({ page, nav, data }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       // Check if listing cards exist before clicking

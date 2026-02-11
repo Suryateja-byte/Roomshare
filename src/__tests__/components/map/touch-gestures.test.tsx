@@ -107,9 +107,7 @@ function createMockMapInstance() {
     removeSource: jest.fn(),
     removeLayer: jest.fn(),
     getSource: jest.fn(() => ({
-      getClusterExpansionZoom: jest.fn((clusterId: number, callback: (err: Error | null, zoom: number) => void) => {
-        callback(null, 14);
-      }),
+      getClusterExpansionZoom: jest.fn(() => Promise.resolve(14)),
     })),
     querySourceFeatures: jest.fn(() => mockQuerySourceFeaturesData),
     setStyle: jest.fn(),
@@ -147,7 +145,7 @@ let capturedMapProps: Record<string, any> = {};
 
 // Mock react-map-gl
 /* eslint-disable @typescript-eslint/no-require-imports, react/display-name */
-jest.mock('react-map-gl', () => {
+jest.mock('react-map-gl/maplibre', () => {
   const React = require('react');
 
   const MockMap = React.forwardRef(({
@@ -289,11 +287,8 @@ jest.mock('react-map-gl', () => {
 });
 /* eslint-enable @typescript-eslint/no-require-imports, react/display-name */
 
-// Mock mapbox-gl CSS
-jest.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}));
-
-// Mock mapbox-init
-jest.mock('@/lib/mapbox-init', () => ({}));
+// Mock maplibre-gl CSS
+jest.mock('maplibre-gl/dist/maplibre-gl.css', () => ({}));
 
 // Mock haptics
 jest.mock('@/lib/haptics', () => ({

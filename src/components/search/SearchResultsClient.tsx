@@ -161,7 +161,7 @@ export function SearchResultsClient({
       </div>
 
       {hasConfirmedZeroResults ? (
-        <div className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50">
+        <div data-testid="empty-state" className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm mb-4">
             <Search className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-400" />
           </div>

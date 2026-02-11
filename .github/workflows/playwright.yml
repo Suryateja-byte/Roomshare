@@ -74,7 +74,7 @@ jobs:
       E2E_TEST_PASSWORD: TestPassword123!
       NODE_OPTIONS: '--max-old-space-size=4096'
       CI: 'true'
-      NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }} # Used for geocoding API only, not map rendering
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
 

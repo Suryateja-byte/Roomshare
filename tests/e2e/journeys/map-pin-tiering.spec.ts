@@ -49,12 +49,12 @@ test.describe("Map Pin Tiering", () => {
       await waitForMapMarkers(page);
 
       // With 49 unique locations and PRIMARY_PIN_LIMIT=40, expect 40 primary + 9 mini
-      // Use .mapboxgl-marker as base selector (react-map-gl wrapper class)
+      // Use .maplibregl-marker as base selector (react-map-gl wrapper class)
       const miniPins = page.locator(
-        '.mapboxgl-marker:visible [data-testid^="map-pin-mini-"]',
+        '.maplibregl-marker:visible [data-testid^="map-pin-mini-"]',
       );
       const primaryPins = page.locator(
-        '.mapboxgl-marker:visible [data-testid^="map-pin-primary-"]',
+        '.maplibregl-marker:visible [data-testid^="map-pin-primary-"]',
       );
 
       // Assert both types exist (mock guarantees this)
@@ -87,7 +87,7 @@ test.describe("Map Pin Tiering", () => {
 
       // Get a mini pin
       const miniPin = page
-        .locator('.mapboxgl-marker:visible [data-testid^="map-pin-mini-"]')
+        .locator('.maplibregl-marker:visible [data-testid^="map-pin-mini-"]')
         .first();
       await expect(miniPin).toBeVisible({ timeout: timeouts.action });
 
@@ -100,7 +100,7 @@ test.describe("Map Pin Tiering", () => {
 
       // Popup should appear
       const popup = page.locator(
-        '.mapboxgl-popup, [data-testid="stacked-popup"]',
+        '.maplibregl-popup, [data-testid="stacked-popup"]',
       );
       await expect(popup).toBeVisible({ timeout: timeouts.action });
     } finally {
@@ -122,7 +122,7 @@ test.describe("Map Pin Tiering", () => {
       // Get a mini pin's wrapper (the parent div with data-listing-id and data-focus-state)
       const miniPinWrapper = page
         .locator(
-          '.mapboxgl-marker:visible [data-testid^="map-pin-mini-"]',
+          '.maplibregl-marker:visible [data-testid^="map-pin-mini-"]',
         )
         .first();
       await expect(miniPinWrapper).toBeVisible();
@@ -159,7 +159,7 @@ test.describe("Map Pin Tiering", () => {
       await waitForMapMarkers(page);
 
       const primaryPin = page
-        .locator('.mapboxgl-marker:visible [data-testid^="map-pin-primary-"]')
+        .locator('.maplibregl-marker:visible [data-testid^="map-pin-primary-"]')
         .first();
       await expect(primaryPin).toBeVisible({ timeout: timeouts.action });
 
@@ -170,7 +170,7 @@ test.describe("Map Pin Tiering", () => {
       await page.waitForTimeout(timeouts.animation);
 
       // Popup should appear
-      await expect(page.locator(".mapboxgl-popup")).toBeVisible();
+      await expect(page.locator(".maplibregl-popup")).toBeVisible();
     } finally {
       await cleanup();
     }

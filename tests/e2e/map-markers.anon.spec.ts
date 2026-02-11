@@ -33,7 +33,7 @@ const SEARCH_URL = `/search?${boundsQS}`;
  * Check if map canvas is visible (WebGL initialized)
  */
 async function isMapAvailable(page: Page): Promise<boolean> {
-  const map = page.locator(".mapboxgl-canvas:visible").first();
+  const map = page.locator(".maplibregl-canvas:visible").first();
   try {
     await map.waitFor({ state: "visible", timeout: 5000 });
     return true;
@@ -46,7 +46,7 @@ async function isMapAvailable(page: Page): Promise<boolean> {
  * Wait for popup to appear after marker interaction
  */
 async function waitForPopup(page: Page): Promise<void> {
-  await expect(page.locator(".mapboxgl-popup")).toBeVisible({
+  await expect(page.locator(".maplibregl-popup")).toBeVisible({
     timeout: timeouts.action,
   });
 }
@@ -61,7 +61,7 @@ async function closePopupViaButton(page: Page): Promise<void> {
     )
     .first();
   await closeBtn.click();
-  await expect(page.locator(".mapboxgl-popup")).not.toBeVisible({
+  await expect(page.locator(".maplibregl-popup")).not.toBeVisible({
     timeout: 2000,
   });
 }
@@ -70,7 +70,7 @@ async function closePopupViaButton(page: Page): Promise<void> {
  * Get the first visible marker element
  */
 function getFirstVisibleMarker(page: Page) {
-  return page.locator(".mapboxgl-marker:visible").first();
+  return page.locator(".maplibregl-marker:visible").first();
 }
 
 /**
@@ -133,7 +133,7 @@ async function waitForMapRef(page: Page, timeout = 30000): Promise<boolean> {
  */
 async function zoomToExpandClusters(page: Page): Promise<boolean> {
   // Check if individual markers are already visible
-  const existingCount = await page.locator(".mapboxgl-marker:visible").count();
+  const existingCount = await page.locator(".maplibregl-marker:visible").count();
   if (existingCount > 0) return true;
 
   // Wait for map E2E hook to be available
@@ -206,7 +206,7 @@ async function zoomToExpandClusters(page: Page): Promise<boolean> {
   // Wait for map to settle after programmatic marker update
   await waitForMapReady(page);
 
-  const finalCount = await page.locator(".mapboxgl-marker:visible").count();
+  const finalCount = await page.locator(".maplibregl-marker:visible").count();
   return finalCount > 0;
 }
 
@@ -221,7 +221,7 @@ async function waitForMarkersWithClusterExpansion(
   const minCount = options?.minCount ?? 1;
 
   // Check if markers are already visible
-  let markerCount = await page.locator(".mapboxgl-marker:visible").count();
+  let markerCount = await page.locator(".maplibregl-marker:visible").count();
 
   if (markerCount < minCount) {
     // Zoom in to expand clusters (uses E2E hook, won't trigger search)
@@ -229,7 +229,7 @@ async function waitForMarkersWithClusterExpansion(
   }
 
   // Recount after expansion attempt
-  markerCount = await page.locator(".mapboxgl-marker:visible").count();
+  markerCount = await page.locator(".maplibregl-marker:visible").count();
   return markerCount;
 }
 
@@ -284,7 +284,7 @@ test.describe("Map Marker Interactions", () => {
       await marker.evaluate((el) => (el as HTMLElement).click());
 
       // Popup should appear
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
       await expect(popup).toBeVisible({ timeout: timeouts.action });
 
       // Verify popup has expected content (price, image area, or listing info)
@@ -320,7 +320,7 @@ test.describe("Map Marker Interactions", () => {
       await closePopupViaButton(page);
 
       // Popup should be gone
-      await expect(page.locator(".mapboxgl-popup")).not.toBeVisible({
+      await expect(page.locator(".maplibregl-popup")).not.toBeVisible({
         timeout: 2000,
       });
     });
@@ -344,7 +344,7 @@ test.describe("Map Marker Interactions", () => {
       await waitForPopup(page);
 
       // Get map canvas bounding box
-      const mapCanvas = page.locator(".mapboxgl-canvas:visible").first();
+      const mapCanvas = page.locator(".maplibregl-canvas:visible").first();
       const boundingBox = await mapCanvas.boundingBox();
       expect(boundingBox).toBeTruthy();
 
@@ -356,7 +356,7 @@ test.describe("Map Marker Interactions", () => {
       await waitForMapReady(page);
 
       // Popup count should be 0 or 1 (might open another marker's popup)
-      const popupCount = await page.locator(".mapboxgl-popup").count();
+      const popupCount = await page.locator(".maplibregl-popup").count();
       expect(popupCount).toBeLessThanOrEqual(1);
     });
 
@@ -413,7 +413,7 @@ test.describe("Map Marker Interactions", () => {
 
       // Look for cluster marker (has count badge showing a number like "2", "3", etc.)
       const clusterMarker = page
-        .locator(".mapboxgl-marker:visible")
+        .locator(".maplibregl-marker:visible")
         .filter({ hasText: /^\d+$/ });
       const clusterCount = await clusterMarker.count();
 
@@ -452,7 +452,7 @@ test.describe("Map Marker Interactions", () => {
 
       // Alternative check: marker count may have changed
       const newMarkerCount = await page
-        .locator(".mapboxgl-marker:visible")
+        .locator(".maplibregl-marker:visible")
         .count();
       expect(newMarkerCount).toBeGreaterThanOrEqual(1);
     });
@@ -482,7 +482,7 @@ test.describe("Map Marker Interactions", () => {
       await waitForPopup(page);
 
       // Find View Details button/link
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
       const viewDetailsLink = popup.locator('a:has(button:has-text("View Details"))');
       const stackedItemLink = popup.locator('[data-testid^="stacked-popup-open-"]');
 
@@ -541,7 +541,7 @@ test.describe("Map Marker Interactions", () => {
       await page.keyboard.press("Enter");
 
       // Popup should appear
-      await expect(page.locator(".mapboxgl-popup")).toBeVisible({
+      await expect(page.locator(".maplibregl-popup")).toBeVisible({
         timeout: timeouts.action,
       });
     });
@@ -569,7 +569,7 @@ test.describe("Map Marker Interactions", () => {
       await page.keyboard.press("Space");
 
       // Popup should appear
-      await expect(page.locator(".mapboxgl-popup")).toBeVisible({
+      await expect(page.locator(".maplibregl-popup")).toBeVisible({
         timeout: timeouts.action,
       });
     });
@@ -741,7 +741,7 @@ test.describe("Map Marker Interactions", () => {
       await page.keyboard.press("Escape");
 
       // Popup should be closed
-      await expect(page.locator(".mapboxgl-popup")).not.toBeVisible({
+      await expect(page.locator(".maplibregl-popup")).not.toBeVisible({
         timeout: 2000,
       });
     });
@@ -774,7 +774,7 @@ test.describe("Map Marker Interactions", () => {
       await page.keyboard.press("Escape");
 
       // Popup should be gone
-      await expect(page.locator(".mapboxgl-popup")).not.toBeVisible({
+      await expect(page.locator(".maplibregl-popup")).not.toBeVisible({
         timeout: 2000,
       });
 
@@ -818,7 +818,7 @@ test.describe("Map Marker Interactions", () => {
       // Verify the offset logic exists by checking that the markerPositions memo
       // handles same-coordinate listings. We test this indirectly by verifying
       // that multiple markers are rendered at distinct DOM positions.
-      const markers = page.locator(".mapboxgl-marker:visible");
+      const markers = page.locator(".maplibregl-marker:visible");
       const count = await markers.count();
 
       if (count < 2) {
@@ -877,7 +877,7 @@ test.describe("Map Marker Interactions", () => {
       }
 
       // All marker inner elements should have tabindex="0"
-      const markerButtons = page.locator('.mapboxgl-marker [role="button"]');
+      const markerButtons = page.locator('.maplibregl-marker [role="button"]');
       const count = await markerButtons.count();
 
       if (count > 0) {
@@ -912,7 +912,7 @@ test.describe("Map Marker Interactions", () => {
       // Check for visible focus indicator (the component uses a focus ring)
       // The MapClient.tsx shows focus ring when keyboardFocusedId matches
       const focusRing = page.locator(
-        '.mapboxgl-marker [data-focus-state="hovered"], .mapboxgl-marker [data-focus-state="active"]'
+        '.maplibregl-marker [data-focus-state="hovered"], .maplibregl-marker [data-focus-state="active"]'
       );
       const hasFocusRing = (await focusRing.count()) > 0;
 
@@ -938,7 +938,7 @@ test.describe("Map Marker Interactions", () => {
       await marker.evaluate((el) => (el as HTMLElement).click());
       await waitForPopup(page);
 
-      const popup = page.locator(".mapboxgl-popup");
+      const popup = page.locator(".maplibregl-popup");
 
       // Popup should contain meaningful content
       const popupText = await popup.textContent();

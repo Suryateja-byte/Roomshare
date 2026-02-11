@@ -46,6 +46,9 @@ test.describe("Filter Race Conditions", () => {
     // Rapid click 5 times (odd number = should end up pressed)
     await rapidClick(wifiToggle, 5, 80);
 
+    // Let React batched state settle after rapid clicks
+    await page.waitForTimeout(500);
+
     // After settling, check aria-pressed attribute
     await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
 
@@ -182,6 +185,7 @@ test.describe("Filter Race Conditions", () => {
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiToggle = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
     await wifiToggle.click();
+    await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
 
     // Double-click Apply button rapidly — the second click may fail because
     // the modal closes after the first click (this IS the correct behavior)
@@ -191,7 +195,8 @@ test.describe("Filter Race Conditions", () => {
       // Expected: second click may throw if modal closed after first click
     }
 
-    // Wait for modal to close
+    // Wait for modal to close — if the double-click dismissed without applying,
+    // the modal may already be closed. Either way wait for it.
     await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 
     // Wait for URL to update via soft navigation

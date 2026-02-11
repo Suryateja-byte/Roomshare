@@ -169,7 +169,7 @@ test.describe("Group 1: Zero Results State", () => {
     const noMatchesHeading = container.locator('h2:has-text("No matches found")');
     const noListingsHeading = container.locator('h3:has-text("No listings found")');
     const noExactHeading = container.locator('h3:has-text("No exact matches")');
-    const zeroPlaces = container.locator('h1:has-text("0 places")');
+    const zeroPlaces = container.locator('h1').filter({ hasText: /^0\s+place/i });
 
     // Either the zero-results heading or the "0 places" count should appear
     await expect(
@@ -210,7 +210,7 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for initial results to render
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Now intercept subsequent RSC fetch requests (GET with RSC header)
@@ -304,7 +304,7 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     // Load page normally
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Set up route interception to force errors
@@ -360,7 +360,7 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     // Load page normally
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Set up flaky interception (50% failure rate on RSC fetches)
@@ -399,7 +399,7 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     // Load page normally first
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Add a 5s delay to the map-listings API to simulate slow network
@@ -728,7 +728,7 @@ test.describe("Group 5: Network Resilience", () => {
     // Load page while online
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Go offline
@@ -805,7 +805,7 @@ test.describe("Group 5: Network Resilience", () => {
     // Load page normally
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Go offline briefly
@@ -920,7 +920,7 @@ test.describe("Group 7: Load-More Error States", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listings to appear
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Check if "Show more places" button exists (requires nextCursor)
@@ -976,7 +976,7 @@ test.describe("Group 7: Load-More Error States", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     const loadMoreButton = page.locator(
@@ -1054,7 +1054,7 @@ test.describe("Group 7: Load-More Error States", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     const loadMoreButton = page.locator(
@@ -1137,7 +1137,7 @@ test.describe("Group 8: Console Error Monitoring", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for results to render
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Interact with the page (scroll, hover over a card)
@@ -1196,7 +1196,7 @@ test.describe("Group 8: Console Error Monitoring", () => {
     // Load page
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    const listings = page.locator('a[href^="/listings/c"]');
+    const listings = page.locator('a[href^="/listings/"]');
     await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
 
     // Force an error via route interception

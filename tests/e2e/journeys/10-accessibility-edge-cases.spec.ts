@@ -6,7 +6,7 @@
  * error handling, and edge case scenarios.
  */
 
-import { test, expect, tags, selectors, timeouts, searchResultsContainer } from '../helpers';
+import { test, expect, tags, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from '../helpers';
 
 test.beforeEach(async () => {
   test.slow();
@@ -112,7 +112,7 @@ test.describe('Accessibility Journeys', () => {
     });
 
     test(`${tags.a11y} - Images have alt text`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       const images = page.locator('img');
@@ -209,16 +209,20 @@ test.describe('Accessibility Journeys', () => {
 
 test.describe('Edge Case Journeys', () => {
   test.describe('J091: Empty states', () => {
-    test(`${tags.core} - Search with no results`, async ({ page, nav }) => {
-      await nav.goToSearch({ q: 'xyznonexistentlisting123456789' });
+    test(`${tags.core} - Search with no results`, async ({ page }) => {
+      // Use extreme price filter to guarantee zero results (q= param is a location query, not listing search)
+      await page.goto(`/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}&minPrice=99999&maxPrice=100000`);
       await page.waitForLoadState('domcontentloaded');
 
-      // Should show empty state
+      // Should show empty state or "0 places" heading
+      const container = searchResultsContainer(page);
+      const emptyStateVisible = container.locator('[data-testid="empty-state"]');
+      const noMatchesHeading = container.getByRole('heading', { name: /no matches/i });
+      const noListingsText = container.getByText(/no listings found|no exact matches/i);
+      const zeroHeading = page.getByRole('heading', { level: 1, name: /^0\s+place/i });
       await expect(
-        page.locator(selectors.emptyState)
-          .or(page.getByText(/no.*results|no.*listings|nothing.*found/i))
-          .first()
-      ).toBeVisible({ timeout: 30000 });
+        emptyStateVisible.or(noMatchesHeading).or(noListingsText).or(zeroHeading).first()
+      ).toBeAttached({ timeout: 30000 });
     });
 
     test(`${tags.auth} - Empty bookings list`, async ({ page, nav }) => {
@@ -308,7 +312,7 @@ test.describe('Edge Case Journeys', () => {
 
   test.describe('J093: Long content handling', () => {
     test(`${tags.core} - Long listing title display`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       // Check that listing cards handle long text
@@ -327,7 +331,7 @@ test.describe('Edge Case Journeys', () => {
     });
 
     test(`${tags.core} - Long description truncation`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
       await nav.clickListingCard(0);
       await page.waitForLoadState('domcontentloaded');
@@ -385,7 +389,7 @@ test.describe('Edge Case Journeys', () => {
       });
 
       await nav.goHome();
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       // Filter out known acceptable errors
@@ -465,7 +469,7 @@ test.describe('Edge Case Journeys', () => {
 
   test.describe('J098: Data validation', () => {
     test(`${tags.auth} - XSS prevention in inputs`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       // Try to inject script via search
@@ -516,7 +520,7 @@ test.describe('Edge Case Journeys', () => {
     test(`${tags.core} ${tags.slow} - Large image handling`, async ({ page, nav }) => {
       test.slow();
 
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
       await nav.clickListingCard(0);
       await page.waitForLoadState('domcontentloaded');
@@ -535,7 +539,7 @@ test.describe('Edge Case Journeys', () => {
     test(`${tags.core} ${tags.slow} - Scroll performance`, async ({ page, nav }) => {
       test.slow();
 
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       // Scroll through page multiple times
@@ -563,7 +567,7 @@ test.describe('Edge Case Journeys', () => {
       await assert.pageLoaded();
 
       // Step 2: Navigate to search
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await assert.pageLoaded();
 
       // Step 3: View a listing

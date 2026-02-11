@@ -1,9 +1,9 @@
 'use client';
 
-import '@/lib/mapbox-init'; // Must be first - initializes worker
-import ReactMapGL, { Marker, Popup, Source, Layer, ViewStateChangeEvent, MapLayerMouseEvent } from 'react-map-gl';
-import type { LayerProps, GeoJSONSource } from 'react-map-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import ReactMapGL, { Marker, Popup, Source, Layer, ViewStateChangeEvent, MapLayerMouseEvent } from 'react-map-gl/maplibre';
+import type { LayerProps } from 'react-map-gl/maplibre';
+import type { GeoJSONSource } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { useState, useMemo, useEffect, useRef, useCallback, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -61,7 +61,7 @@ const clusterCountLayer: LayerProps = {
     filter: ['has', 'point_count'],
     layout: {
         'text-field': '{point_count_abbreviated}',
-        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-font': ['Noto Sans Regular'],
         'text-size': 14
     },
     paint: { 'text-color': '#ffffff' }
@@ -74,7 +74,7 @@ const clusterCountLayerDark: LayerProps = {
     filter: ['has', 'point_count'],
     layout: {
         'text-field': '{point_count_abbreviated}',
-        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-font': ['Noto Sans Regular'],
         'text-size': 14
     },
     paint: { 'text-color': '#18181b' }
@@ -148,7 +148,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
     }), [listings]);
 
     // Handle cluster click to zoom in and expand
-    const onClusterClick = useCallback((event: MapLayerMouseEvent) => {
+    const onClusterClick = useCallback(async (event: MapLayerMouseEvent) => {
         const feature = event.features?.[0];
         if (!feature || !mapRef.current) return;
 
@@ -159,13 +159,12 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
         if (!mapboxSource) return;
 
         try {
-            mapboxSource.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
-                if (err || !feature.geometry || feature.geometry.type !== 'Point') return;
-                mapRef.current?.flyTo({
-                    center: feature.geometry.coordinates as [number, number],
-                    zoom: zoom,
-                    duration: 500
-                });
+            const zoom = await mapboxSource.getClusterExpansionZoom(clusterId);
+            if (!feature.geometry || feature.geometry.type !== 'Point') return;
+            mapRef.current?.flyTo({
+                center: feature.geometry.coordinates as [number, number],
+                zoom: zoom,
+                duration: 500
             });
         } catch (error) {
             console.warn('Cluster expansion failed', error);
@@ -409,7 +408,6 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
 
             <ReactMapGL
                 ref={mapRef}
-                mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
                 {...viewState}
                 onMove={onMove}
                 onMoveStart={() => setAreTilesLoading(true)}
@@ -421,7 +419,10 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                 onClick={useClustering ? onClusterClick : undefined}
                 interactiveLayerIds={useClustering ? [isDarkMode ? 'clusters-dark' : 'clusters'] : []}
                 style={{ width: '100%', height: '100%' }}
-                mapStyle={isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v11"}
+                mapStyle={isDarkMode
+                    ? "/map-styles/liberty-dark.json"
+                    : "https://tiles.openfreemap.org/styles/liberty"
+                }
             >
                 {/* Clustering Source and Layers - Layer nested inside Source inherits source automatically */}
                 {useClustering && (
@@ -511,9 +512,9 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                         onClose={() => setSelectedListing(null)}
                         closeOnClick={false}
                         closeButton={false}
-                        className={`z-50 [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${isDarkMode
-                                ? '[&_.mapboxgl-popup-tip]:border-t-zinc-900'
-                                : '[&_.mapboxgl-popup-tip]:border-t-white'
+                        className={`z-50 [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden ${isDarkMode
+                                ? '[&_.maplibregl-popup-tip]:border-t-zinc-900'
+                                : '[&_.maplibregl-popup-tip]:border-t-white'
                             }`}
                         maxWidth="300px"
                     >
@@ -597,13 +598,6 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                     </Popup>
                 )}
             </ReactMapGL>
-            {!process.env.NEXT_PUBLIC_MAPBOX_TOKEN && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white z-50 pointer-events-none">
-                    <div className="bg-destructive p-4 rounded-lg">
-                        Mapbox Token Missing
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

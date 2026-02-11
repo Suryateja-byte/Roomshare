@@ -6,7 +6,7 @@
  * and message management.
  */
 
-import { test, expect, tags, timeouts, selectors } from '../helpers';
+import { test, expect, tags, timeouts, selectors, SF_BOUNDS } from '../helpers';
 
 test.describe('Messaging Journeys', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
@@ -17,7 +17,7 @@ test.describe('Messaging Journeys', () => {
 
   test.describe('J047: Start new conversation', () => {
     test(`${tags.auth} - Contact host from listing`, async ({ page, nav }) => {
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState('domcontentloaded');
 
       // Check if listing cards exist before clicking

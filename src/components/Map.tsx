@@ -3,21 +3,21 @@
 /**
  * Map Component for displaying listings with marker clustering
  *
- * Uses Mapbox GL JS built-in clustering for performance optimization.
+ * Uses MapLibre GL JS built-in clustering for performance optimization.
  * - Clustered points show as circles with count
  * - Individual points show custom price markers
  * - Click cluster to zoom and expand
  */
 
-import '@/lib/mapbox-init'; // Must be first - initializes worker
-import Map, { Marker, Popup, Source, Layer, MapLayerMouseEvent, ViewStateChangeEvent, MapRef } from 'react-map-gl';
-import type { LayerProps, GeoJSONSource, MapSourceDataEvent } from 'react-map-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import Map, { Marker, Popup, Source, Layer, MapLayerMouseEvent, ViewStateChangeEvent, MapRef } from 'react-map-gl/maplibre';
+import type { LayerProps, MapSourceDataEvent } from 'react-map-gl/maplibre';
+import type { GeoJSONSource } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { useState, useMemo, useRef, useEffect, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Home, Loader2, MapPin, Maximize2, X, Map as MapIcon, Satellite, TrainFront } from 'lucide-react';
+import { Home, Loader2, MapPin, Maximize2, X } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 import { Button } from './ui/button';
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from './SearchForm';
@@ -298,7 +298,7 @@ function getClusterCountLayer(textScale: number): LayerProps {
         filter: ['has', 'point_count'],
         layout: {
             'text-field': clusterCountTextField,
-            'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+            'text-font': ['Noto Sans Bold'],
             'text-size': Math.round(14 * textScale)
         },
         paint: { 'text-color': MAP_COLORS.white }
@@ -312,7 +312,7 @@ function getClusterCountLayerDark(textScale: number): LayerProps {
         filter: ['has', 'point_count'],
         layout: {
             'text-field': clusterCountTextField,
-            'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+            'text-font': ['Noto Sans Bold'],
             'text-size': Math.round(14 * textScale)
         },
         paint: { 'text-color': MAP_COLORS.zinc900 }
@@ -365,14 +365,10 @@ export default function MapComponent({
     }, [isControlledSelection, onSelectedListingChange]);
     const [unclusteredListings, setUnclusteredListings] = useState<Listing[]>([]);
     const [isDarkMode, setIsDarkMode] = useState(false);
-    const [isHighContrast, setIsHighContrast] = useState(false);
     // Scale map label text with OS/browser font-size (Dynamic Type support)
     const [textScale, setTextScale] = useState(1);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [currentZoom, setCurrentZoom] = useState(12);
-    // P2-FIX (#137): Initialize with 'standard' for SSR, then hydrate from sessionStorage
-    // This prevents hydration mismatch since server always renders 'standard'
-    const [mapStyleKey, setMapStyleKey] = useState<'standard' | 'satellite' | 'transit'>('standard');
     const [areTilesLoading, setAreTilesLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const { hoveredId, activeId, setHovered, setActive, requestScrollTo } = useListingFocus();
@@ -471,25 +467,7 @@ export default function MapComponent({
         return () => observer.disconnect();
     }, []);
 
-    // Detect high contrast preference
-    useEffect(() => {
-        const mq = window.matchMedia('(prefers-contrast: more)');
-        setIsHighContrast(mq.matches);
-        const handler = (e: MediaQueryListEvent) => setIsHighContrast(e.matches);
-        mq.addEventListener('change', handler);
-        return () => mq.removeEventListener('change', handler);
-    }, []);
 
-    // P2-FIX (#137): Hydrate map style from sessionStorage after mount
-    // This runs only on client after hydration, avoiding SSR mismatch
-    useEffect(() => {
-        try {
-            const saved = sessionStorage.getItem('roomshare-map-style');
-            if (saved === 'satellite' || saved === 'transit') {
-                setMapStyleKey(saved);
-            }
-        } catch { /* sessionStorage unavailable (private browsing) */ }
-    }, []);
 
     // Detect OS/browser font-size scale for map label Dynamic Type support
     useEffect(() => {
@@ -543,7 +521,7 @@ export default function MapComponent({
     }, [listings]);
 
     // Handle cluster click to zoom in and expand
-    const onClusterClick = useCallback((event: MapLayerMouseEvent) => {
+    const onClusterClick = useCallback(async (event: MapLayerMouseEvent) => {
         const feature = event.features?.[0];
         if (!feature || !mapRef.current) return;
 
@@ -557,32 +535,31 @@ export default function MapComponent({
         if (!mapboxSource) return;
 
         try {
-            mapboxSource.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
-                if (err || !feature.geometry || feature.geometry.type !== 'Point') return;
-                // P0 Issue #25: Guard against stale callback after unmount
-                if (!isMountedRef.current) return;
+            const zoom = await mapboxSource.getClusterExpansionZoom(clusterId);
+            if (!feature.geometry || feature.geometry.type !== 'Point') return;
+            // P0 Issue #25: Guard against stale callback after unmount
+            if (!isMountedRef.current) return;
 
-                // Mark as programmatic move to prevent banner showing
-                setProgrammaticMove(true);
-                isClusterExpandingRef.current = true;
-                // P1-FIX (#109): Safety timeout to clear BOTH flags if moveEnd/onIdle don't fire.
-                // This prevents isClusterExpandingRef from getting stuck if animation is interrupted.
-                if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
-                programmaticClearTimeoutRef.current = setTimeout(() => {
-                    if (isProgrammaticMoveRef.current) {
-                        setProgrammaticMove(false);
-                    }
-                    // P1-FIX (#109): Also clear cluster expansion flag on timeout
-                    if (isClusterExpandingRef.current) {
-                        isClusterExpandingRef.current = false;
-                    }
-                }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-                mapRef.current?.flyTo({
-                    center: feature.geometry.coordinates as [number, number],
-                    zoom: zoom,
-                    duration: 700,
-                    padding: { top: 50, bottom: 50, left: 50, right: 50 },
-                });
+            // Mark as programmatic move to prevent banner showing
+            setProgrammaticMove(true);
+            isClusterExpandingRef.current = true;
+            // P1-FIX (#109): Safety timeout to clear BOTH flags if moveEnd/onIdle don't fire.
+            // This prevents isClusterExpandingRef from getting stuck if animation is interrupted.
+            if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+            programmaticClearTimeoutRef.current = setTimeout(() => {
+                if (isProgrammaticMoveRef.current) {
+                    setProgrammaticMove(false);
+                }
+                // P1-FIX (#109): Also clear cluster expansion flag on timeout
+                if (isClusterExpandingRef.current) {
+                    isClusterExpandingRef.current = false;
+                }
+            }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+            mapRef.current?.flyTo({
+                center: feature.geometry.coordinates as [number, number],
+                zoom: zoom,
+                duration: 700,
+                padding: { top: 50, bottom: 50, left: 50, right: 50 },
             });
         } catch (error) {
             // P1-FIX (#109): Clear cluster expansion flag on error to prevent stuck state
@@ -646,6 +623,43 @@ export default function MapComponent({
 
         setUnclusteredListings(unique);
     }, [imagesByListingId, useClustering]);
+
+    // Defense-in-depth: retry updateUnclusteredListings when listings exist
+    // but unclustered is empty (source tiles may not be ready yet)
+    useEffect(() => {
+        if (!isMapLoaded || !useClustering || listings.length === 0) return;
+        if (unclusteredListings.length > 0) return;
+
+        const retryDelays = [200, 500, 1000, 2000];
+        const timeouts: NodeJS.Timeout[] = [];
+        let cancelled = false;
+
+        for (const delay of retryDelays) {
+            timeouts.push(setTimeout(() => {
+                if (!cancelled && isMountedRef.current) {
+                    updateUnclusteredListings();
+                }
+            }, delay));
+        }
+
+        return () => {
+            cancelled = true;
+            timeouts.forEach(clearTimeout);
+        };
+    }, [isMapLoaded, useClustering, listings.length, unclusteredListings.length, updateUnclusteredListings]);
+
+    // Refresh markers when listings data changes (search-as-move updates)
+    useEffect(() => {
+        if (!isMapLoaded || !useClustering || listings.length === 0) return;
+
+        const timeout = setTimeout(() => {
+            if (isMountedRef.current) {
+                updateUnclusteredListings();
+            }
+        }, 300);
+
+        return () => clearTimeout(timeout);
+    }, [isMapLoaded, useClustering, listings, updateUnclusteredListings]);
 
     // Add small offsets to markers that share the same coordinates
     // When clustering, use unclustered listings; otherwise use all listings
@@ -1443,10 +1457,8 @@ export default function MapComponent({
         onMoveEndProp,
     ]);
 
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-
-    // User pin (drop-a-pin) state
-    const { isDropMode, toggleDropMode, pin: userPin, setPin: setUserPin, handleMapClick: handleUserPinClick } = useUserPin(token || '');
+    // User pin (drop-a-pin) state — token still needed for geocoding
+    const { isDropMode, toggleDropMode, pin: userPin, setPin: setUserPin, handleMapClick: handleUserPinClick } = useUserPin(process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '');
 
     // Get hovered listing coords for distance display
     const hoveredListingCoords = useMemo(() => {
@@ -1504,17 +1516,6 @@ export default function MapComponent({
             duration: 400
         });
     }, [setSelectedListing, setActive, requestScrollTo, setProgrammaticMove, isProgrammaticMoveRef]);
-
-    if (!token) {
-        return (
-            <div className="w-full h-full rounded-xl overflow-hidden border shadow-lg relative bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                <div className="bg-destructive/10 text-destructive p-4 rounded-lg text-center">
-                    <p className="font-bold">Mapbox Token Missing</p>
-                    <p className="text-sm">Please add NEXT_PUBLIC_MAPBOX_TOKEN to your .env file</p>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div
@@ -1589,7 +1590,6 @@ export default function MapComponent({
 
             <Map
                 ref={mapRef}
-                mapboxAccessToken={token}
                 // Controlled mode: use viewState prop + onMove handler
                 // Uncontrolled mode: use initialViewState (default behavior)
                 {...(isControlledViewState && controlledViewState
@@ -1602,18 +1602,10 @@ export default function MapComponent({
                 doubleClickZoom={true}
                 keyboard={true}
                 touchZoomRotate={true}
-                mapStyle={(() => {
-                    if (isHighContrast) {
-                        return isDarkMode ? "mapbox://styles/mapbox/navigation-night-v1" : "mapbox://styles/mapbox/navigation-day-v1";
-                    }
-                    if (mapStyleKey === 'satellite') {
-                        return "mapbox://styles/mapbox/satellite-streets-v12";
-                    }
-                    if (mapStyleKey === 'transit') {
-                        return isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/light-v11";
-                    }
-                    return isDarkMode ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/streets-v11";
-                })()}
+                mapStyle={isDarkMode
+                    ? "/map-styles/liberty-dark.json"
+                    : "https://tiles.openfreemap.org/styles/liberty"
+                }
                 onMoveEnd={handleMoveEnd}
                 onLoad={() => {
                     // P2-FIX (#84): Clean up old sourcedata listener on style change before adding new one
@@ -1627,7 +1619,8 @@ export default function MapComponent({
                     }
 
                     setIsMapLoaded(true);
-                    updateUnclusteredListings();
+                    // Defer to next tick so <Source> can mount before we query
+                    setTimeout(() => updateUnclusteredListings(), 0);
 
                     // A11y fix: Remove canvas from tab order to prevent keyboard trap.
                     // The mapbox-gl canvas absorbs Tab key events when focused, trapping
@@ -1654,10 +1647,24 @@ export default function MapComponent({
                     if (mapRef.current) {
                         const map = mapRef.current.getMap();
                         const handler = (e: MapSourceDataEvent) => {
-                            if (e.sourceId !== 'listings' || !e.isSourceLoaded) return;
-                            // CLUSTER FIX: During expansion, accept tile events (e.tile defined)
-                            // Otherwise, only accept source-level events (!e.tile)
-                            if (isClusterExpandingRef.current || !e.tile) {
+                            if (e.sourceId !== 'listings') return;
+
+                            // During cluster expansion, accept any sourcedata event
+                            if (isClusterExpandingRef.current) {
+                                updateUnclusteredListings();
+                                return;
+                            }
+
+                            // Accept content/idle events or when source reports loaded.
+                            // MapLibre v5 provides sourceDataType on GeoJSON source events;
+                            // the old !e.tile guard filtered out the events we need.
+                            const sourceDataType = (e as Record<string, unknown>).sourceDataType as string | undefined;
+                            if (
+                                sourceDataType === 'content' ||
+                                sourceDataType === 'idle' ||
+                                e.isSourceLoaded ||
+                                mapRef.current?.getMap().isSourceLoaded('listings')
+                            ) {
                                 updateUnclusteredListings();
                             }
                         };
@@ -1726,7 +1733,7 @@ export default function MapComponent({
 
                     // Worker communication errors are non-fatal during HMR/navigation
                     // These occur when the mapbox-gl worker loses connection during hot reload
-                    if (message.includes('send') || message.includes('worker') || message.includes('Actor')) {
+                    if ((message.includes('send') && message.includes('worker')) || message.includes('Actor')) {
                         console.warn('[Map] Worker communication issue (safe to ignore during HMR):', message);
                         return;
                     }
@@ -1737,7 +1744,7 @@ export default function MapComponent({
                 {/* Boundary polygon for named search areas */}
                 <BoundaryLayer
                     query={searchParams.get('q')}
-                    mapboxToken={token}
+                    mapboxToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''}
                     isDarkMode={isDarkMode}
                 />
 
@@ -1941,9 +1948,9 @@ export default function MapComponent({
                         onClose={() => setSelectedListing(null)}
                         closeOnClick={false}
                         maxWidth="320px"
-                        className={`z-[60] [&_.mapboxgl-popup-content]:rounded-xl [&_.mapboxgl-popup-content]:p-0 [&_.mapboxgl-popup-content]:!bg-transparent [&_.mapboxgl-popup-content]:!shadow-none [&_.mapboxgl-popup-close-button]:hidden ${isDarkMode
-                            ? '[&_.mapboxgl-popup-tip]:border-t-zinc-900'
-                            : '[&_.mapboxgl-popup-tip]:border-t-white'
+                        className={`z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden ${isDarkMode
+                            ? '[&_.maplibregl-popup-tip]:border-t-zinc-900'
+                            : '[&_.maplibregl-popup-tip]:border-t-white'
                             }`}
                     >
                         {/* Premium Card Design */}
@@ -2038,7 +2045,7 @@ export default function MapComponent({
                     onToggleDropMode={toggleDropMode}
                     pin={userPin}
                     onSetPin={setUserPin}
-                    mapboxToken={token}
+                    mapboxToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''}
                     hoveredListingCoords={hoveredListingCoords}
                     isDarkMode={isDarkMode}
                 />
@@ -2093,37 +2100,6 @@ export default function MapComponent({
                 </button>
             )}
 
-            {/* Map style toggle — Standard / Satellite / Transit */}
-            {isMapLoaded && (
-                <div className="absolute bottom-4 right-16 z-10 flex rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700 overflow-hidden" role="radiogroup" aria-label="Map style">
-                    {([
-                        { key: 'standard' as const, icon: <MapIcon className="w-3.5 h-3.5" />, label: 'Standard' },
-                        { key: 'satellite' as const, icon: <Satellite className="w-3.5 h-3.5" />, label: 'Satellite' },
-                        { key: 'transit' as const, icon: <TrainFront className="w-3.5 h-3.5" />, label: 'Transit' },
-                    ]).map(style => (
-                        <button
-                            key={style.key}
-                            role="radio"
-                            aria-checked={mapStyleKey === style.key}
-                            onClick={() => {
-                                setMapStyleKey(style.key);
-                                try { sessionStorage.setItem('roomshare-map-style', style.key); } catch { /* SSR safe */ }
-                            }}
-                            className={cn(
-                                "flex items-center gap-1 px-2.5 py-2 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset",
-                                mapStyleKey === style.key
-                                    ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                                    : "bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-                            )}
-                            aria-label={style.label}
-                            title={style.label}
-                        >
-                            {style.icon}
-                            <span className="hidden sm:inline">{style.label}</span>
-                        </button>
-                    ))}
-                </div>
-            )}
 
             {/* MapMovedBanner - Shows when user panned with search-as-move OFF */}
             {(showBanner || showLocationConflict) && (

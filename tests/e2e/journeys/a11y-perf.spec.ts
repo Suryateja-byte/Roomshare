@@ -128,8 +128,17 @@ test.describe("Accessibility & Performance", () => {
       // Check for load-more button and click it to trigger performance.mark('load-more-start')
       const loadMore = page.getByRole("button", { name: /load more/i });
       if (await loadMore.isVisible({ timeout: 5000 }).catch(() => false)) {
+        const countBefore = await page.locator('[data-testid="listing-card"]').count();
         await loadMore.click();
-        await page.waitForTimeout(3000);
+        // Wait for new cards to appear (Server Actions use /_next POST, not /api/search)
+        try {
+          await expect.poll(
+            () => page.locator('[data-testid="listing-card"]').count(),
+            { timeout: 10_000 },
+          ).toBeGreaterThan(countBefore);
+        } catch {
+          // Load more may not produce new results if all data is on page 1
+        }
 
         const marks = await page.evaluate(() =>
           performance.getEntriesByName("load-more-start").length,
@@ -150,7 +159,7 @@ test.describe("Accessibility & Performance", () => {
   test.describe("Fluid typography", () => {
     test("no horizontal scroll at 320px viewport", async ({ page, nav }) => {
       await page.setViewportSize({ width: 320, height: 568 });
-      await nav.goToSearch();
+      await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
       await page.waitForTimeout(2000);
 

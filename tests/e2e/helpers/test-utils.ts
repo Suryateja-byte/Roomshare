@@ -4,6 +4,7 @@ import { navigationHelpers } from "./navigation-helpers";
 import { networkHelpers, NetworkCondition } from "./network-helpers";
 import { assertionHelpers } from "./assertions";
 import { dataHelpers } from "./data-helpers";
+import { mockMapTileRequests } from "./map-mock-helpers";
 
 /**
  * Extended test fixture with custom helpers
@@ -14,7 +15,16 @@ export const test = base.extend<{
   network: ReturnType<typeof networkHelpers>;
   assert: ReturnType<typeof assertionHelpers>;
   data: typeof dataHelpers;
+  _mockMapTiles: void;
 }>({
+  // Auto-mock all external map tile/style/geocoding requests.
+  // Runs before every test; only intercepts external domains so
+  // non-map tests are unaffected (routes simply never match).
+  _mockMapTiles: [async ({ page }, use) => {
+    await mockMapTileRequests(page);
+    await use();
+  }, { auto: true }],
+
   auth: async ({}, use) => {
     await use(authHelpers);
   },
@@ -64,7 +74,7 @@ export const A11Y_CONFIG = {
   standard: 'WCAG 2.1 AA' as const,
   tags: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] as const,
   /** Elements to always exclude from axe scans (map canvases are third-party) */
-  globalExcludes: ['.mapboxgl-canvas', '.maplibregl-canvas', '.maplibregl-ctrl-group'] as const,
+  globalExcludes: ['.maplibregl-canvas', '.maplibregl-canvas', '.maplibregl-ctrl-group'] as const,
   /** Rules with known acceptable violations */
   knownExclusions: ['color-contrast', 'aria-prohibited-attr'] as const,
 } as const;
@@ -156,11 +166,11 @@ export const selectors = {
   prevPage: '[aria-label*="previous" i], [data-testid="prev-page"]',
 
   // Empty states
-  emptyState: '[data-testid="empty-state"], [class*="empty-state"]',
+  emptyState: '[data-testid="empty-state"], [class*="empty-state"], :text-matches("No matches found", "i")',
 
   // Map
-  map: '[data-testid="map"], [class*="mapboxgl"], .mapboxgl-map',
-  mapMarker: '.mapboxgl-marker, [data-testid="map-marker"]',
+  map: '[data-testid="map"], [class*="maplibregl"], .maplibregl-map',
+  mapMarker: '.maplibregl-marker, [data-testid="map-marker"]',
 } as const;
 
 /**
@@ -205,7 +215,7 @@ export async function waitForMapReady(
   if (mapRefReady) return;
 
   // Phase 2: Fall back to waiting for map container or canvas in DOM
-  await page.locator('.mapboxgl-map, .mapboxgl-canvas, [data-testid="map"]')
+  await page.locator('.maplibregl-map, .maplibregl-canvas, [data-testid="map"]')
     .first()
     .waitFor({ state: 'attached', timeout: Math.min(timeout, 5_000) })
     .catch(() => {

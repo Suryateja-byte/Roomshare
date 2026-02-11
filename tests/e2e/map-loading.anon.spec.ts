@@ -279,7 +279,7 @@ test.describe("1.4: Map initializes to URL bounds", () => {
     // Get map center via Mapbox GL JS instance
     const mapCenter = await page.evaluate(() => {
       // Try to access the mapbox instance
-      const mapElement = document.querySelector(".mapboxgl-map");
+      const mapElement = document.querySelector(".maplibregl-map");
       if (!mapElement) return null;
 
       // Mapbox GL stores the map instance on the element
@@ -379,7 +379,7 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
 
     // Try to get map center
     const mapCenter = await page.evaluate(() => {
-      const mapElement = document.querySelector(".mapboxgl-map");
+      const mapElement = document.querySelector(".maplibregl-map");
       if (!mapElement) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const map = (mapElement as any)._map || (mapElement as any).__mapboxgl;
@@ -422,7 +422,7 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
     const SF_DEFAULT = { lat: 37.7749, lng: -122.4194 };
 
     const mapCenter = await page.evaluate(() => {
-      const mapElement = document.querySelector(".mapboxgl-map");
+      const mapElement = document.querySelector(".maplibregl-map");
       if (!mapElement) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const map = (mapElement as any)._map || (mapElement as any).__mapboxgl;

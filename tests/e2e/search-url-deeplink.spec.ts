@@ -44,7 +44,7 @@ async function waitForSearchContent(page: Page) {
   const cards = container.locator('[data-testid="listing-card"]');
   // ZeroResultsSuggestions uses h3 "No exact matches", older UI might use h2 "No matches found"
   const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-  await expect(cards.first().or(zeroResults.first())).toBeAttached({ timeout: 30_000 });
+  await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ test.describe("Search URL Deep Links (P0)", () => {
     const cards1 = page1.locator('[data-testid="listing-card"]');
     const zeroResults1 = page1.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
     try {
-      await cards1.first().or(zeroResults1.first()).waitFor({ state: "attached", timeout: 30_000 });
+      await cards1.or(zeroResults1).first().waitFor({ state: "attached", timeout: 30_000 });
     } catch {
       // Zero results is also valid
     }
@@ -246,7 +246,7 @@ test.describe("Search URL Deep Links (P0)", () => {
     const cards2 = page2.locator('[data-testid="listing-card"]');
     const zeroResults2 = page2.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
     try {
-      await cards2.first().or(zeroResults2.first()).waitFor({ state: "attached", timeout: 30_000 });
+      await cards2.or(zeroResults2).first().waitFor({ state: "attached", timeout: 30_000 });
     } catch {
       // Zero results is also valid
     }
