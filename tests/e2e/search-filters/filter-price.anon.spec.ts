@@ -26,6 +26,7 @@ import {
   waitForUrlParam,
   waitForNoUrlParam,
   pollForUrlParam,
+  waitForUrlStable,
 } from "../helpers";
 import type { Page } from "@playwright/test";
 
@@ -33,12 +34,13 @@ import type { Page } from "@playwright/test";
 // Domain-specific helpers (price filter inline inputs)
 // ---------------------------------------------------------------------------
 
-/** Fill the inline budget min input and submit the form */
+/** Fill the inline budget min input */
 async function setInlineMinPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-min");
   await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.click();
-  await page.waitForTimeout(500);
+  // Brief settle for React controlled input to stabilize after focus
+  await page.waitForTimeout(300);
   await input.clear();
   if (value) {
     await input.pressSequentially(value, { delay: 50 });
@@ -51,7 +53,8 @@ async function setInlineMaxPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-max");
   await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.click();
-  await page.waitForTimeout(500);
+  // Brief settle for React controlled input to stabilize after focus
+  await page.waitForTimeout(300);
   await input.clear();
   if (value) {
     await input.pressSequentially(value, { delay: 50 });
@@ -61,12 +64,13 @@ async function setInlineMaxPrice(page: Page, value: string) {
 
 /** Submit the search form to commit inline price changes */
 async function submitSearch(page: Page) {
-  const submitBtn = page.getByRole("button", { name: /search/i }).first();
+  // Dismiss any open popovers (e.g. Save Search) that could intercept clicks
+  await page.keyboard.press("Escape");
+
+  const submitBtn = page.getByRole("button", { name: /search listings/i });
+  await submitBtn.waitFor({ state: "visible", timeout: 10_000 });
   await submitBtn.click();
-  // Wait for navigation (increased for CI)
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForTimeout(2_000);
-  await page.waitForLoadState("networkidle").catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +90,9 @@ test.describe("Price Range Filter", () => {
   // 1. Set min price -> URL gets minPrice param
   test(`${tags.core} - setting min price updates URL with minPrice param`, async ({ page }) => {
     await waitForSearchReady(page);
+    // Wait for map "Search as I move" URL updates to settle — useBatchedFilters
+    // resets pending state whenever searchParams change (committed → pending sync)
+    await waitForUrlStable(page);
 
     await setInlineMinPrice(page, "500");
     await submitSearch(page);
@@ -97,6 +104,7 @@ test.describe("Price Range Filter", () => {
   // 2. Set max price -> URL gets maxPrice param
   test(`${tags.core} - setting max price updates URL with maxPrice param`, async ({ page }) => {
     await waitForSearchReady(page);
+    await waitForUrlStable(page);
 
     await setInlineMaxPrice(page, "2000");
     await submitSearch(page);
@@ -108,6 +116,7 @@ test.describe("Price Range Filter", () => {
   // 3. Set both min and max -> URL has both params
   test(`${tags.core} - setting both min and max price updates URL with both params`, async ({ page }) => {
     await waitForSearchReady(page);
+    await waitForUrlStable(page);
 
     await setInlineMinPrice(page, "500");
     await setInlineMaxPrice(page, "2000");
@@ -122,7 +131,7 @@ test.describe("Price Range Filter", () => {
     // Start with price filters applied
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await waitForUrlParam(page, "minPrice", "500");
 
     // Verify starting state
     expect(getUrlParam(page, "minPrice")).toBe("500");
@@ -149,7 +158,7 @@ test.describe("Price Range Filter", () => {
     // Navigate with a restrictive max price
     await page.goto(`${SEARCH_URL}&maxPrice=500`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await waitForUrlParam(page, "maxPrice", "500");
 
     const filteredCount = await container.locator(selectors.listingCard).count();
 
@@ -169,7 +178,7 @@ test.describe("Price Range Filter", () => {
 
     // The app should either clamp to 0 or ignore the value
     // Either way, no crash — wait for URL to settle before checking
-    await page.waitForTimeout(2_000);
+    await waitForUrlStable(page);
     const minPrice = getUrlParam(page, "minPrice");
     if (minPrice !== null) {
       expect(Number(minPrice)).toBeGreaterThanOrEqual(0);
@@ -188,7 +197,7 @@ test.describe("Price Range Filter", () => {
     await submitSearch(page);
 
     // Wait for URL to settle after submit
-    await page.waitForTimeout(2_000);
+    await waitForUrlStable(page);
 
     // SearchForm auto-swaps inverted ranges
     const finalMin = getUrlParam(page, "minPrice");
@@ -206,7 +215,7 @@ test.describe("Price Range Filter", () => {
   test(`${tags.core} - price filter persists across page refresh`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&minPrice=800&maxPrice=2500`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await waitForUrlParam(page, "minPrice", "800");
 
     // Verify params in URL
     expect(getUrlParam(page, "minPrice")).toBe("800");
@@ -215,7 +224,7 @@ test.describe("Price Range Filter", () => {
     // Refresh the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await waitForUrlParam(page, "minPrice", "800");
 
     // Params should still be present
     expect(getUrlParam(page, "minPrice")).toBe("800");
@@ -236,7 +245,7 @@ test.describe("Price Range Filter", () => {
   test(`${tags.core} - price filter shows as chip in applied filters`, async ({ page }) => {
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await waitForUrlParam(page, "minPrice", "500");
 
     // Check for applied filters region
     const container = searchResultsContainer(page);

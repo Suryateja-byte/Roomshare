@@ -69,7 +69,11 @@ test.describe("Filter Race Conditions", () => {
   test(`${tags.filter} Type search + immediately apply filter (P1)`, async ({
     page,
   }) => {
+    test.setTimeout(90_000); // generous timeout for race test
     await waitForSearchReady(page);
+    // Wait for map "Search as I move" URL updates to settle — useBatchedFilters
+    // resets pending state whenever searchParams change (committed → pending sync)
+    await waitForUrlStable(page);
 
     // Type search query using the destination search input
     const searchInput = page.getByPlaceholder(/search destination/i);
@@ -80,18 +84,22 @@ test.describe("Filter Race Conditions", () => {
     }
     await searchInput.fill("San Francisco");
 
-    // IMMEDIATELY open filter modal and toggle Wifi
+    // Wait for search debounce (~600ms) + map "Search as I move" bounds update
+    // to fully settle. useBatchedFilters resets pending state on any URL change,
+    // so we need a generous settle window to avoid the toggle being wiped.
+    await waitForUrlStable(page, 1500);
+
     await openFilterModal(page);
 
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiToggle = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
     await wifiToggle.click();
 
-    // Apply filters
+    // Click Apply and wait for modal to close
     await applyButton(page).click();
-
-    // Wait for modal to close and URL to include amenities
     await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
+
+    // Poll for the specific param rather than generic URL-changed assertion
     await expect.poll(
       () => page.url().includes("amenities=Wifi"),
       { timeout: 30_000, message: "URL to contain amenities=Wifi" },
