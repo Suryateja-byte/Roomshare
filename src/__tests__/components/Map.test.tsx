@@ -85,6 +85,7 @@ function createMockMapInstance() {
     triggerRepaint: jest.fn(),
     resize: jest.fn(),
     loaded: jest.fn(() => true),
+    isSourceLoaded: jest.fn(() => true),
     getCanvas: jest.fn(() => ({ tabIndex: 0 })),
   };
 }
@@ -700,6 +701,59 @@ describe('Map Component', () => {
 
       // Popup should be visible
       expect(screen.getByTestId('map-popup')).toBeInTheDocument();
+    });
+  });
+
+  describe('marker retry mechanism', () => {
+    it('retries updateUnclusteredListings when querySourceFeatures initially returns empty', async () => {
+      // Start with empty features to simulate source not ready
+      mockQuerySourceFeaturesData = [];
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // At this point, unclustered should be empty
+      expect(screen.queryAllByTestId('map-marker')).toHaveLength(0);
+
+      // Now simulate source becoming ready
+      mockQuerySourceFeaturesData = listingsToFeatures(mockListings);
+
+      // Advance past first retry delay (200ms)
+      await act(async () => {
+        jest.advanceTimersByTime(250);
+      });
+
+      // Markers should appear after retry
+      await waitFor(() => {
+        expect(screen.getAllByTestId('map-marker')).toHaveLength(mockListings.length);
+      });
+    });
+
+    it('fires sourcedata handler on content sourceDataType', async () => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // Clear calls from initialization
+      mockMapInstance.querySourceFeatures.mockClear();
+
+      // Fire sourcedata with sourceDataType: 'content'
+      const sourcedataCallbacks = onCallbacks['sourcedata'] || [];
+      expect(sourcedataCallbacks.length).toBeGreaterThan(0);
+
+      await act(async () => {
+        for (const cb of sourcedataCallbacks) {
+          cb({ sourceId: 'listings', sourceDataType: 'content', isSourceLoaded: false });
+        }
+      });
+
+      // Should have called querySourceFeatures via updateUnclusteredListings
+      expect(mockMapInstance.querySourceFeatures).toHaveBeenCalled();
     });
   });
 

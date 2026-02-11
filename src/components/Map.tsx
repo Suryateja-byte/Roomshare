@@ -624,6 +624,43 @@ export default function MapComponent({
         setUnclusteredListings(unique);
     }, [imagesByListingId, useClustering]);
 
+    // Defense-in-depth: retry updateUnclusteredListings when listings exist
+    // but unclustered is empty (source tiles may not be ready yet)
+    useEffect(() => {
+        if (!isMapLoaded || !useClustering || listings.length === 0) return;
+        if (unclusteredListings.length > 0) return;
+
+        const retryDelays = [200, 500, 1000, 2000];
+        const timeouts: NodeJS.Timeout[] = [];
+        let cancelled = false;
+
+        for (const delay of retryDelays) {
+            timeouts.push(setTimeout(() => {
+                if (!cancelled && isMountedRef.current) {
+                    updateUnclusteredListings();
+                }
+            }, delay));
+        }
+
+        return () => {
+            cancelled = true;
+            timeouts.forEach(clearTimeout);
+        };
+    }, [isMapLoaded, useClustering, listings.length, unclusteredListings.length, updateUnclusteredListings]);
+
+    // Refresh markers when listings data changes (search-as-move updates)
+    useEffect(() => {
+        if (!isMapLoaded || !useClustering || listings.length === 0) return;
+
+        const timeout = setTimeout(() => {
+            if (isMountedRef.current) {
+                updateUnclusteredListings();
+            }
+        }, 300);
+
+        return () => clearTimeout(timeout);
+    }, [isMapLoaded, useClustering, listings, updateUnclusteredListings]);
+
     // Add small offsets to markers that share the same coordinates
     // When clustering, use unclustered listings; otherwise use all listings
     const markersSource = useClustering ? unclusteredListings : listings;
@@ -1582,7 +1619,8 @@ export default function MapComponent({
                     }
 
                     setIsMapLoaded(true);
-                    updateUnclusteredListings();
+                    // Defer to next tick so <Source> can mount before we query
+                    setTimeout(() => updateUnclusteredListings(), 0);
 
                     // A11y fix: Remove canvas from tab order to prevent keyboard trap.
                     // The mapbox-gl canvas absorbs Tab key events when focused, trapping
@@ -1609,10 +1647,24 @@ export default function MapComponent({
                     if (mapRef.current) {
                         const map = mapRef.current.getMap();
                         const handler = (e: MapSourceDataEvent) => {
-                            if (e.sourceId !== 'listings' || !e.isSourceLoaded) return;
-                            // CLUSTER FIX: During expansion, accept tile events (e.tile defined)
-                            // Otherwise, only accept source-level events (!e.tile)
-                            if (isClusterExpandingRef.current || !e.tile) {
+                            if (e.sourceId !== 'listings') return;
+
+                            // During cluster expansion, accept any sourcedata event
+                            if (isClusterExpandingRef.current) {
+                                updateUnclusteredListings();
+                                return;
+                            }
+
+                            // Accept content/idle events or when source reports loaded.
+                            // MapLibre v5 provides sourceDataType on GeoJSON source events;
+                            // the old !e.tile guard filtered out the events we need.
+                            const sourceDataType = (e as Record<string, unknown>).sourceDataType as string | undefined;
+                            if (
+                                sourceDataType === 'content' ||
+                                sourceDataType === 'idle' ||
+                                e.isSourceLoaded ||
+                                mapRef.current?.getMap().isSourceLoaded('listings')
+                            ) {
                                 updateUnclusteredListings();
                             }
                         };
@@ -1681,7 +1733,7 @@ export default function MapComponent({
 
                     // Worker communication errors are non-fatal during HMR/navigation
                     // These occur when the mapbox-gl worker loses connection during hot reload
-                    if (message.includes('send') || message.includes('worker') || message.includes('Actor')) {
+                    if ((message.includes('send') && message.includes('worker')) || message.includes('Actor')) {
                         console.warn('[Map] Worker communication issue (safe to ignore during HMR):', message);
                         return;
                     }
