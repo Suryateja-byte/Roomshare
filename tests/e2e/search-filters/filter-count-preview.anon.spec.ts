@@ -72,8 +72,12 @@ async function setupCountMock(
           });
         }
 
-        // All other requests: pass through but convert 429 to 200
-        const res = await originalFetch(input, init);
+        // All other requests: pass through but retry once on 429
+        let res = await originalFetch(input, init);
+        if (res.status === 429) {
+          await new Promise((r) => setTimeout(r, 500));
+          res = await originalFetch(input, init);
+        }
         if (res.status === 429) {
           return new Response("{}", {
             status: 200,
@@ -98,7 +102,11 @@ async function prevent429s(page: import("@playwright/test").Page) {
       input: RequestInfo | URL,
       init?: RequestInit,
     ) {
-      const res = await originalFetch(input, init);
+      let res = await originalFetch(input, init);
+      if (res.status === 429) {
+        await new Promise((r) => setTimeout(r, 500));
+        res = await originalFetch(input, init);
+      }
       if (res.status === 429) {
         return new Response("{}", {
           status: 200,
@@ -177,7 +185,11 @@ test.describe("Filter Count Preview", () => {
           });
         }
 
-        const res = await originalFetch(input, init);
+        let res = await originalFetch(input, init);
+        if (res.status === 429) {
+          await new Promise((r) => setTimeout(r, 500));
+          res = await originalFetch(input, init);
+        }
         if (res.status === 429) {
           return new Response("{}", {
             status: 200,

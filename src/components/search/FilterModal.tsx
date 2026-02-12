@@ -238,7 +238,7 @@ export function FilterModal({
                 <SelectContent>
                   <SelectItem value="any">Any</SelectItem>
                   {(['Private Room', 'Shared Room', 'Entire Place'] as const).map(type => {
-                    const count = facetCounts?.roomTypes[type];
+                    const count = facetCounts?.roomTypes?.[type];
                     const isZero = count === 0;
                     return (
                       <SelectItem
@@ -262,7 +262,7 @@ export function FilterModal({
               <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
               <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
                 {amenityOptions.map(amenity => {
-                  const count = facetCounts?.amenities[amenity];
+                  const count = facetCounts?.amenities?.[amenity];
                   const isZero = count === 0;
                   const isActive = amenities.includes(amenity);
                   return (
@@ -297,7 +297,7 @@ export function FilterModal({
               <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
               <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
                 {houseRuleOptions.map(rule => {
-                  const count = facetCounts?.houseRules[rule];
+                  const count = facetCounts?.houseRules?.[rule];
                   const isZero = count === 0;
                   const isActive = houseRules.includes(rule);
                   return (

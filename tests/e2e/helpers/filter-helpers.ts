@@ -269,16 +269,11 @@ export async function openFilterModal(page: Page): Promise<Locator> {
     await expect(dialog).toBeVisible({ timeout: 30_000 });
   }
 
-  // Wait for amenity buttons to render — ensures facet data has loaded
-  // (useFacets hook completes async after dialog opens)
-  const group = amenitiesGroup(page);
-  await group
-    .getByRole("button")
-    .first()
-    .waitFor({ state: "attached", timeout: 30_000 })
-    .catch(() => {
-      // Amenities group may not be present in all filter modals
-    });
+  // Wait for FilterModal dynamic import to complete — the apply button
+  // is always present and is a reliable signal the chunk loaded and rendered.
+  // Do NOT silently catch: if this times out, every subsequent interaction will
+  // also fail, so failing fast here provides a clear diagnostic.
+  await applyButton(page).waitFor({ state: "attached", timeout: 60_000 });
 
   return dialog;
 }
