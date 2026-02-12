@@ -235,9 +235,10 @@ test.describe("J24: Double-Booking Prevention", () => {
     await startDateTrigger.click();
     const todayBtn = page.getByRole('button', { name: 'Today' });
     await todayBtn.waitFor({ state: 'visible', timeout: 10_000 });
-    // Popover renders via portal which may land outside the viewport on CI;
-    // Playwright can't scroll portal content into view, so use force click.
-    await todayBtn.click({ force: true });
+    // Popover renders via portal which may land outside the viewport on
+    // Mobile Chrome. dispatchEvent fires the click directly on the DOM node
+    // without requiring it to be inside the viewport.
+    await todayBtn.dispatchEvent('click');
     await page.waitForTimeout(500);
 
     // Step 4: Fill end date — click date picker, navigate 2 months forward, select day 15
