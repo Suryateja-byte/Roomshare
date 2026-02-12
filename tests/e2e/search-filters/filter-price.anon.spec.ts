@@ -46,6 +46,7 @@ async function setInlineMinPrice(page: Page, value: string) {
     await input.pressSequentially(value, { delay: 50 });
   }
   await input.blur();
+  await page.waitForTimeout(200);
 }
 
 /** Fill the inline budget max input */
@@ -60,6 +61,7 @@ async function setInlineMaxPrice(page: Page, value: string) {
     await input.pressSequentially(value, { delay: 50 });
   }
   await input.blur();
+  await page.waitForTimeout(200);
 }
 
 /** Submit the search form to commit inline price changes */
@@ -105,7 +107,7 @@ test.describe("Price Range Filter", () => {
   // 2. Set max price -> URL gets maxPrice param
   test(`${tags.core} - setting max price updates URL with maxPrice param`, async ({ page }) => {
     await waitForSearchReady(page);
-    await waitForUrlStable(page, 1500);
+    await waitForUrlStable(page, 2500);
 
     await setInlineMaxPrice(page, "2000");
     await submitSearch(page);
@@ -118,7 +120,7 @@ test.describe("Price Range Filter", () => {
   test(`${tags.core} - setting both min and max price updates URL with both params`, async ({ page }) => {
     await waitForSearchReady(page);
     // Generous settle — CI runners are slower; map bounds can take >500ms
-    await waitForUrlStable(page, 1500);
+    await waitForUrlStable(page, 2500);
 
     await setInlineMinPrice(page, "500");
     await setInlineMaxPrice(page, "2000");

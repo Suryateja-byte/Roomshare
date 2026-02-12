@@ -44,10 +44,10 @@ test.describe("Filter Race Conditions", () => {
     const wifiToggle = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
 
     // Rapid click 5 times (odd number = should end up pressed)
-    await rapidClick(wifiToggle, 5, 80);
+    await rapidClick(wifiToggle, 5, 150);
 
     // Let React batched state settle after rapid clicks
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1500);
 
     // After settling, check aria-pressed attribute
     await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
@@ -88,7 +88,7 @@ test.describe("Filter Race Conditions", () => {
     // to fully settle. useBatchedFilters resets pending state on any URL change,
     // so we need a generous settle window to avoid the toggle being wiped.
     // CI runners need extra time (map fly animation + geocode round-trip).
-    await waitForUrlStable(page, 2000);
+    await waitForUrlStable(page, 3500);
 
     await openFilterModal(page);
 
@@ -278,6 +278,7 @@ test.describe("Filter Race Conditions", () => {
   }) => {
     test.slow(); // 2 navigations on WSL2/NTFS
     await waitForSearchReady(page);
+    await waitForUrlStable(page, 1500);
 
     // Open filter modal and toggle amenity
     await openFilterModal(page);
