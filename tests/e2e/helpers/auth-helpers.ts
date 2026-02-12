@@ -48,6 +48,13 @@ export const authHelpers = {
 
     await page.getByLabel(/email/i).first().fill(useEmail);
     await page.getByLabel(/password/i).first().fill(usePassword);
+
+    // Wait for Turnstile widget to auto-solve (dummy test keys)
+    await page.waitForFunction(() => {
+      const input = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
+      return input !== null && input.value.length > 0;
+    }, { timeout: 10_000 });
+
     await page.getByRole('button', { name: /sign in|log in|login/i }).first().click();
 
     // Wait for redirect away from login
@@ -93,6 +100,12 @@ export const authHelpers = {
     } else {
       await passwordInputs.first().fill(options.password);
     }
+
+    // Wait for Turnstile widget to auto-solve (dummy test keys)
+    await page.waitForFunction(() => {
+      const input = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
+      return input !== null && input.value.length > 0;
+    }, { timeout: 10_000 });
 
     await page.getByRole('button', { name: /sign up|register|create account/i }).first().click();
 

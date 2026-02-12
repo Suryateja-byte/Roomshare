@@ -6,6 +6,7 @@ import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { normalizeEmail } from '@/lib/normalize-email';
 import { createTokenPair } from '@/lib/token-security';
+import { verifyTurnstileToken } from '@/lib/turnstile';
 
 const registerSchema = z.object({
     name: z.string().min(2),
@@ -20,7 +21,18 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
-        const result = registerSchema.safeParse(body);
+
+        // Verify Turnstile token before processing registration
+        const { turnstileToken, ...registrationData } = body;
+        const turnstileResult = await verifyTurnstileToken(turnstileToken);
+        if (!turnstileResult.success) {
+            return NextResponse.json(
+                { error: 'Bot verification failed. Please try again.' },
+                { status: 403 }
+            );
+        }
+
+        const result = registerSchema.safeParse(registrationData);
 
         if (!result.success) {
             return NextResponse.json({ error: 'Invalid input' }, { status: 400 });

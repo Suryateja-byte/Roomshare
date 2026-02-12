@@ -6,6 +6,7 @@ import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useState, Suspense, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
+import TurnstileWidget, { type TurnstileWidgetRef } from '@/components/auth/TurnstileWidget';
 import { AuthErrorAlert } from '@/components/auth/AuthErrorAlert';
 import { shouldHighlightEmailForm } from '@/lib/auth-errors';
 
@@ -20,6 +21,8 @@ function LoginForm() {
     const [googleLoading, setGoogleLoading] = useState(false);
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState<string>('');
+    const turnstileRef = useRef<TurnstileWidgetRef>(null);
 
     // Focus email input when OAuth error suggests using email form
     useEffect(() => {
@@ -50,11 +53,14 @@ function LoginForm() {
             const result = await signIn('credentials', {
                 email,
                 password,
+                turnstileToken,
                 redirect: false,
             });
 
             if (result?.error) {
                 setError('Invalid email or password');
+                turnstileRef.current?.reset();
+                setTurnstileToken('');
                 setLoading(false);
             } else {
                 // Force full page reload to ensure fresh session from layout
@@ -62,6 +68,8 @@ function LoginForm() {
             }
         } catch (err) {
             setError('An error occurred');
+            turnstileRef.current?.reset();
+            setTurnstileToken('');
             setLoading(false);
         }
     };
@@ -226,9 +234,16 @@ function LoginForm() {
                             </div>
                         </div>
 
+                        {/* Turnstile Bot Protection */}
+                        <TurnstileWidget
+                            ref={turnstileRef}
+                            onToken={setTurnstileToken}
+                            onExpire={() => setTurnstileToken('')}
+                        />
+
                         <Button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
                             className="w-full h-11 sm:h-12 rounded-lg shadow-sm hover:shadow-md transition-all"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Sign in <ArrowRight className="w-4 h-4 ml-2" /></>}

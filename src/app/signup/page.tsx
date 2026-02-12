@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Loader2, Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { signIn } from 'next-auth/react';
-import { useState, Suspense } from 'react';
+import { useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import TurnstileWidget, { type TurnstileWidgetRef } from '@/components/auth/TurnstileWidget';
 import { AuthErrorAlert } from '@/components/auth/AuthErrorAlert';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 
@@ -22,6 +23,8 @@ function SignUpForm() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [acceptedTerms, setAcceptedTerms] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState<string>('');
+    const turnstileRef = useRef<TurnstileWidgetRef>(null);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -58,7 +61,7 @@ function SignUpForm() {
             const res = await fetch('/api/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
+                body: JSON.stringify({ ...data, turnstileToken }),
             });
 
             if (!res.ok) {
@@ -69,6 +72,8 @@ function SignUpForm() {
             router.push('/login?registered=true');
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'An error occurred');
+            turnstileRef.current?.reset();
+            setTurnstileToken('');
         } finally {
             setLoading(false);
         }
@@ -330,10 +335,17 @@ function SignUpForm() {
                             </label>
                         </div>
 
+                        {/* Turnstile Bot Protection */}
+                        <TurnstileWidget
+                            ref={turnstileRef}
+                            onToken={setTurnstileToken}
+                            onExpire={() => setTurnstileToken('')}
+                        />
+
                         {/* Submit Button */}
                         <Button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
                             className="w-full h-11 sm:h-12 rounded-lg shadow-sm hover:shadow-md transition-all"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Create account <ArrowRight className="w-4 h-4 ml-2" /></>}

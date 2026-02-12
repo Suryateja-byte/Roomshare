@@ -4,6 +4,7 @@ import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { normalizeEmail } from '@/lib/normalize-email';
 import { createTokenPair } from '@/lib/token-security';
+import { verifyTurnstileToken } from '@/lib/turnstile';
 
 export async function POST(request: NextRequest) {
     // Rate limit: 3 password reset requests per hour per IP
@@ -18,7 +19,16 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { email } = await request.json();
+        const { email, turnstileToken } = await request.json();
+
+        // Verify Turnstile token before processing
+        const turnstileResult = await verifyTurnstileToken(turnstileToken);
+        if (!turnstileResult.success) {
+            return NextResponse.json(
+                { error: 'Bot verification failed. Please try again.' },
+                { status: 403 }
+            );
+        }
 
         if (!email) {
             return NextResponse.json(

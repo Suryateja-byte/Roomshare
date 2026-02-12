@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { logger } from "@/lib/logger"
 import { isGoogleEmailVerified, AUTH_ROUTES, normalizeEmail } from "@/lib/auth-helpers"
+import { verifyTurnstileToken } from "@/lib/turnstile"
 
 async function getUser(email: string) {
     try {
@@ -168,10 +169,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         Credentials({
             async authorize(credentials) {
                 const parsedCredentials = z
-                    .object({ email: z.string().email(), password: z.string().min(12) })
+                    .object({
+                        email: z.string().email(),
+                        password: z.string().min(12),
+                        turnstileToken: z.string().optional(),
+                    })
                     .safeParse(credentials)
 
                 if (parsedCredentials.success) {
+                    // Verify Turnstile token before any DB lookup
+                    const turnstileResult = await verifyTurnstileToken(
+                        parsedCredentials.data.turnstileToken
+                    )
+                    if (!turnstileResult.success) {
+                        logger.sync.warn("Turnstile verification failed on login")
+                        return null
+                    }
+
                     const { password } = parsedCredentials.data
                     const email = normalizeEmail(parsedCredentials.data.email)
                     const user = await getUser(email)

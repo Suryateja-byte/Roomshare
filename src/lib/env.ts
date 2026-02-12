@@ -77,6 +77,10 @@ const serverEnvSchema = z.object({
   // CRITICAL: Should be enabled in production for performance
   ENABLE_SEARCH_DOC: z.enum(["true", "false"]).optional(),
 
+  // Cloudflare Turnstile (bot protection)
+  TURNSTILE_SECRET_KEY: z.string().optional(),
+  TURNSTILE_ENABLED: z.enum(["true", "false"]).optional(),
+
   // Node environment
   NODE_ENV: z
     .enum(["development", "production", "test"])
@@ -102,6 +106,9 @@ const clientEnvSchema = z.object({
 
   // Feature flags
   NEXT_PUBLIC_NEARBY_ENABLED: z.enum(["true", "false"]).optional(),
+
+  // Cloudflare Turnstile (bot protection)
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
 });
 
 // Type exports for use throughout the application
@@ -146,6 +153,8 @@ function validateClientEnv(): ClientEnv {
       process.env.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY,
     NEXT_PUBLIC_STADIA_API_KEY: process.env.NEXT_PUBLIC_STADIA_API_KEY,
     NEXT_PUBLIC_NEARBY_ENABLED: process.env.NEXT_PUBLIC_NEARBY_ENABLED,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY:
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   };
 
   const result = clientEnvSchema.safeParse(clientVars);
@@ -272,6 +281,16 @@ export const features = {
     const e = getServerEnv();
     return e.ENABLE_SEARCH_DOC === "true";
   },
+  // Cloudflare Turnstile bot protection
+  get turnstile() {
+    const e = getServerEnv();
+    const c = getClientEnv();
+    return (
+      e.TURNSTILE_ENABLED === "true" &&
+      !!e.TURNSTILE_SECRET_KEY &&
+      !!c.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+    );
+  },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals
   get searchDebugRanking() {
@@ -324,6 +343,11 @@ export function logStartupWarnings(): void {
   if (!features.searchDoc) {
     warnings.push(
       "ENABLE_SEARCH_DOC not enabled - using slow LIKE queries for text search (CRITICAL: enable for production)",
+    );
+  }
+  if (!features.turnstile) {
+    warnings.push(
+      "Turnstile not configured - auth forms have no bot protection",
     );
   }
 

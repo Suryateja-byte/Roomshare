@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Mail, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import TurnstileWidget, { type TurnstileWidgetRef } from '@/components/auth/TurnstileWidget';
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
@@ -13,6 +14,8 @@ export default function ForgotPasswordPage() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
+    const [turnstileToken, setTurnstileToken] = useState<string>('');
+    const turnstileRef = useRef<TurnstileWidgetRef>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -23,7 +26,7 @@ export default function ForgotPasswordPage() {
             const response = await fetch('/api/auth/forgot-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ email, turnstileToken })
             });
 
             const data = await response.json();
@@ -39,6 +42,8 @@ export default function ForgotPasswordPage() {
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Something went wrong');
+            turnstileRef.current?.reset();
+            setTurnstileToken('');
         } finally {
             setIsLoading(false);
         }
@@ -136,10 +141,17 @@ export default function ForgotPasswordPage() {
                             </div>
                         )}
 
+                        {/* Turnstile Bot Protection */}
+                        <TurnstileWidget
+                            ref={turnstileRef}
+                            onToken={setTurnstileToken}
+                            onExpire={() => setTurnstileToken('')}
+                        />
+
                         <Button
                             type="submit"
                             className="w-full"
-                            disabled={isLoading}
+                            disabled={isLoading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
                         >
                             {isLoading ? (
                                 <>
