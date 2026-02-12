@@ -76,11 +76,12 @@ jobs:
       CI: 'true'
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
-      # Cloudflare Turnstile (dummy test keys — always auto-pass, per
-      # https://developers.cloudflare.com/turnstile/troubleshooting/testing/)
-      TURNSTILE_ENABLED: 'true'
-      TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA'
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA'
+      # Cloudflare Turnstile: intentionally DISABLED in CI.
+      # Turnstile's CDN script doesn't auto-solve in headless Chromium,
+      # so we omit the site key — TurnstileWidget returns null, server
+      # verification is bypassed (isTurnstileEnabled() → false).
+      # See: https://developers.cloudflare.com/turnstile/tutorials/excluding-turnstile-from-e2e-tests/
+      TURNSTILE_ENABLED: 'false'
 
     steps:
       - uses: actions/checkout@v4
