@@ -126,9 +126,10 @@ export async function withIdempotency<T>(
           // If row doesn't exist, we claim it with status='processing'
           await tx.$executeRaw`
         INSERT INTO "IdempotencyKey" (
-          key, "userId", endpoint, status, "requestHash", "createdAt", "expiresAt"
+          id, key, "userId", endpoint, status, "requestHash", "createdAt", "expiresAt"
         )
         VALUES (
+          gen_random_uuid()::text,
           ${key},
           ${userId},
           ${endpoint},
