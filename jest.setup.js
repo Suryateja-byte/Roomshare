@@ -115,6 +115,20 @@ jest.mock('@auth/prisma-adapter', () => ({
   PrismaAdapter: jest.fn(() => ({})),
 }))
 
+// Mock @marsidev/react-turnstile (ESM-only package — prevents SyntaxError in Jest)
+jest.mock('@marsidev/react-turnstile', () => {
+  const React = require('react')
+  return {
+    __esModule: true,
+    Turnstile: React.forwardRef(function MockTurnstile({ onSuccess }) {
+      React.useEffect(() => {
+        if (onSuccess) onSuccess('mock-turnstile-token')
+      }, [onSuccess])
+      return null
+    }),
+  }
+})
+
 // Mock @/lib/prisma to prevent PrismaClient initialization errors in tests
 // Tests that need real DB access should set DATABASE_URL and use jest.unmock
 const mockPrismaModel = {
