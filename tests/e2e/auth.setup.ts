@@ -1,5 +1,6 @@
 import { test as setup, expect } from '@playwright/test';
 import path from 'path';
+import { waitForTurnstileIfPresent } from './helpers/auth-helpers';
 
 const authFile = path.join(__dirname, '../../playwright/.auth/user.json');
 
@@ -27,11 +28,8 @@ setup('authenticate', async ({ page }) => {
   await page.getByLabel(/email/i).fill(email);
   await page.locator('input#password').fill(password);
 
-  // Wait for Turnstile widget to auto-solve (dummy test keys solve in ~200-500ms)
-  await page.waitForFunction(() => {
-    const input = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
-    return input !== null && input.value.length > 0;
-  }, { timeout: 10_000 });
+  // Wait for Turnstile widget to auto-solve (skips if widget not rendered)
+  await waitForTurnstileIfPresent(page);
 
   // Set up response waiter before clicking to avoid race conditions
   const loginResponsePromise = page.waitForResponse(
@@ -82,11 +80,8 @@ setup.describe('admin auth', () => {
     await page.getByLabel(/email/i).fill(email);
     await page.locator('input#password').fill(password);
 
-    // Wait for Turnstile widget to auto-solve (dummy test keys solve in ~200-500ms)
-    await page.waitForFunction(() => {
-      const input = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
-      return input !== null && input.value.length > 0;
-    }, { timeout: 10_000 });
+    // Wait for Turnstile widget to auto-solve (skips if widget not rendered)
+    await waitForTurnstileIfPresent(page);
 
     // Set up response waiter before clicking to avoid race conditions
     const loginResponsePromise = page.waitForResponse(

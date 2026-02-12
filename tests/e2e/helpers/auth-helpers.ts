@@ -7,6 +7,21 @@ import { Page, expect } from '@playwright/test';
 export const MOCK_SESSION_TOKEN = 'mock-session-token';
 
 /**
+ * Wait for Turnstile to auto-solve, or skip if widget not rendered.
+ * When NEXT_PUBLIC_TURNSTILE_SITE_KEY is absent, TurnstileWidget returns null
+ * and no hidden input is created — this function detects that and proceeds.
+ * See: https://developers.cloudflare.com/turnstile/tutorials/excluding-turnstile-from-e2e-tests/
+ */
+export async function waitForTurnstileIfPresent(page: Page, timeout = 15_000): Promise<void> {
+  await page.waitForFunction(() => {
+    const widget = document.querySelector('[data-testid="turnstile-widget"]');
+    if (!widget) return true; // No Turnstile widget rendered, skip
+    const input = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
+    return input !== null && input.value.length > 0;
+  }, { timeout });
+}
+
+/**
  * Authentication helper functions
  */
 export const authHelpers = {
@@ -49,11 +64,8 @@ export const authHelpers = {
     await page.getByLabel(/email/i).first().fill(useEmail);
     await page.getByLabel(/password/i).first().fill(usePassword);
 
-    // Wait for Turnstile widget to auto-solve (dummy test keys)
-    await page.waitForFunction(() => {
-      const input = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
-      return input !== null && input.value.length > 0;
-    }, { timeout: 10_000 });
+    // Wait for Turnstile widget to auto-solve (skips if widget not rendered)
+    await waitForTurnstileIfPresent(page);
 
     await page.getByRole('button', { name: /sign in|log in|login/i }).first().click();
 
@@ -101,11 +113,8 @@ export const authHelpers = {
       await passwordInputs.first().fill(options.password);
     }
 
-    // Wait for Turnstile widget to auto-solve (dummy test keys)
-    await page.waitForFunction(() => {
-      const input = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
-      return input !== null && input.value.length > 0;
-    }, { timeout: 10_000 });
+    // Wait for Turnstile widget to auto-solve (skips if widget not rendered)
+    await waitForTurnstileIfPresent(page);
 
     await page.getByRole('button', { name: /sign up|register|create account/i }).first().click();
 

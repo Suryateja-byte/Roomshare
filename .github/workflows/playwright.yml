@@ -76,6 +76,11 @@ jobs:
       CI: 'true'
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
+      # Cloudflare Turnstile (dummy test keys — always auto-pass, per
+      # https://developers.cloudflare.com/turnstile/troubleshooting/testing/)
+      TURNSTILE_ENABLED: 'true'
+      TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA'
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA'
 
     steps:
       - uses: actions/checkout@v4
