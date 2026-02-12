@@ -340,8 +340,8 @@ test.describe("Map Error States and Accessibility", () => {
       }
 
       // Try to focus on a marker
-      const firstMarker = markers.first();
-      await firstMarker.focus();
+      const firstMarkerInner = markers.first().locator('[role="button"], [tabindex="0"]').first();
+      await firstMarkerInner.focus();
 
       // Press Enter or Space to activate
       await page.keyboard.press("Enter");

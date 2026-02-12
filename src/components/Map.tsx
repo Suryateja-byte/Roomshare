@@ -27,6 +27,7 @@ import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
 import { MapMovedBanner } from './map/MapMovedBanner';
 import { MapGestureHint } from './map/MapGestureHint';
 import { PrivacyCircle } from './map/PrivacyCircle';
+import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
 import { UserMarker, useUserPin } from './map/UserMarker';
 import { POILayer } from './map/POILayer';
@@ -1788,6 +1789,7 @@ export default function MapComponent({
                             ref={(el) => {
                                 if (el) {
                                     markerRefs.current.set(position.listing.id, el);
+                                    fixMarkerWrapperRole(el);
                                 } else {
                                     markerRefs.current.delete(position.listing.id);
                                 }

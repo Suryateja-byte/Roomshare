@@ -41,8 +41,6 @@ const KNOWN_ISSUES: string[] = [
   'list',
   // Third-party embeds (map tiles, images) may have missing alt in headless
   'image-alt',
-  // Nested interactive controls in third-party components
-  'nested-interactive',
   // Link names from dynamic content may be empty during SSR
   'link-name',
 ];

@@ -18,6 +18,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { MapPin } from 'lucide-react';
 import { getWalkabilityRings, formatDistance } from '@/lib/geo/distance';
 import type { POI } from '@/lib/places/types';
+import { fixMarkerWrapperRole } from '@/components/map/fixMarkerA11y';
 
 interface NeighborhoodMapProps {
   /** Listing center coordinates */
@@ -382,6 +383,7 @@ export function NeighborhoodMap({
             }}
           >
             <div
+              ref={(el) => { if (el) fixMarkerWrapperRole(el); }}
               className={`
                 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
                 transition-transform duration-150

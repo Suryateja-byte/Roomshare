@@ -10,6 +10,7 @@ import { Marker } from 'react-map-gl/maplibre';
 import { MapPin, X, Navigation } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { fixMarkerWrapperRole } from './fixMarkerA11y';
 import { reverseGeocode } from '@/lib/geocoding/nominatim';
 
 export interface UserPinState {
@@ -113,7 +114,10 @@ export function UserMarker({
                         onSetPin({ lng, lat, address });
                     }}
                 >
-                    <div className="relative flex flex-col items-center animate-[fadeIn_200ms_ease-out]">
+                    <div
+                        ref={(el) => { if (el) fixMarkerWrapperRole(el); }}
+                        className="relative flex flex-col items-center animate-[fadeIn_200ms_ease-out]"
+                    >
                         {/* Pin icon */}
                         <div className={cn(
                             "w-8 h-8 rounded-full flex items-center justify-center shadow-lg",

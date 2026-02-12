@@ -12,6 +12,7 @@ import { getListingsInBounds, MapListing } from '@/app/actions/get-listings';
 import { useDebounce } from 'use-debounce';
 import { Loader2, Home, X, MapPin } from 'lucide-react';
 import { useAbortableServerAction } from '@/hooks/useAbortableServerAction';
+import { fixMarkerWrapperRole } from './fixMarkerA11y';
 
 interface MarkerPosition {
     listing: MapListing;
@@ -468,6 +469,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                                 ref={(el) => {
                                     if (el) {
                                         markerRefs.current.set(position.listing.id, el);
+                                        fixMarkerWrapperRole(el);
                                     } else {
                                         markerRefs.current.delete(position.listing.id);
                                     }
