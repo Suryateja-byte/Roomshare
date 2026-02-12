@@ -18,7 +18,6 @@ test.describe("J21: Full Booking Request Submission", () => {
   test("search → listing detail → submit booking → verify on bookings page", async ({
     page,
     nav,
-    assert,
   }) => {
     // Step 1: Search for a listing NOT owned by test user (reviewer's listing)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
@@ -31,45 +30,31 @@ test.describe("J21: Full Booking Request Submission", () => {
     // Step 2: Navigate to a listing detail
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
-
-    // Wait for listing detail to load
     await page.waitForLoadState('domcontentloaded');
-    const heading = page.locator("main h1, main h2, main [class*='title'], main [data-testid='listing-title']").first();
-    const hasHeading = await heading.isVisible().catch(() => false);
-    // If no heading, page may still be loading or have different structure — continue anyway
 
-    // Step 3: Look for booking / apply / request button
-    const bookingBtn = page
+    // Step 3: Verify booking button is visible
+    const requestToBookBtn = page
       .locator("main")
-      .getByRole("button", { name: /book|apply|request|reserve/i })
-      .or(page.locator('main a[href*="book"]'))
-      .or(page.locator('main [data-testid="booking-button"]'));
-
-    const canBook = await bookingBtn.first().isVisible().catch(() => false);
-    test.skip(!canBook, "No booking button visible (owner view or unavailable)");
-
-    await bookingBtn.first().click();
-    await page.waitForLoadState('domcontentloaded');
-
-    // Step 4: Fill any booking form fields that appear
-    const messageField = page
-      .getByPlaceholder(/message|note|intro/i)
-      .or(page.locator('textarea[name*="message"]'))
+      .getByRole("button", { name: /request to book/i })
       .first();
-    if (await messageField.isVisible().catch(() => false)) {
-      await messageField.fill("Hi, I am very interested in this room!");
-    }
+    const canBook = await requestToBookBtn.isVisible().catch(() => false);
+    test.skip(!canBook, "No 'Request to Book' button — skipping (owner view or unavailable)");
 
-    // Submit the booking form
-    const submitBtn = page
-      .getByRole("button", { name: /submit|confirm|send|request/i })
-      .or(page.locator('button[type="submit"]'));
-    if (await submitBtn.first().isVisible().catch(() => false)) {
-      await submitBtn.first().click();
-      await page.waitForLoadState('domcontentloaded');
-    }
+    // Step 4: Select booking dates (offset 14 months to avoid collision with J24's 3-11 range)
+    await selectBookingDates(page, 14);
 
-    // Step 5: Verify success — require success-specific text (not any toast)
+    // Step 5: Click "Request to Book" → confirmation modal
+    await requestToBookBtn.click();
+
+    const confirmModal = page.locator('[role="dialog"][aria-modal="true"]');
+    await expect(confirmModal).toBeVisible({ timeout: 10_000 });
+
+    // Step 6: Click "Confirm Booking"
+    const confirmBookingBtn = confirmModal.getByRole('button', { name: /confirm booking/i });
+    await expect(confirmBookingBtn).toBeVisible({ timeout: 5_000 });
+    await confirmBookingBtn.click();
+
+    // Step 7: Verify success — require success-specific text (not any toast)
     await expect(
       page.getByText(/request sent|booking confirmed|submitted|pending/i)
         .or(page.locator(selectors.toast).filter({ hasText: /sent|confirmed|success/i }))
