@@ -599,7 +599,7 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
                         className="animate-in fade-in slide-in-from-bottom-2 duration-200"
                     >
                         {currentBookings.length === 0 ? (
-                            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-12 text-center">
+                            <div data-testid="empty-state" className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-12 text-center">
                                 <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
                                     {activeTab === 'received' ? (
                                         <Home className="w-8 h-8 text-zinc-400" />

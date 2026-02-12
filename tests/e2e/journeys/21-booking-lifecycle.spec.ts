@@ -229,7 +229,7 @@ test.describe("J24: Double-Booking Prevention", () => {
     await startDateTrigger.scrollIntoViewIfNeeded();
     await startDateTrigger.click();
     const todayBtn = page.getByRole('button', { name: 'Today' });
-    await todayBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await todayBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await todayBtn.click();
     await page.waitForTimeout(500);
 

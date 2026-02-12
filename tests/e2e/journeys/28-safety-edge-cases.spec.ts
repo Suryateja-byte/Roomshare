@@ -210,8 +210,8 @@ test.describe("J49: Offline Page", () => {
     const offlineContent = page.getByText(/offline|connection|retry|no internet/i);
     const has404 = page.getByText(/404|not found|couldn't find|doesn't exist/i);
 
-    const hasOffline = await offlineContent.isVisible().catch(() => false);
-    const hasNotFound = await has404.isVisible().catch(() => false);
+    const hasOffline = await offlineContent.first().isVisible().catch(() => false);
+    const hasNotFound = await has404.first().isVisible().catch(() => false);
 
     // Should show either offline page, 404, or redirect
     expect(hasOffline || hasNotFound).toBeTruthy();
