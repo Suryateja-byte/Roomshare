@@ -225,11 +225,19 @@ test.describe("J24: Double-Booking Prevention", () => {
     test.skip(!canBook, "No 'Request to Book' button — skipping (owner view or unavailable)");
 
     // Step 3: Fill start date — click date picker trigger, then click "Today"
+    // DatePicker has a hydration guard (mounted state) — the Popover only renders
+    // after useEffect runs. On slow CI the first click may hit the SSR placeholder,
+    // so we retry the click until the popover dialog appears.
     const startDateTrigger = page.locator('#booking-start-date');
     await startDateTrigger.scrollIntoViewIfNeeded();
-    await startDateTrigger.click();
+    const popoverDialog = page.locator('[role="dialog"]');
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await startDateTrigger.click();
+      const opened = await popoverDialog.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+      if (opened) break;
+    }
     const todayBtn = page.getByRole('button', { name: 'Today' });
-    await todayBtn.waitFor({ state: 'visible', timeout: 15_000 });
+    await todayBtn.waitFor({ state: 'visible', timeout: 10_000 });
     await todayBtn.click();
     await page.waitForTimeout(500);
 

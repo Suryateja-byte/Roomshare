@@ -154,7 +154,7 @@ function BookingCard({
     const showCancelButton = type === 'sent' && (booking.status === 'PENDING' || booking.status === 'ACCEPTED');
 
     return (
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div data-testid="booking-item" className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
             <div className="p-6">
                 <div className="flex items-start justify-between gap-4 mb-4">
                     <div className="flex-1">
