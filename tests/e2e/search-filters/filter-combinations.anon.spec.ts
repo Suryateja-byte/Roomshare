@@ -29,6 +29,7 @@ import {
   appliedFiltersRegion,
   openFilterModal,
   applyFilters,
+  waitForUrlStable,
 } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -198,6 +199,7 @@ test.describe("Filter Combinations", () => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&page=2`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
+    await waitForUrlStable(page, 3000);
 
     // Open filter modal with retry-click for hydration race
     await openFilterModal(page);
@@ -207,6 +209,7 @@ test.describe("Filter Combinations", () => {
     const wifiBtn = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
     if (await wifiBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await wifiBtn.click();
+      await page.waitForTimeout(500); // let Apply button count settle
 
       // Apply filters (handles modal close + URL settle)
       await applyFilters(page);

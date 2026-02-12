@@ -31,11 +31,12 @@ test.describe("REG-001: Search page loads", () => {
     const headings = page.locator('h3').filter({ hasText: /.+/ });
     await expect(headings.first()).toBeAttached({ timeout: 30_000 });
 
-    // Verify listing links are present in the DOM — scope to visible container
+    // Verify listing links are present in the DOM — scope to visible container.
+    // Use auto-retrying assertion (not instant .count()) so we wait for cards
+    // to render after SSR hydration + data fetch on slow CI.
     const container = searchResultsContainer(page);
     const cards = container.locator('a[href^="/listings/"]');
-    const count = await cards.count();
-    expect(count).toBeGreaterThanOrEqual(1);
+    await expect(cards.first()).toBeAttached({ timeout: 30_000 });
 
     // Filter out known benign console errors (e.g., Mapbox telemetry, Next.js HMR)
     const realErrors = consoleErrors.filter(

@@ -296,7 +296,17 @@ export async function applyFilters(
   opts?: { expectUrlChange?: boolean },
 ): Promise<void> {
   const urlBefore = page.url();
-  await applyButton(page).click();
+
+  // The Apply button can be temporarily unstable when useBatchedFilters
+  // updates the listing count (React re-render detaches the element, or
+  // the Radix overlay intercepts pointer events during the transition).
+  // Try a normal click first; fall back to force-click after a short settle.
+  try {
+    await applyButton(page).click({ timeout: 5_000 });
+  } catch {
+    await page.waitForTimeout(300);
+    await applyButton(page).click({ force: true, timeout: 10_000 });
+  }
 
   // Wait for modal to close
   await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });

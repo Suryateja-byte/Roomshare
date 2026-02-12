@@ -38,6 +38,7 @@ import {
   openFilterModal,
   applyFilters,
   selectDropdownOption,
+  waitForUrlStable,
 } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -54,10 +55,12 @@ test.describe("Gender & Language Filters", () => {
   // 8.1: Select gender preference -> URL has genderPreference=FEMALE_ONLY
   test(`${tags.core} - selecting gender preference and applying updates URL`, async ({ page }) => {
     await waitForSearchReady(page);
+    await waitForUrlStable(page, 1500);
     const dialog = await openFilterModal(page);
 
     // Select "Female Identifying Only" from the gender preference dropdown
     await selectDropdownOption(page, "#filter-gender-pref", /female identifying only/i);
+    await page.waitForTimeout(300);
 
     // Apply
     await applyFilters(page);
