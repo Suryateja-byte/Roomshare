@@ -371,7 +371,12 @@ export function amenitiesGroup(page: Page): Locator {
 /** Toggle an amenity button by name */
 export async function toggleAmenity(page: Page, name: string): Promise<void> {
   const group = amenitiesGroup(page);
+  // Ensure the amenities group is scrolled into view (may be below fold in drawer)
+  await group.scrollIntoViewIfNeeded().catch(() => {});
   const btn = group.getByRole("button", { name: new RegExp(`^${name}`, "i") });
+  // Wait for the button to exist — FilterModal is dynamically imported and may
+  // not have rendered yet even if the dialog container is visible
+  await btn.waitFor({ state: 'attached', timeout: 30_000 });
   await btn.click();
 }
 
@@ -386,7 +391,9 @@ export async function toggleHouseRule(
   name: string,
 ): Promise<void> {
   const group = houseRulesGroup(page);
+  await group.scrollIntoViewIfNeeded().catch(() => {});
   const btn = group.getByRole("button", { name: new RegExp(name, "i") });
+  await btn.waitFor({ state: 'attached', timeout: 30_000 });
   await btn.click();
 }
 
