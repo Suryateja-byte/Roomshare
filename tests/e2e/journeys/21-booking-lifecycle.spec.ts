@@ -69,11 +69,12 @@ test.describe("J21: Full Booking Request Submission", () => {
       await page.waitForLoadState('domcontentloaded');
     }
 
-    // Step 5: Verify toast or redirect
-    const toast = page.locator(selectors.toast);
-    const onBookings = page.url().includes("/bookings");
-    const hasToast = await toast.isVisible().catch(() => false);
-    expect(hasToast || onBookings).toBeTruthy();
+    // Step 5: Verify success — require success-specific text (not any toast)
+    await expect(
+      page.getByText(/request sent|booking confirmed|submitted|pending/i)
+        .or(page.locator(selectors.toast).filter({ hasText: /sent|confirmed|success/i }))
+        .first()
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
 
@@ -123,11 +124,12 @@ test.describe("J22: Booking Rejection Flow", () => {
       await page.waitForLoadState('domcontentloaded');
     }
 
-    // Step 5: Verify status changed
-    const rejectedBadge = page.getByText(/rejected|declined/i).first();
-    const hasRejected = await rejectedBadge.isVisible().catch(() => false);
-    const hasToast = await page.locator(selectors.toast).isVisible().catch(() => false);
-    expect(hasRejected || hasToast).toBeTruthy();
+    // Step 5: Verify rejection — require rejection-specific text (not any toast)
+    await expect(
+      page.getByText(/rejected|declined/i)
+        .or(page.locator(selectors.toast).filter({ hasText: /rejected|declined|updated/i }))
+        .first()
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
 
@@ -171,11 +173,12 @@ test.describe("J23: Booking Cancellation", () => {
       await page.waitForLoadState('domcontentloaded');
     }
 
-    // Step 5: Verify CANCELLED status
-    const cancelledBadge = page.getByText(/cancelled|canceled/i).first();
-    const hasCancelled = await cancelledBadge.isVisible().catch(() => false);
-    const hasToast = await page.locator(selectors.toast).isVisible().catch(() => false);
-    expect(hasCancelled || hasToast).toBeTruthy();
+    // Step 5: Verify cancellation — require cancellation-specific text (not any toast)
+    await expect(
+      page.getByText(/cancelled|canceled/i)
+        .or(page.locator(selectors.toast).filter({ hasText: /cancelled|canceled/i }))
+        .first()
+    ).toBeVisible({ timeout: 15_000 });
 
     // Step 6: Refresh and verify persistence
     await page.reload();
@@ -187,36 +190,95 @@ test.describe("J23: Booking Cancellation", () => {
 });
 
 // ─── J24: Double-Booking Prevention ───────────────────────────────────────────
+
+/**
+ * Select booking dates via the DatePicker UI.
+ * Navigates `startMonths` months forward for start date (day 1),
+ * and `startMonths + 2` months forward for end date (day 1).
+ * This ensures >=30 days (MIN_BOOKING_DAYS) and unique date windows per browser.
+ */
+async function selectBookingDates(page: import('@playwright/test').Page, startMonths: number) {
+  // --- Start date ---
+  const startDateTrigger = page.locator('#booking-start-date');
+  await startDateTrigger.scrollIntoViewIfNeeded();
+  // Wait for Radix hydration: SSR placeholder lacks data-state, hydrated Popover.Trigger has it
+  await page.locator('#booking-start-date[data-state]').waitFor({ state: 'attached', timeout: 15_000 });
+  await startDateTrigger.click();
+
+  const nextMonthBtnStart = page.locator('button[aria-label="Next month"]');
+  await nextMonthBtnStart.waitFor({ state: 'visible', timeout: 10_000 });
+  for (let i = 0; i < startMonths; i++) {
+    await nextMonthBtnStart.click();
+    await page.waitForTimeout(250);
+  }
+
+  // Select day 1 from the calendar (unique, always exists)
+  const startDayBtn = page
+    .locator('[data-radix-popper-content-wrapper] button, [class*="popover"] button')
+    .filter({ hasText: /^1$/ })
+    .first();
+  await startDayBtn.waitFor({ state: 'visible', timeout: 5_000 });
+  // dispatchEvent works even when portal lands outside viewport (mobile)
+  await startDayBtn.dispatchEvent('click');
+  await page.waitForTimeout(500);
+
+  // --- End date ---
+  const endDateTrigger = page.locator('#booking-end-date');
+  await endDateTrigger.scrollIntoViewIfNeeded();
+  await page.locator('#booking-end-date[data-state]').waitFor({ state: 'attached', timeout: 10_000 });
+  await endDateTrigger.click();
+  await page.waitForTimeout(300);
+
+  const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
+  await nextMonthBtnEnd.waitFor({ state: 'visible', timeout: 10_000 });
+  // End date picker opens at CURRENT month, not start-date's month.
+  // Navigate startMonths + 2 from current month to land 2 months after start date.
+  for (let i = 0; i < startMonths + 2; i++) {
+    await nextMonthBtnEnd.click();
+    await page.waitForTimeout(250);
+  }
+
+  // Select day 1 for end date
+  const endDayBtn = page
+    .locator('[data-radix-popper-content-wrapper] button, [class*="popover"] button')
+    .filter({ hasText: /^1$/ })
+    .first();
+  await endDayBtn.waitFor({ state: 'visible', timeout: 5_000 });
+  await endDayBtn.dispatchEvent('click');
+  await page.waitForTimeout(500);
+}
+
 test.describe("J24: Double-Booking Prevention", () => {
-  test("fill dates → confirm booking → verify button disabled during submission", async ({
+  test("submit booking → clear session → attempt duplicate → assert server rejection", async ({
     page,
     nav,
   }) => {
-    // Step 1: Find a listing NOT owned by test user (with retry)
+    const testInfo = test.info();
+
+    // Per-project month offsets to avoid date collisions across parallel browsers
+    const MONTH_OFFSETS: Record<string, number> = {
+      'chromium': 3, 'firefox': 5, 'webkit': 7,
+      'Mobile Chrome': 9, 'Mobile Safari': 11,
+    };
+    const monthOffset = (MONTH_OFFSETS[testInfo.project.name] ?? 4) + (testInfo.retry * 2);
+
+    // Step 1: Search for a listing NOT owned by test user
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
     await page.waitForLoadState('domcontentloaded');
 
-    let cards = searchResultsContainer(page).locator(selectors.listingCard);
-    let count = await cards.count();
-    if (count === 0) {
-      await nav.goToSearch({ q: "Reviewer", bounds: SF_BOUNDS });
-      await page.waitForLoadState('domcontentloaded');
-      cards = searchResultsContainer(page).locator(selectors.listingCard);
-      count = await cards.count();
-    }
-    if (count === 0) {
-      await nav.goToSearch({ bounds: SF_BOUNDS });
-      await page.waitForLoadState('domcontentloaded');
-      cards = searchResultsContainer(page).locator(selectors.listingCard);
-      count = await cards.count();
-    }
+    const cards = searchResultsContainer(page).locator(selectors.listingCard);
+    const count = await cards.count();
     test.skip(count === 0, "Reviewer listing not found — skipping");
 
-    // Step 2: Go to listing detail
+    // Step 2: Navigate to listing detail and extract listingId
     await nav.clickListingCard(0);
     await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
     await page.waitForLoadState('domcontentloaded');
 
+    const listingId = page.url().match(/\/listings\/([^/?#]+)/)?.[1];
+    test.skip(!listingId, "Could not extract listingId from URL — skipping");
+
+    // Step 3: Verify booking button is visible
     const requestToBookBtn = page
       .locator("main")
       .getByRole("button", { name: /request to book/i })
@@ -224,77 +286,82 @@ test.describe("J24: Double-Booking Prevention", () => {
     const canBook = await requestToBookBtn.isVisible().catch(() => false);
     test.skip(!canBook, "No 'Request to Book' button — skipping (owner view or unavailable)");
 
-    // Step 3: Fill start date — click date picker trigger, then click "Today"
-    // DatePicker has a hydration guard (mounted state) — the SSR placeholder
-    // renders a plain <button> without data-state. After useEffect sets mounted=true,
-    // Radix Popover.Trigger replaces it and adds data-state="closed". Wait for that
-    // attribute before clicking so we don't click the inert SSR placeholder.
-    const startDateTrigger = page.locator('#booking-start-date');
-    await startDateTrigger.scrollIntoViewIfNeeded();
-    await page.locator('#booking-start-date[data-state]').waitFor({ state: 'attached', timeout: 15_000 });
-    await startDateTrigger.click();
-    const todayBtn = page.getByRole('button', { name: 'Today' });
-    await todayBtn.waitFor({ state: 'visible', timeout: 10_000 });
-    // Popover renders via portal which may land outside the viewport on
-    // Mobile Chrome. dispatchEvent fires the click directly on the DOM node
-    // without requiring it to be inside the viewport.
-    await todayBtn.dispatchEvent('click');
-    await page.waitForTimeout(500);
-
-    // Step 4: Fill end date — click date picker, navigate 2 months forward, select day 15
-    // This ensures >=30 days (MIN_BOOKING_DAYS) from today
-    const endDateTrigger = page.locator('#booking-end-date');
-    await endDateTrigger.scrollIntoViewIfNeeded();
-    await endDateTrigger.click();
-    await page.waitForTimeout(300);
-
-    const nextMonthBtn = page.locator('button[aria-label="Next month"]');
-    if (await nextMonthBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await nextMonthBtn.click();
-      await page.waitForTimeout(300);
-      await nextMonthBtn.click();
-      await page.waitForTimeout(300);
-    }
-
-    // Select day 15 from the calendar
-    const dayButtons = page
-      .locator('[data-radix-popper-content-wrapper] button, [class*="popover"] button')
-      .filter({ hasText: /^15$/ });
-    const dayButton = dayButtons.first();
-    if (await dayButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await dayButton.click();
-    } else {
-      // Fallback: use "Today" if day 15 isn't visible
-      const fallbackToday = page.getByRole('button', { name: 'Today' });
-      if (await fallbackToday.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await fallbackToday.click();
+    // Step 4: Clear stale sessionStorage keys from prior runs
+    await page.evaluate((id) => {
+      sessionStorage.removeItem(`booking_submitted_${id}`);
+      sessionStorage.removeItem(`booking_pending_key_${id}`);
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k?.startsWith('booking_key_')) sessionStorage.removeItem(k);
       }
-    }
-    await page.waitForTimeout(500);
+    }, listingId);
 
-    // Step 5: Click "Request to Book" → should open confirmation modal
+    // ──── PHASE 1: Submit first booking successfully ────
+
+    // Step 5: Select unique dates for this browser project
+    await selectBookingDates(page, monthOffset);
+
+    // Step 6: Click "Request to Book" → confirmation modal
     await requestToBookBtn.click();
 
     const confirmModal = page.locator('[role="dialog"][aria-modal="true"]');
-    const modalOpened = await confirmModal.isVisible({ timeout: 5000 }).catch(() => false);
-    test.skip(!modalOpened, "Confirmation modal did not open — dates may be invalid, skipping");
+    await expect(confirmModal).toBeVisible({ timeout: 10_000 });
 
-    // Step 6: Click "Confirm Booking" in the modal
+    // Step 7: Click "Confirm Booking"
     const confirmBookingBtn = confirmModal.getByRole('button', { name: /confirm booking/i });
-    await expect(confirmBookingBtn).toBeVisible({ timeout: 3000 });
+    await expect(confirmBookingBtn).toBeVisible({ timeout: 5_000 });
     await confirmBookingBtn.click();
 
-    // Step 7: Verify submission went through. The server may respond fast
-    // (button re-enables before we check) or the page may redirect away.
-    // Capture the URL before submission and check multiple success signals.
-    const urlBefore = page.url();
-    await page.waitForTimeout(3000);
-    const urlChanged = page.url() !== urlBefore;
-    const btnDisabled = await requestToBookBtn.isDisabled().catch(() => false);
-    const toastVisible = await page.locator(selectors.toast).first().isVisible().catch(() => false);
-    const outcomeText = await page.getByText(/success|already submitted|request sent|redirecting|booking confirmed|error/i)
-      .first().isVisible().catch(() => false);
-    // At least one signal should indicate the submission was processed
-    expect(urlChanged || btnDisabled || toastVisible || outcomeText).toBeTruthy();
+    // Step 8: Assert first booking succeeded specifically
+    const successIndicator = page.getByText(/request sent|booking confirmed|submitted/i)
+      .or(page.locator(selectors.toast).filter({ hasText: /sent|confirmed|success/i }));
+    await expect(successIndicator.first()).toBeVisible({ timeout: 15_000 });
+
+    // ──── PHASE 2: Attempt duplicate booking, expect rejection ────
+
+    // Step 9: Clear sessionStorage to reset client-side guards
+    await page.evaluate((id) => {
+      sessionStorage.removeItem(`booking_submitted_${id}`);
+      sessionStorage.removeItem(`booking_pending_key_${id}`);
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k?.startsWith('booking_key_')) sessionStorage.removeItem(k);
+      }
+    }, listingId);
+
+    // Step 10: Navigate back to listing detail
+    await page.goto(`/listings/${listingId}`);
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for booking form to hydrate
+    await page.locator('#booking-start-date[data-state]').waitFor({ state: 'attached', timeout: 15_000 });
+
+    // Step 11: Select the SAME dates as phase 1
+    await selectBookingDates(page, monthOffset);
+
+    // Step 12: Click "Request to Book" → confirmation modal
+    const requestToBookBtn2 = page
+      .locator("main")
+      .getByRole("button", { name: /request to book/i })
+      .first();
+    await requestToBookBtn2.click();
+
+    const confirmModal2 = page.locator('[role="dialog"][aria-modal="true"]');
+    await expect(confirmModal2).toBeVisible({ timeout: 10_000 });
+
+    // Step 13: Click "Confirm Booking"
+    const confirmBookingBtn2 = confirmModal2.getByRole('button', { name: /confirm booking/i });
+    await expect(confirmBookingBtn2).toBeVisible({ timeout: 5_000 });
+    await confirmBookingBtn2.click();
+
+    // Step 14: Assert server rejection — BookingForm renders error in role="alert"
+    // Server returns: "You already have a booking request for these exact dates."
+    // or: "You already have a booking request for overlapping dates."
+    const errorAlert = page.locator('[role="alert"]');
+    await expect(errorAlert.first()).toBeVisible({ timeout: 15_000 });
+    await expect(errorAlert.first()).toContainText(/already have a booking/i);
+
+    // Must NOT have redirected to /bookings (that would mean success)
+    expect(page.url()).toContain('/listings/');
   });
 });
