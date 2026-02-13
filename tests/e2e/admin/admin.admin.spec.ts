@@ -185,7 +185,7 @@ test.describe('ADM: Report Management', () => {
 
     // ReportList has filter buttons: All, Open (may include count badge), Resolved, Dismissed
     await expect(page.getByRole('button', { name: /^all$/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /open/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /open/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /resolved/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /dismissed/i })).toBeVisible();
   });

@@ -265,7 +265,7 @@ test.describe("Discovery & Search Journeys", () => {
           // Should show popup or listing info
           const popup = page.locator('[class*="popup"], [class*="Popup"]');
           await expect(
-            popup.or(page.locator('[data-testid="marker-popup"]')),
+            popup.or(page.locator('[data-testid="marker-popup"]')).first(),
           ).toBeVisible({
             timeout: 5000,
           });
