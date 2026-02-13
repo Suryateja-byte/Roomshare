@@ -74,7 +74,7 @@ export default defineConfig({
 
     {
       name: 'chromium',
-      testIgnore: /\.anon\.spec\.ts/,
+      testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',
@@ -84,7 +84,7 @@ export default defineConfig({
 
     {
       name: 'firefox',
-      testIgnore: /\.anon\.spec\.ts/,
+      testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
         ...devices['Desktop Firefox'],
         storageState: 'playwright/.auth/user.json',
@@ -94,7 +94,7 @@ export default defineConfig({
 
     {
       name: 'webkit',
-      testIgnore: /\.anon\.spec\.ts/,
+      testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
         ...devices['Desktop Safari'],
         storageState: 'playwright/.auth/user.json',
@@ -105,7 +105,7 @@ export default defineConfig({
     /* Mobile viewports */
     {
       name: 'Mobile Chrome',
-      testIgnore: /\.anon\.spec\.ts/,
+      testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
         ...devices['Pixel 5'],
         storageState: 'playwright/.auth/user.json',
@@ -115,10 +115,21 @@ export default defineConfig({
 
     {
       name: 'Mobile Safari',
-      testIgnore: /\.anon\.spec\.ts/,
+      testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
         ...devices['iPhone 12'],
         storageState: 'playwright/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+
+    /* Admin tests — requires admin authentication */
+    {
+      name: 'chromium-admin',
+      testMatch: /\.admin\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/admin.json',
       },
       dependencies: ['setup'],
     },

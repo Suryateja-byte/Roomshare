@@ -72,6 +72,8 @@ jobs:
       E2E_BASE_URL: http://localhost:3000
       E2E_TEST_EMAIL: test@example.com
       E2E_TEST_PASSWORD: TestPassword123!
+      E2E_ADMIN_EMAIL: e2e-admin@roomshare.dev
+      E2E_ADMIN_PASSWORD: TestPassword123!
       NODE_OPTIONS: '--max-old-space-size=4096'
       CI: 'true'
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
@@ -140,6 +142,7 @@ jobs:
             --reporter=blob \
             --workers=4 \
             --project=chromium \
+            --project=chromium-admin \
             --project=chromium-anon \
             --project="Mobile Chrome" \
             --project=firefox-anon \

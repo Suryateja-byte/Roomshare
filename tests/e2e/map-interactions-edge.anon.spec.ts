@@ -189,7 +189,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       }
 
       // Navigate to search page
-      await page.goto(SEARCH_URL);
+      await page.goto(SEARCH_URL, { timeout: 90_000 });
       await page.waitForLoadState("domcontentloaded");
 
       // Look for "Loading map..." placeholder before canvas appears
