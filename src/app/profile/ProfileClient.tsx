@@ -189,7 +189,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
     const joinedDate = new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     return (
-        <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black pb-20 pt-16">
+        <div data-testid="profile-page" className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black pb-20 pt-16">
             <div className="container mx-auto max-w-5xl px-4 sm:px-6 py-6">
 
                 {/* Profile Header */}
@@ -213,7 +213,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                         <div className="flex-1 pt-0 md:pt-2 text-center md:text-left">
                             <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
                                 <div>
-                                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white tracking-tight mb-2">
+                                    <h1 data-testid="profile-name" className="text-2xl sm:text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white tracking-tight mb-2">
                                         {user.name || 'User'}
                                     </h1>
                                     <p className="text-zinc-500 dark:text-zinc-400 font-medium mb-4">
@@ -232,6 +232,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
 
                                 <div className="flex gap-3 justify-center md:justify-start">
                                     <button
+                                        data-testid="edit-profile-link"
                                         onClick={handleEdit}
                                         disabled={isEditing}
                                         className="h-10 px-6 rounded-full border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2 disabled:opacity-60"
@@ -347,7 +348,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                         {user.bio && (
                             <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 shadow-sm border border-zinc-100 dark:border-zinc-800">
                                 <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-4">About {user.name?.split(' ')[0]}</h3>
-                                <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed font-light text-base sm:text-lg">
+                                <p data-testid="profile-bio" className="text-zinc-500 dark:text-zinc-400 leading-relaxed font-light text-base sm:text-lg">
                                     {user.bio}
                                 </p>
                             </div>
