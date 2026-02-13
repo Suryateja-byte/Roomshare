@@ -44,15 +44,47 @@ test.describe('Homepage — Authenticated User', () => {
   });
 
   test('HP-11: User menu visible in header when authenticated', async ({ page }) => {
-    // The user menu button has data-testid="user-menu" and aria-label="User menu"
+    // On mobile viewports, the user menu may be inside the hamburger nav
+    const viewport = page.viewportSize();
+    const isMobile = viewport && viewport.width < 768;
+
+    if (isMobile) {
+      // Open mobile nav first — hamburger has aria-label="Open menu"
+      const hamburger = page.getByRole('button', { name: /open menu/i })
+        .or(page.getByLabel(/open menu/i))
+        .first();
+
+      if (await hamburger.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await hamburger.click();
+        await page.waitForTimeout(500);
+      }
+    }
+
+    // Desktop: data-testid="user-menu" button is directly visible
+    // Mobile: hamburger menu contains "View Profile" link and user avatar
     await expect(
       page.locator('[data-testid="user-menu"]')
         .or(page.getByRole('button', { name: /user menu/i }))
+        .or(page.getByRole('link', { name: /view profile/i }))
         .first()
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('HP-12: List a Room CTA in navbar links to /listings/create', async ({ page }) => {
+    // On mobile viewports, open hamburger menu first to reveal "List a Room"
+    const viewport = page.viewportSize();
+    const isMobile = viewport && viewport.width < 768;
+
+    if (isMobile) {
+      const hamburger = page.getByRole('button', { name: /open menu/i })
+        .or(page.getByLabel(/open menu/i))
+        .first();
+      if (await hamburger.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await hamburger.click();
+        await page.waitForTimeout(500);
+      }
+    }
+
     // The navbar has a "List a Room" button/link for all users
     const listLink = page.getByRole('link', { name: /list a room/i }).first();
 

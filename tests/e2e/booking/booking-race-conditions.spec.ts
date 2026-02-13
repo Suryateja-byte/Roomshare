@@ -283,7 +283,7 @@ test.describe('Booking Race Conditions @race', () => {
 
   // ─── RC-03: Sequential booking conflict ───────────────────────────────────
   test('RC-03: sequential duplicate — same user, same dates, same listing rejected', async ({ page }) => {
-    test.use({ storageState: USER_STATE });
+    // page fixture already uses USER_STATE from project config
 
     const listingUrl = await findReviewerListingUrl(page);
     test.skip(!listingUrl, 'Reviewer listing not found — skipping');
@@ -319,7 +319,7 @@ test.describe('Booking Race Conditions @race', () => {
 
   // ─── RC-04: Double-click submit ───────────────────────────────────────────
   test('RC-04: double-click submit — only one booking created', async ({ page }) => {
-    test.use({ storageState: USER_STATE });
+    // page fixture already uses USER_STATE from project config
 
     const listingUrl = await findReviewerListingUrl(page);
     test.skip(!listingUrl, 'Reviewer listing not found — skipping');
@@ -659,7 +659,7 @@ test.describe('Booking Race Conditions @race', () => {
 
   // ─── RC-09: Network retry idempotency ─────────────────────────────────────
   test('RC-09: idempotency key — retry after simulated failure uses same key', async ({ page }) => {
-    test.use({ storageState: USER_STATE });
+    // page fixture already uses USER_STATE from project config
 
     const listingUrl = await findReviewerListingUrl(page);
     test.skip(!listingUrl, 'Reviewer listing not found — skipping');
