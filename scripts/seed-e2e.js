@@ -680,6 +680,60 @@ async function main() {
     // Non-fatal: tests may still partially work without it
   }
 
+  // 13. Create notification records for E2E tests
+  const existingNotification = await prisma.notification.findFirst({
+    where: { userId: user.id, type: 'BOOKING_ACCEPTED' },
+  });
+  if (!existingNotification) {
+    await prisma.notification.createMany({
+      data: [
+        {
+          userId: user.id,
+          type: 'BOOKING_ACCEPTED',
+          title: 'Booking Confirmed',
+          message: 'Your booking request for Spacious SOMA Shared has been accepted!',
+          link: '/bookings',
+          read: false,
+        },
+        {
+          userId: user.id,
+          type: 'NEW_MESSAGE',
+          title: 'New Message',
+          message: 'E2E Reviewer sent you a message about Sunny Mission Room.',
+          link: '/messages',
+          read: false,
+        },
+        {
+          userId: user.id,
+          type: 'BOOKING_CANCELLED',
+          title: 'Booking Cancelled',
+          message: 'A booking for Hayes Valley Private Suite was cancelled.',
+          link: null,
+          read: true,
+        },
+        {
+          userId: user.id,
+          type: 'NEW_REVIEW',
+          title: 'New Review',
+          message: 'Someone left a review on your listing Sunny Mission Room.',
+          link: `/listings/${createdListings[0]?.id || 'unknown'}`,
+          read: true,
+        },
+        {
+          userId: reviewer.id,
+          type: 'BOOKING_REQUEST',
+          title: 'New Booking Request',
+          message: 'You have a new booking request for Reviewer Nob Hill Apartment.',
+          link: '/bookings',
+          read: false,
+        },
+      ],
+    });
+    console.log('  ✓ Notification records created');
+  } else {
+    console.log('  ⏭ Notification records exist');
+  }
+
   console.log('✅ E2E seed complete.');
 }
 

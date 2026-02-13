@@ -380,6 +380,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     return (
         <>
             <Link
+                data-testid="listing-cancel-button"
                 href={`/listings/${listing.id}`}
                 className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
             >
@@ -463,7 +464,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                 </div>
             )}
 
-            <form ref={formRef} onSubmit={handleSubmit} onChange={handleFormChange} className="space-y-12">
+            <form ref={formRef} data-testid="edit-listing-form" onSubmit={handleSubmit} onChange={handleFormChange} className="space-y-12">
                 {/* Section 1: The Basics */}
                 <div className="space-y-6">
                     <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
@@ -479,6 +480,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             defaultValue={listing.title}
                             placeholder="e.g. Sun-drenched Loft in Arts District"
                             disabled={loading}
+                            data-testid="listing-title-input"
                         />
                         <FieldError field="title" />
                     </div>
@@ -495,6 +497,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             disabled={loading}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
+                            data-testid="listing-description-input"
                         />
                         <FieldError field="description" />
                     </div>
@@ -510,6 +513,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                 defaultValue={listing.price}
                                 placeholder="2400"
                                 disabled={loading}
+                                data-testid="listing-price-input"
                             />
                             <FieldError field="price" />
                         </div>
@@ -795,6 +799,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                         disabled={loading || isAnyImageUploading || (images.length === 0)}
                         size="lg"
                         className="flex-1 h-14 rounded-xl shadow-xl shadow-zinc-900/10 text-lg"
+                        data-testid="listing-save-button"
                     >
                         {loading ? (
                             <>

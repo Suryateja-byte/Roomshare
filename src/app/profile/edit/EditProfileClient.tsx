@@ -191,7 +191,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-8">
+                <form data-testid="edit-profile-form" onSubmit={handleSubmit} className="space-y-8">
                     {/* Section: Profile Photo */}
                     <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 md:p-8 shadow-sm border border-zinc-200 dark:border-zinc-800">
                         <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -277,6 +277,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="Your full name"
                                     required
+                                    data-testid="profile-name-input"
                                     className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white/20 focus:bg-white dark:focus:bg-zinc-800 transition-all placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
                                 />
                             </div>
@@ -446,6 +447,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                         <button
                             type="submit"
                             disabled={isLoading}
+                            data-testid="profile-save-button"
                             className="w-full sm:w-auto px-8 py-2.5 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium transition-all shadow-lg shadow-zinc-900/20 dark:shadow-white/10 active:scale-[0.98] text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             <Save className="w-4 h-4" />

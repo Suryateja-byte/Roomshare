@@ -459,7 +459,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
     });
 
     return (
-        <div className="fixed inset-0 z-40 bg-white dark:bg-zinc-950 flex overflow-hidden font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black pt-[80px]">
+        <div data-testid="messages-page" className="fixed inset-0 z-40 bg-white dark:bg-zinc-950 flex overflow-hidden font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black pt-[80px]">
             {/* Sidebar */}
             <div className={`w-full md:w-[400px] flex flex-col border-r border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 ${activeId ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-6 border-b border-zinc-50 dark:border-zinc-800">
@@ -510,7 +510,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                         const lastMsg = c.messages[0];
                         const hasUnread = (c.unreadCount || 0) > 0;
                         return (
-                            <div key={c.id} onClick={() => setActiveId(c.id)} className={`px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-900 dark:border-white' : 'bg-white dark:bg-zinc-950 border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900'}`}>
+                            <div key={c.id} data-testid="conversation-item" onClick={() => setActiveId(c.id)} className={`px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-900 dark:border-white' : 'bg-white dark:bg-zinc-950 border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900'}`}>
                                 <div className="relative">
                                     <UserAvatar image={other?.image} name={other?.name} size="lg" />
                                     {hasUnread && (
@@ -685,6 +685,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                 msgs.map(m => (
                                     <div key={m.id} className={`flex ${m.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}>
                                         <div
+                                            data-testid="message-bubble"
                                             onClick={m.status === 'failed' ? () => handleRetry(m.id, m.content) : undefined}
                                             className={`
                                                 max-w-[70%] px-5 py-2.5 text-sm leading-relaxed shadow-sm
@@ -778,6 +779,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                         <Paperclip className="w-5 h-5" />
                                     </button>
                                     <input
+                                        data-testid="message-input"
                                         value={input}
                                         onChange={e => handleInputChange(e.target.value)}
                                         placeholder={isOffline ? "You're offline..." : "Type a message..."}

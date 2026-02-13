@@ -98,3 +98,43 @@ setup('authenticate as admin', async ({ page }) => {
 
   await page.context().storageState({ path: adminAuthFile });
 });
+
+/**
+ * User2 authentication setup
+ * Creates a separate authenticated session for multi-user tests
+ * Uses seed credentials from scripts/seed-e2e.js (e2e-other user)
+ */
+setup('authenticate as user2', async ({ page }) => {
+  const user2AuthFile = path.join(__dirname, '../../playwright/.auth/user2.json');
+
+  await page.goto('/login');
+  await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
+
+  await page.getByLabel(/email/i).fill('e2e-other@roomshare.dev');
+  await page.locator('input#password').fill('TestPassword123!');
+
+  await waitForTurnstileIfPresent(page);
+
+  const loginResponsePromise = page.waitForResponse(
+    (response) => response.url().includes('/api/auth') && response.status() === 200,
+    { timeout: 30000 }
+  );
+
+  await page.getByRole('button', { name: /sign in|log in|login/i }).click();
+
+  await loginResponsePromise;
+
+  await page.waitForURL((url) => !url.pathname.includes('/login'), {
+    timeout: 30000,
+  });
+
+  await expect(
+    page.getByRole('button', { name: /menu|profile|account/i }).or(
+      page.locator('[data-testid="user-menu"]')
+    ).or(
+      page.locator('[aria-label*="user"]')
+    )
+  ).toBeVisible({ timeout: 10000 });
+
+  await page.context().storageState({ path: user2AuthFile });
+});
