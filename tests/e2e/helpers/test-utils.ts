@@ -64,6 +64,7 @@ export const tags = {
   core: "@core",
   smoke: "@smoke",
   filter: "@filter",
+  sessionExpiry: "@session-expiry",
 } as const;
 
 /**
