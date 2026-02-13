@@ -36,7 +36,7 @@ async function selectDates(page: import('@playwright/test').Page, startMonths: n
   const nextMonthBtnStart = page.locator('button[aria-label="Next month"]');
   await nextMonthBtnStart.waitFor({ state: 'visible', timeout: 10_000 });
   for (let i = 0; i < startMonths; i++) {
-    await nextMonthBtnStart.click({ force: true });
+    await nextMonthBtnStart.dispatchEvent('click');
     await page.waitForTimeout(250);
   }
 
@@ -58,7 +58,7 @@ async function selectDates(page: import('@playwright/test').Page, startMonths: n
   const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
   await nextMonthBtnEnd.waitFor({ state: 'visible', timeout: 10_000 });
   for (let i = 0; i < startMonths + 2; i++) {
-    await nextMonthBtnEnd.click({ force: true });
+    await nextMonthBtnEnd.dispatchEvent('click');
     await page.waitForTimeout(250);
   }
 
