@@ -218,12 +218,10 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     useEffect(() => {
         if (isMobileMenuOpen) {
             document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
+            return () => {
+                document.body.style.overflow = '';
+            };
         }
-        return () => {
-            document.body.style.overflow = '';
-        };
     }, [isMobileMenuOpen]);
 
     // Poll for unread count updates and listen for custom events

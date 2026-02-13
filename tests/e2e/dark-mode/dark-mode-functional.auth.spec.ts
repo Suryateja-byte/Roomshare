@@ -204,11 +204,21 @@ test.describe('Dark Mode — Functional (Authenticated Pages)', () => {
      * Parse an rgb/rgba string and return perceived luminance (0 = black, 1 = white).
      * Uses the standard CCIR 601 luma formula.
      */
-    function parseLuminance(rgb: string): number | null {
-      const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-      if (!match) return null;
-      const [, r, g, b] = match.map(Number);
-      return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    function parseLuminance(color: string): number | null {
+      // Support legacy comma-separated: rgb(39, 39, 42) / rgba(39, 39, 42, 0.5)
+      // and modern space-separated: rgb(39 39 42) / rgb(39 39 42 / 0.5)
+      const rgbMatch = color.match(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/);
+      if (rgbMatch) {
+        const [, r, g, b] = rgbMatch.map(Number);
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      }
+      // Support OKLab/OKLCH: oklab(L a b) / oklch(L C H) — L is perceptual lightness [0,1]
+      // Modern Chromium returns these for Tailwind opacity modifier colors
+      const oklMatch = color.match(/okl(?:ab|ch)\(\s*([\d.]+)/);
+      if (oklMatch) {
+        return parseFloat(oklMatch[1]);
+      }
+      return null;
     }
 
     test('DM-F12: /bookings body background is dark', async ({ page }) => {

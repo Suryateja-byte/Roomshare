@@ -22,6 +22,7 @@ import {
   rapidClick,
   captureNavigationCount,
 } from "../helpers";
+import { applyFilters } from "../helpers/filter-helpers";
 import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 
 test.describe("Filter Race Conditions", () => {
@@ -299,8 +300,7 @@ test.describe("Filter Race Conditions", () => {
     await wifiToggle.click();
 
     // Apply filters
-    await applyButton(page).click();
-    await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
+    await applyFilters(page);
     await expect.poll(
       () => page.url().includes("amenities=Wifi"),
       { timeout: 30_000, message: "URL to contain amenities=Wifi" },

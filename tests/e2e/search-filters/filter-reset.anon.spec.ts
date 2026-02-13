@@ -148,23 +148,23 @@ test.describe("Filter Reset", () => {
       `${SEARCH_URL}&amenities=Wifi,Parking&roomType=Private+Room&sort=price_asc&q=downtown`,
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
 
+    // Wait for hydration — applied filters region must be stable and interactive
     const region = appliedFiltersRegion(page);
+    await expect(region).toBeVisible({ timeout: 15_000 });
+
     const regionVisible = await region.isVisible().catch(() => false);
     test.skip(!regionVisible, "Applied filters region not visible");
 
-    // "Clear all filters" button in the chip bar — retry in case click doesn't register
+    // "Clear all filters" button in the chip bar
     const clearAllBtn = chipsClearAllButton(page);
-    const clearBtnVisible = await clearAllBtn.isVisible({ timeout: 10_000 }).catch(() => false);
-    if (!clearBtnVisible) {
-      test.skip(true, "Clear all filters button not visible (chips may not have rendered)");
-      return;
-    }
-    await expect(async () => {
-      await clearAllBtn.click();
-      await expect(clearAllBtn).not.toBeVisible();
-    }).toPass({ timeout: 45_000 });
+    await expect(clearAllBtn).toBeVisible({ timeout: 15_000 });
+
+    // Single click — no retry loop around the click itself
+    await clearAllBtn.click();
+
+    // Wait for the button to disappear (filter clear navigation completed)
+    await expect(clearAllBtn).not.toBeVisible({ timeout: 30_000 });
 
     // Wait for all filter params to be removed from URL via soft navigation
     await expect.poll(
@@ -172,7 +172,7 @@ test.describe("Filter Reset", () => {
         const params = new URL(page.url(), "http://localhost").searchParams;
         return !params.has("amenities") && !params.has("roomType");
       },
-      { timeout: timeouts.action, message: "URL to have no filter params after clear all" },
+      { timeout: 30_000, message: "URL to have no filter params after clear all" },
     ).toBe(true);
 
     // All chips should be gone -- region should disappear

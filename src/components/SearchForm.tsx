@@ -595,12 +595,10 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     useEffect(() => {
         if (showFilters) {
             document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
+            return () => {
+                document.body.style.overflow = '';
+            };
         }
-        return () => {
-            document.body.style.overflow = '';
-        };
     }, [showFilters]);
 
     const isCompact = variant === 'compact';

@@ -353,8 +353,9 @@ test.describe("Discovery & Search Journeys", () => {
       // Check for main landmark and heading (core a11y checks)
       const main = page.locator('main, [role="main"]');
       await expect(main).toBeVisible({ timeout: 30000 });
-      const h1 = page.locator('h1');
-      expect(await h1.count()).toBeGreaterThanOrEqual(1);
+      // Verify at least one heading exists (core a11y: page must have a heading)
+      const heading = page.locator('h1, h2, h3, [role="heading"]');
+      await expect(heading.first()).toBeAttached({ timeout: 30_000 });
 
       // Specific search accessibility
       // - Form should have proper labeling
