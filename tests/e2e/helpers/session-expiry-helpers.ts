@@ -1,0 +1,111 @@
+/**
+ * Session Expiry E2E Test Helpers
+ *
+ * Reusable utilities for simulating mid-session auth token expiry.
+ * Combines cookie clearing, session endpoint mocking, and API 401 mocking
+ * to test how components react when the user's session expires.
+ *
+ * Cookie name: `authjs.session-token` (NextAuth v5 / Auth.js beta 30)
+ */
+
+import { Page, Route } from "@playwright/test";
+import { expect } from "@playwright/test";
+
+const SESSION_COOKIE = "authjs.session-token";
+
+/**
+ * Expire session by clearing auth cookie + optionally mocking session endpoint.
+ *
+ * @param page - Playwright page
+ * @param options.mockEndpoint - Also mock /api/auth/session to return {} (default: true)
+ * @param options.triggerRefetch - Dispatch a focus event to force SessionProvider refetch (default: false)
+ */
+export async function expireSession(
+  page: Page,
+  options: { mockEndpoint?: boolean; triggerRefetch?: boolean } = {},
+): Promise<void> {
+  const { mockEndpoint = true, triggerRefetch = false } = options;
+
+  await page.context().clearCookies({ name: SESSION_COOKIE });
+
+  if (mockEndpoint) {
+    await page.route("**/api/auth/session", async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "{}",
+      });
+    });
+  }
+
+  if (triggerRefetch) {
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await page.waitForTimeout(500);
+  }
+}
+
+/**
+ * Mock a specific API endpoint to return 401 Unauthorized.
+ *
+ * @param page - Playwright page
+ * @param urlPattern - URL string or regex to intercept
+ * @param options.method - Only intercept this HTTP method (e.g. 'POST')
+ */
+export async function mockApi401(
+  page: Page,
+  urlPattern: string | RegExp,
+  options?: { method?: string },
+): Promise<void> {
+  await page.route(urlPattern, async (route: Route) => {
+    if (options?.method && route.request().method() !== options.method) {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Unauthorized" }),
+    });
+  });
+}
+
+/**
+ * Trigger SessionProvider refetch immediately via window focus event.
+ * SessionProvider (refetchOnWindowFocus: true) will call /api/auth/session.
+ */
+export async function triggerSessionPoll(page: Page): Promise<void> {
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+}
+
+/**
+ * Assert page redirected to /login, optionally checking callbackUrl.
+ */
+export async function expectLoginRedirect(
+  page: Page,
+  callbackUrl?: string,
+  timeout = 15000,
+): Promise<void> {
+  await expect(page).toHaveURL(/\/login/, { timeout });
+  if (callbackUrl) {
+    const url = new URL(page.url());
+    expect(url.searchParams.get("callbackUrl") ?? "").toContain(callbackUrl);
+  }
+}
+
+/**
+ * Assert sessionStorage draft was preserved after session expiry.
+ *
+ * @returns The stored draft value
+ */
+export async function expectDraftSaved(
+  page: Page,
+  key: string,
+  expectedContent?: string,
+): Promise<string | null> {
+  const value = await page.evaluate((k) => sessionStorage.getItem(k), key);
+  expect(value).not.toBeNull();
+  if (expectedContent) {
+    expect(value).toContain(expectedContent);
+  }
+  return value;
+}

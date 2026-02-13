@@ -90,3 +90,12 @@ export {
   waitForAuthPageReady,
   authPageMasks,
 } from "./dark-mode-helpers";
+
+// Session expiry helpers for mid-session auth token expiry testing
+export {
+  expireSession,
+  mockApi401,
+  triggerSessionPoll,
+  expectLoginRedirect,
+  expectDraftSaved,
+} from "./session-expiry-helpers";
