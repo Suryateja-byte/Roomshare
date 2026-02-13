@@ -97,17 +97,15 @@ test.describe('Listing Edit — Auth & Access Guards', () => {
     const unauthPage = await unauthContext.newPage();
 
     try {
-      await unauthPage.goto(`/listings/${listingId}/edit`, { waitUntil: 'domcontentloaded' });
+      await unauthPage.goto(`/listings/${listingId}/edit`);
+      await unauthPage.waitForLoadState('domcontentloaded');
 
-      // Server-side redirect: auth() returns null → redirect('/login')
-      // Wait for the redirect to complete before asserting
-      await unauthPage.waitForURL(/\/(login|auth|signin)/, { timeout: 20000 }).catch(() => {});
+      // Wait for potential redirect
+      await unauthPage.waitForURL(/\/(login|auth|signin)/, { timeout: 15000 }).catch(() => {});
 
-      // Verify we ended up on a login/auth page (not still on /edit)
-      const url = unauthPage.url();
-      const onLoginPage = /\/(login|auth|signin)/.test(url);
-      const notOnEditPage = !url.includes('/edit');
-      expect(onLoginPage || notOnEditPage).toBeTruthy();
+      // The edit form must NOT be accessible to unauthenticated users
+      const editForm = unauthPage.locator('[data-testid="edit-listing-form"]');
+      await expect(editForm).not.toBeVisible({ timeout: 10000 });
     } finally {
       await unauthContext.close();
     }

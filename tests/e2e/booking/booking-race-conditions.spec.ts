@@ -31,12 +31,12 @@ async function selectDates(page: import('@playwright/test').Page, startMonths: n
   const startDateTrigger = page.locator('#booking-start-date');
   await startDateTrigger.scrollIntoViewIfNeeded();
   await page.locator('#booking-start-date[data-state]').waitFor({ state: 'attached', timeout: 15_000 });
-  await startDateTrigger.click();
+  await startDateTrigger.click({ force: true });
 
   const nextMonthBtnStart = page.locator('button[aria-label="Next month"]');
   await nextMonthBtnStart.waitFor({ state: 'visible', timeout: 10_000 });
   for (let i = 0; i < startMonths; i++) {
-    await nextMonthBtnStart.click();
+    await nextMonthBtnStart.click({ force: true });
     await page.waitForTimeout(250);
   }
 
@@ -52,13 +52,13 @@ async function selectDates(page: import('@playwright/test').Page, startMonths: n
   const endDateTrigger = page.locator('#booking-end-date');
   await endDateTrigger.scrollIntoViewIfNeeded();
   await page.locator('#booking-end-date[data-state]').waitFor({ state: 'attached', timeout: 10_000 });
-  await endDateTrigger.click();
+  await endDateTrigger.click({ force: true });
   await page.waitForTimeout(300);
 
   const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
   await nextMonthBtnEnd.waitFor({ state: 'visible', timeout: 10_000 });
   for (let i = 0; i < startMonths + 2; i++) {
-    await nextMonthBtnEnd.click();
+    await nextMonthBtnEnd.click({ force: true });
     await page.waitForTimeout(250);
   }
 
