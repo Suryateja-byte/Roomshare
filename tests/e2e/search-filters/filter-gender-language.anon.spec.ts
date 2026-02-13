@@ -60,7 +60,12 @@ test.describe("Gender & Language Filters", () => {
 
     // Select "Female Identifying Only" from the gender preference dropdown
     await selectDropdownOption(page, "#filter-gender-pref", /female identifying only/i);
-    await page.waitForTimeout(300);
+
+    // Wait for React to re-render the Apply button after dropdown selection
+    // Radix Select can cause layout shifts that temporarily detach the button
+    const apply = page.locator('[data-testid="filter-modal-apply"]');
+    await apply.scrollIntoViewIfNeeded();
+    await expect(apply).toBeVisible({ timeout: 10_000 });
 
     // Apply
     await applyFilters(page);
