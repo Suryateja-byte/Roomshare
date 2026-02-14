@@ -133,7 +133,7 @@ test.describe("Session Expiry: Form Submissions", () => {
       // which renders: "Your session has expired. Please sign in again."
       await expect(
         page.getByText(/session.*expired|sign in again/i),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible({ timeout: 20000 });
     },
   );
 

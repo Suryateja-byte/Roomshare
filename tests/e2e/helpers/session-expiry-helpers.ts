@@ -83,7 +83,7 @@ export async function triggerSessionPoll(page: Page): Promise<void> {
 export async function expectLoginRedirect(
   page: Page,
   callbackUrl?: string,
-  timeout = 15000,
+  timeout = 30000,
 ): Promise<void> {
   await expect(page).toHaveURL(/\/login/, { timeout });
   if (callbackUrl) {

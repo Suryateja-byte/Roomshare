@@ -309,7 +309,7 @@ test.describe('Booking Race Conditions @race', () => {
     test.skip(!submitted2, 'Could not submit second booking');
 
     // Should get server-side rejection (message may vary: specific or generic error)
-    const errorAlert = page.locator('[role="alert"]');
+    const errorAlert = page.locator('div[role="alert"]');
     await expect(errorAlert.first()).toBeVisible({ timeout: 15_000 });
     await expect(errorAlert.first()).toContainText(/already have a booking|error occurred|try again|duplicate|conflict/i);
 
