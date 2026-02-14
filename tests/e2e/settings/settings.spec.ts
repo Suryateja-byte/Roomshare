@@ -565,12 +565,13 @@ test.describe("Settings — Account Deletion", () => {
     // prevents Playwright's auto-scroll from reaching the button
     const deleteAccountBtnST14 = page.getByRole("button", { name: "Delete My Account" });
     await deleteAccountBtnST14.scrollIntoViewIfNeeded();
-    await deleteAccountBtnST14.click();
+    await deleteAccountBtnST14.click({ force: true });
 
-    // Confirmation input and Delete Forever button should appear
-    await expect(
-      page.locator("#deleteConfirmText")
-    ).toBeVisible({ timeout: timeouts.action });
+    // Wait for confirmation section to mount, then scroll into view on mobile
+    const confirmInputST14 = page.locator("#deleteConfirmText");
+    await confirmInputST14.waitFor({ state: "attached", timeout: timeouts.action });
+    await confirmInputST14.scrollIntoViewIfNeeded();
+    await expect(confirmInputST14).toBeVisible({ timeout: timeouts.action });
 
     // Type wrong text
     await page.locator("#deleteConfirmText").fill("WRONG");
@@ -597,11 +598,13 @@ test.describe("Settings — Account Deletion", () => {
     // prevents Playwright's auto-scroll from reaching the button
     const deleteAccountBtnST15 = page.getByRole("button", { name: "Delete My Account" });
     await deleteAccountBtnST15.scrollIntoViewIfNeeded();
-    await deleteAccountBtnST15.click();
+    await deleteAccountBtnST15.click({ force: true });
 
-    await expect(
-      page.locator("#deleteConfirmText")
-    ).toBeVisible({ timeout: timeouts.action });
+    // Wait for confirmation section to mount, then scroll into view on mobile
+    const confirmInputST15 = page.locator("#deleteConfirmText");
+    await confirmInputST15.waitFor({ state: "attached", timeout: timeouts.action });
+    await confirmInputST15.scrollIntoViewIfNeeded();
+    await expect(confirmInputST15).toBeVisible({ timeout: timeouts.action });
 
     // Type the exact confirmation text
     await page.locator("#deleteConfirmText").fill("DELETE");
