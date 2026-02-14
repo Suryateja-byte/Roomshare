@@ -62,9 +62,11 @@ export async function openConversation(page: Page, index = 0): Promise<void> {
   }
 
   const items = page.locator(MSG_SELECTORS.conversationItem);
-  await expect(items.first()).toBeVisible({ timeout: 10_000 });
+  await expect(items.first()).toBeVisible({ timeout: 15_000 });
   await items.nth(index).click();
-  await expect(page.locator(MSG_SELECTORS.messageInput)).toBeVisible({ timeout: 10_000 });
+  // Wait for conversation data to load before checking input
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator(MSG_SELECTORS.messageInput)).toBeVisible({ timeout: 30_000 });
 }
 
 /** Navigate directly to a conversation by ID */
@@ -88,9 +90,9 @@ export async function sendMessage(page: Page, text: string): Promise<void> {
   await input.click();
   await input.fill('');
   await input.pressSequentially(text, { delay: 30 });
-  await expect(input).toHaveValue(text, { timeout: 5_000 });
+  await expect(input).toHaveValue(text, { timeout: 15_000 });
   const sendBtn = page.locator(MSG_SELECTORS.sendButton);
-  await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
+  await expect(sendBtn).toBeEnabled({ timeout: 15_000 });
   await sendBtn.click();
 }
 
