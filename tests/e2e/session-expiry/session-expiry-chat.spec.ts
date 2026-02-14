@@ -119,7 +119,11 @@ test.describe("Session Expiry: Messaging", () => {
     // Navigate to messages — server action getMessages should return SESSION_EXPIRED
     await page.goto("/messages");
 
-    // Should redirect to login with callbackUrl
+    // Wait explicitly for login redirect to complete with full URL
+    await page.waitForURL(/\/login/, { timeout: 30_000 });
+    await page.waitForLoadState("domcontentloaded");
+
+    // Now check callbackUrl after page is fully loaded
     await expectLoginRedirect(page, "/messages");
   });
 });

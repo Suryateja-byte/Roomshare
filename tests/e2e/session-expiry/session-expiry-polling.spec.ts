@@ -68,18 +68,21 @@ test.describe("Session Expiry: Polling Components", () => {
       // Expire session and trigger SessionProvider refetch via focus event
       await expireSession(page, { triggerRefetch: true });
 
-      // Wait for SessionProvider to update useSession status
-      await page.waitForTimeout(2000);
+      // SessionProvider refetchOnWindowFocus can be slow in CI
+      // Dispatch focus multiple times and wait longer
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      await page.waitForTimeout(3000);
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
 
       // Navbar should reflect unauthenticated state:
       // Login/signup links should appear OR user menu should disappear
       const loginLink = page.getByRole("link", { name: /log in|sign in/i });
       const signupLink = page.getByRole("link", { name: /sign up/i });
       const loginVisible = await loginLink
-        .isVisible({ timeout: 10000 })
+        .isVisible({ timeout: 15_000 })
         .catch(() => false);
       const signupVisible = await signupLink
-        .isVisible({ timeout: 5000 })
+        .isVisible({ timeout: 10_000 })
         .catch(() => false);
 
       expect(loginVisible || signupVisible).toBe(true);
