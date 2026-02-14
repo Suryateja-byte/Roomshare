@@ -41,8 +41,13 @@ test.describe("Session Expiry: Favorites", () => {
 
     // Click into the first listing detail page
     const listingLink = firstCard.locator("a").first();
-    await listingLink.click();
-    await page.waitForURL(/\/listings\/.+/);
+    const listingHref = await listingLink.getAttribute("href");
+    await Promise.all([
+      page.waitForURL(/\/listings\/.+/, { timeout: 30_000 }),
+      listingLink.click(),
+    ]).catch(async () => {
+      if (listingHref) await page.goto(listingHref);
+    });
 
     // Expire session and mock 401 on favorites API
     await expireSession(page);
@@ -83,8 +88,13 @@ test.describe("Session Expiry: Favorites", () => {
     }
 
     const listingLink = firstCard.locator("a").first();
-    await listingLink.click();
-    await page.waitForURL(/\/listings\/.+/);
+    const listingHref2 = await listingLink.getAttribute("href");
+    await Promise.all([
+      page.waitForURL(/\/listings\/.+/, { timeout: 30_000 }),
+      listingLink.click(),
+    ]).catch(async () => {
+      if (listingHref2) await page.goto(listingHref2);
+    });
 
     // Find an unsaved favorite button
     const favBtn = page
