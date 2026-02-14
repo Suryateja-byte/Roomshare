@@ -54,7 +54,7 @@ test.describe("RV: Recently Viewed", () => {
     page,
   }) => {
     await page.goto("/recently-viewed");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     await expect(
       page.getByRole("heading", { name: /recently viewed/i, level: 1 })

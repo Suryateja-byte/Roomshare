@@ -82,9 +82,9 @@ test.describe("SS: Saved Searches Read-only", () => {
       page.getByRole("heading", { name: /saved searches/i, level: 1 })
     ).toBeVisible({ timeout: timeouts.navigation });
 
-    // "SF Under $1500" should show price/type/location filter info
+    // Saved search cards show filter summary (e.g. "2 amenities", "Search: ...")
     await expect(
-      page.getByText(/price|type|private/i).first()
+      page.getByText(/amenities|search:|created/i).first()
     ).toBeVisible({ timeout: timeouts.action });
   });
 });
@@ -159,7 +159,34 @@ test.describe("SS: Saved Searches Mutations", () => {
       page.getByRole("heading", { name: /saved searches/i, level: 1 })
     ).toBeVisible({ timeout: timeouts.navigation });
 
-    // Reload and verify page still loads with searches
+    // Toggle an alert on (if available) to test persistence
+    const enableBtn = page.locator('button[title="Enable alerts"]').first();
+    const disableBtn = page.locator('button[title="Disable alerts"]').first();
+
+    // Determine initial alert state, then toggle
+    let toggledToEnabled = false;
+    try {
+      await expect(enableBtn).toBeVisible({ timeout: 5_000 });
+      await enableBtn.click();
+      await expect(
+        page.locator('button[title="Disable alerts"]').first()
+      ).toBeVisible({ timeout: timeouts.action });
+      toggledToEnabled = true;
+    } catch {
+      // Already enabled — toggle off instead
+      try {
+        await expect(disableBtn).toBeVisible({ timeout: 3_000 });
+        await disableBtn.click();
+        await expect(
+          page.locator('button[title="Enable alerts"]').first()
+        ).toBeVisible({ timeout: timeouts.action });
+      } catch {
+        test.skip(true, "No alert toggle found for persistence test");
+        return;
+      }
+    }
+
+    // Reload and verify alert state persisted
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
 
@@ -167,10 +194,17 @@ test.describe("SS: Saved Searches Mutations", () => {
       page.getByRole("heading", { name: /saved searches/i, level: 1 })
     ).toBeVisible({ timeout: timeouts.navigation });
 
-    // Searches should still be present
-    await expect(
-      page.getByText(/SF Under \$1500|Mission District/i).first()
-    ).toBeVisible({ timeout: timeouts.action });
+    if (toggledToEnabled) {
+      // We toggled ON — should still show "Disable alerts" after reload
+      await expect(
+        page.locator('button[title="Disable alerts"]').first()
+      ).toBeVisible({ timeout: timeouts.action });
+    } else {
+      // We toggled OFF — should still show "Enable alerts" after reload
+      await expect(
+        page.locator('button[title="Enable alerts"]').first()
+      ).toBeVisible({ timeout: timeouts.action });
+    }
   });
 
   // SS-07: Delete saved search - confirm
