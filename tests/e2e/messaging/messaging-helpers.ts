@@ -47,6 +47,20 @@ export async function goToMessages(page: Page): Promise<boolean> {
 
 /** Open a specific conversation by clicking the nth item */
 export async function openConversation(page: Page, index = 0): Promise<void> {
+  const viewport = page.viewportSize();
+  const isMobile = !!viewport && viewport.width < 768;
+
+  // On mobile, sidebar may be hidden if a conversation is auto-selected
+  if (isMobile) {
+    const sidebar = page.locator(MSG_SELECTORS.conversationItem).first();
+    const sidebarVisible = await sidebar.isVisible().catch(() => false);
+    if (!sidebarVisible) {
+      const backBtn = page.locator('[data-testid="back-button"], button[aria-label="Back"], nav button').first();
+      const backVisible = await backBtn.isVisible({ timeout: 3_000 }).catch(() => false);
+      if (backVisible) await backBtn.click();
+    }
+  }
+
   const items = page.locator(MSG_SELECTORS.conversationItem);
   await expect(items.first()).toBeVisible({ timeout: 10_000 });
   await items.nth(index).click();
@@ -73,7 +87,8 @@ export async function sendMessage(page: Page, text: string): Promise<void> {
   const input = page.locator(MSG_SELECTORS.messageInput);
   await input.click();
   await input.fill('');
-  await input.pressSequentially(text, { delay: 10 });
+  await input.pressSequentially(text, { delay: 30 });
+  await expect(input).toHaveValue(text, { timeout: 5_000 });
   const sendBtn = page.locator(MSG_SELECTORS.sendButton);
   await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
   await sendBtn.click();

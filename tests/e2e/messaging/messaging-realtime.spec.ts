@@ -21,7 +21,7 @@ import {
   sendMessage,
   waitForNewMessage,
   createUser2Context,
-  mockMessageApiError,
+  mockSendMessageError,
 } from './messaging-helpers';
 
 test.use({ storageState: 'playwright/.auth/user.json' });
@@ -337,7 +337,7 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
     const draftText = 'draft text';
     await input.click();
     await input.fill('');
-    await input.pressSequentially(draftText, { delay: 10 });
+    await input.pressSequentially(draftText, { delay: 30 });
 
     // Verify the draft is in the input
     await expect(input).toHaveValue(draftText);
@@ -373,8 +373,8 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
     test.skip(!ready, 'Auth session expired');
     await openConversation(page, 0);
 
-    // Mock the message API to return 500 errors
-    await mockMessageApiError(page, 500, { error: 'Internal server error' });
+    // Mock the server action to return an error
+    await mockSendMessageError(page, { error: 'Internal server error' });
 
     const uniqueText = `Failed msg test ${Date.now()}`;
     await sendMessage(page, uniqueText);
