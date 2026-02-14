@@ -53,12 +53,18 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.waitForLoadState("networkidle").catch(() => {});
 
     // Set price range — wait for inputs to be ready under load
+    // Use pressSequentially for React controlled number inputs
+    // fill() can be overwritten by React re-renders during hydration
     const minInput = page.getByLabel(/minimum budget/i);
     const maxInput = page.getByLabel(/maximum budget/i);
     await expect(minInput).toBeVisible({ timeout: 30000 });
-    await minInput.fill("800");
+    await minInput.click();
+    await minInput.fill("");
+    await minInput.pressSequentially("800", { delay: 50 });
     await expect(minInput).toHaveValue("800", { timeout: 30000 });
-    await maxInput.fill("2000");
+    await maxInput.click();
+    await maxInput.fill("");
+    await maxInput.pressSequentially("2000", { delay: 50 });
     await expect(maxInput).toHaveValue("2000", { timeout: 30000 });
 
     // Open filter modal and set lease + amenity
