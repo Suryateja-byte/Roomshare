@@ -116,14 +116,13 @@ test.describe("Session Expiry: Messaging", () => {
     await page.waitForLoadState("domcontentloaded");
     await expireSession(page);
 
-    // Navigate to messages — server-side auth() finds no session → redirect
+    // Navigate to messages — server-side auth() finds no session → redirect.
+    // Next.js App Router redirect() produces an RSC client-side navigation,
+    // NOT an HTTP 302. We must wait for the client-side router to process it.
     await page.goto("/messages");
-
-    // Should redirect AWAY from /messages. The redirect chain may land on /login
-    // or / (if the login page further redirects when session is invalid).
-    // The test's purpose: unauthenticated users cannot stay on /messages.
-    await page.waitForLoadState("domcontentloaded");
-    const url = page.url();
-    expect(url).not.toMatch(/\/messages/);
+    await page.waitForFunction(
+      () => !window.location.pathname.startsWith('/messages'),
+      { timeout: 15_000 },
+    );
   });
 });
