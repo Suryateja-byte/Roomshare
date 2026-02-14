@@ -112,7 +112,8 @@ test.describe("Session Expiry: Form Submissions", () => {
         test.skip(true, "No listings available");
         return;
       }
-      await listingLink.locator("a").first().click();
+      // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+      await listingLink.locator("h3").first().click();
       await page.waitForURL(/\/listings\/.+/);
 
       // Look for booking form elements (date inputs, booking CTA)

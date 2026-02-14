@@ -68,21 +68,11 @@ test.describe("Session Expiry: Polling Components", () => {
       // Expire session and trigger SessionProvider refetch via focus event
       await expireSession(page, { triggerRefetch: true });
 
-      // Wait for SessionProvider to update useSession status
-      await page.waitForTimeout(2000);
-
-      // Navbar should reflect unauthenticated state:
-      // Login/signup links should appear OR user menu should disappear
-      const loginLink = page.getByRole("link", { name: /log in|sign in/i });
-      const signupLink = page.getByRole("link", { name: /sign up/i });
-      const loginVisible = await loginLink
-        .isVisible({ timeout: 10000 })
-        .catch(() => false);
-      const signupVisible = await signupLink
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
-
-      expect(loginVisible || signupVisible).toBe(true);
+      // Navbar should reflect unauthenticated state — use auto-retry assertion
+      await expect(
+        page.getByRole('link', { name: /log in|sign in/i })
+          .or(page.getByRole('link', { name: /sign up/i }))
+      ).toBeVisible({ timeout: 15_000 });
     },
   );
 

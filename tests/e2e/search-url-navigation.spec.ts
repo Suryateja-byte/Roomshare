@@ -271,12 +271,13 @@ test.describe("Search URL Browser Navigation (P1)", () => {
       return;
     }
 
-    const firstLink = cards.first().locator('a[href^="/listings/"]').first();
-    const href = await firstLink.getAttribute("href");
+    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+    const firstCard = cards.first();
+    const href = await firstCard.locator('a[href^="/listings/"]').first().getAttribute("href");
     expect(href).toBeTruthy();
 
-    // Navigate to listing detail via click (preserves SPA state for back navigation)
-    await firstLink.click();
+    // Navigate via h3 click (inside Link but outside carousel area)
+    await firstCard.locator('h3').first().click();
     await expect(page).toHaveURL(/\/listings\//, { timeout: 15_000 });
 
     // Go back to search

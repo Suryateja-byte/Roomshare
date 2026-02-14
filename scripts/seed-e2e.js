@@ -560,6 +560,11 @@ async function main() {
         },
       });
 
+      // Backdate conversation2 so it sorts AFTER conversation1 in getConversations()
+      // (which uses updatedAt DESC). This prevents the blocked-user conversation
+      // from appearing first in the messaging tests.
+      await prisma.$executeRaw`UPDATE "Conversation" SET "updatedAt" = NOW() - INTERVAL '30 days' WHERE "id" = ${conversation2.id}`;
+
       await prisma.message.createMany({
         data: [
           {

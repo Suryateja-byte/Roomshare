@@ -44,23 +44,29 @@ test.describe('Messaging: Resilience', { tag: [tags.auth] }, () => {
 
     await openConversation(page);
 
+    // Verify send button works while online
+    const sendBtn = page.locator(MSG_SELECTORS.sendButton);
+    const messageInput = page.locator(MSG_SELECTORS.messageInput);
+    await messageInput.click();
+    await messageInput.fill('test');
+    await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
+    await messageInput.fill('');
+
     // Go offline
     await network.goOffline();
 
-    // Try to send a message
-    const testMsg = `Offline test ${Date.now()}`;
-    await sendMessage(page, testMsg);
+    // Type a message while offline
+    await messageInput.click();
+    await messageInput.pressSequentially('Offline test message', { delay: 30 });
 
-    // Wait briefly for error handling to kick in
-    await page.waitForTimeout(3000);
+    // Production UI disables send button when offline
+    await expect(sendBtn).toBeDisabled({ timeout: 10_000 });
 
-    // Expect either a failed-message indicator OR an error toast
-    const failedMessage = page.locator(MSG_SELECTORS.failedMessage);
-    const errorToast = page.locator(selectors.toast);
-    const failedVisible = await failedMessage.first().isVisible().catch(() => false);
-    const toastVisible = await errorToast.first().isVisible().catch(() => false);
+    // Go back online
+    await network.goOnline();
 
-    expect(failedVisible || toastVisible).toBe(true);
+    // Send button should become enabled again
+    await expect(sendBtn).toBeEnabled({ timeout: 15_000 });
   });
 
   // ────────────────────────────────────────────────
