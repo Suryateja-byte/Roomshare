@@ -226,9 +226,19 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
       await sendMessage(page2, uniqueText);
       await waitForNewMessage(page2, uniqueText, 10_000);
 
+      // Wait for server confirmation (opacity-70 removal) on User2's bubble
+      // to ensure the message is persisted before User1 polls
+      const sentBubble = page2.locator(MSG_SELECTORS.messageBubble).filter({ hasText: uniqueText }).first();
+      await expect
+        .poll(
+          () => sentBubble.evaluate((el) => !el.classList.contains('opacity-70')),
+          { timeout: 15_000, message: 'Message should be server-confirmed before checking unread badge' },
+        )
+        .toBe(true);
+
       // User1's navbar should eventually show (or update) the unread badge
-      // Unread polling is 30s, so allow generous timeout
-      const unreadTimeout = POLL_INTERVAL.unread + 10_000;
+      // Allow 2 full poll cycles + buffer (30s * 2 + 15s = 75s)
+      const unreadTimeout = (POLL_INTERVAL.unread * 2) + 15_000;
       await expect(badge).toBeVisible({ timeout: unreadTimeout });
     } finally {
       if (ctx2) {

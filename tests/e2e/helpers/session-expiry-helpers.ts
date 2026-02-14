@@ -11,10 +11,14 @@
 import { Page, Route } from "@playwright/test";
 import { expect } from "@playwright/test";
 
-const SESSION_COOKIE = "authjs.session-token";
+const AUTH_COOKIES = [
+  "authjs.session-token",
+  "authjs.csrf-token",
+  "authjs.callback-url",
+];
 
 /**
- * Expire session by clearing auth cookie + optionally mocking session endpoint.
+ * Expire session by clearing all auth cookies + optionally mocking session endpoint.
  *
  * @param page - Playwright page
  * @param options.mockEndpoint - Also mock /api/auth/session to return {} (default: true)
@@ -26,7 +30,9 @@ export async function expireSession(
 ): Promise<void> {
   const { mockEndpoint = true, triggerRefetch = false } = options;
 
-  await page.context().clearCookies({ name: SESSION_COOKIE });
+  for (const cookie of AUTH_COOKIES) {
+    await page.context().clearCookies({ name: cookie });
+  }
 
   if (mockEndpoint) {
     await page.route("**/api/auth/session", async (route: Route) => {

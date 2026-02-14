@@ -275,9 +275,9 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     const href = await firstLink.getAttribute("href");
     expect(href).toBeTruthy();
 
-    // Navigate to listing detail
-    await page.goto(href!);
-    await expect(page).toHaveURL(/\/listings\//);
+    // Navigate to listing detail via click (preserves SPA state for back navigation)
+    await firstLink.click();
+    await expect(page).toHaveURL(/\/listings\//, { timeout: 15_000 });
 
     // Go back to search
     await page.goBack();
@@ -333,8 +333,8 @@ test.describe("Search URL Browser Navigation (P1)", () => {
       return;
     }
 
-    await page.goto(href);
-    await expect(page).toHaveURL(/\/listings\//);
+    await firstLink.click();
+    await expect(page).toHaveURL(/\/listings\//, { timeout: 15_000 });
 
     // Go back
     await page.goBack();

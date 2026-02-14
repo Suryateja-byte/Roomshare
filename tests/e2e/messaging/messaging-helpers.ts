@@ -163,20 +163,32 @@ export async function mockMessageApiError(
   });
 }
 
-/** Mock server action sendMessage to return an error */
+/**
+ * Encode a value as an RSC Flight response (matches Next.js 14/15 format).
+ * Row 0 references the result in row 1 via `$@1`.
+ */
+function encodeAsRSCResponse(value: unknown): string {
+  const row0 = JSON.stringify({ a: "$@1", f: "", b: "development" });
+  const row1 = JSON.stringify(value);
+  return `0:${row0}\n1:${row1}\n`;
+}
+
+/** Mock server action sendMessage to return an error (one-shot) */
 export async function mockSendMessageError(
   page: Page,
   errorResponse: { error: string; code?: string },
 ): Promise<void> {
+  let intercepted = false;
   // Server actions go through Next.js internal POST — intercept the actions endpoint
   await page.route('**/messages**', (route) => {
     const request = route.request();
-    // Server actions use POST with Next-Action header
-    if (request.method() === 'POST' && request.headers()['next-action']) {
+    // Server actions use POST with Next-Action header (one-shot: only first POST)
+    if (!intercepted && request.method() === 'POST' && request.headers()['next-action']) {
+      intercepted = true;
       route.fulfill({
         status: 200,
         contentType: 'text/x-component',
-        body: JSON.stringify(errorResponse),
+        body: encodeAsRSCResponse(errorResponse),
       });
     } else {
       route.continue();

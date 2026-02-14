@@ -134,7 +134,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     const { data: session, status } = useSession();
 
     // Use reactive session data, fall back to server props for SSR hydration
-    const user = status === 'loading' ? initialUser : (session?.user ?? initialUser);
+    const user = status === 'loading' ? initialUser : status === 'unauthenticated' ? null : (session?.user ?? initialUser);
 
     const [isScrolled, setIsScrolled] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);

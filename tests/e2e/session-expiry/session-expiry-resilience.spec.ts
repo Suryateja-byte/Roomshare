@@ -69,7 +69,9 @@ test.describe("Session Expiry: Resilience", () => {
       await expect(page).toHaveURL(/\/settings/, { timeout: 10000 });
 
       // Expire session and navigate to trigger redirect
-      await page.context().clearCookies({ name: "authjs.session-token" });
+      for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
+        await page.context().clearCookies({ name: cookie });
+      }
       await page.goto("/settings");
       await expectLoginRedirect(page);
 
