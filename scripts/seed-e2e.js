@@ -542,6 +542,48 @@ async function main() {
     }
   }
 
+  // 8b. Create conversation between user and thirdUser (for multi-user E2E tests)
+  if (createdListings.length > 0) {
+    const convoListing2 = createdListings[0];
+    let conversation2 = await prisma.conversation.findFirst({
+      where: {
+        listingId: convoListing2.id,
+        participants: { some: { id: thirdUser.id } },
+      },
+    });
+
+    if (!conversation2) {
+      conversation2 = await prisma.conversation.create({
+        data: {
+          listingId: convoListing2.id,
+          participants: { connect: [{ id: user.id }, { id: thirdUser.id }] },
+        },
+      });
+
+      await prisma.message.createMany({
+        data: [
+          {
+            conversationId: conversation2.id,
+            senderId: thirdUser.id,
+            content: 'Hey, is the room still available?',
+            read: true,
+            createdAt: new Date(Date.now() - 120000),
+          },
+          {
+            conversationId: conversation2.id,
+            senderId: user.id,
+            content: 'Yes! Want to schedule a viewing?',
+            read: true,
+            createdAt: new Date(Date.now() - 60000),
+          },
+        ],
+      });
+      console.log(`  ✓ Conversation 2 (user <-> thirdUser) for: ${convoListing2.title}`);
+    } else {
+      console.log(`  ⏭ Conversation 2 exists for: ${convoListing2.title}`);
+    }
+  }
+
   // 9. Create an OPEN report
   if (createdListings.length >= 4) {
     const reportedListing = createdListings[3]; // Hayes Valley
