@@ -776,6 +776,90 @@ async function main() {
     console.log('  ⏭ Notification records exist');
   }
 
+  // 14. Create BlockedUser for Settings E2E tests
+  const existingBlock = await prisma.blockedUser.findFirst({
+    where: { blockerId: user.id, blockedId: thirdUser.id },
+  });
+  if (!existingBlock) {
+    await prisma.blockedUser.create({
+      data: {
+        blockerId: user.id,
+        blockedId: thirdUser.id,
+      },
+    });
+    console.log(`  ✓ BlockedUser: ${user.email} blocked ${thirdUser.email}`);
+  } else {
+    console.log(`  ⏭ BlockedUser exists`);
+  }
+
+  // 15. Create SavedSearch records for E2E tests
+  const existingSavedSearch = await prisma.savedSearch.findFirst({
+    where: { userId: user.id },
+  });
+  if (!existingSavedSearch) {
+    await prisma.savedSearch.createMany({
+      data: [
+        {
+          userId: user.id,
+          name: 'SF Under $1500',
+          query: 'San Francisco',
+          filters: {
+            minPrice: 500,
+            maxPrice: 1500,
+            roomType: 'private',
+            location: 'San Francisco',
+          },
+          alertEnabled: true,
+          alertFrequency: 'DAILY',
+        },
+        {
+          userId: user.id,
+          name: 'Mission District',
+          query: 'Mission',
+          filters: {
+            location: 'Mission District',
+            amenities: ['wifi', 'parking'],
+          },
+          alertEnabled: false,
+          alertFrequency: 'WEEKLY',
+        },
+      ],
+    });
+    console.log('  ✓ SavedSearch records created');
+  } else {
+    console.log('  ⏭ SavedSearch records exist');
+  }
+
+  // 16. Create RecentlyViewed records for E2E tests
+  const existingRecent = await prisma.recentlyViewed.findFirst({
+    where: { userId: user.id },
+  });
+  if (!existingRecent && createdListings.length >= 3) {
+    const now = new Date();
+    await prisma.recentlyViewed.createMany({
+      data: [
+        {
+          userId: user.id,
+          listingId: createdListings[0].id,
+          viewedAt: new Date(now.getTime() - 5 * 60 * 1000), // 5 min ago
+        },
+        {
+          userId: user.id,
+          listingId: createdListings[1].id,
+          viewedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2h ago
+        },
+        {
+          userId: user.id,
+          listingId: createdListings[2].id,
+          viewedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000), // 1d ago
+        },
+      ],
+    });
+    console.log('  ✓ RecentlyViewed records created');
+  } else {
+    console.log(`  ⏭ RecentlyViewed ${existingRecent ? 'exists' : 'skipped (need 3+ listings)'}`);
+  }
+
   console.log('✅ E2E seed complete.');
 }
 
