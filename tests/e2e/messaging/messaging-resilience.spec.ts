@@ -455,9 +455,6 @@ test.describe('Messaging: Resilience', { tag: [tags.auth] }, () => {
 
     await openConversation(page);
 
-    // Note initial message count
-    const initialCount = await page.locator(MSG_SELECTORS.messageBubble).count();
-
     // Create a unique message identifier to track
     const uniqueText = `Rapid fire ${Date.now()}`;
     const sendCount = 3;
@@ -467,28 +464,26 @@ test.describe('Messaging: Resilience', { tag: [tags.auth] }, () => {
     const sendButton = page.locator(MSG_SELECTORS.sendButton);
 
     for (let i = 0; i < sendCount; i++) {
-      await input.fill(`${uniqueText} #${i + 1}`);
+      await input.click();
+      await input.fill('');
+      await input.pressSequentially(`${uniqueText} #${i + 1}`, { delay: 10 });
+      await expect(sendButton).toBeEnabled({ timeout: 5_000 });
       await sendButton.click();
       // Minimal delay between sends — simulate rapid clicking
       await page.waitForTimeout(200);
     }
 
-    // Wait for all messages to be processed
+    // Wait for all messages to be processed (including any polling cycles)
     await page.waitForTimeout(5000);
 
-    // Count messages containing our unique identifier
-    const matchingBubbles = page.locator(MSG_SELECTORS.messageBubble).filter({
-      hasText: uniqueText,
-    });
-    const matchCount = await matchingBubbles.count();
-
-    // Should have exactly 3 messages (one per intentional send), not more
-    // Allow for the possibility that some sends failed (network conditions, dedup)
-    // but ensure we never have MORE than we sent
-    expect(matchCount).toBeLessThanOrEqual(sendCount);
-
-    // Verify total count increased by at most sendCount
-    const finalCount = await page.locator(MSG_SELECTORS.messageBubble).count();
-    expect(finalCount - initialCount).toBeLessThanOrEqual(sendCount);
+    // Count only messages matching our unique text — immune to polling deduplication
+    // Each unique message (e.g. "Rapid fire ... #1") should appear at most once
+    for (let i = 1; i <= sendCount; i++) {
+      const specificBubble = page.locator(MSG_SELECTORS.messageBubble).filter({
+        hasText: `${uniqueText} #${i}`,
+      });
+      const count = await specificBubble.count();
+      expect(count, `Message #${i} should appear at most once`).toBeLessThanOrEqual(1);
+    }
   });
 });

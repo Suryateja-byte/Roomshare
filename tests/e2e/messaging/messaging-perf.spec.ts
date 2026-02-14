@@ -48,10 +48,13 @@ test.describe('Messaging: Performance', { tag: [tags.auth, tags.slow] }, () => {
 
     const uniqueText = `perf-optimistic-${Date.now()}`;
     const input = page.locator(MSG_SELECTORS.messageInput);
-    await input.fill(uniqueText);
+    await input.click();
+    await input.fill('');
+    await input.pressSequentially(uniqueText, { delay: 10 });
 
     // Measure from the moment we click send
     const sendBtn = page.locator(MSG_SELECTORS.sendButton);
+    await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
     const start = Date.now();
     await sendBtn.click();
 
@@ -295,6 +298,8 @@ test.describe('Messaging: Performance', { tag: [tags.auth, tags.slow] }, () => {
   // RT-P05: Conversation switch < 1s
   // -----------------------------------------------------------------------
   test('RT-P05: Conversation switch < 1s', async ({ page }) => {
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: mobile shows single-panel layout');
     const ready = await goToMessages(page);
     test.skip(!ready, 'Could not reach /messages');
 
