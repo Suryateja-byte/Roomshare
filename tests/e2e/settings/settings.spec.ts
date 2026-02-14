@@ -561,9 +561,11 @@ test.describe("Settings — Account Deletion", () => {
     ).toBeVisible({ timeout: timeouts.navigation });
 
     // Click "Delete My Account" to reveal the confirmation step
-    await page
-      .getByRole("button", { name: "Delete My Account" })
-      .click();
+    // scrollIntoViewIfNeeded handles mobile viewports where CustomScrollContainer
+    // prevents Playwright's auto-scroll from reaching the button
+    const deleteAccountBtnST14 = page.getByRole("button", { name: "Delete My Account" });
+    await deleteAccountBtnST14.scrollIntoViewIfNeeded();
+    await deleteAccountBtnST14.click();
 
     // Confirmation input and Delete Forever button should appear
     await expect(
@@ -591,9 +593,11 @@ test.describe("Settings — Account Deletion", () => {
     ).toBeVisible({ timeout: timeouts.navigation });
 
     // Click "Delete My Account"
-    await page
-      .getByRole("button", { name: "Delete My Account" })
-      .click();
+    // scrollIntoViewIfNeeded handles mobile viewports where CustomScrollContainer
+    // prevents Playwright's auto-scroll from reaching the button
+    const deleteAccountBtnST15 = page.getByRole("button", { name: "Delete My Account" });
+    await deleteAccountBtnST15.scrollIntoViewIfNeeded();
+    await deleteAccountBtnST15.click();
 
     await expect(
       page.locator("#deleteConfirmText")
