@@ -352,7 +352,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
         if (moveInDate) params.set('moveInDate', moveInDate);
         if (leaseDuration) params.set('leaseDuration', leaseDuration);
-        if (roomType) params.set('roomType', roomType);
+        const effectiveRoomType = formRef.current?.dataset.roomTypeOverride ?? roomType;
+        if (effectiveRoomType) params.set('roomType', effectiveRoomType);
         amenities.forEach(a => params.append('amenities', a));
         houseRules.forEach(r => params.append('houseRules', r));
         languages.forEach(l => params.append('languages', l));
@@ -450,15 +451,31 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     // Room type selection — updates state and triggers search immediately
     const handleRoomTypeSelect = useCallback((value: string) => {
-        setPending({ roomType: value === 'any' ? '' : value });
-        // Use queueMicrotask to let React process the state update before submitting
-        queueMicrotask(() => formRef.current?.requestSubmit());
+        const resolved = value === 'any' ? '' : value;
+        setPending({ roomType: resolved });
+        // Set data attribute synchronously so handleSearch reads fresh value
+        // (React state update won't be visible until next render)
+        if (formRef.current) {
+            formRef.current.dataset.roomTypeOverride = resolved;
+        }
+        queueMicrotask(() => {
+            formRef.current?.requestSubmit();
+            // Clean up override after submit
+            if (formRef.current) delete formRef.current.dataset.roomTypeOverride;
+        });
     }, [setPending]);
 
     // Room type selection from FilterBar CategoryTabs — sets state AND triggers search
     const handleFilterBarRoomTypeChange = useCallback((value: string) => {
-        setPending({ roomType: value === 'any' ? '' : value });
-        queueMicrotask(() => formRef.current?.requestSubmit());
+        const resolved = value === 'any' ? '' : value;
+        setPending({ roomType: resolved });
+        if (formRef.current) {
+            formRef.current.dataset.roomTypeOverride = resolved;
+        }
+        queueMicrotask(() => {
+            formRef.current?.requestSubmit();
+            if (formRef.current) delete formRef.current.dataset.roomTypeOverride;
+        });
     }, [setPending]);
 
     // Clear all filters and reset to defaults

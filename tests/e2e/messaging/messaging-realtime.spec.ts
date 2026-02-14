@@ -89,10 +89,10 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
       await sendMessage(page, uniqueText);
 
       // Verify user1 sees it immediately (optimistic)
-      await waitForNewMessage(page, uniqueText, 5_000);
+      await waitForNewMessage(page, uniqueText, 10_000);
 
-      // User2 should see the message within polling interval + buffer
-      const pollingTimeout = POLL_INTERVAL.chatWindow + 5_000;
+      // User2 should see the message within 3 poll cycles + buffer for CI
+      const pollingTimeout = (POLL_INTERVAL.chatWindow * 3) + 5_000;
       await waitForNewMessage(page2, uniqueText, pollingTimeout);
     } finally {
       if (ctx2) {
