@@ -44,8 +44,8 @@ test.describe("Session Expiry: Form Submissions", () => {
         test.skip(true, "No listings found");
         return;
       }
-      const listingLink = firstCard.locator("a").first();
-      await listingLink.click();
+      // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+      await firstCard.locator("h3").first().click();
       await page.waitForURL(/\/listings\/.+/);
 
       // Fill review form (if available)

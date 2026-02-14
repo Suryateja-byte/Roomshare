@@ -40,8 +40,8 @@ test.describe("Session Expiry: Favorites", () => {
     }
 
     // Click into the first listing detail page
-    const listingLink = firstCard.locator("a").first();
-    await listingLink.click();
+    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+    await firstCard.locator("h3").first().click();
     await page.waitForURL(/\/listings\/.+/);
 
     // Expire session and mock 401 on favorites API
@@ -82,8 +82,8 @@ test.describe("Session Expiry: Favorites", () => {
       return;
     }
 
-    const listingLink = firstCard.locator("a").first();
-    await listingLink.click();
+    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+    await firstCard.locator("h3").first().click();
     await page.waitForURL(/\/listings\/.+/);
 
     // Find an unsaved favorite button

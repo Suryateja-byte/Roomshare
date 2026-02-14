@@ -69,10 +69,12 @@ test.describe("Session Expiry: Polling Components", () => {
       await expireSession(page, { triggerRefetch: true });
 
       // Navbar should reflect unauthenticated state — use auto-retry assertion
+      // Give SessionProvider up to 30s — if focus event doesn't trigger immediate
+      // refetch, the periodic refetch (60s interval) may take longer in CI.
       await expect(
         page.getByRole('link', { name: /log in|sign in/i })
           .or(page.getByRole('link', { name: /sign up/i }))
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
     },
   );
 
