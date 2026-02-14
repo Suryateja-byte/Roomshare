@@ -672,6 +672,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                         {/* Messages */}
                         <div
                             ref={messagesContainerRef}
+                            data-testid="messages-container"
                             className="flex-1 overflow-y-auto p-6 space-y-4 relative"
                             onScroll={(e) => {
                                 const target = e.target as HTMLDivElement;
@@ -685,7 +686,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                 msgs.map(m => (
                                     <div key={m.id} className={`flex ${m.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}>
                                         <div
-                                            data-testid="message-bubble"
+                                            data-testid={m.status === 'failed' ? 'failed-message' : 'message-bubble'}
                                             onClick={m.status === 'failed' ? () => handleRetry(m.id, m.content) : undefined}
                                             className={`
                                                 max-w-[70%] px-5 py-2.5 text-sm leading-relaxed shadow-sm
@@ -700,7 +701,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                         >
                                             {m.content}
                                             {m.status === 'failed' && (
-                                                <div className="flex items-center gap-1 mt-2 text-red-600 dark:text-red-400 text-xs">
+                                                <div data-testid="retry-button" className="flex items-center gap-1 mt-2 text-red-600 dark:text-red-400 text-xs">
                                                     <AlertCircle className="w-3 h-3" />
                                                     <span>Failed to send. Tap to retry</span>
                                                 </div>
@@ -719,7 +720,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
 
                             {/* Typing Indicator */}
                             {typingUsers.length > 0 && (
-                                <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+                                <div data-testid="typing-indicator" className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
                                     <div className="flex gap-1">
                                         <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                                         <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -786,7 +787,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                         maxLength={MESSAGE_MAX_LENGTH}
                                         className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
                                     />
-                                    <button type="submit" disabled={!input.trim() || isOffline} className="min-w-[44px] min-h-[44px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-60 transition-all" aria-label="Send message"><Send className="w-4 h-4 ml-0.5" /></button>
+                                    <button type="submit" data-testid="send-button" disabled={!input.trim() || isOffline} className="min-w-[44px] min-h-[44px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-60 transition-all" aria-label="Send message"><Send className="w-4 h-4 ml-0.5" /></button>
                                 </form>
                                 {/* Character counter - show when user is typing */}
                                 {input.length > 0 && (

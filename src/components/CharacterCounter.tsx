@@ -21,7 +21,7 @@ export default function CharacterCounter({
     const isNearLimit = percentage >= 95 && percentage <= 100;
 
     return (
-        <div className={cn('flex items-center justify-end gap-1 text-xs', className)}>
+        <div data-testid="char-counter" className={cn('flex items-center justify-end gap-1 text-xs', className)}>
             <span
                 className={cn(
                     'tabular-nums transition-colors',
