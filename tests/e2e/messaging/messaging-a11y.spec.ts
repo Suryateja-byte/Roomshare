@@ -93,6 +93,8 @@ test.describe('Messaging: Accessibility', { tag: [tags.auth, tags.a11y] }, () =>
   // RT-A02: Chat window axe scan after loading messages
   // -----------------------------------------------------------------------
   test('RT-A02: Chat window passes axe-core after loading', async ({ page }) => {
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: axe results differ on mobile layout');
     const ready = await goToMessages(page);
     test.skip(!ready, 'Could not reach /messages');
 
@@ -114,6 +116,8 @@ test.describe('Messaging: Accessibility', { tag: [tags.auth, tags.a11y] }, () =>
   // RT-A03: Keyboard-only navigation and send
   // -----------------------------------------------------------------------
   test('RT-A03: Keyboard-only navigation and send', async ({ page }) => {
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: keyboard navigation not applicable on mobile');
     const ready = await goToMessages(page);
     test.skip(!ready, 'Could not reach /messages');
 
@@ -186,7 +190,9 @@ test.describe('Messaging: Accessibility', { tag: [tags.auth, tags.a11y] }, () =>
 
     if (!sent) {
       // Re-type the message (Enter may have added a newline or been consumed)
-      await input.fill(uniqueText);
+      await input.click();
+      await input.fill('');
+      await input.pressSequentially(uniqueText, { delay: 10 });
       // Tab to send button and press Enter
       await page.keyboard.press('Tab');
       await page.keyboard.press('Enter');

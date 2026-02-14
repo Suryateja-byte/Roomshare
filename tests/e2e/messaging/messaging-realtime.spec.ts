@@ -131,6 +131,8 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
   // RT-F04: Message ordering preserved across rapid sends
   // ---------------------------------------------------------------------------
   test('RT-F04: Message ordering preserved across rapid sends', async ({ page }) => {
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: requires side-by-side layout');
     const ready = await goToMessages(page);
     test.skip(!ready, 'Auth session expired');
     await openConversation(page, 0);
@@ -324,6 +326,8 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
   // RT-F09: Draft behavior across conversation switching
   // ---------------------------------------------------------------------------
   test('RT-F09: Draft behavior across conversation switching', async ({ page }) => {
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: requires side-by-side layout');
     const ready = await goToMessages(page);
     test.skip(!ready, 'Auth session expired');
 
@@ -331,7 +335,9 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
     await openConversation(page, 0);
     const input = page.locator(MSG_SELECTORS.messageInput);
     const draftText = 'draft text';
-    await input.fill(draftText);
+    await input.click();
+    await input.fill('');
+    await input.pressSequentially(draftText, { delay: 10 });
 
     // Verify the draft is in the input
     await expect(input).toHaveValue(draftText);

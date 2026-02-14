@@ -65,11 +65,17 @@ export async function goToConversation(page: Page, conversationId: string): Prom
 
 // --- Messaging Actions ---
 
-/** Type and send a message */
+/** Type and send a message.
+ *  Uses pressSequentially to reliably trigger React's onChange on controlled inputs.
+ *  fill() alone can fail to update React state because it sets the DOM value
+ *  without dispatching the synthetic events React listens for. */
 export async function sendMessage(page: Page, text: string): Promise<void> {
   const input = page.locator(MSG_SELECTORS.messageInput);
-  await input.fill(text);
+  await input.click();
+  await input.fill('');
+  await input.pressSequentially(text, { delay: 10 });
   const sendBtn = page.locator(MSG_SELECTORS.sendButton);
+  await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
   await sendBtn.click();
 }
 
