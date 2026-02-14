@@ -124,7 +124,49 @@ test.describe("Session Expiry: Form Submissions", () => {
         return;
       }
 
-      // Expire session before booking attempt
+      // Select dates before booking (required by client-side validation)
+      // --- Start date (2 months ahead) ---
+      const startDateTrigger = page.locator('#booking-start-date');
+      await page.locator('#booking-start-date[data-state]').waitFor({ state: 'visible', timeout: 15_000 });
+      await startDateTrigger.click({ force: true });
+
+      const nextMonthBtn = page.locator('button[aria-label="Next month"]');
+      await nextMonthBtn.waitFor({ state: 'visible', timeout: 10_000 });
+      for (let i = 0; i < 2; i++) {
+        await nextMonthBtn.dispatchEvent('click');
+        await page.waitForTimeout(250);
+      }
+
+      const startDayBtn = page
+        .locator('[data-radix-popper-content-wrapper] button, [class*="popover"] button')
+        .filter({ hasText: /^1$/ })
+        .first();
+      await startDayBtn.waitFor({ state: 'visible', timeout: 5_000 });
+      await startDayBtn.dispatchEvent('click');
+      await page.waitForTimeout(500);
+
+      // --- End date (4 months ahead) ---
+      const endDateTrigger = page.locator('#booking-end-date');
+      await page.locator('#booking-end-date[data-state]').waitFor({ state: 'visible', timeout: 10_000 });
+      await endDateTrigger.click({ force: true });
+      await page.waitForTimeout(300);
+
+      const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
+      await nextMonthBtnEnd.waitFor({ state: 'visible', timeout: 10_000 });
+      for (let i = 0; i < 4; i++) {
+        await nextMonthBtnEnd.dispatchEvent('click');
+        await page.waitForTimeout(250);
+      }
+
+      const endDayBtn = page
+        .locator('[data-radix-popper-content-wrapper] button, [class*="popover"] button')
+        .filter({ hasText: /^1$/ })
+        .first();
+      await endDayBtn.waitFor({ state: 'visible', timeout: 5_000 });
+      await endDayBtn.dispatchEvent('click');
+      await page.waitForTimeout(500);
+
+      // Expire session AFTER dates are selected (before booking attempt)
       await expireSession(page);
       await bookBtn.click();
 

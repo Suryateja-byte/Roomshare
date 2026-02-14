@@ -26,8 +26,10 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
   test(
     `${tags.auth} ${tags.sessionExpiry} - SE-N01: Navigate to /bookings with expired cookie redirects to /login`,
     async ({ page }) => {
-      // Clear cookies to simulate expired session
-      await page.context().clearCookies({ name: "authjs.session-token" });
+      // Clear all auth cookies to simulate expired session
+      for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
+        await page.context().clearCookies({ name: cookie });
+      }
 
       // Navigate to protected page
       await page.goto("/bookings");
@@ -40,7 +42,9 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
   test(
     `${tags.auth} ${tags.sessionExpiry} - SE-N02: Navigate to /messages with expired cookie redirects to /login`,
     async ({ page }) => {
-      await page.context().clearCookies({ name: "authjs.session-token" });
+      for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
+        await page.context().clearCookies({ name: cookie });
+      }
       await page.goto("/messages");
       await expectLoginRedirect(page);
     },
@@ -49,7 +53,9 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
   test(
     `${tags.auth} ${tags.sessionExpiry} - SE-N03: Navigate to /settings with expired cookie preserves callbackUrl`,
     async ({ page }) => {
-      await page.context().clearCookies({ name: "authjs.session-token" });
+      for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
+        await page.context().clearCookies({ name: cookie });
+      }
       await page.goto("/settings");
 
       // /settings page explicitly uses redirect('/login?callbackUrl=/settings')
@@ -60,7 +66,9 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
   test(
     `${tags.auth} ${tags.sessionExpiry} - SE-N04: Navigate to /profile with expired cookie redirects to /login`,
     async ({ page }) => {
-      await page.context().clearCookies({ name: "authjs.session-token" });
+      for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
+        await page.context().clearCookies({ name: cookie });
+      }
       await page.goto("/profile");
       await expectLoginRedirect(page);
     },
