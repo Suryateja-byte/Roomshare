@@ -352,7 +352,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
         if (moveInDate) params.set('moveInDate', moveInDate);
         if (leaseDuration) params.set('leaseDuration', leaseDuration);
-        const effectiveRoomType = formRef.current?.dataset.roomTypeOverride ?? roomType;
+        const override = formRef.current?.dataset.roomTypeOverride;
+        const effectiveRoomType = override !== undefined ? override : roomType;
         if (effectiveRoomType) params.set('roomType', effectiveRoomType);
         amenities.forEach(a => params.append('amenities', a));
         houseRules.forEach(r => params.append('houseRules', r));

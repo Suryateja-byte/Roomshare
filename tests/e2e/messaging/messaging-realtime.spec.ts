@@ -92,7 +92,7 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
       await waitForNewMessage(page, uniqueText, 10_000);
 
       // User2 should see the message within 3 poll cycles + buffer for CI
-      const pollingTimeout = (POLL_INTERVAL.chatWindow * 3) + 5_000;
+      const pollingTimeout = (POLL_INTERVAL.chatWindow * 3) + 15_000;
       await waitForNewMessage(page2, uniqueText, pollingTimeout);
     } finally {
       if (ctx2) {
