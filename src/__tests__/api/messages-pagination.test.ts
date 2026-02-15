@@ -10,8 +10,8 @@
  */
 
 // Mock Prisma before imports
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
+jest.mock('@/lib/prisma', () => {
+  const mockPrisma: Record<string, any> = {
     message: {
       findMany: jest.fn(),
       count: jest.fn(),
@@ -27,8 +27,11 @@ jest.mock('@/lib/prisma', () => ({
     conversationDeletion: {
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
-  },
-}));
+    $transaction: jest.fn(),
+  };
+  mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
+  return { prisma: mockPrisma };
+});
 
 jest.mock('@/auth', () => ({
   auth: jest.fn(),
@@ -125,6 +128,8 @@ function generateMockConversations(count: number, startIndex = 0): Array<{
 describe('Messages Pagination (P1-03)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Restore default $transaction behavior after clearAllMocks wipes it
+    (prisma.$transaction as jest.Mock).mockImplementation((fn: any) => fn(prisma));
     // Default: authenticated user
     (auth as jest.Mock).mockResolvedValue({
       user: { id: 'user-123', email: 'test@example.com' },
