@@ -36,6 +36,11 @@ jest.mock('@/auth', () => ({
 
 jest.mock('@/app/actions/suspension', () => ({
   checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+  checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
+}));
+
+jest.mock('@/app/actions/block', () => ({
+  checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
 }));
 
 // Mock next/server to avoid NextRequest issues in Jest
