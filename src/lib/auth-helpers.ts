@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { prisma } from '@/lib/prisma';
 
 // Re-export from standalone module for backward compatibility (auth.ts imports from here)
 export { normalizeEmail } from './normalize-email';
@@ -50,8 +51,6 @@ const PROTECTED_PAGE_PATHS = [
 const READ_ONLY_PUBLIC_ENDPOINTS = [
   '/api/listings',
 ];
-
-const LIVE_SUSPENSION_CHECK_TIMEOUT_MS = 1500;
 
 /**
  * Check if a pathname is a public route that doesn't need suspension check.
@@ -121,38 +120,26 @@ function buildSuspensionBlockedResponse(): NextResponse {
 }
 
 /**
- * Check current suspension status from the database via internal API.
- * This reduces edge-token staleness for recently suspended users.
+ * Check current suspension status directly from the database.
+ * This reduces token staleness for recently suspended users.
+ *
+ * SECURITY FIX (P1): Previously used HTTP fetch to an internal API endpoint,
+ * constructing the URL from request.nextUrl.origin (attacker-controlled via
+ * Host header) and sending NEXTAUTH_SECRET in a custom header. Replaced with
+ * direct Prisma query to eliminate the secret exfiltration attack surface.
+ *
+ * @returns true if suspended, false if not, undefined on error (graceful degradation)
  */
 async function getLiveSuspensionStatus(
-  request: NextRequest,
   userId: string
 ): Promise<boolean | undefined> {
-  const secret = process.env.SUSPENSION_CHECK_SECRET || process.env.NEXTAUTH_SECRET;
-  if (!secret) return undefined;
-
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), LIVE_SUSPENSION_CHECK_TIMEOUT_MS);
-
-    const url = new URL('/api/auth/suspension-status', request.nextUrl.origin);
-    url.searchParams.set('userId', userId);
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'x-suspension-check-secret': secret,
-      },
-      cache: 'no-store',
-      signal: controller.signal,
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isSuspended: true },
     });
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) return undefined;
-
-    const data = await response.json() as { isSuspended?: boolean };
-    return data.isSuspended === true;
+    return user?.isSuspended === true;
   } catch {
     return undefined;
   }
@@ -205,7 +192,7 @@ export async function checkSuspension(request: NextRequest): Promise<NextRespons
     return null;
   }
 
-  const liveSuspended = await getLiveSuspensionStatus(request, userId);
+  const liveSuspended = await getLiveSuspensionStatus(userId);
   if (liveSuspended) {
     return buildSuspensionBlockedResponse();
   }
