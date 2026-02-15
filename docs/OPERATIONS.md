@@ -8,7 +8,7 @@ Operational runbook for monitoring, incident response, and maintenance.
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
-| App | Next.js 15 on Vercel | SSR + API routes, Node.js runtime |
+| App | Next.js 16 on Vercel | SSR + API routes, Node.js runtime |
 | Database | PostgreSQL + PostGIS (Prisma ORM) | Hosted externally (e.g., Supabase, Neon) |
 | Cache/Rate Limiting | Upstash Redis (optional) | Falls back to DB-backed rate limiting |
 | Error Tracking | Sentry (optional) | Client, server, and edge configs |

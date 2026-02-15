@@ -194,10 +194,18 @@ function validateClientEnv(): ClientEnv {
   const result = clientEnvSchema.safeParse(clientVars);
 
   if (!result.success) {
-    console.warn(
-      "Client environment validation warnings:",
-      result.error.issues,
-    );
+    const errors = result.error.issues
+      .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
+      .join("\n");
+
+    console.warn("Client environment validation warnings:\n" + errors);
+
+    // In production, fail fast (same as server env)
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Invalid client environment configuration. Check logs for details.",
+      );
+    }
   }
 
   return result.success ? result.data : (clientVars as ClientEnv);

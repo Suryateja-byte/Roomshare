@@ -38,6 +38,14 @@ describe("Turnstile production enforcement", () => {
     expect(() => getServerEnv()).toThrow();
   });
 
+  it("rejects when NEXT_PUBLIC_TURNSTILE_SITE_KEY is missing in production", async () => {
+    process.env.TURNSTILE_ENABLED = "true";
+    process.env.TURNSTILE_SECRET_KEY = "test-secret";
+    // NEXT_PUBLIC_TURNSTILE_SITE_KEY deliberately absent
+    const { getClientEnv } = await import("@/lib/env");
+    expect(() => getClientEnv()).toThrow();
+  });
+
   it("succeeds when both Turnstile vars are set in production", async () => {
     process.env.TURNSTILE_ENABLED = "true";
     process.env.TURNSTILE_SECRET_KEY = "test-secret";
