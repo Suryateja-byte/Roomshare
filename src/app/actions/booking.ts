@@ -19,11 +19,12 @@ export type BookingResult = {
     error?: string;
     code?: string;
     fieldErrors?: Record<string, string>;
+    currentPrice?: number;
 };
 
 // Internal result type with side effect data (not exposed to callers)
 type InternalBookingResult =
-    | { success: false; error: string; code?: string; fieldErrors?: Record<string, string> }
+    | { success: false; error: string; code?: string; fieldErrors?: Record<string, string>; currentPrice?: number }
     | {
         success: true;
         bookingId: string;
@@ -48,7 +49,7 @@ async function executeBookingTransaction(
     listingId: string,
     startDate: Date,
     endDate: Date,
-    totalPrice: number
+    clientPricePerMonth: number
 ): Promise<InternalBookingResult> {
     // Check for existing duplicate booking (same tenant, listing, dates)
     // This serves as server-side idempotency - if same booking already exists, treat as duplicate
@@ -78,8 +79,9 @@ async function executeBookingTransaction(
         totalSlots: number;
         availableSlots: number;
         status: string;
+        price: number;
     }>>`
-        SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status"
+        SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status", "price"
         FROM "Listing"
         WHERE "id" = ${listingId}
         FOR UPDATE
@@ -87,6 +89,17 @@ async function executeBookingTransaction(
 
     if (!listing) {
         return { success: false, error: 'Listing not found' };
+    }
+
+    // P1 FIX: Validate client-provided price against authoritative DB price
+    // Reject if mismatch (tolerance $0.01 for floating-point rounding)
+    if (Math.abs(clientPricePerMonth - listing.price) > 0.01) {
+        return {
+            success: false,
+            error: 'The listing price has changed. Please review the updated price and try again.',
+            code: 'PRICE_CHANGED',
+            currentPrice: listing.price
+        };
     }
 
     // Fetch owner details separately (no lock needed, read-only)
@@ -174,6 +187,12 @@ async function executeBookingTransaction(
         select: { name: true }
     });
 
+    // P1 FIX: Calculate total price from authoritative DB price (not client value)
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const pricePerDay = listing.price / 30;
+    const totalPrice = Math.round(diffDays * pricePerDay * 100) / 100;
+
     // Create the booking within the transaction
     const booking = await tx.booking.create({
         data: {
@@ -241,7 +260,8 @@ function toBookingResult(result: InternalBookingResult): BookingResult {
             success: false,
             error: result.error,
             code: result.code,
-            fieldErrors: result.fieldErrors
+            fieldErrors: result.fieldErrors,
+            currentPrice: result.currentPrice
         };
     }
     return { success: true, bookingId: result.bookingId };
@@ -295,14 +315,8 @@ export async function createBooking(
         return { success: false, error: 'Invalid booking data' };
     }
 
-    // Calculate total price based on actual days
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    // Approximate monthly price to daily
-    const pricePerDay = pricePerMonth / 30;
-    const totalPrice = Math.round(diffDays * pricePerDay * 100) / 100;
-
     // Request body for idempotency hash (deterministic across retries)
+    // Note: pricePerMonth is included as client assertion; actual price comes from DB inside transaction
     const requestBody = { listingId, startDate: startDate.toISOString(), endDate: endDate.toISOString(), pricePerMonth };
 
     // P0-04 FIX: Use withIdempotency wrapper for atomic idempotency handling
@@ -313,7 +327,7 @@ export async function createBooking(
             userId,
             'createBooking',
             requestBody,
-            async (tx) => executeBookingTransaction(tx, userId, listingId, startDate, endDate, totalPrice)
+            async (tx) => executeBookingTransaction(tx, userId, listingId, startDate, endDate, pricePerMonth)
         );
 
         // Handle idempotency wrapper errors (400 for hash mismatch, 500 for lock failure)
@@ -355,7 +369,7 @@ export async function createBooking(
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
             const result = await prisma.$transaction(
-                async (tx) => executeBookingTransaction(tx, userId, listingId, startDate, endDate, totalPrice),
+                async (tx) => executeBookingTransaction(tx, userId, listingId, startDate, endDate, pricePerMonth),
                 { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
             );
 
