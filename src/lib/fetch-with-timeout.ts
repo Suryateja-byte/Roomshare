@@ -51,7 +51,11 @@ export async function fetchWithTimeout(
 
   // If an existing signal was provided, link it to our controller
   if (existingSignal) {
-    existingSignal.addEventListener('abort', () => controller.abort());
+    if (existingSignal.aborted) {
+      controller.abort();
+    } else if (typeof existingSignal.addEventListener === 'function') {
+      existingSignal.addEventListener('abort', () => controller.abort());
+    }
   }
 
   try {
