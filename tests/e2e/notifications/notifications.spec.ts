@@ -13,6 +13,11 @@
  * Test ordering: read-only tests first (NF-01..NF-06, NF-10),
  * then mutation tests in careful sequence (NF-07..NF-14).
  * Mutations persist server-side, so ordering matters.
+ *
+ * IMPORTANT: Restricted to chromium project only. When multiple projects
+ * (chromium + Mobile Chrome) run in the same shard, chromium's mutation
+ * tests (delete, mark-read) modify the shared DB before Mobile Chrome's
+ * read-only tests execute, causing "notification-item not found" failures.
  */
 
 import { test, expect, timeouts } from "../helpers";
@@ -23,7 +28,9 @@ import { test, expect, timeouts } from "../helpers";
 test.describe("NF: Read-only", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium',
+      'Notifications: chromium-only (mutation tests modify shared DB state)');
     test.slow(); // 3x timeout for SSR pages
   });
 
@@ -208,7 +215,9 @@ test.describe("NF: Mutations", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
   test.describe.configure({ mode: "serial" });
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium',
+      'Notifications: chromium-only (mutation tests modify shared DB state)');
     test.slow();
   });
 
