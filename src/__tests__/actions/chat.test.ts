@@ -10,8 +10,8 @@ jest.mock('next/cache', () => ({
 }))
 
 // Mock dependencies before imports
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
+jest.mock('@/lib/prisma', () => {
+  const mockPrisma: Record<string, any> = {
     listing: {
       findUnique: jest.fn(),
     },
@@ -36,8 +36,12 @@ jest.mock('@/lib/prisma', () => ({
     user: {
       findUnique: jest.fn(),
     },
-  },
-}))
+    $transaction: jest.fn(),
+  };
+  // $transaction passes mockPrisma as tx so existing assertions still work
+  mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
+  return { prisma: mockPrisma };
+})
 
 jest.mock('@/app/actions/block', () => ({
   checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),

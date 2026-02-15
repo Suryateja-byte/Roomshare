@@ -2,8 +2,8 @@
  * Tests for messages API route
  */
 
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
+jest.mock('@/lib/prisma', () => {
+  const mockPrisma: Record<string, any> = {
     conversation: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
@@ -22,8 +22,12 @@ jest.mock('@/lib/prisma', () => ({
     conversationDeletion: {
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
-  },
-}))
+    $transaction: jest.fn(),
+  };
+  // $transaction passes mockPrisma as tx so existing assertions still work
+  mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
+  return { prisma: mockPrisma };
+})
 
 jest.mock('@/auth', () => ({
   auth: jest.fn(),

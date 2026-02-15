@@ -133,25 +133,27 @@ export async function sendMessage(conversationId: string, content: string) {
         }
     }
 
-    const message = await prisma.message.create({
-        data: {
-            content: safeContent,
-            conversationId: safeConversationId,
-            senderId: session.user.id,
-        },
+    // Wrap dependent writes in a transaction to prevent partial failures
+    const message = await prisma.$transaction(async (tx) => {
+        const msg = await tx.message.create({
+            data: {
+                content: safeContent,
+                conversationId: safeConversationId,
+                senderId: session.user.id,
+            },
+        });
+        await Promise.all([
+            tx.conversation.update({
+                where: { id: safeConversationId },
+                data: { updatedAt: new Date() },
+            }),
+            // New message resurrects conversation for everyone
+            tx.conversationDeletion.deleteMany({
+                where: { conversationId: safeConversationId },
+            }),
+        ]);
+        return msg;
     });
-
-    // Resurrect conversation for all users + update timestamp
-    await Promise.all([
-        prisma.conversation.update({
-            where: { id: safeConversationId },
-            data: { updatedAt: new Date() },
-        }),
-        // New message resurrects conversation for everyone
-        prisma.conversationDeletion.deleteMany({
-            where: { conversationId: safeConversationId },
-        }),
-    ]);
 
     // Get sender info
     const sender = await prisma.user.findUnique({
