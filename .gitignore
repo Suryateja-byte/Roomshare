@@ -37,6 +37,7 @@ test-output.txt
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
