@@ -5,6 +5,7 @@ import { auth } from '@/auth';
 import { getListingsPaginated } from '@/lib/data';
 import { buildRawParamsFromSearchParams, parseSearchParams } from '@/lib/search-params';
 import { logger } from '@/lib/logger';
+import { isDataError } from '@/lib/errors/data-errors';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { createListingApiSchema } from '@/lib/schemas';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
@@ -68,14 +69,29 @@ export async function GET(request: Request) {
             },
         });
     } catch (error) {
-        if (error instanceof Error && (
-            error.message.includes('cannot exceed') ||
-            error.message.includes('Unbounded text search')
-        )) {
-            return NextResponse.json({ error: error.message }, {
-                status: 400,
-                headers: { "x-request-id": requestId },
-            });
+        // Detect user-facing validation errors (return 400 instead of 500):
+        // - parseSearchParams throws plain Error ("minPrice cannot exceed maxPrice")
+        // - getListingsPaginated wraps errors via wrapDatabaseError;
+        //   original message is in error.cause.message
+        const isUserError = (msg: string) =>
+            msg.includes('cannot exceed') || msg.includes('Unbounded text search');
+
+        if (error instanceof Error) {
+            const causeMsg = isDataError(error) && error.cause
+                ? error.cause.message
+                : '';
+            if (isUserError(error.message)) {
+                return NextResponse.json({ error: error.message }, {
+                    status: 400,
+                    headers: { "x-request-id": requestId },
+                });
+            }
+            if (isUserError(causeMsg)) {
+                return NextResponse.json({ error: causeMsg }, {
+                    status: 400,
+                    headers: { "x-request-id": requestId },
+                });
+            }
         }
 
         logger.sync.error('Error fetching listings', {
