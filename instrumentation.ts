@@ -15,6 +15,10 @@ export async function register() {
     // This ensures Sentry events are flushed and Prisma disconnects cleanly
     const { registerShutdownHandlers } = await import('./src/lib/shutdown');
     registerShutdownHandlers();
+
+    // Log warnings for missing optional services at startup
+    const { logStartupWarnings } = await import('./src/lib/env');
+    logStartupWarnings();
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {
