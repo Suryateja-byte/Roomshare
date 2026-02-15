@@ -74,12 +74,18 @@ export async function openConversation(page: Page, index = 0): Promise<void> {
   // Ensure the target item is visible before clicking
   await items.nth(index).waitFor({ state: 'visible', timeout: 10_000 });
   await items.nth(index).click();
-
-  // Wait for conversation data to load — check both DOM ready and input visible
-  await page.waitForLoadState('domcontentloaded');
+  // Defense-in-depth: detect if we opened a blocked conversation (no data-testid on banner)
   const messageInput = page.locator(MSG_SELECTORS.messageInput);
-  await messageInput.waitFor({ state: 'visible', timeout: 30_000 });
-  await expect(messageInput).toBeEnabled({ timeout: 10_000 });
+  const blockedBanner = page.getByText(/you have blocked|you can no longer send messages/i);
+  await expect(messageInput.or(blockedBanner)).toBeVisible({ timeout: 10_000 });
+  if (await blockedBanner.isVisible()) {
+    throw new Error(`Opened a blocked conversation at index ${index}. Seed data ordering may be wrong.`);
+  }
+  // Allow useBlockStatus() async resolution to settle — if it swaps input for banner, catch it
+  await page.waitForTimeout(500);
+  if (await blockedBanner.isVisible()) {
+    throw new Error(`Blocked conversation banner appeared after delay at index ${index}. The blocked-user seed may conflict with this conversation.`);
+  }
 }
 
 /** Navigate directly to a conversation by ID */

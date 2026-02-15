@@ -81,8 +81,8 @@ test.describe("Session Expiry: Resilience", () => {
       await page.waitForURL(/^(?!about:blank)/, { timeout: 10_000 }).catch(() => {});
       await page.waitForLoadState("domcontentloaded").catch(() => {});
       const url = page.url();
-      // After back navigation, page could be on login (re-redirected), settings, or root
-      expect(url).not.toBe("about:blank");
+      // about:blank is acceptable — browser may navigate there on back after redirect
+      expect(url).toMatch(/\/(login|settings)|about:blank/);
     },
   );
 

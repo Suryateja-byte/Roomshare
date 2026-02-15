@@ -271,18 +271,13 @@ test.describe("Search URL Browser Navigation (P1)", () => {
       return;
     }
 
-    const firstLink = cards.first().locator('a[href^="/listings/"]').first();
-    const href = await firstLink.getAttribute("href");
+    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+    const firstCard = cards.first();
+    const href = await firstCard.locator('a[href^="/listings/"]').first().getAttribute("href");
     expect(href).toBeTruthy();
 
-    // Use direct navigation if click doesn't trigger nav (CI click-interception issue)
-    await Promise.all([
-      page.waitForURL(/\/listings\//, { timeout: 15_000 }),
-      firstLink.click(),
-    ]).catch(async () => {
-      // Fallback: navigate directly if click was absorbed by overlay element
-      await page.goto(href!);
-    });
+    // Navigate via h3 click (inside Link but outside carousel area)
+    await firstCard.locator('h3').first().click();
     await expect(page).toHaveURL(/\/listings\//, { timeout: 15_000 });
 
     // Go back to search

@@ -42,7 +42,9 @@ test.describe("Filter URL-UI Desync", () => {
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiButton = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
     await wifiButton.click();
-    await applyFilters(page);
+    // Wait for React to process the startTransition state update
+    await expect(wifiButton).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
+    await applyFilters(page, { expectUrlChange: false });
 
     // Wait for URL to contain amenities=Wifi
     await waitForUrlParam(page, "amenities", "Wifi");

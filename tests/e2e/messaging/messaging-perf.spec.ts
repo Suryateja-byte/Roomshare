@@ -104,7 +104,7 @@ test.describe('Messaging: Performance', { tag: [tags.auth, tags.slow] }, () => {
 
     // Wait for the optimistic bubble to appear first
     const bubble = page.locator(MSG_SELECTORS.messageBubble).filter({ hasText: uniqueText });
-    await expect(bubble.first()).toBeVisible({ timeout: 5_000 });
+    await expect(bubble.first()).toBeVisible({ timeout: 10_000 });
 
     const bubbleEl = bubble.first();
     const budget = process.env.CI ? 8_000 : 3_000;

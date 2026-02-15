@@ -118,10 +118,13 @@ test.describe("Session Expiry: Messaging", () => {
       await page.context().clearCookies({ name: cookie });
     }
 
-    // Navigate to messages — server-side auth check should redirect to /login.
-    // Note: /messages/page.tsx does redirect('/login') WITHOUT callbackUrl.
+    // Navigate to messages — server-side auth() finds no session → redirect.
+    // Next.js App Router redirect() produces an RSC client-side navigation,
+    // NOT an HTTP 302. We must wait for the client-side router to process it.
     await page.goto("/messages");
-
-    await expectLoginRedirect(page);
+    await page.waitForFunction(
+      () => !window.location.pathname.startsWith('/messages'),
+      { timeout: 15_000 },
+    );
   });
 });

@@ -45,8 +45,15 @@ export async function expireSession(
   }
 
   if (triggerRefetch) {
-    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await page.waitForTimeout(500);
+    // Dispatch both focus and visibilitychange to maximize chance of triggering
+    // SessionProvider's refetchOnWindowFocus. Playwright's synthetic events may not
+    // always trigger the same listeners as real user interactions.
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event("focus"));
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await page.waitForTimeout(1000);
   }
 }
 

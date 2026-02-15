@@ -777,17 +777,21 @@ async function main() {
   }
 
   // 14. Create BlockedUser for Settings E2E tests
+  // NOTE: Block admin (not thirdUser) to avoid poisoning messaging conversations.
+  // thirdUser shares conversation2 with user; blocking them causes BlockedConversationBanner
+  // to replace message-input, breaking all messaging tests that use that conversation.
+  // Settings tests (ST-11, ST-12) only need ANY blocked user — they don't care who.
   const existingBlock = await prisma.blockedUser.findFirst({
-    where: { blockerId: user.id, blockedId: thirdUser.id },
+    where: { blockerId: user.id, blockedId: admin.id },
   });
   if (!existingBlock) {
     await prisma.blockedUser.create({
       data: {
         blockerId: user.id,
-        blockedId: thirdUser.id,
+        blockedId: admin.id,
       },
     });
-    console.log(`  ✓ BlockedUser: ${user.email} blocked ${thirdUser.email}`);
+    console.log(`  ✓ BlockedUser: ${user.email} blocked ${admin.email}`);
   } else {
     console.log(`  ⏭ BlockedUser exists`);
   }

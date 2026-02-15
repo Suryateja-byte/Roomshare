@@ -8,7 +8,7 @@ export default async function MessagesPage() {
     const session = await auth();
 
     if (!session || !session.user || !session.user.id) {
-        redirect('/login');
+        redirect('/login?callbackUrl=%2Fmessages');
     }
 
     const conversations = await getConversations();
