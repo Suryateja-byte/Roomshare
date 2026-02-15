@@ -109,6 +109,9 @@ const clientEnvSchema = z.object({
 
   // Cloudflare Turnstile (bot protection)
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
+
+  // App URL (used for metadataBase, sitemap, robots, structured data)
+  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
 });
 
 // Type exports for use throughout the application
@@ -155,6 +158,7 @@ function validateClientEnv(): ClientEnv {
     NEXT_PUBLIC_NEARBY_ENABLED: process.env.NEXT_PUBLIC_NEARBY_ENABLED,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY:
       process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   };
 
   const result = clientEnvSchema.safeParse(clientVars);
