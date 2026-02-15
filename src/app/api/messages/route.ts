@@ -186,28 +186,30 @@ export async function POST(request: Request) {
             }
         }
 
-        // P1-21 FIX: Parallelize independent database operations
-        const [message] = await Promise.all([
-            prisma.message.create({
-                data: {
-                    senderId: userId,
-                    conversationId,
-                    content,
-                },
-                include: {
-                    sender: { select: { id: true, name: true, image: true } },
-                }
-            }),
-            // Update conversation timestamp in parallel
-            prisma.conversation.update({
-                where: { id: conversationId },
-                data: { updatedAt: new Date() },
-            }),
-            // New message resurrects conversation for all users
-            prisma.conversationDeletion.deleteMany({
-                where: { conversationId },
-            }),
-        ]);
+        // Wrap dependent writes in a transaction to prevent partial failures
+        const message = await prisma.$transaction(async (tx) => {
+            const [msg] = await Promise.all([
+                tx.message.create({
+                    data: {
+                        senderId: userId,
+                        conversationId,
+                        content,
+                    },
+                    include: {
+                        sender: { select: { id: true, name: true, image: true } },
+                    }
+                }),
+                tx.conversation.update({
+                    where: { id: conversationId },
+                    data: { updatedAt: new Date() },
+                }),
+                // New message resurrects conversation for all users
+                tx.conversationDeletion.deleteMany({
+                    where: { conversationId },
+                }),
+            ]);
+            return msg;
+        });
 
         // P2-1: Mutation responses must not be cached
         const response = NextResponse.json(message, { status: 201 });

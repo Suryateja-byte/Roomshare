@@ -41,7 +41,7 @@ const PROTECTED_API_PATHS = [
  */
 const PROTECTED_PAGE_PATHS = [
   '/dashboard',
-  '/listings/new',
+  '/listings/create',
 ];
 
 /**
@@ -56,12 +56,12 @@ const READ_ONLY_PUBLIC_ENDPOINTS = [
  * Check if a pathname is a public route that doesn't need suspension check.
  * Public routes are accessible to everyone, including suspended users.
  *
- * Note: Protected paths take precedence, so /listings/new is protected
+ * Note: Protected paths take precedence, so /listings/create is protected
  * even though /listings is public.
  */
 export function isPublicRoute(pathname: string): boolean {
   // Protected paths take precedence over public paths
-  // e.g., /listings/new is protected even though /listings is public
+  // e.g., /listings/create is protected even though /listings is public
   const isProtected = PROTECTED_PAGE_PATHS.some(path => {
     return pathname === path || pathname.startsWith(`${path}/`);
   });

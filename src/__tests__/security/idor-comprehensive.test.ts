@@ -9,8 +9,8 @@
  * - Modify other user's resources
  */
 
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
+jest.mock('@/lib/prisma', () => {
+  const mockPrisma: Record<string, any> = {
     booking: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
@@ -52,8 +52,12 @@ jest.mock('@/lib/prisma', () => ({
     },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
-  },
-}));
+  };
+  // Default: $transaction passes mockPrisma as tx (for sendMessage etc.)
+  // Tests that need custom tx (bookings) override this per-test
+  mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
+  return { prisma: mockPrisma };
+});
 
 jest.mock('@/auth', () => ({
   auth: jest.fn(),
@@ -121,6 +125,8 @@ describe('Comprehensive IDOR Protection Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Restore default $transaction behavior after clearAllMocks wipes it
+    (prisma.$transaction as jest.Mock).mockImplementation((fn: any) => fn(prisma));
   });
 
   describe('Booking IDOR Protection', () => {

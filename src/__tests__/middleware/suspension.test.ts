@@ -53,7 +53,7 @@ describe('Suspension Middleware', () => {
       '/dashboard',
       '/dashboard/listings',
       '/dashboard/bookings',
-      '/listings/new',
+      '/listings/create',
     ];
 
     it.each(protectedApiPaths)(
@@ -141,6 +141,11 @@ describe('Suspension Middleware', () => {
       '/_next/static/chunk.js',
       '/favicon.ico',
     ];
+
+    it('does NOT classify /listings/create as a public route (regression)', async () => {
+      const { isPublicRoute } = await import('@/lib/auth-helpers');
+      expect(isPublicRoute('/listings/create')).toBe(false);
+    });
 
     it.each(publicPaths)(
       'allows suspended user on public route %s',
