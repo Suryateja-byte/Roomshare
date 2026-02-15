@@ -186,7 +186,7 @@ export interface UseBatchedFiltersReturn {
   pending: BatchedFilterValues;
   /** Whether pending differs from committed URL state */
   isDirty: boolean;
-  /** Update one or more pending filter values (accepts values or a functional updater) */
+  /** Update one or more pending filter values */
   setPending: (
     valuesOrFn:
       | Partial<BatchedFilterValues>

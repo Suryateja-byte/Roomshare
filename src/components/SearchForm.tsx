@@ -104,7 +104,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     };
     const [location, setLocation] = useState(searchParams.get('q') || '');
     // Batched filter state — single hook manages pending vs committed
-    const { pending, isDirty: filtersDirty, setPending, reset: resetFilters, commit: commitFilters, committed } = useBatchedFilters();
+    const { pending, isDirty: filtersDirty, setPending, commit: commitFilters } = useBatchedFilters();
     // Destructure for convenient access (read-only aliases)
     const { minPrice, maxPrice, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender } = pending;
 
@@ -475,19 +475,6 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         });
     }, [setPending]);
 
-    // Room type selection from FilterBar CategoryTabs — sets state AND triggers search
-    const handleFilterBarRoomTypeChange = useCallback((value: string) => {
-        const resolved = value === 'any' ? '' : value;
-        setPending({ roomType: resolved });
-        if (formRef.current) {
-            formRef.current.dataset.roomTypeOverride = resolved;
-        }
-        queueMicrotask(() => {
-            formRef.current?.requestSubmit();
-            if (formRef.current) delete formRef.current.dataset.roomTypeOverride;
-        });
-    }, [setPending]);
-
     // Clear all filters and reset to defaults
     // INP optimization: Batch state updates in startTransition
     const handleClearAllFilters = useCallback(() => {
@@ -574,36 +561,6 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             });
         });
     }, [priceAbsoluteMin, priceAbsoluteMax, setPending]);
-
-    // Handler for removing individual filters from FilterBar pills
-    // INP optimization: Wrap state updates in startTransition for responsiveness
-    const handleRemoveFilter = useCallback((type: string, value?: string) => {
-        startTransition(() => {
-            switch (type) {
-                case 'leaseDuration':
-                    setPending({ leaseDuration: '' });
-                    break;
-                case 'moveInDate':
-                    setPending({ moveInDate: '' });
-                    break;
-                case 'amenity':
-                    if (value) setPending((prev) => ({ amenities: prev.amenities.filter(a => a !== value) }));
-                    break;
-                case 'houseRule':
-                    if (value) setPending((prev) => ({ houseRules: prev.houseRules.filter(r => r !== value) }));
-                    break;
-                case 'language':
-                    if (value) setPending((prev) => ({ languages: prev.languages.filter(l => l !== value) }));
-                    break;
-                case 'genderPreference':
-                    setPending({ genderPreference: '' });
-                    break;
-                case 'householdGender':
-                    setPending({ householdGender: '' });
-                    break;
-            }
-        });
-    }, [setPending]);
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;

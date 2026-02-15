@@ -10,7 +10,7 @@
  * Run: pnpm playwright test tests/e2e/search-url-navigation.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, searchResultsContainer } from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS, searchResultsContainer } from "./helpers/test-utils";
 import { pollForUrlParam } from "./helpers/sync-helpers";
 import type { Page } from "@playwright/test";
 
@@ -18,27 +18,11 @@ import type { Page } from "@playwright/test";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-
 function buildSearchUrl(params?: Record<string, string>): string {
   const base = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
   if (!params) return base;
   const extra = new URLSearchParams(params).toString();
   return `${base}&${extra}`;
-}
-
-async function assertUrlParams(page: Page, expected: Record<string, string>) {
-  const url = new URL(page.url());
-  for (const [key, value] of Object.entries(expected)) {
-    expect(url.searchParams.get(key), `URL param "${key}" should be "${value}"`).toBe(value);
-  }
-}
-
-async function assertUrlExcludesParams(page: Page, keys: string[]) {
-  const url = new URL(page.url());
-  for (const key of keys) {
-    expect(url.searchParams.has(key), `URL should NOT contain param "${key}"`).toBe(false);
-  }
 }
 
 /** Wait for search results or zero-results state to render. */
@@ -160,8 +144,6 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     // Go back -- since replaceState was used, back should go to the page before /search
     // (or stay on search if there is no prior entry)
     // The key assertion is that the replace did NOT add a new history entry
-    const historyLength = await page.evaluate(() => window.history.length);
-
     // Navigate to a different page first, then back, to verify replaceState behavior
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
@@ -257,9 +239,6 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     const searchUrlWithFilters = buildSearchUrl({ maxPrice: "2000", sort: "price_asc" });
     await page.goto(searchUrlWithFilters);
     await waitForSearchContent(page);
-
-    // Capture the search URL before navigating away
-    const searchUrl = page.url();
 
     // Click on a listing card to navigate to detail
     const container = searchResultsContainer(page);
