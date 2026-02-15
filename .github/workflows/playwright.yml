@@ -140,7 +140,7 @@ jobs:
           pnpm exec playwright test \
             --shard="${SHARD_INDEX}/${SHARD_TOTAL}" \
             --reporter=blob \
-            --workers=4 \
+            --workers=1 \
             --project=chromium \
             --project=chromium-admin \
             --project=chromium-anon \

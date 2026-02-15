@@ -14,7 +14,7 @@
  */
 
 import { test, expect, tags } from "../helpers";
-import { expireSession, expectLoginRedirect } from "../helpers";
+import { expectLoginRedirect } from "../helpers";
 
 test.describe("Session Expiry: Navigation & Redirects", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
@@ -84,8 +84,10 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
       // Verify we're on settings (authenticated)
       await expect(page).toHaveURL(/\/settings/, { timeout: 10000 });
 
-      // Expire session
-      await expireSession(page);
+      // Clear session cookies (same pattern as SE-N01..N04)
+      for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
+        await page.context().clearCookies({ name: cookie });
+      }
 
       // Try navigating to settings again — should redirect to login
       await page.goto("/settings");

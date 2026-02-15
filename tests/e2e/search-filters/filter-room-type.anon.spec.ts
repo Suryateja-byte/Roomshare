@@ -24,6 +24,7 @@ import {
   gotoSearchWithFilters,
   getUrlParam,
   filtersButton,
+  applyFilters,
 } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -194,10 +195,8 @@ test.describe("Room Type Filter", () => {
         // Radix Select trigger text may take a moment to update
         await expect(roomTypeSelect).toContainText(/shared room/i, { timeout: 10_000 }).catch(() => {});
 
-        // Apply
-        await page.locator('[data-testid="filter-modal-apply"]').click();
-
-        await expect(dialog).not.toBeVisible({ timeout: 30_000 });
+        // Apply — use resilient helper for hydration race
+        await applyFilters(page);
 
         // URL should have roomType=Shared Room
         await expect.poll(
