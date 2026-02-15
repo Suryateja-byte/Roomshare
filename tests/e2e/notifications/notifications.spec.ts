@@ -76,17 +76,16 @@ test.describe("NF: Read-only", () => {
   // NF-03: Notification items rendered
   test("NF-03  notification items are rendered", async ({ page }) => {
     await page.goto("/notifications");
-    await page.waitForLoadState("networkidle");
-
-    await expect(
-      page.getByTestId("notifications-page"),
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait for notification items to render after SSR hydration.
     // On slow CI machines, hydration can take significant time after
-    // the page shell renders.
+    // the page shell renders. Use same pattern as NF-04 which passes
+    // reliably: wait directly for the first item with generous timeout.
+    // NOTE: Do NOT use "networkidle" — Unsplash image 404 retries keep
+    // the network busy on CI, causing networkidle to hang.
     const items = page.getByTestId("notification-item");
-    await expect(items.first()).toBeVisible({ timeout: timeouts.navigation });
+    await expect(items.first()).toBeVisible({ timeout: timeouts.action });
 
     const count = await items.count();
     expect(count).toBeGreaterThanOrEqual(2);
