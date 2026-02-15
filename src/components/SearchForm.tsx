@@ -431,24 +431,33 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // visual feedback (button press) over state computation
     const toggleAmenity = useCallback((amenity: string) => {
         startTransition(() => {
-            const next = amenities.includes(amenity) ? amenities.filter(a => a !== amenity) : [...amenities, amenity];
-            setPending({ amenities: next });
+            setPending((prev) => ({
+                amenities: prev.amenities.includes(amenity)
+                    ? prev.amenities.filter(a => a !== amenity)
+                    : [...prev.amenities, amenity],
+            }));
         });
-    }, [amenities, setPending]);
+    }, [setPending]);
 
     const toggleHouseRule = useCallback((rule: string) => {
         startTransition(() => {
-            const next = houseRules.includes(rule) ? houseRules.filter(r => r !== rule) : [...houseRules, rule];
-            setPending({ houseRules: next });
+            setPending((prev) => ({
+                houseRules: prev.houseRules.includes(rule)
+                    ? prev.houseRules.filter(r => r !== rule)
+                    : [...prev.houseRules, rule],
+            }));
         });
-    }, [houseRules, setPending]);
+    }, [setPending]);
 
     const toggleLanguage = useCallback((lang: string) => {
         startTransition(() => {
-            const next = languages.includes(lang) ? languages.filter(l => l !== lang) : [...languages, lang];
-            setPending({ languages: next });
+            setPending((prev) => ({
+                languages: prev.languages.includes(lang)
+                    ? prev.languages.filter(l => l !== lang)
+                    : [...prev.languages, lang],
+            }));
         });
-    }, [languages, setPending]);
+    }, [setPending]);
 
     // Room type selection — updates state and triggers search immediately
     const handleRoomTypeSelect = useCallback((value: string) => {
