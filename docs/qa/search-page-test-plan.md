@@ -7,7 +7,7 @@
 ## Executive Summary
 
 - **Feature**: Search Page — listing discovery with filters, map, pagination, ranking
-- **Tech Stack**: Next.js SSR + PostGIS + Mapbox + Redis rate limiting + keyset pagination
+- **Tech Stack**: Next.js SSR + PostGIS + MapLibre GL + Redis rate limiting + keyset pagination
 - **Testing Objective**: Validate correctness, security, performance, and UX of all search flows
 - **Key Risks**: XSS, full-table scan DoS, cursor tampering, IDOR, data parity (V1/V2)
 - **Timeline**: Regression suite runs in ~45 min (smoke: 15 min)
@@ -88,7 +88,7 @@
 
 ### Out of Scope
 
-- Mapbox GL JS rendering internals (3rd party)
+- MapLibre GL JS rendering internals (3rd party)
 - Payment/booking flows triggered from search results
 - Admin/moderation views of listings
 - Search alerts cron job (separate test plan)

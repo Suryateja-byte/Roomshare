@@ -1,6 +1,8 @@
 # Search Page: Map Components & Map Integration
 
-Comprehensive documentation of the map system powering the Roomshare search page. The map stack is built on **Mapbox GL JS** via `react-map-gl`, with a **MapLibre adapter** for listing detail pages and a **Google Maps** loader for Places UI Kit autocomplete.
+> **Note (Feb 2026):** The map stack has since migrated from Mapbox GL JS to **MapLibre GL** (`react-map-gl/maplibre` + `maplibre-gl`). References to "Mapbox" below are outdated -- the actual implementation uses MapLibre with Stadia Maps tile styles. See `src/components/map/MapClient.tsx` for the current implementation.
+
+Comprehensive documentation of the map system powering the Roomshare search page. The map stack is built on **MapLibre GL** via `react-map-gl/maplibre`, with **Stadia Maps** tiles and a **Google Maps** loader for Places UI Kit autocomplete.
 
 ---
 

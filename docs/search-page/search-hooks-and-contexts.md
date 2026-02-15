@@ -1,5 +1,7 @@
 # Search Hooks & Context Providers
 
+> **Note (Feb 2026):** References to "Mapbox" in this doc should read **MapLibre GL**. The map library was migrated after this doc was generated.
+
 Comprehensive reference for all React hooks and context providers powering the Roomshare search page.
 
 ---

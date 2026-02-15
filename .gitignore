@@ -9,6 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+package-lock.json
 
 # testing
 /coverage
@@ -32,8 +33,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+test-output.txt
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
 
 # vercel
@@ -49,3 +51,32 @@ next-env.d.ts
 playwright-report.zip
 playwright-report/
 test-results/
+.playwright-mcp/
+
+# AI tool configs (not project code)
+.agent/
+.agents/
+.cline/
+.codex/
+.commandcode/
+.continue/
+.crush/
+.cursor/
+.factory/
+.gemini/
+.goose/
+.kilocode/
+.kiro/
+.mcpjam/
+.neovate/
+.opencode/
+.openhands/
+.pi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+.zencoder/
+.claude-backup*/
+.specify/

@@ -37,7 +37,7 @@ Neighborhood Intelligence allows users to discover nearby amenities (coffee shop
 
 | Component | Path | Purpose |
 |-----------|------|---------|
-| `NeighborhoodChat` | `src/app/messages/[id]/NeighborhoodChat.tsx` | Main chat orchestrator |
+| `NeighborhoodChat` | `src/components/NeighborhoodChat.tsx` | Main chat orchestrator |
 | `NeighborhoodModule` | `src/components/neighborhood/NeighborhoodModule.tsx` | Tier-aware rendering |
 | `ContextBar` | `src/components/neighborhood/ContextBar.tsx` | Search metadata display |
 | `NearbyPlacesCard` | `src/components/chat/NearbyPlacesCard.tsx` | Google Places UI Kit wrapper |

@@ -1,5 +1,7 @@
 # Roomshare Search Page Architecture
 
+> **Note:** This is a large (~170KB) generated reference document from January 2026. Some file paths and implementation details may have drifted. For modular, up-to-date docs see the `docs/search-page/` directory. Use this as a deep-dive reference, not as the authoritative source for current file locations.
+
 ## Complete Technical Reference: Every Component, State, API, and Visual Change
 
 **Generated:** January 2026

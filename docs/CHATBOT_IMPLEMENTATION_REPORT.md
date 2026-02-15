@@ -11,7 +11,7 @@
 The AI Neighborhood Concierge is a sophisticated chatbot system integrated into the RoomShare listing detail pages. It enables users to explore nearby amenities and ask questions about listings using a hybrid approach combining:
 
 1. **Google Places UI Kit** - For real-time nearby place searches
-2. **OpenAI GPT-4o-mini** - For conversational AI responses about neighborhoods
+2. **Groq + Llama 3.1** - For conversational AI responses about neighborhoods
 
 The system implements comprehensive security measures including Fair Housing Act compliance, multi-layer rate limiting, privacy-safe logging, and Google Places API Terms of Service compliance.
 
@@ -64,14 +64,14 @@ The system implements comprehensive security measures including Fair Housing Act
 │  1. detectNearbyIntent()      │    │  1. POST /api/chat            │
 │  2. checkFairHousingPolicy()  │    │  2. Fair Housing Check        │
 │  3. NearbyPlacesCard          │    │  3. Rate Limit Check          │
-│  4. Google Places UI Kit      │    │  4. OpenAI Streaming          │
+│  4. Google Places UI Kit      │    │  4. Groq/Llama Streaming      │
 │                               │    │  5. Response Rendering        │
 └───────────────────────────────┘    └───────────────────────────────┘
                 │                                  │
                 ▼                                  ▼
 ┌───────────────────────────────┐    ┌───────────────────────────────┐
-│   GOOGLE PLACES UI KIT        │    │     OPENAI API                │
-│   gmp-place-search            │    │     gpt-4o-mini               │
+│   GOOGLE PLACES UI KIT        │    │     GROQ API                  │
+│   gmp-place-search            │    │     llama-3.1-8b-instant      │
 │   gmp-place-nearby-search     │    │     Streaming Response        │
 │   gmp-place-text-search       │    │                               │
 └───────────────────────────────┘    └───────────────────────────────┘
@@ -83,7 +83,7 @@ The system implements comprehensive security measures including Fair Housing Act
 |-------|------------|---------|
 | Frontend | React 18 + Next.js 14 | UI rendering |
 | Animation | Framer Motion | Chat animations |
-| AI | OpenAI GPT-4o-mini | Conversational responses |
+| AI | Groq + Llama 3.1 (8B) | Conversational responses |
 | Places | Google Places UI Kit (Beta) | Nearby place search |
 | Rate Limiting | Upstash Redis | Server-side rate limits |
 | State | sessionStorage + React Hooks | Client-side rate limits |
@@ -186,7 +186,7 @@ const SEARCH_TIMEOUT_MS = 15000; // 15s timeout
 5. JSON parsing with error handling
 6. Input validation (listingId, message content)
 7. Fair Housing policy check
-8. OpenAI streaming with timeout
+8. Groq streaming with timeout
 
 **System Prompt Strategy:**
 ```typescript
@@ -800,8 +800,8 @@ const safeLog = {
 ## Environment Variables
 
 ```env
-# OpenAI
-OPENAI_API_KEY=sk-...
+# Groq (AI chat)
+GROQ_API_KEY=gsk_...
 
 # Google Maps
 NEXT_PUBLIC_GOOGLE_MAPS_UIKIT_KEY=AIza...

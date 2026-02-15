@@ -1,5 +1,7 @@
 # Search Page Entry Points & Layout
 
+> **Note (Feb 2026):** References to "Mapbox" in this doc should read **MapLibre GL** (`maplibre-gl` + `react-map-gl/maplibre`). The migration happened after this doc was generated.
+
 Comprehensive documentation of the `/search` route: its Next.js file conventions, layout architecture, data flow, and supporting UI components.
 
 ---

@@ -1,5 +1,7 @@
 # Geocoding Accuracy Comparison: Mapbox vs HERE
 
+> **Note (Feb 2026):** The project has since migrated from Mapbox to **Photon** (photon.komoot.io) and **Nominatim** for geocoding. See `src/lib/geocoding/`. The comparison scripts in `scripts/` still exist but are historical. This document is kept for reference.
+
 This document describes the geocoding accuracy test suite for comparing Mapbox and HERE geocoding services.
 
 ## Overview

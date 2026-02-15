@@ -27,12 +27,12 @@ Add these patterns:
 
 ### 2. Non-Google Map Restriction (CRITICAL)
 
-**Rule:** Never use Routes API, Directions API, or Distance Matrix API content on any screen that also displays a non-Google map (e.g., Mapbox).
+**Rule:** Never use Routes API, Directions API, or Distance Matrix API content on any screen that also displays a non-Google map (e.g., MapLibre).
 
-Since RoomShare uses Mapbox for map displays, the following are **PROHIBITED**:
-- Displaying Google-calculated distances alongside Mapbox maps
-- Showing Google-calculated travel times with Mapbox maps
-- Using Google route polylines on Mapbox maps
+Since RoomShare uses MapLibre GL for map displays, the following are **PROHIBITED**:
+- Displaying Google-calculated distances alongside MapLibre maps
+- Showing Google-calculated travel times with MapLibre maps
+- Using Google route polylines on MapLibre maps
 
 **Our Approach:**
 - We use Places UI Kit ONLY for nearby place discovery
@@ -45,7 +45,7 @@ The following practices are **prohibited** under Google Maps Platform ToS:
 
 1. **Extracting coordinates from Places API results** for use in distance calculations
 2. **Storing place data** (names, addresses, ratings, coordinates) beyond caching limits
-3. **Displaying Places data on non-Google maps** without proper attribution
+3. **Displaying Places data on non-Google maps** (e.g., MapLibre) without proper attribution
 4. **Calculating distances/routes** from Places coordinates using any method (including Haversine)
 
 **Our Implementation:**
@@ -96,7 +96,7 @@ GOOGLE_PLACES_API_KEY=your-server-key
 - [ ] Budget alerts configured
 - [ ] No coordinate extraction in client code
 - [ ] Google attribution visible on all Places UI Kit components
-- [ ] No Places data displayed on Mapbox maps
+- [ ] No Places data displayed on MapLibre maps
 
 ## Related Files
 
