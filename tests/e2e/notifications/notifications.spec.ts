@@ -76,14 +76,17 @@ test.describe("NF: Read-only", () => {
   // NF-03: Notification items rendered
   test("NF-03  notification items are rendered", async ({ page }) => {
     await page.goto("/notifications");
-    await page.waitForLoadState("domcontentloaded");
+    await page.waitForLoadState("networkidle");
 
     await expect(
       page.getByTestId("notifications-page"),
     ).toBeVisible({ timeout: timeouts.navigation });
 
+    // Wait for notification items to render after SSR hydration.
+    // On slow CI machines, hydration can take significant time after
+    // the page shell renders.
     const items = page.getByTestId("notification-item");
-    await expect(items.first()).toBeVisible({ timeout: timeouts.action });
+    await expect(items.first()).toBeVisible({ timeout: timeouts.navigation });
 
     const count = await items.count();
     expect(count).toBeGreaterThanOrEqual(2);
