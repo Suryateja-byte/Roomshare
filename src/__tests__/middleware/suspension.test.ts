@@ -1,8 +1,11 @@
 /**
- * Tests for suspension middleware (P0-01, P1-01)
+ * Tests for suspension middleware (P0-01, P1-01, P1-02)
  *
  * Verifies that suspended users receive 403 on protected routes
  * and can still access public routes.
+ *
+ * P1-02: Verifies getLiveSuspensionStatus uses direct Prisma query
+ * (no HTTP fetch, no secret transmission, no Host header usage).
  */
 
 import type { NextRequest } from 'next/server';
