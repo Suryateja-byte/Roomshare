@@ -52,13 +52,10 @@ export async function GET(request: Request) {
             requestId,
         });
 
-        // P2-6: Add Cache-Control headers for CDN and client-side caching
-        // s-maxage=60: CDN caches for 60s
-        // max-age=30: Browser caches for 30s (shorter to get fresher data)
-        // stale-while-revalidate=120: Serve stale while revalidating in background
+        // Private, no-store: prevent caching of user-generated listing data
         return NextResponse.json(listings, {
             headers: {
-                "Cache-Control": "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+                "Cache-Control": "private, no-store",
                 "x-request-id": requestId,
                 "Vary": "Accept-Encoding",
             },
