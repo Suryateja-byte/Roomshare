@@ -69,6 +69,7 @@ describe('createBooking', () => {
     totalSlots: 2,
     availableSlots: 2,
     status: 'ACTIVE',
+    price: 800,
   }
 
   const mockOwner = {
@@ -220,6 +221,73 @@ describe('createBooking', () => {
 
       expect(result.success).toBe(false)
       expect(result.error).toContain('Failed to create booking')
+    })
+  })
+
+  describe('price verification (P1 security fix)', () => {
+    it('rejects booking when client price does not match listing price', async () => {
+      const result = await createBooking('listing-123', futureStart, futureEnd, 0.01)
+
+      expect(result.success).toBe(false)
+      expect(result.code).toBe('PRICE_CHANGED')
+      expect(result.error).toContain('price has changed')
+      expect(result.currentPrice).toBe(800)
+    })
+
+    it('accepts booking when client price matches listing price', async () => {
+      const result = await createBooking('listing-123', futureStart, futureEnd, 800)
+
+      expect(result.success).toBe(true)
+      expect(result.bookingId).toBe('booking-123')
+    })
+
+    it('accepts booking when client price is within $0.01 tolerance', async () => {
+      const result = await createBooking('listing-123', futureStart, futureEnd, 800.005)
+
+      expect(result.success).toBe(true)
+      expect(result.bookingId).toBe('booking-123')
+    })
+
+    it('calculates totalPrice from DB listing price, not client value', async () => {
+      let capturedCreateData: any = null
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: any) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+          user: {
+            findUnique: jest.fn().mockImplementation(({ where }) => {
+              if (where.id === 'owner-123') return Promise.resolve(mockOwner)
+              if (where.id === 'user-123') return Promise.resolve(mockTenant)
+              return Promise.resolve(null)
+            }),
+          },
+          booking: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            count: jest.fn().mockResolvedValue(0),
+            create: jest.fn().mockImplementation((args) => {
+              capturedCreateData = args.data
+              return Promise.resolve(mockBooking)
+            }),
+          },
+        }
+        return callback(tx)
+      })
+
+      await createBooking('listing-123', futureStart, futureEnd, 800)
+
+      // Verify totalPrice was calculated from DB price (800/30 * diffDays)
+      const diffDays = Math.ceil((futureEnd.getTime() - futureStart.getTime()) / (1000 * 60 * 60 * 24))
+      const expectedTotal = Math.round(diffDays * (800 / 30) * 100) / 100
+
+      expect(capturedCreateData).not.toBeNull()
+      expect(capturedCreateData.totalPrice).toBeCloseTo(expectedTotal, 2)
+    })
+
+    it('rejects manipulated high price as well', async () => {
+      const result = await createBooking('listing-123', futureStart, futureEnd, 99999)
+
+      expect(result.success).toBe(false)
+      expect(result.code).toBe('PRICE_CHANGED')
+      expect(result.currentPrice).toBe(800)
     })
   })
 })

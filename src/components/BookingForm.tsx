@@ -164,6 +164,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
     // Determine error type from error message/code
     const categorizeError = (result: BookingResult): ErrorType => {
         if (result.code === 'SESSION_EXPIRED') return 'auth';
+        if (result.code === 'PRICE_CHANGED') return 'validation';
         if (result.fieldErrors && Object.keys(result.fieldErrors).length > 0) return 'validation';
 
         const errorMsg = result.error?.toLowerCase() || '';
@@ -302,7 +303,9 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 setErrorType(errType);
 
                 // Set user-friendly messages based on error type
-                if (errType === 'auth') {
+                if (result.code === 'PRICE_CHANGED' && result.currentPrice != null) {
+                    setMessage(`The listing price has changed to $${result.currentPrice}/month. Please review and try again.`);
+                } else if (errType === 'auth') {
                     setMessage('Your session has expired. Please sign in again.');
                 } else if (errType === 'server') {
                     setMessage('Something went wrong on our end. Please try again.');

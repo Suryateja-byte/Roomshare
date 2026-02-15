@@ -98,6 +98,7 @@ describe('Booking Race Condition Prevention', () => {
     totalSlots: 1,
     availableSlots: 1,
     status: 'ACTIVE',
+    price: 1000,
   };
 
   const mockOwner = {
