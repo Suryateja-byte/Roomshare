@@ -9,9 +9,12 @@
  * - No autocomplete use (use Photon for that)
  */
 
+import { fetchWithTimeout } from '../fetch-with-timeout';
+
 const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
 const USER_AGENT = 'Roomshare/1.0 (contact@roomshare.app)';
 const MIN_REQUEST_INTERVAL_MS = 1100; // Slightly over 1s to be safe
+const GEOCODING_TIMEOUT_MS = 5000;
 
 /** Module-level rate limiter for server-side usage */
 let lastRequestTimestamp = 0;
@@ -69,9 +72,10 @@ export async function forwardGeocode(
   const encoded = encodeURIComponent(query);
   const url = `${NOMINATIM_BASE_URL}/search?q=${encoded}&format=jsonv2&limit=1&addressdetails=1`;
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: NOMINATIM_HEADERS,
     signal: options?.signal,
+    timeout: GEOCODING_TIMEOUT_MS,
   });
 
   if (!response.ok) {
@@ -104,9 +108,10 @@ export async function reverseGeocode(
 ): Promise<string | null> {
   const url = `${NOMINATIM_BASE_URL}/reverse?lat=${lat}&lon=${lng}&format=jsonv2&addressdetails=1`;
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: NOMINATIM_HEADERS,
     signal: options?.signal,
+    timeout: GEOCODING_TIMEOUT_MS,
   });
 
   if (!response.ok) {
@@ -137,9 +142,10 @@ export async function searchBoundary(
   const encoded = encodeURIComponent(query);
   const url = `${NOMINATIM_BASE_URL}/search?q=${encoded}&format=jsonv2&polygon_geojson=1&limit=1`;
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: NOMINATIM_HEADERS,
     signal: options?.signal,
+    timeout: GEOCODING_TIMEOUT_MS,
   });
 
   if (!response.ok) {

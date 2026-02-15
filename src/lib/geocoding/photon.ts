@@ -8,8 +8,10 @@
  */
 
 import type { GeocodingResult } from '../geocoding-cache';
+import { fetchWithTimeout } from '../fetch-with-timeout';
 
 const PHOTON_BASE_URL = 'https://photon.komoot.io/api';
+const GEOCODING_TIMEOUT_MS = 5000;
 
 /** Max query length (reasonable limit; Photon has no documented cap) */
 export const PHOTON_QUERY_MAX_LENGTH = 500;
@@ -126,7 +128,10 @@ export async function searchPhoton(
   const encoded = encodeURIComponent(query);
   const url = `${PHOTON_BASE_URL}?q=${encoded}&limit=${limit}&lang=en`;
 
-  const response = await fetch(url, { signal: options?.signal });
+  const response = await fetchWithTimeout(url, {
+    signal: options?.signal,
+    timeout: GEOCODING_TIMEOUT_MS,
+  });
 
   if (!response.ok) {
     if (response.status >= 500) {
