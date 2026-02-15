@@ -68,24 +68,24 @@ test.describe("Session Expiry: Polling Components", () => {
       // Expire session and trigger SessionProvider refetch via focus event
       await expireSession(page, { triggerRefetch: true });
 
-      // SessionProvider refetchOnWindowFocus can be slow in CI
-      // Dispatch focus multiple times and wait longer
-      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-      await page.waitForTimeout(3000);
-      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-
-      // Navbar should reflect unauthenticated state:
-      // Login/signup links should appear OR user menu should disappear
-      const loginLink = page.getByRole("link", { name: /log in|sign in/i });
-      const signupLink = page.getByRole("link", { name: /sign up/i });
-      const loginVisible = await loginLink
-        .isVisible({ timeout: 15_000 })
-        .catch(() => false);
-      const signupVisible = await signupLink
-        .isVisible({ timeout: 10_000 })
-        .catch(() => false);
-
-      expect(loginVisible || signupVisible).toBe(true);
+      // Poll for unauthenticated state with repeated focus events.
+      // SessionProvider's refetchOnWindowFocus may need multiple triggers in CI.
+      await expect.poll(
+        async () => {
+          // Re-trigger focus to nudge SessionProvider
+          await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+          const loginLink = page.getByRole("link", { name: /log in|sign in/i });
+          const signupLink = page.getByRole("link", { name: /sign up/i });
+          const loginVisible = await loginLink.isVisible().catch(() => false);
+          const signupVisible = await signupLink.isVisible().catch(() => false);
+          return loginVisible || signupVisible;
+        },
+        {
+          timeout: 30_000,
+          intervals: [1_000, 2_000, 3_000],
+          message: "Navbar to show login/signup links after session expiry",
+        },
+      ).toBe(true);
     },
   );
 

@@ -68,11 +68,11 @@ test.describe("Session Expiry: Resilience", () => {
       await page.waitForLoadState("domcontentloaded");
       await expect(page).toHaveURL(/\/settings/, { timeout: 10000 });
 
-      // Expire session and navigate to trigger redirect
+      // Clear auth cookies and navigate to trigger server-side redirect
       for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
         await page.context().clearCookies({ name: cookie });
       }
-      await page.goto("/settings");
+      await page.goto("/settings", { waitUntil: "domcontentloaded" });
       await expectLoginRedirect(page);
 
       // Press browser back — should not crash or enter infinite loop

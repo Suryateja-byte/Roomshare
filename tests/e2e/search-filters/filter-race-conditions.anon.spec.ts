@@ -202,11 +202,16 @@ test.describe("Filter Race Conditions", () => {
     // Open filter modal
     await openFilterModal(page);
 
-    // Toggle Wifi amenity
+    // Toggle Wifi amenity with retry for React re-render race
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiToggle = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
-    await wifiToggle.click();
-    await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
+    await expect(async () => {
+      const currentState = await wifiToggle.getAttribute("aria-pressed");
+      if (currentState !== "true") {
+        await wifiToggle.click();
+      }
+      await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
+    }).toPass({ timeout: 10_000 });
 
     // Double-click Apply button rapidly — the second click may fail because
     // the modal closes after the first click (this IS the correct behavior)
@@ -297,7 +302,14 @@ test.describe("Filter Race Conditions", () => {
 
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiToggle = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
-    await wifiToggle.click();
+    // Toggle Wifi with retry for React re-render race
+    await expect(async () => {
+      const currentState = await wifiToggle.getAttribute("aria-pressed");
+      if (currentState !== "true") {
+        await wifiToggle.click();
+      }
+      await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
+    }).toPass({ timeout: 10_000 });
 
     // Apply filters
     await applyFilters(page);

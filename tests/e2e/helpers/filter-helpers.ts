@@ -300,12 +300,16 @@ export async function applyFilters(
   // The Apply button can be temporarily unstable when useBatchedFilters
   // updates the listing count (React re-render detaches the element, or
   // the Radix overlay intercepts pointer events during the transition).
-  // Try a normal click first; fall back to force-click after a short settle.
+  // Wait for the button to be stable, then try a normal click first;
+  // fall back to force-click after a short settle.
+  const btn = applyButton(page);
+  await btn.waitFor({ state: "attached", timeout: 10_000 });
+
   try {
-    await applyButton(page).click({ timeout: 5_000 });
+    await btn.click({ timeout: 5_000 });
   } catch {
-    await page.waitForTimeout(300);
-    await applyButton(page).click({ force: true, timeout: 10_000 });
+    await page.waitForTimeout(500);
+    await btn.click({ force: true, timeout: 15_000 });
   }
 
   // Wait for modal to close

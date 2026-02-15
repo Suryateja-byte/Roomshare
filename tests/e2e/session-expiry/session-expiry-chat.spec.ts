@@ -111,19 +111,17 @@ test.describe("Session Expiry: Messaging", () => {
   test(`${tags.auth} ${tags.sessionExpiry} - SE-C03: MessagesPageClient redirects on session expiry`, async ({
     page,
   }) => {
-    // Expire session before navigating to messages
-    await page.goto("/");
-    await page.waitForLoadState("domcontentloaded");
-    await expireSession(page);
+    // Clear auth cookies to simulate expired session.
+    // Don't use expireSession() — its route mock for /api/auth/session is
+    // irrelevant for server-side redirects and can interfere with navigation.
+    for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
+      await page.context().clearCookies({ name: cookie });
+    }
 
-    // Navigate to messages — server action getMessages should return SESSION_EXPIRED
+    // Navigate to messages — server-side auth check should redirect to /login.
+    // Note: /messages/page.tsx does redirect('/login') WITHOUT callbackUrl.
     await page.goto("/messages");
 
-    // Wait explicitly for login redirect to complete with full URL
-    await page.waitForURL(/\/login/, { timeout: 30_000 });
-    await page.waitForLoadState("domcontentloaded");
-
-    // Now check callbackUrl after page is fully loaded
-    await expectLoginRedirect(page, "/messages");
+    await expectLoginRedirect(page);
   });
 });

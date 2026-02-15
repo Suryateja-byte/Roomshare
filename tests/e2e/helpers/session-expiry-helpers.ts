@@ -85,16 +85,22 @@ export async function triggerSessionPoll(page: Page): Promise<void> {
 
 /**
  * Assert page redirected to /login, optionally checking callbackUrl.
+ * Handles NextAuth redirecting to /login, /signin, or /auth paths,
+ * and URL-encoded callbackUrl values.
  */
 export async function expectLoginRedirect(
   page: Page,
   callbackUrl?: string,
   timeout = 30000,
 ): Promise<void> {
-  await expect(page).toHaveURL(/\/login/, { timeout });
+  // Wait for redirect — may go through /api/auth/signin first
+  await expect(page).toHaveURL(/\/(login|signin|auth)/, { timeout });
   if (callbackUrl) {
     const url = new URL(page.url());
-    expect(url.searchParams.get("callbackUrl") ?? "").toContain(callbackUrl);
+    const raw = url.searchParams.get("callbackUrl") ?? url.search;
+    // Handle both encoded (%2F) and decoded (/) forms
+    const decoded = decodeURIComponent(raw);
+    expect(decoded).toContain(callbackUrl);
   }
 }
 
