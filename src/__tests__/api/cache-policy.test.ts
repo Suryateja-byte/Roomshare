@@ -93,13 +93,13 @@ describe('Cache Policy (P2-1)', () => {
       const USER_SPECIFIC_POLICY = 'private, no-store';
       const HEALTH_CHECK_POLICY = 'no-cache, no-store, must-revalidate';
       const MUTATION_POLICY = 'no-store';
-      const PUBLIC_LIST_POLICY = 'public, max-age=60, stale-while-revalidate=300';
+      const LISTINGS_POLICY = 'private, no-store';
 
       // These are the expected policies - tests above verify implementation
       expect(USER_SPECIFIC_POLICY).toBe('private, no-store');
       expect(HEALTH_CHECK_POLICY).toBe('no-cache, no-store, must-revalidate');
       expect(MUTATION_POLICY).toBe('no-store');
-      expect(PUBLIC_LIST_POLICY).toContain('public');
+      expect(LISTINGS_POLICY).toBe('private, no-store');
     });
   });
 });

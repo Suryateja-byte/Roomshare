@@ -134,6 +134,30 @@ describe('Listings API', () => {
       expect(response.status).toBe(200)
       const data = await response.json()
       expect(data).toEqual(mockListings)
+      // Security: prevent CDN caching of user-generated listing data
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    })
+
+    it('does not leak address or zip in listing location', async () => {
+      const mockListings = [
+        {
+          id: 'listing-1',
+          title: 'Cozy Room',
+          location: { city: 'Portland', state: 'OR', lat: 45.5, lng: -122.6 },
+        },
+      ]
+      ;(getListings as jest.Mock).mockResolvedValue(mockListings)
+
+      const request = new Request('http://localhost/api/listings')
+      const response = await GET(request)
+      const data = await response.json()
+
+      for (const listing of data) {
+        if (listing.location) {
+          expect(listing.location).not.toHaveProperty('address')
+          expect(listing.location).not.toHaveProperty('zip')
+        }
+      }
     })
 
     it('passes query parameter to getListings', async () => {
