@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { geocodeAddress } from '@/lib/geocoding';
 import { auth } from '@/auth';
-import { getListings } from '@/lib/data';
+import { getListingsPaginated } from '@/lib/data';
+import { buildRawParamsFromSearchParams, parseSearchParams } from '@/lib/search-params';
 import { logger } from '@/lib/logger';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { createListingApiSchema } from '@/lib/schemas';
@@ -39,21 +40,27 @@ export async function GET(request: Request) {
     const requestId = crypto.randomUUID();
     try {
         const { searchParams } = new URL(request.url);
-        const q = searchParams.get('q') || undefined;
+        const rawParams = buildRawParamsFromSearchParams(searchParams);
+        const { filterParams, requestedPage } = parseSearchParams(rawParams);
 
-        const listings = await getListings({ query: q });
+        const result = await getListingsPaginated({
+            ...filterParams,
+            page: requestedPage,
+            limit: 20,
+        });
 
         await logger.info('Listings fetched', {
             route: '/api/listings',
             method: 'GET',
-            query: q,
-            count: listings.length,
+            query: filterParams.query,
+            count: result.items.length,
+            total: result.total,
             durationMs: Date.now() - startTime,
             requestId,
         });
 
         // Private, no-store: prevent caching of user-generated listing data
-        return NextResponse.json(listings, {
+        return NextResponse.json(result, {
             headers: {
                 "Cache-Control": "private, no-store",
                 "x-request-id": requestId,
@@ -61,6 +68,16 @@ export async function GET(request: Request) {
             },
         });
     } catch (error) {
+        if (error instanceof Error && (
+            error.message.includes('cannot exceed') ||
+            error.message.includes('Unbounded text search')
+        )) {
+            return NextResponse.json({ error: error.message }, {
+                status: 400,
+                headers: { "x-request-id": requestId },
+            });
+        }
+
         logger.sync.error('Error fetching listings', {
             route: '/api/listings',
             method: 'GET',

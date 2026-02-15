@@ -28,7 +28,18 @@ jest.mock('@/lib/geocoding', () => ({
 }))
 
 jest.mock('@/lib/data', () => ({
-  getListings: jest.fn(),
+  getListingsPaginated: jest.fn(),
+}))
+
+jest.mock('@/lib/search-params', () => ({
+  buildRawParamsFromSearchParams: jest.fn().mockReturnValue({}),
+  parseSearchParams: jest.fn().mockReturnValue({
+    filterParams: {},
+    requestedPage: 1,
+    sortOption: 'recommended',
+    boundsRequired: false,
+    browseMode: true,
+  }),
 }))
 
 // P2-3: Mock rate limiting to return null (allow request)
@@ -101,7 +112,8 @@ import { GET, POST } from '@/app/api/listings/route'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { geocodeAddress } from '@/lib/geocoding'
-import { getListings } from '@/lib/data'
+import { getListingsPaginated } from '@/lib/data'
+import { parseSearchParams } from '@/lib/search-params'
 import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension'
 import { upsertSearchDocSync } from '@/lib/search/search-doc-sync'
 import { triggerInstantAlerts } from '@/lib/search-alerts'
@@ -121,38 +133,52 @@ describe('Listings API', () => {
   })
 
   describe('GET', () => {
-    it('returns listings successfully', async () => {
-      const mockListings = [
-        { id: 'listing-1', title: 'Cozy Room' },
-        { id: 'listing-2', title: 'Sunny Apartment' },
-      ]
-      ;(getListings as jest.Mock).mockResolvedValue(mockListings)
+    it('returns paginated listings successfully', async () => {
+      const mockResult = {
+        items: [
+          { id: 'listing-1', title: 'Cozy Room' },
+          { id: 'listing-2', title: 'Sunny Apartment' },
+        ],
+        total: 2,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+      }
+      ;(getListingsPaginated as jest.Mock).mockResolvedValue(mockResult)
 
       const request = new Request('http://localhost/api/listings')
       const response = await GET(request)
 
       expect(response.status).toBe(200)
       const data = await response.json()
-      expect(data).toEqual(mockListings)
+      expect(data.items).toEqual(mockResult.items)
+      expect(data.total).toBe(2)
+      expect(data.page).toBe(1)
       // Security: prevent CDN caching of user-generated listing data
       expect(response.headers.get('Cache-Control')).toBe('private, no-store')
     })
 
     it('does not leak address or zip in listing location', async () => {
-      const mockListings = [
-        {
-          id: 'listing-1',
-          title: 'Cozy Room',
-          location: { city: 'Portland', state: 'OR', lat: 45.5, lng: -122.6 },
-        },
-      ]
-      ;(getListings as jest.Mock).mockResolvedValue(mockListings)
+      const mockResult = {
+        items: [
+          {
+            id: 'listing-1',
+            title: 'Cozy Room',
+            location: { city: 'Portland', state: 'OR', lat: 45.5, lng: -122.6 },
+          },
+        ],
+        total: 1,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+      }
+      ;(getListingsPaginated as jest.Mock).mockResolvedValue(mockResult)
 
       const request = new Request('http://localhost/api/listings')
       const response = await GET(request)
       const data = await response.json()
 
-      for (const listing of data) {
+      for (const listing of data.items) {
         if (listing.location) {
           expect(listing.location).not.toHaveProperty('address')
           expect(listing.location).not.toHaveProperty('zip')
@@ -160,17 +186,42 @@ describe('Listings API', () => {
       }
     })
 
-    it('passes query parameter to getListings', async () => {
-      ;(getListings as jest.Mock).mockResolvedValue([])
+    it('passes parsed filter params to getListingsPaginated', async () => {
+      const mockFilterParams = { query: 'apartment' }
+      ;(parseSearchParams as jest.Mock).mockReturnValue({
+        filterParams: mockFilterParams,
+        requestedPage: 1,
+        sortOption: 'recommended',
+        boundsRequired: false,
+        browseMode: true,
+      })
+      ;(getListingsPaginated as jest.Mock).mockResolvedValue({
+        items: [], total: 0, page: 1, limit: 20, totalPages: 0,
+      })
 
       const request = new Request('http://localhost/api/listings?q=apartment')
       await GET(request)
 
-      expect(getListings).toHaveBeenCalledWith({ query: 'apartment' })
+      expect(getListingsPaginated).toHaveBeenCalledWith({
+        ...mockFilterParams,
+        page: 1,
+        limit: 20,
+      })
     })
 
-    it('handles errors', async () => {
-      ;(getListings as jest.Mock).mockRejectedValue(new Error('DB Error'))
+    it('returns 400 for validation errors', async () => {
+      ;(getListingsPaginated as jest.Mock).mockRejectedValue(
+        new Error('minPrice cannot exceed maxPrice')
+      )
+
+      const request = new Request('http://localhost/api/listings?minPrice=500&maxPrice=100')
+      const response = await GET(request)
+
+      expect(response.status).toBe(400)
+    })
+
+    it('handles internal errors', async () => {
+      ;(getListingsPaginated as jest.Mock).mockRejectedValue(new Error('DB Error'))
 
       const request = new Request('http://localhost/api/listings')
       const response = await GET(request)
