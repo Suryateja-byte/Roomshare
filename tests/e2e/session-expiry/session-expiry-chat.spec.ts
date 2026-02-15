@@ -111,10 +111,12 @@ test.describe("Session Expiry: Messaging", () => {
   test(`${tags.auth} ${tags.sessionExpiry} - SE-C03: MessagesPageClient redirects on session expiry`, async ({
     page,
   }) => {
-    // Expire session before navigating to messages
-    await page.goto("/");
-    await page.waitForLoadState("domcontentloaded");
-    await expireSession(page);
+    // Clear auth cookies to simulate expired session.
+    // Don't use expireSession() — its route mock for /api/auth/session is
+    // irrelevant for server-side redirects and can interfere with navigation.
+    for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
+      await page.context().clearCookies({ name: cookie });
+    }
 
     // Navigate to messages — server-side auth() finds no session → redirect.
     // Next.js App Router redirect() produces an RSC client-side navigation,

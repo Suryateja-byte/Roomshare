@@ -816,4 +816,55 @@ describe("useBatchedFilters hook", () => {
       expect(result.current.pending.amenities).toEqual(["Wifi", "Parking"]);
     });
   });
+
+  describe("setPending with functional updater", () => {
+    it("accepts a function that receives previous state", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({ amenities: "Wifi" })
+      );
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending((prev) => ({
+          amenities: [...prev.amenities, "Parking"],
+        }));
+      });
+
+      expect(result.current.pending.amenities).toEqual(["Wifi", "Parking"]);
+    });
+
+    it("functional updater sees latest state across rapid calls", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(createMockSearchParams());
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending((prev) => ({
+          amenities: [...prev.amenities, "Wifi"],
+        }));
+        result.current.setPending((prev) => ({
+          amenities: [...prev.amenities, "Parking"],
+        }));
+        result.current.setPending((prev) => ({
+          amenities: [...prev.amenities, "Furnished"],
+        }));
+      });
+
+      expect(result.current.pending.amenities).toEqual(["Wifi", "Parking", "Furnished"]);
+    });
+
+    it("mixes functional and object updaters", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(createMockSearchParams());
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ minPrice: "500" });
+        result.current.setPending((prev) => ({
+          amenities: [...prev.amenities, "Wifi"],
+        }));
+      });
+
+      expect(result.current.pending.minPrice).toBe("500");
+      expect(result.current.pending.amenities).toEqual(["Wifi"]);
+    });
+  });
 });

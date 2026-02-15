@@ -187,7 +187,11 @@ export interface UseBatchedFiltersReturn {
   /** Whether pending differs from committed URL state */
   isDirty: boolean;
   /** Update one or more pending filter values */
-  setPending: (values: Partial<BatchedFilterValues>) => void;
+  setPending: (
+    valuesOrFn:
+      | Partial<BatchedFilterValues>
+      | ((prev: BatchedFilterValues) => Partial<BatchedFilterValues>),
+  ) => void;
   /** Discard pending changes, restore to URL state */
   reset: () => void;
   /** Write pending state to URL and navigate */
@@ -222,8 +226,16 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
   );
 
   const setPending = useCallback(
-    (values: Partial<BatchedFilterValues>) => {
-      setPendingState((prev) => ({ ...prev, ...values }));
+    (
+      valuesOrFn:
+        | Partial<BatchedFilterValues>
+        | ((prev: BatchedFilterValues) => Partial<BatchedFilterValues>),
+    ) => {
+      setPendingState((prev) => {
+        const values =
+          typeof valuesOrFn === "function" ? valuesOrFn(prev) : valuesOrFn;
+        return { ...prev, ...values };
+      });
     },
     [],
   );

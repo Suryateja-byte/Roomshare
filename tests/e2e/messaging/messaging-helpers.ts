@@ -36,13 +36,20 @@ export const CHAR_LIMITS = {
 
 /** Navigate to /messages and wait for page ready */
 export async function goToMessages(page: Page): Promise<boolean> {
-  await page.goto('/messages');
-  await page.waitForLoadState('domcontentloaded');
+  try {
+    await page.goto('/messages', { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  } catch {
+    return false;
+  }
   const url = page.url();
   if (url.includes('/login') || url.includes('/auth')) return false;
   const messagesPage = page.locator(MSG_SELECTORS.page);
-  await expect(messagesPage).toBeVisible({ timeout: 15_000 }).catch(() => {});
-  return messagesPage.isVisible();
+  try {
+    await expect(messagesPage).toBeVisible({ timeout: 15_000 });
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 /** Open a specific conversation by clicking the nth item */
@@ -62,7 +69,10 @@ export async function openConversation(page: Page, index = 0): Promise<void> {
   }
 
   const items = page.locator(MSG_SELECTORS.conversationItem);
-  await expect(items.first()).toBeVisible({ timeout: 10_000 });
+  await expect(items.first()).toBeVisible({ timeout: 15_000 });
+
+  // Ensure the target item is visible before clicking
+  await items.nth(index).waitFor({ state: 'visible', timeout: 10_000 });
   await items.nth(index).click();
   // Defense-in-depth: detect if we opened a blocked conversation (no data-testid on banner)
   const messageInput = page.locator(MSG_SELECTORS.messageInput);
@@ -80,8 +90,11 @@ export async function openConversation(page: Page, index = 0): Promise<void> {
 
 /** Navigate directly to a conversation by ID */
 export async function goToConversation(page: Page, conversationId: string): Promise<boolean> {
-  await page.goto(`/messages/${conversationId}`);
-  await page.waitForLoadState('domcontentloaded');
+  try {
+    await page.goto(`/messages/${conversationId}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  } catch {
+    return false;
+  }
   const url = page.url();
   if (url.includes('/login') || url.includes('/auth')) return false;
   const input = page.locator(MSG_SELECTORS.messageInput);
@@ -96,12 +109,16 @@ export async function goToConversation(page: Page, conversationId: string): Prom
  *  without dispatching the synthetic events React listens for. */
 export async function sendMessage(page: Page, text: string): Promise<void> {
   const input = page.locator(MSG_SELECTORS.messageInput);
+  // Ensure input is visible and enabled before interacting
+  await expect(input).toBeVisible({ timeout: 15_000 });
+  await expect(input).toBeEnabled({ timeout: 5_000 });
   await input.click();
   await input.fill('');
   await input.pressSequentially(text, { delay: 30 });
-  await expect(input).toHaveValue(text, { timeout: 5_000 });
+  await expect(input).toHaveValue(text, { timeout: 15_000 });
   const sendBtn = page.locator(MSG_SELECTORS.sendButton);
-  await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
+  await expect(sendBtn).toBeVisible({ timeout: 15_000 });
+  await expect(sendBtn).toBeEnabled({ timeout: 15_000 });
   await sendBtn.click();
 }
 

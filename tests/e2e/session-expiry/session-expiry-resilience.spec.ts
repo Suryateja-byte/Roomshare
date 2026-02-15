@@ -68,18 +68,18 @@ test.describe("Session Expiry: Resilience", () => {
       await page.waitForLoadState("domcontentloaded");
       await expect(page).toHaveURL(/\/settings/, { timeout: 10000 });
 
-      // Expire session and navigate to trigger redirect
+      // Clear auth cookies and navigate to trigger server-side redirect
       for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
         await page.context().clearCookies({ name: cookie });
       }
-      await page.goto("/settings");
+      await page.goto("/settings", { waitUntil: "domcontentloaded" });
       await expectLoginRedirect(page);
 
       // Press browser back — should not crash or enter infinite loop
       await page.goBack();
-      await page.waitForTimeout(2000);
-
-      // Page should be on login or settings (redirected again) — not crashed
+      // Wait for navigation to settle — accept any non-blank page
+      await page.waitForURL(/^(?!about:blank)/, { timeout: 10_000 }).catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
       const url = page.url();
       // about:blank is acceptable — browser may navigate there on back after redirect
       expect(url).toMatch(/\/(login|settings)|about:blank/);

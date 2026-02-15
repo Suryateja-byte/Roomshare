@@ -104,7 +104,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     };
     const [location, setLocation] = useState(searchParams.get('q') || '');
     // Batched filter state — single hook manages pending vs committed
-    const { pending, isDirty: filtersDirty, setPending, reset: resetFilters, commit: commitFilters, committed } = useBatchedFilters();
+    const { pending, isDirty: filtersDirty, setPending, commit: commitFilters } = useBatchedFilters();
     // Destructure for convenient access (read-only aliases)
     const { minPrice, maxPrice, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender } = pending;
 
@@ -431,24 +431,33 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // visual feedback (button press) over state computation
     const toggleAmenity = useCallback((amenity: string) => {
         startTransition(() => {
-            const next = amenities.includes(amenity) ? amenities.filter(a => a !== amenity) : [...amenities, amenity];
-            setPending({ amenities: next });
+            setPending((prev) => ({
+                amenities: prev.amenities.includes(amenity)
+                    ? prev.amenities.filter(a => a !== amenity)
+                    : [...prev.amenities, amenity],
+            }));
         });
-    }, [amenities, setPending]);
+    }, [setPending]);
 
     const toggleHouseRule = useCallback((rule: string) => {
         startTransition(() => {
-            const next = houseRules.includes(rule) ? houseRules.filter(r => r !== rule) : [...houseRules, rule];
-            setPending({ houseRules: next });
+            setPending((prev) => ({
+                houseRules: prev.houseRules.includes(rule)
+                    ? prev.houseRules.filter(r => r !== rule)
+                    : [...prev.houseRules, rule],
+            }));
         });
-    }, [houseRules, setPending]);
+    }, [setPending]);
 
     const toggleLanguage = useCallback((lang: string) => {
         startTransition(() => {
-            const next = languages.includes(lang) ? languages.filter(l => l !== lang) : [...languages, lang];
-            setPending({ languages: next });
+            setPending((prev) => ({
+                languages: prev.languages.includes(lang)
+                    ? prev.languages.filter(l => l !== lang)
+                    : [...prev.languages, lang],
+            }));
         });
-    }, [languages, setPending]);
+    }, [setPending]);
 
     // Room type selection — updates state and triggers search immediately
     const handleRoomTypeSelect = useCallback((value: string) => {
@@ -462,19 +471,6 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         queueMicrotask(() => {
             formRef.current?.requestSubmit();
             // Clean up override after submit
-            if (formRef.current) delete formRef.current.dataset.roomTypeOverride;
-        });
-    }, [setPending]);
-
-    // Room type selection from FilterBar CategoryTabs — sets state AND triggers search
-    const handleFilterBarRoomTypeChange = useCallback((value: string) => {
-        const resolved = value === 'any' ? '' : value;
-        setPending({ roomType: resolved });
-        if (formRef.current) {
-            formRef.current.dataset.roomTypeOverride = resolved;
-        }
-        queueMicrotask(() => {
-            formRef.current?.requestSubmit();
             if (formRef.current) delete formRef.current.dataset.roomTypeOverride;
         });
     }, [setPending]);
@@ -565,36 +561,6 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             });
         });
     }, [priceAbsoluteMin, priceAbsoluteMax, setPending]);
-
-    // Handler for removing individual filters from FilterBar pills
-    // INP optimization: Wrap state updates in startTransition for responsiveness
-    const handleRemoveFilter = useCallback((type: string, value?: string) => {
-        startTransition(() => {
-            switch (type) {
-                case 'leaseDuration':
-                    setPending({ leaseDuration: '' });
-                    break;
-                case 'moveInDate':
-                    setPending({ moveInDate: '' });
-                    break;
-                case 'amenity':
-                    if (value) setPending({ amenities: amenities.filter(a => a !== value) });
-                    break;
-                case 'houseRule':
-                    if (value) setPending({ houseRules: houseRules.filter(r => r !== value) });
-                    break;
-                case 'language':
-                    if (value) setPending({ languages: languages.filter(l => l !== value) });
-                    break;
-                case 'genderPreference':
-                    setPending({ genderPreference: '' });
-                    break;
-                case 'householdGender':
-                    setPending({ householdGender: '' });
-                    break;
-            }
-        });
-    }, [amenities, houseRules, languages, setPending]);
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;

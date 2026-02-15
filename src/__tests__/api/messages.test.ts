@@ -29,6 +29,15 @@ jest.mock('@/auth', () => ({
   auth: jest.fn(),
 }))
 
+jest.mock('@/app/actions/suspension', () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+  checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
+}))
+
+jest.mock('@/app/actions/block', () => ({
+  checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
+}))
+
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (data: any, init?: { status?: number }) => {
@@ -49,6 +58,8 @@ jest.mock('@/lib/with-rate-limit', () => ({
 import { GET, POST } from '@/app/api/messages/route'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
+import { checkEmailVerified } from '@/app/actions/suspension'
+import { checkBlockBeforeAction } from '@/app/actions/block'
 
 describe('Messages API', () => {
   const mockSession = {
@@ -179,6 +190,65 @@ describe('Messages API', () => {
       const response = await POST(request)
 
       expect(response.status).toBe(403)
+    })
+
+    it('returns 403 when email is not verified', async () => {
+      ;(checkEmailVerified as jest.Mock).mockResolvedValueOnce({
+        verified: false,
+        error: 'Please verify your email to continue',
+      })
+
+      const request = new Request('http://localhost/api/messages', {
+        method: 'POST',
+        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(403)
+      const data = await response.json()
+      expect(data.error).toMatch(/verify your email/i)
+    })
+
+    it('returns 403 when sender is blocked by recipient', async () => {
+      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: 'conv-123',
+        participants: [{ id: 'user-123' }, { id: 'user-456' }],
+      })
+      ;(checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
+        allowed: false,
+        message: 'This user has blocked you',
+      })
+
+      const request = new Request('http://localhost/api/messages', {
+        method: 'POST',
+        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(403)
+      const data = await response.json()
+      expect(data.error).toBe('This user has blocked you')
+    })
+
+    it('returns 403 when sender has blocked recipient', async () => {
+      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: 'conv-123',
+        participants: [{ id: 'user-123' }, { id: 'user-456' }],
+      })
+      ;(checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
+        allowed: false,
+        message: 'You have blocked this user. Unblock them to interact.',
+      })
+
+      const request = new Request('http://localhost/api/messages', {
+        method: 'POST',
+        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(403)
+      const data = await response.json()
+      expect(data.error).toBe('You have blocked this user. Unblock them to interact.')
     })
 
     it('creates message successfully', async () => {

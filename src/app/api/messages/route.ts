@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
-import { checkSuspension } from '@/app/actions/suspension';
+import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension';
+import { checkBlockBeforeAction } from '@/app/actions/block';
 import { logger } from '@/lib/logger';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import {
@@ -139,6 +140,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
+        // P1: Email verification check — mirror server action policy
+        const emailCheck = await checkEmailVerified();
+        if (!emailCheck.verified) {
+            return NextResponse.json({ error: emailCheck.error || 'Please verify your email to send messages' }, { status: 403 });
+        }
+
         const userId = session.user.id;
 
         const body = await request.json();
@@ -168,6 +175,15 @@ export async function POST(request: Request) {
 
         if (!conversation || conversation.deletedAt || !conversation.participants.some(p => p.id === userId)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
+        // P1: Block check — mirror server action policy
+        const otherParticipant = conversation.participants.find(p => p.id !== userId);
+        if (otherParticipant) {
+            const blockCheck = await checkBlockBeforeAction(otherParticipant.id);
+            if (!blockCheck.allowed) {
+                return NextResponse.json({ error: blockCheck.message }, { status: 403 });
+            }
         }
 
         // P1-21 FIX: Parallelize independent database operations
