@@ -14,18 +14,23 @@
  * then mutation tests in careful sequence (NF-07..NF-14).
  * Mutations persist server-side, so ordering matters.
  *
- * IMPORTANT: Restricted to chromium project only. When multiple projects
- * (chromium + Mobile Chrome) run in the same shard, chromium's mutation
- * tests (delete, mark-read) modify the shared DB before Mobile Chrome's
- * read-only tests execute, causing "notification-item not found" failures.
+ * IMPORTANT — two CI stability guards:
+ * 1. Chromium-only: When multiple projects (chromium + Mobile Chrome) run
+ *    in the same shard, chromium's mutation tests modify the shared DB
+ *    before Mobile Chrome's read-only tests, causing failures.
+ * 2. Serial parent describe: With fullyParallel=true, Playwright flattens
+ *    sibling describe blocks and can interleave mutation tests before
+ *    read-only tests complete. The outer serial describe guarantees
+ *    Block 1 (read-only) finishes entirely before Block 2 (mutations).
  */
 
 import { test, expect, timeouts } from "../helpers";
 
-// ---------------------------------------------------------------------------
-// Block 1: Read-only tests (no state mutation)
-// ---------------------------------------------------------------------------
-test.describe("NF: Read-only", () => {
+// Outer serial wrapper: ensures read-only block completes before mutations.
+// Without this, fullyParallel=true lets Playwright interleave tests from
+// both sibling blocks, causing mutation queries to corrupt read-only state.
+test.describe("Notifications", () => {
+  test.describe.configure({ mode: "serial" });
   test.use({ storageState: "playwright/.auth/user.json" });
 
   test.beforeEach(async ({}, testInfo) => {
@@ -33,6 +38,11 @@ test.describe("NF: Read-only", () => {
       'Notifications: chromium-only (mutation tests modify shared DB state)');
     test.slow(); // 3x timeout for SSR pages
   });
+
+// ---------------------------------------------------------------------------
+// Block 1: Read-only tests (no state mutation)
+// ---------------------------------------------------------------------------
+test.describe("NF: Read-only", () => {
 
   // NF-01: Unauthenticated redirect
   test("NF-01  unauthenticated user redirects to /login", async ({
@@ -212,14 +222,7 @@ test.describe("NF: Read-only", () => {
 // Block 2: Mutation tests (careful ordering, state persists)
 // ---------------------------------------------------------------------------
 test.describe("NF: Mutations", () => {
-  test.use({ storageState: "playwright/.auth/user.json" });
   test.describe.configure({ mode: "serial" });
-
-  test.beforeEach(async ({}, testInfo) => {
-    test.skip(testInfo.project.name !== 'chromium',
-      'Notifications: chromium-only (mutation tests modify shared DB state)');
-    test.slow();
-  });
 
   // NF-07: Mark single notification as read
   test("NF-07  mark single notification as read", async ({ page }) => {
@@ -438,3 +441,5 @@ test.describe("NF: Mutations", () => {
     });
   });
 });
+
+}); // end outer "Notifications" serial describe
