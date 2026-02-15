@@ -328,6 +328,82 @@ describe('Suspension Middleware', () => {
 
       expect(result).toBeNull();
     });
+
+    it('SECURITY: does not call fetch() during suspension check', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch');
+
+      mockGetToken.mockResolvedValue({
+        sub: 'user-sec-1',
+        isSuspended: false,
+        email: 'test@example.com',
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        isSuspended: false,
+      });
+
+      const { checkSuspension } = await import('@/lib/auth-helpers');
+      const request = createMockRequest('/dashboard', 'GET');
+      await checkSuspension(request);
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
+    it('SECURITY: does not transmit NEXTAUTH_SECRET in any HTTP header', async () => {
+      const originalSecret = process.env.NEXTAUTH_SECRET;
+      process.env.NEXTAUTH_SECRET = 'test-secret-do-not-leak';
+      const fetchSpy = jest.spyOn(global, 'fetch');
+
+      mockGetToken.mockResolvedValue({
+        sub: 'user-sec-2',
+        isSuspended: false,
+        email: 'test@example.com',
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        isSuspended: false,
+      });
+
+      const { checkSuspension } = await import('@/lib/auth-helpers');
+      const request = createMockRequest('/dashboard', 'GET');
+      await checkSuspension(request);
+
+      if (fetchSpy.mock.calls.length > 0) {
+        const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit];
+        const headers = options?.headers as Record<string, string> | undefined;
+        expect(headers?.['x-suspension-check-secret']).toBeUndefined();
+      }
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      process.env.NEXTAUTH_SECRET = originalSecret;
+      fetchSpy.mockRestore();
+    });
+
+    it('SECURITY: does not use request.nextUrl.origin for URL construction', async () => {
+      mockGetToken.mockResolvedValue({
+        sub: 'user-sec-3',
+        isSuspended: false,
+        email: 'test@example.com',
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        isSuspended: false,
+      });
+
+      const { checkSuspension } = await import('@/lib/auth-helpers');
+
+      const maliciousUrl = new URL('/dashboard', 'https://attacker.com');
+      const request = {
+        nextUrl: maliciousUrl,
+        method: 'GET',
+        headers: new Headers(),
+      } as unknown as NextRequest;
+
+      const result = await checkSuspension(request);
+      expect(result).toBeNull();
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-sec-3' },
+        select: { isSuspended: true },
+      });
+    });
   });
 });
 
