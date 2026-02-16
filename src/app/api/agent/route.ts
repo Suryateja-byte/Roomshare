@@ -8,7 +8,8 @@ interface AgentRequest {
   lng: number;
 }
 
-// Validate coordinate ranges
+// ============ VALIDATION HELPERS ============
+
 function isValidCoordinate(lat: number, lng: number): boolean {
   return (
     typeof lat === 'number' &&
@@ -22,13 +23,81 @@ function isValidCoordinate(lat: number, lng: number): boolean {
   );
 }
 
+// ============ ORIGIN/HOST ENFORCEMENT ============
+
+const MAX_BODY_SIZE = 10_000; // 10KB
+
+function getAllowedOrigins(): string[] {
+  const origins = process.env.ALLOWED_ORIGINS || '';
+  const parsed = origins.split(',').map((o) => o.trim()).filter(Boolean);
+  if (process.env.NODE_ENV === 'development') {
+    parsed.push('http://localhost:3000');
+  }
+  return parsed;
+}
+
+function getAllowedHosts(): string[] {
+  const hosts = process.env.ALLOWED_HOSTS || '';
+  const parsed = hosts.split(',').map((h) => h.trim()).filter(Boolean);
+  if (process.env.NODE_ENV === 'development') {
+    parsed.push('localhost:3000', 'localhost');
+  }
+  return parsed;
+}
+
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return false;
+  return getAllowedOrigins().includes(origin);
+}
+
+function isHostAllowed(host: string | null): boolean {
+  if (!host) return false;
+  const allowed = getAllowedHosts();
+  const hostWithoutPort = host.split(':')[0];
+  return allowed.some((h) => h === host || h === hostWithoutPort);
+}
+
+// ============ MAIN HANDLER ============
+
 export async function POST(request: NextRequest) {
-  // P1-7 FIX: Add rate limiting to prevent agent abuse
+  // 1. ORIGIN/HOST ENFORCEMENT (exact match)
+  const origin = request.headers.get('origin');
+  const host = request.headers.get('host');
+
+  if (process.env.NODE_ENV === 'production') {
+    if (origin && !isOriginAllowed(origin)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (!origin && !isHostAllowed(host)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+  }
+
+  // 2. CONTENT-TYPE ENFORCEMENT
+  const contentType = request.headers.get('content-type');
+  if (!contentType?.includes('application/json')) {
+    return NextResponse.json({ error: 'Invalid content type' }, { status: 415 });
+  }
+
+  // 3. RATE LIMITING
   const rateLimitResponse = await withRateLimit(request, { type: 'agent' });
   if (rateLimitResponse) return rateLimitResponse;
 
   try {
-    const body = (await request.json()) as AgentRequest;
+    // 4. BODY SIZE GUARD
+    const raw = await request.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_BODY_SIZE) {
+      return NextResponse.json({ error: 'Request too large' }, { status: 413 });
+    }
+
+    // 5. PARSE JSON
+    let body: AgentRequest;
+    try {
+      body = JSON.parse(raw) as AgentRequest;
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
+
     const { question, lat, lng } = body;
 
     // Validate question
@@ -94,7 +163,6 @@ export async function POST(request: NextRequest) {
 
       if (!n8nResponse.ok) {
         logger.sync.error('n8n webhook error', { status: n8nResponse.status });
-        // P1-24 FIX: Return graceful fallback with helpful message
         return NextResponse.json({
           answer: "I'm having trouble connecting to my knowledge service right now. Please try again in a moment, or feel free to explore the listing details and neighborhood information available on the page.",
           fallback: true
@@ -110,15 +178,12 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeoutId);
 
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        // P1-24 FIX: Return graceful fallback on timeout
         return NextResponse.json({
           answer: "The request took too long to process. Please try asking a simpler question, or check the listing details directly for the information you need.",
           fallback: true
         });
       }
 
-      // P1-11 FIX: Handle fetch errors properly instead of re-throwing
-      // P1-24 FIX: Return graceful fallback on connection failure
       logger.sync.error('Agent webhook fetch error', { error: fetchError instanceof Error ? fetchError.message : 'Unknown error' });
       return NextResponse.json({
         answer: "I'm temporarily unable to process your question. Please try again shortly, or browse the available listing information on this page.",

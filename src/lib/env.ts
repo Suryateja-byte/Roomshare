@@ -54,6 +54,16 @@ const serverEnvSchema = z.object({
       "CRON_SECRET is required in production",
     ),
 
+  // Security: Metrics ops authentication (required in production)
+  METRICS_SECRET: z
+    .string()
+    .min(32, "METRICS_SECRET must be at least 32 characters")
+    .optional()
+    .refine(
+      (val) => process.env.NODE_ENV !== "production" || !!val,
+      "METRICS_SECRET is required in production",
+    ),
+
   // Security: Origin enforcement (comma-separated URLs)
   ALLOWED_ORIGINS: z.string().optional(),
   ALLOWED_HOSTS: z.string().optional(),
@@ -288,6 +298,10 @@ export const features = {
     const e = getServerEnv();
     return !!e.CRON_SECRET;
   },
+  get metricsAuth() {
+    const e = getServerEnv();
+    return !!e.METRICS_SECRET;
+  },
   get originEnforcement() {
     const e = getServerEnv();
     return !!(e.ALLOWED_ORIGINS || e.ALLOWED_HOSTS);
@@ -376,6 +390,9 @@ export function logStartupWarnings(): void {
   }
   if (!features.cronAuth) {
     warnings.push("CRON_SECRET not configured - cron endpoints unprotected");
+  }
+  if (!features.metricsAuth) {
+    warnings.push("METRICS_SECRET not configured - /api/metrics/ops endpoint returns 401");
   }
   if (!features.nearbyPlaces) {
     warnings.push(

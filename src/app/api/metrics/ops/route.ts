@@ -1,23 +1,19 @@
 /**
- * P2-04 FIX: Prometheus-compatible ops metrics endpoint
+ * Prometheus-compatible ops metrics endpoint
  *
- * Provides system metrics for infrastructure monitoring:
- * - Process uptime
- * - Memory usage (heap, RSS, external)
- * - Node.js version
- * - Application version
- *
- * Protected by optional bearer token authentication (METRICS_SECRET)
+ * Protected by bearer token authentication (METRICS_SECRET).
+ * Default-deny: requires METRICS_SECRET configured AND valid bearer token.
  */
+
+import { getServerEnv } from '@/lib/env';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
-    // Auth check - only allow internal/authenticated requests if METRICS_SECRET is set
     const authHeader = request.headers.get('authorization');
-    const expectedToken = process.env.METRICS_SECRET;
+    const { METRICS_SECRET: expectedToken } = getServerEnv();
 
-    // Default-deny: require METRICS_SECRET to be configured AND bearer token to match
+    // Default-deny: require METRICS_SECRET configured AND bearer token to match
     if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
         return new Response('Unauthorized', { status: 401 });
     }
@@ -25,7 +21,6 @@ export async function GET(request: Request) {
     const memory = process.memoryUsage();
     const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || 'dev';
 
-    // Prometheus text format (https://prometheus.io/docs/instrumenting/exposition_formats/)
     const prometheusFormat = [
         `# HELP process_uptime_seconds Process uptime in seconds`,
         `# TYPE process_uptime_seconds gauge`,
