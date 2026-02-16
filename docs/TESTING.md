@@ -437,6 +437,9 @@ tests/e2e/
   notifications/          # Notification tests
   pagination/             # Pagination tests
   performance/            # Performance measurement tests
+  profile/                # User profile tests
+  recently-viewed/        # Recently viewed listings tests
+  saved/                  # Saved listings tests
   search-filters/         # Individual filter tests
   search-*.spec.ts        # Search page tests
   settings/               # User settings tests

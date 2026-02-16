@@ -327,8 +327,8 @@ Fetch all active listings with optional text search.
   ],
   "total": 42,
   "page": 1,
-  "limit": 12,
-  "totalPages": 4
+  "limit": 20,
+  "totalPages": 3
 }
 ```
 

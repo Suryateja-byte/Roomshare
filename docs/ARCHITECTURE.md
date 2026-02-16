@@ -324,7 +324,6 @@ roomshare/
 │   │   ├── listings/              # Listing card, carousel, skeleton
 │   │   ├── map/                   # Map client, markers, popups, boundary layers
 │   │   ├── nearby/                # Nearby places map and panel
-│   │   ├── neighborhood/          # Neighborhood intelligence module
 │   │   ├── search/                # Search-specific (bottom sheet, pills, categories)
 │   │   ├── skeletons/             # Loading skeleton components
 │   │   ├── verification/          # Verification badge and button
@@ -603,7 +602,7 @@ Three separate Sentry configurations for comprehensive coverage:
 - **Server** (`sentry.server.config.ts`) -- Node.js runtime errors and traces
 - **Edge** (`sentry.edge.config.ts`) -- Edge runtime errors (middleware)
 
-PII protection: `sendDefaultPii: false` enforced on all configs.
+PII protection: `sendDefaultPii: false` is set explicitly on the client config; server and edge configs rely on Sentry's default (`false`).
 
 ### Structured Logging
 

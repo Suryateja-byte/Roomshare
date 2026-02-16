@@ -94,7 +94,7 @@ graph TB
 |---|---|
 | [Architecture](docs/ARCHITECTURE.md) | System design, layer boundaries, data flow diagrams |
 | [API Reference](docs/API_REFERENCE.md) | All 31 API endpoints with schemas and examples |
-| [Database](docs/DATABASE.md) | Schema, ERD, 24 models, migration guide |
+| [Database](docs/DATABASE.md) | Schema, ERD, 25 models, migration guide |
 | [Search System](docs/SEARCH_SYSTEM.md) | Search architecture, ranking, filters, pagination |
 | [State Machines](docs/STATE_MACHINES.md) | Booking, listing, report, and verification lifecycles |
 | [Components](docs/COMPONENTS.md) | Component catalog, hooks, contexts, UI library |
@@ -136,7 +136,7 @@ src/
     validation/     # Input validation utilities
   types/            # TypeScript type definitions
   styles/           # Component-specific CSS (nearby-map)
-prisma/             # Prisma schema (24 models) and 21 migrations
+prisma/             # Prisma schema (25 models) and 21 migrations
 tests/e2e/          # Playwright E2E test suites
 scripts/            # Seed scripts and utilities
 public/             # Static assets, map styles, service worker

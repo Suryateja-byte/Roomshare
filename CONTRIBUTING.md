@@ -27,7 +27,7 @@ Before you begin, make sure you have the following installed:
 | **Node.js** | 20+ | LTS recommended |
 | **pnpm** | 9+ | Package manager (`npm install -g pnpm`) |
 | **PostgreSQL** | 16+ | With PostGIS extension |
-| **Docker** (optional) | 20+ | For running PostgreSQL via docker-compose |
+| **Docker** (optional) | Latest | For running PostgreSQL via docker-compose |
 | **Git** | 2.30+ | Version control |
 
 ### Required Accounts (for full functionality)

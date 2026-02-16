@@ -341,7 +341,7 @@ All API inputs are validated server-side with Zod schemas. Key validations:
 - Minimum duration: 30 days
 - Price per month: positive number
 
-**Registration (`registerSchema`):**
+**Registration (`registerSchema` in `src/app/api/register/route.ts`):**
 - Name: minimum 2 characters
 - Email: valid email format
 - Password: minimum 12 characters

@@ -738,7 +738,7 @@ The `listing_search_docs` table combines data from:
 - **Listing** -- title, description, price, amenities, house rules, status, slots, images
 - **Location** -- address, city, state, zip, lat/lng, PostGIS geography
 - **Review aggregation** -- precomputed `avg_rating`, `review_count`
-- **Computed columns** -- `recommended_score` (formula: `avg_rating * 20 + view_count * 0.1 + review_count * 5`), lowercase array columns for case-insensitive filtering
+- **Computed columns** -- `recommended_score` (formula: `ratingScore + viewScore + reviewScore + freshnessBoost` where `ratingScore = avg_rating * 20`, `viewScore = log(1 + viewCount) * 10 * decayFactor` with 30-day half-life decay, `reviewScore = review_count * 5`, and `freshnessBoost` = up to 15 points for listings less than 7 days old), lowercase array columns for case-insensitive filtering
 
 ### Full-Text Search
 
@@ -1096,10 +1096,8 @@ The project has 21 migrations from November 2025 through February 2026:
 | `20251203000000` | Add slots constraint |
 | `20251217000000` | Add household languages |
 | `20251221000000` | Add booking rejection reason |
-| `20251221100000` | Add neighborhood intelligence |
 | `20251229000000` | Remove gender fields |
 | `20260101000000` | Phase 0: Idempotency fix (status, requestHash, scoped uniqueness) |
-| `20260102000000` | Phase 1: Sleeping spot |
 | `20260110000000` | SearchDoc denormalized table |
 | `20260111000000` | Keyset index (recommended sort) |
 | `20260111000001` | Keyset index (newest sort) |
