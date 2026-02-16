@@ -694,7 +694,16 @@ collectCoverageFrom: [
 
 Coverage reports are generated in the `coverage/` directory (gitignored).
 
-No global `coverageThreshold` is enforced in CI. The focus is on testing critical paths thoroughly rather than chasing coverage numbers. Key areas have high actual coverage:
+Global `coverageThreshold` is enforced in CI to catch regressions:
+
+| Metric | Global minimum |
+|--------|---------------|
+| Branches | 30% |
+| Functions | 35% |
+| Lines | 40% |
+| Statements | 40% |
+
+These are intentionally low global floors — a safety net, not a goal. Critical subsystems have much higher actual coverage:
 
 - **Filter system**: 90%+ line coverage
 - **State machines**: Full branch coverage

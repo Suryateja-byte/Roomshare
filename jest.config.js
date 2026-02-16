@@ -29,6 +29,14 @@ const customJestConfig = {
     "!src/app/layout.tsx",
     "!src/app/global-error.tsx",
   ],
+  coverageThreshold: {
+    global: {
+      branches: 30,
+      functions: 35,
+      lines: 40,
+      statements: 40,
+    },
+  },
   forceExit: process.env.CI === "true",
   workerIdleMemoryLimit: "512MB",
   moduleDirectories: ["node_modules", "<rootDir>/"],
