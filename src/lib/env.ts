@@ -77,7 +77,7 @@ const serverEnvSchema = z.object({
   // CRITICAL: Should be enabled in production for performance
   ENABLE_SEARCH_DOC: z.enum(["true", "false"]).optional(),
 
-  // Cloudflare Turnstile (bot protection)
+  // Cloudflare Turnstile (bot protection - required in production)
   TURNSTILE_SECRET_KEY: z.string().optional(),
   TURNSTILE_ENABLED: z.enum(["true", "false"]).optional(),
 
@@ -85,6 +85,26 @@ const serverEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
+}).superRefine((data, ctx) => {
+  // Production enforcement: Turnstile must be fully configured
+  // Uses superRefine on the object level because Zod's field-level .refine()
+  // does not reliably run on optional fields with undefined values.
+  if (process.env.NODE_ENV === "production") {
+    if (!data.TURNSTILE_SECRET_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "TURNSTILE_SECRET_KEY is required in production",
+        path: ["TURNSTILE_SECRET_KEY"],
+      });
+    }
+    if (data.TURNSTILE_ENABLED !== "true") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "TURNSTILE_ENABLED must be 'true' in production",
+        path: ["TURNSTILE_ENABLED"],
+      });
+    }
+  }
 });
 
 // Schema for client-side (public) environment variables
@@ -107,8 +127,21 @@ const clientEnvSchema = z.object({
   // Feature flags
   NEXT_PUBLIC_NEARBY_ENABLED: z.enum(["true", "false"]).optional(),
 
-  // Cloudflare Turnstile (bot protection)
+  // Cloudflare Turnstile (bot protection - required in production)
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
+
+  // App URL (used for metadataBase, sitemap, robots, structured data)
+  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+}).superRefine((data, ctx) => {
+  if (process.env.NODE_ENV === "production") {
+    if (!data.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "NEXT_PUBLIC_TURNSTILE_SITE_KEY is required in production",
+        path: ["NEXT_PUBLIC_TURNSTILE_SITE_KEY"],
+      });
+    }
+  }
 });
 
 // Type exports for use throughout the application
@@ -155,15 +188,24 @@ function validateClientEnv(): ClientEnv {
     NEXT_PUBLIC_NEARBY_ENABLED: process.env.NEXT_PUBLIC_NEARBY_ENABLED,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY:
       process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   };
 
   const result = clientEnvSchema.safeParse(clientVars);
 
   if (!result.success) {
-    console.warn(
-      "Client environment validation warnings:",
-      result.error.issues,
-    );
+    const errors = result.error.issues
+      .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
+      .join("\n");
+
+    console.warn("Client environment validation warnings:\n" + errors);
+
+    // In production, fail fast (same as server env)
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Invalid client environment configuration. Check logs for details.",
+      );
+    }
   }
 
   return result.success ? result.data : (clientVars as ClientEnv);

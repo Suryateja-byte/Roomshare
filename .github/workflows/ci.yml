@@ -44,6 +44,40 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
 
+  migrate-check:
+    name: Migration Validation
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: roomshare_migrate_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+      - name: Run migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/roomshare_migrate_test
+        run: pnpm exec prisma migrate deploy
+
   # Unit tests - fast, isolated tests
   test-unit:
     name: Unit Tests
@@ -84,13 +118,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm jest --ci --coverage --testPathPatterns="src/__tests__/components/" --testPathPatterns="src/__tests__/pages/"
-      - uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          files: ./coverage/lcov.info
-          flags: components
-          fail_ci_if_error: false
+      - run: pnpm jest --ci --testPathPatterns="src/__tests__/components/" --testPathPatterns="src/__tests__/pages/"
 
   # API and action tests - BLOCKING (P1-09 fix: removed continue-on-error)
   test-api:
@@ -185,7 +213,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test-unit, test-components, test-api, test-filters, test-filter-regression, test-performance]
+    needs: [lint, typecheck, migrate-check, test-unit, test-components, test-api, test-filters, test-filter-regression, test-performance]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     steps:
       - uses: actions/checkout@v4

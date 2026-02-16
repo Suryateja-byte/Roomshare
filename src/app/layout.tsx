@@ -23,6 +23,9 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://roomshare.app"
+  ),
   title: "RoomShare - Find Your Perfect Roommate",
   description: "Connect with compatible roommates and find your ideal home.",
   manifest: "/manifest.json",
