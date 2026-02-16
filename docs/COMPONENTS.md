@@ -34,7 +34,7 @@ Roomshare is a Next.js app using the App Router. Components follow this split:
 
 ### Key conventions
 
-- **Radix UI** for accessible primitives (dialog, dropdown, select, checkbox, slider, popover, alert dialog).
+- **Radix UI** for accessible primitives (dialog, dropdown, select, checkbox, alert dialog).
 - **Tailwind CSS v4** for styling, composed with `clsx` and `tailwind-merge` via the `cn()` utility.
 - **Lucide React** for icons.
 - **Framer Motion** (`LazyMotion` with `domAnimation`) for animations.
@@ -227,7 +227,13 @@ Draggable bottom sheet for mobile search results. Overlays the map with 3 snap p
 
 ## Map Components
 
-Located in `src/components/map/`. Powers the search map and listing detail maps.
+Located in `src/components/map/` and `src/components/Map.tsx`. Powers the search map and listing detail maps.
+
+### Map
+
+**File**: `src/components/Map.tsx`
+
+The primary map wrapper component used across the application. Handles map initialization, tile loading, and provides the map instance to child components.
 
 ### MapClient
 
@@ -308,6 +314,12 @@ Card component for search results and listing lists. Features:
 
 ## Messaging Components
 
+### MessagesPageClient
+
+**File**: `src/components/MessagesPageClient.tsx`
+
+Top-level client component for the `/messages` page. Manages conversation list, active conversation selection, and responsive layout (sidebar + chat pane on desktop, full-screen navigation on mobile).
+
 ### ChatWindow
 
 **File**: `src/components/ChatWindow.tsx`
@@ -339,6 +351,12 @@ Message thread display with auto-scroll to latest.
 ---
 
 ## Booking Components
+
+### BookingForm
+
+**File**: `src/components/BookingForm.tsx`
+
+Full booking request form on listing detail pages. Handles date selection, price display with server-side price authority, idempotency key generation, and submission with optimistic UI. Validates against listing availability and enforces slot capacity.
 
 ### BookingCalendar
 
@@ -412,6 +430,7 @@ Section on listing detail pages showing nearby points of interest (restaurants, 
 |---|---|---|
 | `MainLayout` | `MainLayout.tsx` | Full-page layout with navbar and footer |
 | `Navbar` | `Navbar.tsx` | Top navigation bar (server component) |
+| `NavbarClient` | `NavbarClient.tsx` | Client-side navbar with auth state, search bar, notifications dropdown, user menu, and mobile hamburger |
 | `NavbarWrapper` | `NavbarWrapper.tsx` | Client wrapper for navbar with scroll behavior |
 | `Footer` | `Footer.tsx` | Site footer with links |
 | `FooterWrapper` | `FooterWrapper.tsx` | Client wrapper for footer visibility |

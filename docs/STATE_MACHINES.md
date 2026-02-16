@@ -137,8 +137,10 @@ stateDiagram-v2
     ACTIVE --> RENTED: Owner marks as rented
 
     PAUSED --> ACTIVE: Owner reactivates
+    PAUSED --> RENTED: Owner marks as rented
 
     RENTED --> ACTIVE: Owner reactivates
+    RENTED --> PAUSED: Owner pauses
 
     note right of ACTIVE
         Visible in search results.
@@ -443,7 +445,7 @@ Suspended users are blocked from:
 - All write operations on protected API paths
 
 Suspension is checked at two levels:
-1. **Middleware** -- Checks JWT token and live database query for recently suspended users
+1. **Auth helpers** (`src/lib/auth-helpers.ts`) -- Checks session and live database query for suspended users on protected routes
 2. **Server Actions** -- Each action that modifies state calls `checkSuspension()` before proceeding
 
 ### Audit Trail

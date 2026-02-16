@@ -70,7 +70,7 @@ graph TB
         LSD["listing_search_docs"]
         SYNC["search-doc-sync.ts"]
         DIRTY["search-doc-dirty.ts"]
-        CRON["Cron Job (6h backfill)"]
+        CRON["Cron Job (5min sweep)"]
     end
 
     URL --> PSP --> SV2S
@@ -613,7 +613,7 @@ This avoids full-table scans on large result sets while still providing exact co
 
 **File**: `src/lib/search/search-doc-sync.ts`
 
-Immediately upserts a search document when a listing is created or updated, making it searchable within seconds instead of waiting for the 6-hour cron backfill.
+Immediately upserts a search document when a listing is created or updated, making it searchable within seconds instead of waiting for the next 5-minute cron sweep.
 
 ### Recommended Score Formula
 
@@ -639,7 +639,7 @@ Uses `INSERT ON CONFLICT DO UPDATE` for idempotency. Fire-and-forget -- failure 
 
 ```
 Listing mutation -> Sync upsert (immediate) -> Dirty flag (backup)
-                                             -> Cron backfill (6h, catches missed updates)
+                                             -> Cron sweep (every 5min, catches missed updates)
 ```
 
 ---

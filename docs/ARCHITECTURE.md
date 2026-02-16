@@ -214,12 +214,19 @@ The codebase enforces strict separation between three layers. Violations of thes
 | `manage-booking.ts` | Accept/reject/cancel with state machine validation |
 | `create-listing.ts` | Listing creation with geocoding |
 | `listing-status.ts` | ACTIVE/PAUSED/RENTED transitions |
+| `get-listings.ts` | Listing data fetching |
 | `chat.ts` | Message sending with block checks |
 | `admin.ts` | Admin moderation actions with audit logging |
 | `settings.ts` | User preference updates |
 | `verification.ts` | Identity verification requests |
 | `block.ts` | User blocking |
 | `suspension.ts` | Account suspension checks |
+| `profile.ts` | Profile updates |
+| `notifications.ts` | Notification management |
+| `saved-listings.ts` | Saved listing management |
+| `saved-search.ts` | Saved search CRUD |
+| `review-response.ts` | Host review responses |
+| `filter-suggestions.ts` | Filter suggestion generation |
 
 ### Data Layer (`prisma/`, PostGIS)
 
@@ -313,10 +320,12 @@ roomshare/
 │   │   ├── auth/                  # Auth-related components
 │   │   ├── chat/                  # Chat-specific components
 │   │   ├── error/                 # Error boundary
+│   │   ├── filters/               # Filter chips and applied filter display
 │   │   ├── listings/              # Listing card, carousel, skeleton
+│   │   ├── map/                   # Map client, markers, popups, boundary layers
 │   │   ├── nearby/                # Nearby places map and panel
 │   │   ├── neighborhood/          # Neighborhood intelligence module
-│   │   ├── search/                # Search-specific (filters, pills, categories)
+│   │   ├── search/                # Search-specific (bottom sheet, pills, categories)
 │   │   ├── skeletons/             # Loading skeleton components
 │   │   ├── verification/          # Verification badge and button
 │   │   ├── Navbar.tsx             # Main navigation
@@ -376,7 +385,7 @@ roomshare/
 ├── sentry.client.config.ts        # Client-side Sentry
 ├── sentry.server.config.ts        # Server-side Sentry
 ├── sentry.edge.config.ts          # Edge runtime Sentry
-└── middleware.ts                   # Auth + suspension middleware
+└── auth.ts                        # NextAuth configuration and session management
 ```
 
 ---
@@ -451,6 +460,7 @@ Client-side patterns for search and map interactions:
 | **Upstash Redis** | Distributed rate limiting across serverless instances | `src/lib/rate-limit-redis.ts` | `redis` |
 | **Resend** | Transactional email (booking notifications, verification, password reset) | `src/lib/email.ts` | `email` |
 | **Sentry** | Error tracking, performance monitoring, session replay | `sentry.*.config.ts` | No |
+| **Photon (Komoot)** | Address autocomplete (search-as-you-type) | `src/lib/geocoding/photon.ts` | No |
 | **Nominatim (OSM)** | Forward geocoding (address to coordinates) | `src/lib/geocoding.ts` + `src/lib/geocoding/nominatim.ts` | `nominatimGeocode` |
 | **Radar** | Nearby places search (points of interest) | `src/app/api/nearby/route.ts` | `radar` |
 | **Stadia Maps** | Map tile serving for MapLibre GL | Client-side (CSP connect-src) | No |

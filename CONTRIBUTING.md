@@ -24,8 +24,8 @@ Before you begin, make sure you have the following installed:
 
 | Requirement | Version | Notes |
 |---|---|---|
-| **Node.js** | 18+ | Recommended: 20 LTS |
-| **pnpm** | 8+ | Package manager (`npm install -g pnpm`) |
+| **Node.js** | 20+ | LTS recommended |
+| **pnpm** | 9+ | Package manager (`npm install -g pnpm`) |
 | **PostgreSQL** | 16+ | With PostGIS extension |
 | **Docker** (optional) | 20+ | For running PostgreSQL via docker-compose |
 | **Git** | 2.30+ | Version control |
@@ -66,10 +66,10 @@ This also runs `prisma generate` automatically via the `postinstall` script.
 ### 3. Set up environment variables
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-Edit `.env.local` and fill in the required values. At minimum, you need:
+Edit `.env` and fill in the required values. At minimum, you need:
 
 - `DATABASE_URL` -- PostgreSQL connection string (default: `postgresql://postgres:password@localhost:5433/roomshare?schema=public`)
 - `NEXTAUTH_SECRET` -- Generate with `openssl rand -base64 32`

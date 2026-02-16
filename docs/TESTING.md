@@ -690,21 +690,11 @@ collectCoverageFrom: [
   '!src/app/layout.tsx',
   '!src/app/global-error.tsx',
 ],
-coverageThreshold: {
-  global: {
-    branches: 5,
-    functions: 5,
-    lines: 5,
-    statements: 5,
-  },
-},
 ```
 
 Coverage reports are generated in the `coverage/` directory (gitignored).
 
-### Current thresholds
-
-The global thresholds are set conservatively (5%). Focus is on testing critical paths thoroughly rather than chasing coverage numbers. Key areas have much higher actual coverage:
+No global `coverageThreshold` is enforced in CI. The focus is on testing critical paths thoroughly rather than chasing coverage numbers. Key areas have high actual coverage:
 
 - **Filter system**: 90%+ line coverage
 - **State machines**: Full branch coverage

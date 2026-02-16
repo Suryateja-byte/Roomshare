@@ -94,7 +94,7 @@ graph TB
 |---|---|
 | [Architecture](docs/ARCHITECTURE.md) | System design, layer boundaries, data flow diagrams |
 | [API Reference](docs/API_REFERENCE.md) | All 31 API endpoints with schemas and examples |
-| [Database](docs/DATABASE.md) | Schema, ERD, 22 models, migration guide |
+| [Database](docs/DATABASE.md) | Schema, ERD, 24 models, migration guide |
 | [Search System](docs/SEARCH_SYSTEM.md) | Search architecture, ranking, filters, pagination |
 | [State Machines](docs/STATE_MACHINES.md) | Booking, listing, report, and verification lifecycles |
 | [Components](docs/COMPONENTS.md) | Component catalog, hooks, contexts, UI library |
@@ -116,12 +116,13 @@ src/
     listings/       # Listing CRUD pages
     messages/       # Messaging interface
     bookings/       # Booking management
-  components/       # 120+ React components organized by domain
+  components/       # ~150 React components organized by domain
     ui/             # Base UI library (Radix-based: button, dialog, select, etc.)
     search/         # Search UI: filters, results, bottom sheet, category tabs
     map/            # Map: markers, popups, boundary layers, privacy circles
     listings/       # Listing cards, carousels, image uploaders
     chat/           # Chat window, nearby places cards
+    filters/        # Filter chips and applied filter display
     auth/           # Turnstile widget, password modal
   hooks/            # 15 custom hooks (filters, debouncing, rate limits, media queries)
   contexts/         # 7 React contexts (filters, map bounds, search data, focus)
@@ -135,7 +136,7 @@ src/
     validation/     # Input validation utilities
   types/            # TypeScript type definitions
   styles/           # Global CSS styles
-prisma/             # Prisma schema (22 models) and 21 migrations
+prisma/             # Prisma schema (24 models) and 21 migrations
 tests/e2e/          # Playwright E2E test suites
 scripts/            # Seed scripts and utilities
 public/             # Static assets, map styles, service worker

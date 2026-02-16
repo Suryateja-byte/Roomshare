@@ -498,8 +498,8 @@ Rate-limited endpoints return HTTP **429 Too Many Requests**.
 | Endpoint | Limit |
 |---|---|
 | Registration | 5 per hour |
-| Login | 10 per 15 minutes |
 | Forgot password | 3 per hour |
+| Send message | 100 per hour |
 
 **If you hit rate limits in development**:
 

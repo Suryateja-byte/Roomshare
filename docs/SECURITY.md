@@ -73,7 +73,7 @@ Roomshare uses **NextAuth v5** (Auth.js) with two authentication providers and J
 
 - Public routes (/, /login, /signup, /listings, /search) are always accessible
 - Protected API paths (`/api/listings`, `/api/bookings`, `/api/messages`, `/api/reviews`) block suspended users for write operations
-- Protected page paths (`/dashboard`, `/listings/new`) block suspended users entirely
+- Protected page paths (`/dashboard`, `/listings/create`) block suspended users entirely
 - Read-only GET requests to public endpoints (`/api/listings`) are allowed for suspended users
 - Two-layer check: fast path from JWT token + live database query to catch newly suspended users
 
@@ -248,15 +248,22 @@ Used when Redis is not configured, or as a general-purpose rate limiter for API 
 | Resend Verification | 3 | 1 hour |
 | Verify Email | 10 | 1 hour |
 | Reset Password | 5 | 1 hour |
+| Messages (read) | 60 | 1 hour |
 | Send Message | 100 | 1 hour |
 | Create Listing | 5 | 24 hours |
 | Update Listing | 20 | 24 hours |
 | Delete Listing | 10 | 24 hours |
+| Listings Read | 10 | 24 hours |
 | Create Review | 10 | 24 hours |
-| Listings Read | 100 | 1 hour |
+| Update Review | 30 | 24 hours |
+| Delete Review | 30 | 24 hours |
+| Get Reviews | 60 | 1 minute |
+| Create Report | 10 | 24 hours |
+| Listings Read (scraping) | 100 | 1 hour |
 | Search | 30 | 1 minute |
 | Nearby Search | 30 | 1 minute |
 | Upload | 20 | 1 hour |
+| Upload Delete | 20 | 1 hour |
 | Agent (AI Chat) | 20 | 1 hour |
 | Toggle Favorite | 60 | 1 hour |
 | Unread Count | 60 | 1 minute |

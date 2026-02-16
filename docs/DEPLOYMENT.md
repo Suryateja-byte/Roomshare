@@ -85,6 +85,7 @@ Local Docker default: `postgresql://postgres:password@localhost:5433/roomshare?s
 |----------|----------|-------------|---------------|
 | `CRON_SECRET` | Prod only | Authenticates cron job requests (min 32 chars) | `openssl rand -base64 32` |
 | `LOG_HMAC_SECRET` | Recommended | HMAC key for privacy-safe metric logging | `openssl rand -hex 32` |
+| `METRICS_SECRET` | Recommended | Bearer token for `/api/metrics/ops` endpoint (default-deny if unset) | `openssl rand -base64 32` |
 
 ### Origin/Host Security (Production)
 
@@ -178,6 +179,21 @@ Falls back to database-backed rate limiting if not configured (slower but functi
 **Test keys (for dev/E2E):**
 - Secret: `1x0000000000000000000000000000000AA`
 - Site: `1x00000000000000000000AA`
+
+### Feature Flags and Application
+
+| Variable | Required | Description | How to Obtain |
+|----------|----------|-------------|---------------|
+| `ENABLE_SEARCH_DOC` | Prod: Yes | Enable denormalized search docs (`true`/`false`). Without this, text search falls back to slow LIKE queries. | Set to `true` in production |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Canonical app URL for metadata, sitemap, robots.txt, and structured data | e.g., `https://roomshare.com` |
+| `NODE_ENV` | Auto | Node environment (`development`, `production`, `test`) | Auto-set by platform |
+| `TRUST_PROXY` | Prod only | Trust `X-Forwarded-For` headers for rate limiting behind a reverse proxy | Set to `true` behind a load balancer |
+
+### HERE Maps (Geocoding Comparison)
+
+| Variable | Required | Description | How to Obtain |
+|----------|----------|-------------|---------------|
+| `HERE_API_KEY` | Optional | HERE Maps API key for geocoding accuracy comparison | [HERE Developer](https://developer.here.com/) |
 
 ### E2E Testing
 

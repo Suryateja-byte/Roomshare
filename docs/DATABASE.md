@@ -32,7 +32,7 @@ Roomshare uses **PostgreSQL 16** with the **PostGIS 3.4** extension, managed thr
 | Database | PostgreSQL 16 |
 | Extensions | PostGIS 3.4, pgcrypto |
 | ORM | Prisma v6 with `postgresqlExtensions` preview feature |
-| Prisma Models | 22 (plus `spatial_ref_sys` from PostGIS and 2 raw SQL tables for search) |
+| Prisma Models | 24 (plus `spatial_ref_sys` from PostGIS and 2 raw SQL tables for search) |
 | Connection Pooling | 5 connections max per serverless function instance |
 | Pool Timeout | 10 seconds |
 | Connect Timeout | 5 seconds |
@@ -634,7 +634,7 @@ State machine for booking lifecycle:
 | `PENDING` | Initial state. Tenant has submitted a booking request. |
 | `ACCEPTED` | Host has approved the booking. |
 | `REJECTED` | Host has declined the booking (may include `rejectionReason`). |
-| `CANCELLED` | Tenant or host has cancelled an accepted booking. |
+| `CANCELLED` | Tenant has cancelled the booking (only tenants can cancel). |
 
 ### ListingStatus
 
