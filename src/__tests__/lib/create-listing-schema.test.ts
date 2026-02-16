@@ -30,13 +30,13 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Local-timezone ISO date string for N days from today (matches schema's local midnight comparison) */
+/** UTC ISO date string for N days from today (matches schema's UTC midnight comparison) */
 function daysFromNow(n: number): string {
   const d = new Date()
-  d.setDate(d.getDate() + n)
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
+  d.setUTCDate(d.getUTCDate() + n)
+  const yyyy = d.getUTCFullYear()
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(d.getUTCDate()).padStart(2, '0')
   return `${yyyy}-${mm}-${dd}`
 }
 
@@ -47,6 +47,18 @@ function _yearsFromNow(n: number): string {
   return d.toISOString().slice(0, 10)
 }
 void _yearsFromNow // prevent unused warning
+
+/** Compute the exact 2-year boundary date string the schema uses (UTC calendar-year + 2) */
+function twoYearBoundaryDate(offsetDays = 0): string {
+  const d = new Date()
+  d.setUTCFullYear(d.getUTCFullYear() + 2)
+  d.setUTCHours(0, 0, 0, 0)
+  d.setUTCDate(d.getUTCDate() + offsetDays)
+  const yyyy = d.getUTCFullYear()
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(d.getUTCDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -716,8 +728,13 @@ describe('moveInDateSchema', () => {
     expect(r.success).toBe(false)
   })
 
+  it('accepts exact 2-year boundary date', () => {
+    const r = moveInDateSchema.safeParse(twoYearBoundaryDate(0))
+    expect(r.success).toBe(true)
+  })
+
   it('rejects a date more than 2 years in the future', () => {
-    const r = moveInDateSchema.safeParse(daysFromNow(731))
+    const r = moveInDateSchema.safeParse(twoYearBoundaryDate(1))
     expect(r.success).toBe(false)
   })
 
@@ -1100,7 +1117,7 @@ describe('createListingApiSchema', () => {
     it('rejects a date more than 2 years in the future', () => {
       const r = createListingApiSchema.safeParse({
         ...validApi,
-        moveInDate: daysFromNow(731),
+        moveInDate: twoYearBoundaryDate(1),
       })
       expect(r.success).toBe(false)
     })
