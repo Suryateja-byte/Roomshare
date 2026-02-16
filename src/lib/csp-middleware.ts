@@ -1,0 +1,30 @@
+import { buildCspHeader } from "@/lib/csp";
+
+export function applySecurityHeaders(request: { headers: Headers }) {
+  const isDev = process.env.NODE_ENV !== "production";
+  const nonce = isDev
+    ? undefined
+    : crypto.randomUUID().replace(/-/g, "").slice(0, 24);
+  const cspHeader = buildCspHeader(nonce);
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("content-security-policy", cspHeader);
+
+  const responseHeaders = new Headers();
+  responseHeaders.set("Content-Security-Policy", cspHeader);
+  responseHeaders.set("X-Frame-Options", "DENY");
+  responseHeaders.set(
+    "Strict-Transport-Security",
+    "max-age=31536000; includeSubDomains; preload",
+  );
+  responseHeaders.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(self), interest-cohort=()",
+  );
+  responseHeaders.set("X-XSS-Protection", "1; mode=block");
+  responseHeaders.set("X-DNS-Prefetch-Control", "on");
+  responseHeaders.set("X-Content-Type-Options", "nosniff");
+  responseHeaders.set("Referrer-Policy", "origin-when-cross-origin");
+
+  return { requestHeaders, responseHeaders, nonce };
+}
