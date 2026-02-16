@@ -126,19 +126,39 @@ When open, calls throw `CircuitOpenError` (code: `CIRCUIT_OPEN`). Stats availabl
 | API response time (p95) | < 500ms |
 | LCP (p95) | < 3s |
 
+### Error Budgets (30-day rolling window)
+
+| SLO | Target | Monthly error budget | Meaning |
+|-----|--------|---------------------|---------|
+| Availability | 99.5% | 0.5% | ~3.6 hours downtime/month |
+| API latency (p95) | < 500ms | 5% of requests | Up to 5% can exceed 500ms |
+| LCP (p95) | < 3s | 5% of page loads | Up to 5% can exceed 3s |
+
+**Measurement:** Availability via uptime monitoring of `/api/health/ready`. Latency via Sentry performance (10% sample). LCP via Sentry Web Vitals.
+
+**When budget is >80% consumed:** Freeze non-critical deployments, prioritize reliability work.
+
 ---
 
-## Alerting Checklist
+## Alert Definitions
 
-Monitor these signals:
+| Alert | Severity | Condition | Response |
+|-------|----------|-----------|----------|
+| Health check failing | P1 | `/api/health/ready` non-200 for > 30s | See "Health check failing" runbook |
+| High error rate | P1 | Sentry error rate > 1% for 5 min | See "High error rate" runbook |
+| API latency spike | P2 | API p95 > 500ms for 10 min | Check DB queries, connection pool |
+| DB connection failure | P1 | `database.status: "error"` in readiness | See "Database connection issues" runbook |
+| Circuit breaker open | P2 | `postgis` or `redis` breaker opens | See "Circuit breaker open" runbook |
+| Memory pressure | P2 | RSS > 80% of Vercel function limit | Check for leaks, review recent changes |
+| Turnstile spike | P3 | Verification failures > 10% for 15 min | Possible bot attack or Cloudflare issue |
 
-- [ ] `/api/health/ready` returns non-200 for > 30s
-- [ ] Error rate > 1% (Sentry alert)
-- [ ] API p95 latency > 500ms
-- [ ] Database connection failures
-- [ ] Circuit breaker OPEN events (especially `postgis`, `redis`)
-- [ ] Memory usage > 80% of allocation
-- [ ] Turnstile verification failures spike
+### Alert routing
+
+| Severity | Channel | Acknowledge SLA | Resolve SLA |
+|----------|---------|----------------|-------------|
+| P1 — Critical | Sentry alert + email/Slack to on-call | 15 min | 1 hour |
+| P2 — High | Sentry alert | 1 hour | 4 hours |
+| P3 — Medium | Sentry alert (batched daily) | Next business day | 1 week |
 
 ---
 
@@ -158,6 +178,51 @@ Apply fix or roll back (see runbooks below).
 
 ### 5. Postmortem
 Document: timeline, root cause, impact, prevention measures.
+
+---
+
+## On-Call & Escalation
+
+### On-call rotation
+
+Assign a primary on-call engineer per week. The on-call engineer:
+- Monitors Sentry alerts and `/api/health/ready` status
+- Responds to P1 alerts within 15 minutes
+- Has access to: Vercel dashboard, DB provider dashboard, Sentry, Upstash console
+
+### Escalation path
+
+| Step | When | Action |
+|------|------|--------|
+| 1 | P1 alert fires | On-call acknowledges, begins triage |
+| 2 | No resolution after 30 min | Notify team lead, consider rollback |
+| 3 | No resolution after 1 hour, or data loss risk | All-hands incident response |
+
+### Communication during incidents
+
+- **Internal:** Post updates every 15 min during active P1
+- **External:** Update status page if user-facing impact > 5 min
+- **Post-incident:** Write postmortem within 48 hours using this template:
+
+```
+## Postmortem: [Incident title]
+**Date:** YYYY-MM-DD
+**Duration:** X hours Y minutes
+**Severity:** P1/P2/P3
+**Impact:** [Users affected, features impacted]
+
+### Timeline
+- HH:MM — [Event]
+
+### Root Cause
+[Why it happened]
+
+### Resolution
+[What fixed it]
+
+### Action Items
+- [ ] [Prevention measure] — Owner — Due date
+```
 
 ---
 
@@ -202,6 +267,22 @@ Document: timeline, root cause, impact, prevention measures.
 2. Find last known good deployment
 3. Click "..." -> "Promote to Production"
 4. Verify `/api/health/ready` returns 200 after promotion
+
+### Database migration rollback
+
+1. Check migration status: `npx prisma migrate status`
+2. **Additive migration** (new column/table/index):
+   - Deploy a code fix that does not depend on the new schema
+   - Mark migration rolled back: `npx prisma migrate resolve --rolled-back <migration_name>`
+3. **Destructive migration** (dropped column, renamed field):
+   - Cannot auto-rollback — restore from DB provider backup
+   - Always test destructive migrations in staging first
+
+### Feature-level rollback (code revert)
+
+1. On GitHub: open the merged PR → click "Revert" → merge the revert PR
+2. Vercel auto-deploys on merge to main
+3. Verify `/api/health/ready` returns 200 after deploy completes
 
 ---
 
