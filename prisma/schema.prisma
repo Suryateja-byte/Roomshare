@@ -26,6 +26,7 @@ model Account {
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -34,41 +35,44 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model User {
-  id                      String                @id @default(cuid())
+  id                      String                 @id @default(cuid())
   name                    String?
-  email                   String?               @unique
+  email                   String?                @unique
   emailVerified           DateTime?
   image                   String?
   password                String?
   bio                     String?
   countryOfOrigin         String?
   languages               String[]
-  isVerified              Boolean               @default(false)
-  isAdmin                 Boolean               @default(false)
-  isSuspended             Boolean               @default(false)
+  isVerified              Boolean                @default(false)
+  isAdmin                 Boolean                @default(false)
+  isSuspended             Boolean                @default(false)
   notificationPreferences Json?
-  createdAt               DateTime              @default(now())
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
   accounts                Account[]
   listings                Listing[]
   messages                Message[]
   sessions                Session[]
-  conversations           Conversation[]        @relation("ConversationParticipants")
+  conversations           Conversation[]         @relation("ConversationParticipants")
   savedListings           SavedListing[]
-  reviewsWritten          Review[]              @relation("ReviewAuthor")
-  reviewsReceived         Review[]              @relation("ReviewTarget")
+  reviewsWritten          Review[]               @relation("ReviewAuthor")
+  reviewsReceived         Review[]               @relation("ReviewTarget")
   bookings                Booking[]
-  reportsMade             Report[]              @relation("ReportsMade")
-  reportsReviewed         Report[]              @relation("ReportsReviewed")
+  reportsMade             Report[]               @relation("ReportsMade")
+  reportsReviewed         Report[]               @relation("ReportsReviewed")
   recentlyViewed          RecentlyViewed[]
   notifications           Notification[]
   verificationRequests    VerificationRequest[]
   savedSearches           SavedSearch[]
-  blockedUsers            BlockedUser[]         @relation("BlocksMade")
-  blockedByUsers          BlockedUser[]         @relation("BlocksReceived")
-  auditLogs               AuditLog[]            @relation("AuditLogs")
+  blockedUsers            BlockedUser[]          @relation("BlocksMade")
+  blockedByUsers          BlockedUser[]          @relation("BlocksReceived")
+  auditLogs               AuditLog[]             @relation("AuditLogs")
   typingStatuses          TypingStatus[]
   conversationDeletions   ConversationDeletion[]
 }
@@ -94,35 +98,39 @@ model PasswordResetToken {
 }
 
 model Listing {
-  id             String           @id @default(cuid())
-  ownerId        String
-  title          String
-  description    String
-  price          Float
-  images         String[]         @default([])
-  amenities      String[]
-  houseRules     String[]
-  leaseDuration         String?
-  roomType              String?
-  householdLanguages    String[]  @default([]) @map("household_languages")
-  primaryHomeLanguage   String?   @map("primary_home_language")
-  genderPreference      String?
-  householdGender       String?
-  totalSlots       Int
-  availableSlots Int
-  moveInDate     DateTime?
-  status         ListingStatus    @default(ACTIVE)
-  viewCount      Int              @default(0)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  location       Location?
-  conversations  Conversation[]
-  savedBy        SavedListing[]
-  reviews        Review[]
-  bookings       Booking[]
-  reports        Report[]
-  recentlyViewed RecentlyViewed[]
+  id                  String           @id @default(cuid())
+  ownerId             String
+  title               String
+  description         String
+  price               Float
+  images              String[]         @default([])
+  amenities           String[]
+  houseRules          String[]
+  leaseDuration       String?
+  roomType            String?
+  householdLanguages  String[]         @default([]) @map("household_languages")
+  primaryHomeLanguage String?          @map("primary_home_language")
+  genderPreference    String?
+  householdGender     String?
+  totalSlots          Int
+  availableSlots      Int
+  moveInDate          DateTime?
+  status              ListingStatus    @default(ACTIVE)
+  viewCount           Int              @default(0)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  owner               User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  location            Location?
+  conversations       Conversation[]
+  savedBy             SavedListing[]
+  reviews             Review[]
+  bookings            Booking[]
+  reports             Report[]
+  recentlyViewed      RecentlyViewed[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model SavedListing {
@@ -137,21 +145,23 @@ model SavedListing {
 }
 
 model Review {
-  id            String   @id @default(cuid())
-  authorId      String
-  listingId     String?
-  targetUserId  String?
-  rating        Int
-  comment       String
-  createdAt     DateTime        @default(now())
+  id           String   @id @default(cuid())
+  authorId     String
+  listingId    String?
+  targetUserId String?
+  rating       Int
+  comment      String
+  createdAt    DateTime @default(now())
 
-  author        User            @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  listing       Listing?        @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  targetUser    User?           @relation("ReviewTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
-  response      ReviewResponse?
+  author     User            @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  listing    Listing?        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  targetUser User?           @relation("ReviewTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  response   ReviewResponse?
 
   // One review per user per listing (duplicate prevention)
   @@unique([authorId, listingId])
+  @@index([listingId])
+  @@index([targetUserId])
 }
 
 enum BookingStatus {
@@ -175,16 +185,19 @@ model Booking {
   endDate         DateTime
   status          BookingStatus @default(PENDING)
   totalPrice      Float
-  rejectionReason String?       // Optional reason when host rejects booking
+  rejectionReason String? // Optional reason when host rejects booking
   version         Int           @default(1) // P0-04: Optimistic locking for race-safe updates
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  listing   Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  tenant    User          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  tenant  User    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Prevent duplicate booking requests for same tenant/listing/dates
   @@unique([tenantId, listingId, startDate, endDate])
+  @@index([listingId, status])
+  @@index([tenantId])
+  @@index([listingId, status, startDate, endDate])
 }
 
 enum ReportStatus {
@@ -204,10 +217,14 @@ model Report {
   reviewedBy String?
   resolvedAt DateTime?
   createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
-  listing    Listing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  reporter   User         @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
-  reviewer   User?        @relation("ReportsReviewed", fields: [reviewedBy], references: [id])
+  listing  Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporter User    @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reviewer User?   @relation("ReportsReviewed", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([listingId])
 }
 
 model Location {
@@ -224,26 +241,28 @@ model Location {
 }
 
 model Conversation {
-  id             String                  @id @default(cuid())
+  id             String                 @id @default(cuid())
   listingId      String
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  deletedAt      DateTime?               // Admin-level delete: hides from ALL participants
-  listing        Listing                 @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  deletedAt      DateTime? // Admin-level delete: hides from ALL participants
+  listing        Listing                @relation(fields: [listingId], references: [id], onDelete: Cascade)
   messages       Message[]
-  participants   User[]                  @relation("ConversationParticipants")
+  participants   User[]                 @relation("ConversationParticipants")
   typingStatuses TypingStatus[]
-  deletions      ConversationDeletion[]  // Per-user deletion records
+  deletions      ConversationDeletion[] // Per-user deletion records
+
+  @@index([listingId])
 }
 
 model ConversationDeletion {
-  id             String       @id @default(cuid())
+  id             String   @id @default(cuid())
   conversationId String
   userId         String
-  deletedAt      DateTime     @default(now())
+  deletedAt      DateTime @default(now())
 
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
   @@index([userId])
@@ -256,8 +275,8 @@ model Message {
   content        String
   read           Boolean      @default(false)
   createdAt      DateTime     @default(now())
-  deletedAt      DateTime?    // Soft delete timestamp
-  deletedBy      String?      // User who deleted (for audit)
+  deletedAt      DateTime? // Soft delete timestamp
+  deletedBy      String? // User who deleted (for audit)
   sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -298,9 +317,11 @@ model Notification {
   link      String?
   read      Boolean          @default(false)
   createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, read])
+  @@index([userId, createdAt])
 }
 
 enum VerificationStatus {
@@ -310,18 +331,18 @@ enum VerificationStatus {
 }
 
 model VerificationRequest {
-  id            String             @id @default(cuid())
-  userId        String
-  documentType  String             // "passport", "driver_license", "national_id"
-  documentUrl   String             // URL to uploaded document image
-  selfieUrl     String?            // URL to selfie for matching
-  status        VerificationStatus @default(PENDING)
-  adminNotes    String?            // Notes from admin on rejection
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  reviewedAt    DateTime?
-  reviewedBy    String?            // Admin user ID who reviewed
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String             @id @default(cuid())
+  userId       String
+  documentType String // "passport", "driver_license", "national_id"
+  documentUrl  String // URL to uploaded document image
+  selfieUrl    String? // URL to selfie for matching
+  status       VerificationStatus @default(PENDING)
+  adminNotes   String? // Notes from admin on rejection
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  reviewedAt   DateTime?
+  reviewedBy   String? // Admin user ID who reviewed
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -338,7 +359,7 @@ model SavedSearch {
   userId         String
   name           String
   query          String?
-  filters        Json           // Store all filter params as JSON
+  filters        Json // Store all filter params as JSON
   alertEnabled   Boolean        @default(true)
   alertFrequency AlertFrequency @default(DAILY)
   lastAlertAt    DateTime?
@@ -370,7 +391,7 @@ model spatial_ref_sys {
 // Rate Limiting (Database-backed for Vercel serverless)
 model RateLimitEntry {
   id          String   @id @default(cuid())
-  identifier  String   // IP or userId:endpoint
+  identifier  String // IP or userId:endpoint
   endpoint    String
   count       Int      @default(1)
   windowStart DateTime @default(now())
@@ -380,7 +401,6 @@ model RateLimitEntry {
   @@index([expiresAt])
 }
 
-
 // User Blocking
 model BlockedUser {
   id        String   @id @default(cuid())
@@ -388,8 +408,8 @@ model BlockedUser {
   blockedId String
   createdAt DateTime @default(now())
 
-  blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
-  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker User @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
@@ -398,16 +418,16 @@ model BlockedUser {
 
 // Admin Audit Trail - Immutable log of all admin actions for security/compliance
 model AuditLog {
-  id          String   @id @default(cuid())
-  adminId     String
-  action      String   // e.g., "USER_SUSPENDED", "LISTING_DELETED", "REPORT_RESOLVED"
-  targetType  String   // e.g., "User", "Listing", "Report"
-  targetId    String
-  details     Json?    // Additional context (old/new values, reason, etc.)
-  ipAddress   String?  // For security tracking
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String // e.g., "USER_SUSPENDED", "LISTING_DELETED", "REPORT_RESOLVED"
+  targetType String // e.g., "User", "Listing", "Report"
+  targetId   String
+  details    Json? // Additional context (old/new values, reason, etc.)
+  ipAddress  String? // For security tracking
+  createdAt  DateTime @default(now())
 
-  admin       User     @relation("AuditLogs", fields: [adminId], references: [id])
+  admin User @relation("AuditLogs", fields: [adminId], references: [id])
 
   @@index([adminId])
   @@index([targetType, targetId])
@@ -416,14 +436,14 @@ model AuditLog {
 }
 
 model TypingStatus {
-  id             String       @id @default(cuid())
+  id             String   @id @default(cuid())
   userId         String
   conversationId String
-  isTyping       Boolean      @default(false)
-  updatedAt      DateTime     @updatedAt
+  isTyping       Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
 
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, conversationId])
   @@index([conversationId])
@@ -435,12 +455,12 @@ model TypingStatus {
 // P0-04: Uses INSERT ON CONFLICT + FOR UPDATE for atomic claim with no race window
 model IdempotencyKey {
   id          String   @id @default(cuid())
-  key         String   // Client-provided key (unique per user+endpoint)
-  userId      String   // User who made the request
-  endpoint    String   // Which endpoint (e.g., "createBooking")
+  key         String // Client-provided key (unique per user+endpoint)
+  userId      String // User who made the request
+  endpoint    String // Which endpoint (e.g., "createBooking")
   status      String   @default("processing") // 'processing' | 'completed'
-  requestHash String   // SHA-256 hash of request body for replay detection
-  resultData  Json?    // Cached result of the operation
+  requestHash String // SHA-256 hash of request body for replay detection
+  resultData  Json? // Cached result of the operation
   createdAt   DateTime @default(now())
   expiresAt   DateTime // Auto-expire after 24 hours
 
