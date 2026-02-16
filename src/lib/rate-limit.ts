@@ -83,41 +83,49 @@ export async function checkRateLimit(
       },
     });
 
-    // Try to find existing entry within the current window
-    const existing = await prisma.rateLimitEntry.findUnique({
-      where: {
-        identifier_endpoint: { identifier, endpoint },
-      },
-    });
+    // Atomic: increment count only if within window AND under limit
+    const updated = await prisma.$queryRaw<
+      Array<{ id: string; count: number; windowStart: Date; expiresAt: Date }>
+    >`
+      UPDATE "RateLimitEntry"
+      SET count = count + 1
+      WHERE identifier = ${identifier}
+        AND endpoint = ${endpoint}
+        AND "windowStart" > ${windowStart}
+        AND count < ${limit}
+      RETURNING id, count, "windowStart", "expiresAt"
+    `;
 
-    if (existing && existing.windowStart > windowStart) {
-      // Entry exists and is within the current window
-      if (existing.count >= limit) {
-        const resetAt = new Date(existing.windowStart.getTime() + windowMs);
-        const retryAfter = Math.ceil(
-          (resetAt.getTime() - now.getTime()) / 1000,
-        );
-        return {
-          success: false,
-          remaining: 0,
-          resetAt,
-          retryAfter: Math.max(1, retryAfter),
-        };
-      }
-
-      // Increment the count
-      const updated = await prisma.rateLimitEntry.update({
-        where: { id: existing.id },
-        data: { count: existing.count + 1 },
-      });
-
-      const resetAt = new Date(existing.windowStart.getTime() + windowMs);
+    if (updated.length > 0) {
+      const row = updated[0];
+      const resetAt = new Date(row.windowStart.getTime() + windowMs);
       return {
         success: true,
-        remaining: Math.max(0, limit - updated.count),
+        remaining: Math.max(0, limit - row.count),
         resetAt,
       };
     }
+
+    // 0 rows: either (a) no valid entry → create window, or (b) count >= limit → deny
+    const existing = await prisma.rateLimitEntry.findUnique({
+      where: { identifier_endpoint: { identifier, endpoint } },
+    });
+
+    if (existing && existing.windowStart > windowStart) {
+      // (b) Entry exists, valid window, but count >= limit → DENY
+      const resetAt = new Date(existing.windowStart.getTime() + windowMs);
+      const retryAfter = Math.ceil(
+        (resetAt.getTime() - now.getTime()) / 1000,
+      );
+      return {
+        success: false,
+        remaining: 0,
+        resetAt,
+        retryAfter: Math.max(1, retryAfter),
+      };
+    }
+
+    // (a) No valid entry or expired → create/reset window
 
     // Create new entry or reset the window
     await prisma.rateLimitEntry.upsert({

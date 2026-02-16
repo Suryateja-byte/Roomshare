@@ -3,6 +3,12 @@
  * P1-08 FIX: Validates timeout and circuit breaker protection for Redis rate limiting
  */
 
+// Mock the DB rate-limiter for fallback
+const mockCheckRateLimit = jest.fn();
+jest.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: mockCheckRateLimit,
+}));
+
 // Mock the timeout-wrapper module
 jest.mock('@/lib/timeout-wrapper', () => ({
   withTimeout: jest.fn((promise) => promise),
@@ -67,6 +73,7 @@ describe('rate-limit-redis', () => {
   beforeEach(() => {
     // Use resetAllMocks to clear queued mockResolvedValueOnce values between tests
     jest.resetAllMocks();
+    mockCheckRateLimit.mockReset();
 
     // Restore MockRatelimit immediately after resetAllMocks
     // This MUST happen before any jest.resetModules() + dynamic import
@@ -157,18 +164,19 @@ describe('rate-limit-redis', () => {
       expect(result.retryAfter).toBeGreaterThan(0);
     });
 
-    it('uses in-memory fallback in production when Redis is not configured', async () => {
+    it('fails closed in production when Redis is not configured', async () => {
       process.env.UPSTASH_REDIS_REST_URL = '';
       process.env.UPSTASH_REDIS_REST_TOKEN = '';
       Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true });
 
+      restoreRatelimitMock();
       jest.resetModules();
       const rateLimitModule = await import('@/lib/rate-limit-redis');
 
       const result = await rateLimitModule.checkChatRateLimit('127.0.0.1');
 
-      expect(result.success).toBe(true);
-      expect(result.retryAfter).toBeUndefined();
+      expect(result.success).toBe(false);
+      expect(result.retryAfter).toBe(30);
     });
 
     it('allows requests in development when Redis not configured', async () => {
@@ -184,14 +192,13 @@ describe('rate-limit-redis', () => {
       expect(result.success).toBe(true);
     });
 
-    it('fails open on Redis error', async () => {
+    it('fails closed (denies) when Redis errors in production', async () => {
       mockLimit.mockRejectedValue(new Error('Redis connection failed'));
 
       const result = await checkChatRateLimit('127.0.0.1');
 
-      expect(result.success).toBe(true);
-      expect(result.retryAfter).toBeUndefined();
-      Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, writable: true, configurable: true });
+      expect(result.success).toBe(false);
+      expect(result.retryAfter).toBe(30);
     });
   });
 
@@ -219,15 +226,14 @@ describe('rate-limit-redis', () => {
       expect(withTimeout).toHaveBeenCalled();
     });
 
-    it('fails open on timeout in production', async () => {
+    it('fails closed on timeout for chat (LLM cost protection)', async () => {
       const { TimeoutError } = await import('@/lib/timeout-wrapper');
       withTimeout.mockRejectedValue(new TimeoutError('Redis rate limit', 1000));
 
       const result = await checkChatRateLimit('127.0.0.1');
 
-      expect(result.success).toBe(true);
-      expect(result.retryAfter).toBeUndefined();
-      Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, writable: true, configurable: true });
+      expect(result.success).toBe(false);
+      expect(result.retryAfter).toBe(30);
     });
   });
 
@@ -257,15 +263,14 @@ describe('rate-limit-redis', () => {
       expect(circuitBreakers.redis.execute).toHaveBeenCalled();
     });
 
-    it('fails open when circuit is open', async () => {
+    it('fails closed when circuit is open (chat)', async () => {
       const { CircuitOpenError } = await import('@/lib/circuit-breaker');
       circuitBreakers.redis.execute.mockRejectedValue(new CircuitOpenError('redis'));
 
       const result = await checkChatRateLimit('127.0.0.1');
 
-      expect(result.success).toBe(true);
-      expect(result.retryAfter).toBeUndefined();
-      Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, writable: true, configurable: true });
+      expect(result.success).toBe(false);
+      expect(result.retryAfter).toBe(30);
     });
   });
 
@@ -290,12 +295,24 @@ describe('rate-limit-redis', () => {
       expect(result.success).toBe(true);
     });
 
-    it('fails open on error in production', async () => {
+    it('falls back to DB rate limiter on Redis error', async () => {
       mockLimit.mockRejectedValue(new Error('Redis error'));
+      mockCheckRateLimit.mockResolvedValue({
+        success: true, remaining: 99, resetAt: new Date(Date.now() + 60000),
+      });
 
       const result = await checkMetricsRateLimit('127.0.0.1');
-
       expect(result.success).toBe(true);
+      expect(mockCheckRateLimit).toHaveBeenCalledWith(
+        '127.0.0.1', 'redis-fallback:metrics', { limit: 100, windowMs: 60000 }
+      );
+    });
+
+    it('falls back to in-memory if DB fallback also fails', async () => {
+      mockLimit.mockRejectedValue(new Error('Redis error'));
+      mockCheckRateLimit.mockRejectedValue(new Error('DB error'));
+      const result = await checkMetricsRateLimit('127.0.0.1');
+      expect(result.success).toBe(true); // ultimate in-memory fallback
     });
   });
 
@@ -320,12 +337,17 @@ describe('rate-limit-redis', () => {
       expect(result.success).toBe(true);
     });
 
-    it('fails open on error in production', async () => {
+    it('falls back to DB rate limiter on Redis error', async () => {
       mockLimit.mockRejectedValue(new Error('Redis error'));
+      mockCheckRateLimit.mockResolvedValue({
+        success: true, remaining: 59, resetAt: new Date(Date.now() + 60000),
+      });
 
       const result = await checkMapRateLimit('127.0.0.1');
-
       expect(result.success).toBe(true);
+      expect(mockCheckRateLimit).toHaveBeenCalledWith(
+        '127.0.0.1', 'redis-fallback:map', { limit: 60, windowMs: 60000 }
+      );
     });
   });
 
@@ -350,16 +372,20 @@ describe('rate-limit-redis', () => {
       expect(result.success).toBe(true);
     });
 
-    it('fails open on error in production', async () => {
+    it('falls back to DB rate limiter on Redis error', async () => {
       mockLimit.mockRejectedValue(new Error('Redis error'));
+      mockCheckRateLimit.mockResolvedValue({
+        success: true, remaining: 29, resetAt: new Date(Date.now() + 60000),
+      });
 
       const result = await checkSearchCountRateLimit('127.0.0.1');
-
       expect(result.success).toBe(true);
+      expect(mockCheckRateLimit).toHaveBeenCalledWith(
+        '127.0.0.1', 'redis-fallback:searchCount', { limit: 30, windowMs: 60000 }
+      );
     });
 
-    it('should fail open when Redis times out in production', async () => {
-      const originalEnv = process.env.NODE_ENV;
+    it('uses DB fallback when Redis times out in production', async () => {
       Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true, configurable: true });
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -367,12 +393,14 @@ describe('rate-limit-redis', () => {
       circuitBreakerMock.circuitBreakers.redis.execute.mockRejectedValue(
         new Error('Redis timeout')
       );
+      mockCheckRateLimit.mockResolvedValue({
+        success: true, remaining: 29, resetAt: new Date(Date.now() + 60000),
+      });
 
       const result = await checkSearchCountRateLimit('127.0.0.1');
 
       expect(result.success).toBe(true);
-      expect(result.retryAfter).toBeUndefined();
-      Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, writable: true, configurable: true });
+      expect(mockCheckRateLimit).toHaveBeenCalled();
     });
   });
 });
