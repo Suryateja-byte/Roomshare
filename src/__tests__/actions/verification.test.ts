@@ -16,6 +16,7 @@ jest.mock('@/lib/prisma', () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    $transaction: jest.fn(),
   },
 }))
 
@@ -33,6 +34,10 @@ jest.mock('@/lib/email', () => ({
 
 jest.mock('@/lib/audit', () => ({
   logAdminAction: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock('@/lib/logger', () => ({
+  logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
 }))
 
 import {
@@ -273,14 +278,23 @@ describe('Verification Actions', () => {
       ;(prisma.verificationRequest.findUnique as jest.Mock).mockResolvedValue({
         id: 'request-123',
         userId: 'user-456',
+        documentType: 'passport',
         user: { id: 'user-456', name: 'Test User', email: 'test@test.com' },
       })
-      ;(prisma.verificationRequest.update as jest.Mock).mockResolvedValue({})
-      ;(prisma.user.update as jest.Mock).mockResolvedValue({})
+      // Mock $transaction to execute the callback with a mock tx
+      const mockTxVerificationUpdate = jest.fn().mockResolvedValue({})
+      const mockTxUserUpdate = jest.fn().mockResolvedValue({})
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+        const tx = {
+          verificationRequest: { update: mockTxVerificationUpdate },
+          user: { update: mockTxUserUpdate },
+        }
+        return cb(tx)
+      })
 
       const result = await approveVerification('request-123')
 
-      expect(prisma.verificationRequest.update).toHaveBeenCalledWith({
+      expect(mockTxVerificationUpdate).toHaveBeenCalledWith({
         where: { id: 'request-123' },
         data: {
           status: 'APPROVED',
@@ -288,7 +302,7 @@ describe('Verification Actions', () => {
           reviewedBy: 'user-123',
         },
       })
-      expect(prisma.user.update).toHaveBeenCalledWith({
+      expect(mockTxUserUpdate).toHaveBeenCalledWith({
         where: { id: 'user-456' },
         data: { isVerified: true },
       })

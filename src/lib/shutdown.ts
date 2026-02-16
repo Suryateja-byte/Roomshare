@@ -59,8 +59,8 @@ async function performShutdown(signal: string): Promise<void> {
         const Sentry = await import('@sentry/nextjs');
         console.log('[Shutdown] Flushing Sentry events...');
         await Promise.race([
-          Sentry.close(2000), // 2 second timeout for Sentry
-          new Promise((resolve) => setTimeout(resolve, 2500)),
+          Sentry.close(5000), // 5 second timeout for Sentry
+          new Promise((resolve) => setTimeout(resolve, 5500)),
         ]);
         console.log('[Shutdown] Sentry flush complete');
       } catch {

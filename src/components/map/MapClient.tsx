@@ -88,6 +88,8 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
     const [selectedListing, setSelectedListing] = useState<MapListing | null>(null);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [areTilesLoading, setAreTilesLoading] = useState(false);
+    const [showTileLoading, setShowTileLoading] = useState(false);
+    const tileLoadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [unclusteredListings, setUnclusteredListings] = useState<MapListing[]>([]);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [viewState, setViewState] = useState({
@@ -101,7 +103,7 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
     const markerRefs = useRef<globalThis.Map<string, HTMLDivElement>>(new globalThis.Map());
 
     // Debounce the view state to prevent excessive API calls
-    const [debouncedViewState] = useDebounce(viewState, 500);
+    const [debouncedViewState] = useDebounce(viewState, 600);
     const mapRef = useRef<any>(null);
 
     // Detect dark mode
@@ -371,6 +373,39 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
         }
     }, [sortedMarkerPositions]);
 
+    // Delay tile loading indicator to prevent flicker on fast connections
+    useEffect(() => {
+        if (areTilesLoading) {
+            tileLoadingTimerRef.current = setTimeout(() => {
+                setShowTileLoading(true);
+            }, 300);
+        } else {
+            if (tileLoadingTimerRef.current) {
+                clearTimeout(tileLoadingTimerRef.current);
+                tileLoadingTimerRef.current = null;
+            }
+            setShowTileLoading(false);
+        }
+        return () => {
+            if (tileLoadingTimerRef.current) {
+                clearTimeout(tileLoadingTimerRef.current);
+            }
+        };
+    }, [areTilesLoading]);
+
+    // Close popup on Escape key press
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && selectedListing) {
+                setSelectedListing(null);
+            }
+        };
+        if (selectedListing) {
+            window.addEventListener('keydown', handleEsc);
+        }
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [selectedListing]);
+
     const onMove = useCallback((evt: ViewStateChangeEvent) => {
         setViewState(evt.viewState);
         // Update unclustered listings after move
@@ -389,8 +424,8 @@ export default function MapClient({ initialListings = [] }: { initialListings?: 
                 </div>
             )}
 
-            {/* Tile loading indicator */}
-            {isMapLoaded && areTilesLoading && (
+            {/* Tile loading indicator (delayed 300ms to prevent flicker on fast connections) */}
+            {isMapLoaded && showTileLoading && (
                 <div className="absolute inset-0 bg-zinc-100/30 dark:bg-zinc-900/30 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none" role="status" aria-label="Loading map tiles">
                     <div className="flex items-center gap-2 bg-white/90 dark:bg-zinc-800/90 px-4 py-2 rounded-lg shadow-sm">
                         <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" aria-hidden="true" />

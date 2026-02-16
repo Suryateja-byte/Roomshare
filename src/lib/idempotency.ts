@@ -19,6 +19,7 @@
 import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 // Prisma transaction client type
 type TransactionClient = Parameters<
@@ -236,7 +237,7 @@ export async function withIdempotency<T>(
       // Retry on serialization failure with exponential backoff
       if (isSerializationError(error)) {
         if (attempt === MAX_SERIALIZATION_RETRIES) {
-          console.error(
+          logger.sync.error(
             `[Idempotency] Serialization failed after ${MAX_SERIALIZATION_RETRIES} attempts`,
             {
               key,

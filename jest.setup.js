@@ -129,6 +129,19 @@ jest.mock('@marsidev/react-turnstile', () => {
   }
 })
 
+// Mock @upstash/redis to prevent connection errors in tests
+jest.mock('@upstash/redis', () => ({
+  Redis: jest.fn().mockImplementation(() => ({
+    get: jest.fn(),
+    set: jest.fn(),
+    incr: jest.fn(),
+    expire: jest.fn(),
+    del: jest.fn(),
+    multi: jest.fn().mockReturnThis(),
+    exec: jest.fn(),
+  })),
+}))
+
 // Mock @/lib/prisma to prevent PrismaClient initialization errors in tests
 // Tests that need real DB access should set DATABASE_URL and use jest.unmock
 const mockPrismaModel = {

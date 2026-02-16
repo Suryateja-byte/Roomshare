@@ -244,7 +244,7 @@ describe('POST /api/nearby - Auth/Session Edge Cases', () => {
 
       // Should return 500, not crash
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Internal Server Error');
+      expect(data.error).toBe('Internal server error');
     });
   });
 });

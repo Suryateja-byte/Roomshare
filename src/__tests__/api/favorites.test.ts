@@ -37,6 +37,21 @@ jest.mock('@/lib/with-rate-limit', () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }))
 
+// Mock logger and captureApiError
+jest.mock('@/lib/logger', () => ({
+  logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
+}))
+
+jest.mock('@/lib/api-error-handler', () => ({
+  captureApiError: jest.fn((_error: unknown, _context: { route: string; method: string }) => {
+    return {
+      status: 500,
+      json: async () => ({ error: 'Internal server error' }),
+      headers: new Map(),
+    }
+  }),
+}))
+
 import { POST } from '@/app/api/favorites/route'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
@@ -166,17 +181,16 @@ describe('POST /api/favorites', () => {
       const data = await response.json()
 
       expect(response.status).toBe(500)
-      expect(data.error).toBe('Internal Server Error')
+      expect(data.error).toBe('Internal server error')
     })
 
-    it('logs error on failure', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
+    it('calls captureApiError on failure', async () => {
+      const { captureApiError } = require('@/lib/api-error-handler')
       ;(prisma.savedListing.findUnique as jest.Mock).mockRejectedValue(new Error('Test Error'))
 
       await POST(createRequest({ listingId: 'listing-123' }))
 
-      expect(consoleSpy).toHaveBeenCalled()
-      consoleSpy.mockRestore()
+      expect(captureApiError).toHaveBeenCalled()
     })
   })
 })

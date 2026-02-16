@@ -3,6 +3,8 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { crossesAntimeridian } from '@/lib/data';
+import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from '@/lib/rate-limit';
+import { headers } from 'next/headers';
 
 export interface Bounds {
   ne_lat: number;
@@ -25,6 +27,12 @@ export interface MapListing {
 
 export async function getListingsInBounds(bounds: Bounds): Promise<MapListing[]> {
   const { ne_lat, ne_lng, sw_lat, sw_lng } = bounds;
+
+  // Rate limiting
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(ip, 'getListingsInBounds', RATE_LIMITS.getListingsInBounds);
+  if (!rl.success) return [];
 
   try {
     // Use raw query to leverage PostGIS spatial functions
@@ -51,7 +59,8 @@ export async function getListingsInBounds(bounds: Bounds): Promise<MapListing[]>
           ST_X(loc.coords::geometry) as lng
         FROM "Listing" l
         JOIN "Location" loc ON l.id = loc."listingId"
-        WHERE (
+        WHERE l."status" = 'ACTIVE'
+        AND (
           ST_Intersects(
             loc.coords,
             ST_MakeEnvelope(${sw_lng}, ${sw_lat}, 180, ${ne_lat}, 4326)
@@ -78,7 +87,8 @@ export async function getListingsInBounds(bounds: Bounds): Promise<MapListing[]>
           ST_X(loc.coords::geometry) as lng
         FROM "Listing" l
         JOIN "Location" loc ON l.id = loc."listingId"
-        WHERE ST_Intersects(
+        WHERE l."status" = 'ACTIVE'
+        AND ST_Intersects(
           loc.coords,
           ST_MakeEnvelope(${sw_lng}, ${sw_lat}, ${ne_lng}, ${ne_lat}, 4326)
         )

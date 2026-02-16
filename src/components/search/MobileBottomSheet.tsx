@@ -257,6 +257,8 @@ export default function MobileBottomSheet({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && snapIndex !== 0) {
+        // Don't handle Escape if a dialog/modal or focus trap is already handling it
+        if (document.querySelector('[role="dialog"][aria-modal="true"]') || document.querySelector('[data-focus-trap]')) return;
         // Only handle if sheet is not collapsed (map popup has priority via stopImmediatePropagation)
         setSnapIndex(1);
       }

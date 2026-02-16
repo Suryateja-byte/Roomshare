@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Ban, Loader2, ShieldOff } from 'lucide-react';
+import { FocusTrap } from '@/components/ui/FocusTrap';
 import { blockUser, unblockUser } from '@/app/actions/block';
 
 interface BlockUserButtonProps {
@@ -115,6 +116,7 @@ export default function BlockUserButton({
 
             {/* Confirmation Modal */}
             {showConfirm && (
+                <FocusTrap active={showConfirm}>
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div
                         className="absolute inset-0 bg-black/50"
@@ -153,6 +155,7 @@ export default function BlockUserButton({
                         </div>
                     </div>
                 </div>
+                </FocusTrap>
             )}
         </>
     );

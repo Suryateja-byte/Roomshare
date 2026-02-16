@@ -41,7 +41,17 @@ export default async function ListingPage({ params }: PageProps) {
     const listing = await prisma.listing.findUnique({
         where: { id },
         include: {
-            owner: true,
+            owner: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    image: true,
+                    isVerified: true,
+                    bio: true,
+                    createdAt: true,
+                }
+            },
             location: true,
         },
     });

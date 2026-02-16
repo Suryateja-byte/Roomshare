@@ -1,12 +1,11 @@
 /**
- * Simple LRU-like cache for geocoding results
- * Avoids external dependency while providing caching benefits
+ * Geocoding cache backed by Upstash Redis for persistence across serverless invocations.
+ * Falls back to in-memory Map when Redis is not configured.
+ *
+ * Redis handles TTL natively — no eager eviction needed.
  */
 
-interface CacheEntry {
-  results: GeocodingResult[];
-  timestamp: number;
-}
+import { Redis } from "@upstash/redis";
 
 export interface GeocodingResult {
   id: string;
@@ -16,73 +15,114 @@ export interface GeocodingResult {
   bbox?: [number, number, number, number];
 }
 
-const MAX_ENTRIES = 100;
-const TTL_MS = 5 * 60 * 1000; // 5 minutes
+const TTL_SECONDS = 5 * 60; // 5 minutes
+const CACHE_PREFIX = "geocode:";
 
-// Use Map to maintain insertion order for LRU behavior
-const cache = new Map<string, CacheEntry>();
+// --- Redis client (lazy singleton) ---
+let redis: Redis | null = null;
+let redisUnavailable = false;
+
+function getRedis(): Redis | null {
+  if (redisUnavailable) return null;
+  if (redis) return redis;
+
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    redisUnavailable = true;
+    return null;
+  }
+
+  try {
+    redis = new Redis({ url, token });
+    return redis;
+  } catch {
+    redisUnavailable = true;
+    return null;
+  }
+}
+
+// --- In-memory fallback (same as before, for dev / missing Redis env) ---
+interface CacheEntry {
+  results: GeocodingResult[];
+  timestamp: number;
+}
+
+const MAX_ENTRIES = 100;
+const TTL_MS = TTL_SECONDS * 1000;
+const memoryCache = new Map<string, CacheEntry>();
 
 function normalizeQuery(query: string): string {
   return query.toLowerCase().trim();
 }
 
-function evictStaleEntries(): void {
-  const now = Date.now();
-  for (const [key, entry] of cache.entries()) {
-    if (now - entry.timestamp > TTL_MS) {
-      cache.delete(key);
-    }
-  }
-}
+// --- Public API ---
 
-function enforceMaxSize(): void {
-  while (cache.size > MAX_ENTRIES) {
-    // Delete oldest entry (first key in Map iteration order)
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey) {
-      cache.delete(oldestKey);
-    }
-  }
-}
-
-export function getCachedResults(query: string): GeocodingResult[] | null {
-  evictStaleEntries();
-
+export async function getCachedResults(
+  query: string,
+): Promise<GeocodingResult[] | null> {
   const normalized = normalizeQuery(query);
-  const entry = cache.get(normalized);
+  const redisClient = getRedis();
 
-  if (!entry) {
-    return null;
+  if (redisClient) {
+    try {
+      const cached = await redisClient.get<GeocodingResult[]>(
+        `${CACHE_PREFIX}${normalized}`,
+      );
+      return cached ?? null;
+    } catch {
+      // Redis error — fall through to memory cache
+    }
   }
 
-  // Check if entry is still valid
+  // In-memory fallback (lazy eviction: only check requested key)
+  const entry = memoryCache.get(normalized);
+  if (!entry) return null;
+
   if (Date.now() - entry.timestamp > TTL_MS) {
-    cache.delete(normalized);
+    memoryCache.delete(normalized);
     return null;
   }
 
-  // Move to end (most recently used) by re-inserting
-  cache.delete(normalized);
-  cache.set(normalized, entry);
-
+  // LRU: move to end
+  memoryCache.delete(normalized);
+  memoryCache.set(normalized, entry);
   return entry.results;
 }
 
-export function setCachedResults(query: string, results: GeocodingResult[]): void {
+export async function setCachedResults(
+  query: string,
+  results: GeocodingResult[],
+): Promise<void> {
   const normalized = normalizeQuery(query);
+  const redisClient = getRedis();
 
-  cache.set(normalized, {
-    results,
-    timestamp: Date.now(),
-  });
+  if (redisClient) {
+    try {
+      await redisClient.set(`${CACHE_PREFIX}${normalized}`, results, {
+        ex: TTL_SECONDS,
+      });
+      return;
+    } catch {
+      // Redis error — fall through to memory cache
+    }
+  }
 
-  enforceMaxSize();
+  // In-memory fallback
+  memoryCache.set(normalized, { results, timestamp: Date.now() });
+
+  // Enforce max size (evict oldest)
+  while (memoryCache.size > MAX_ENTRIES) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey) memoryCache.delete(oldestKey);
+  }
 }
 
 export function clearCache(): void {
-  cache.clear();
+  memoryCache.clear();
+  // Note: Redis cache will expire via TTL; explicit flush is not needed for normal operation
 }
 
 export function getCacheSize(): number {
-  return cache.size;
+  return memoryCache.size;
 }

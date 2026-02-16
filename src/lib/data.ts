@@ -1504,109 +1504,98 @@ async function safeGetCount(params: FilterParams): Promise<number | null> {
 
 // Analyze which filters are most restrictive and suggest removing them
 // P0 fix: Now uses efficient COUNT queries instead of fetching all data
+// Perf fix: All count queries run in parallel via Promise.all
 export async function analyzeFilterImpact(
   params: FilterParams,
 ): Promise<FilterSuggestion[]> {
-  const suggestions: FilterSuggestion[] = [];
+  // Build list of filter checks to run in parallel
+  const checks: {
+    filter: string;
+    label: string;
+    suggestionTemplate: (count: number) => string;
+    countParams: FilterParams;
+  }[] = [];
 
-  // Test removing price filters
   if (params.maxPrice !== undefined) {
-    const withoutMaxPrice = await safeGetCount({
-      ...params,
-      maxPrice: undefined,
+    checks.push({
+      filter: "maxPrice",
+      label: `max price ($${params.maxPrice})`,
+      suggestionTemplate: (n) => `Increase your budget to see ${n} more listing${n > 1 ? "s" : ""}`,
+      countParams: { ...params, maxPrice: undefined },
     });
-    if (withoutMaxPrice !== null && withoutMaxPrice > 0) {
-      suggestions.push({
-        filter: "maxPrice",
-        label: `max price ($${params.maxPrice})`,
-        resultsWithout: withoutMaxPrice,
-        suggestion: `Increase your budget to see ${withoutMaxPrice} more listing${withoutMaxPrice > 1 ? "s" : ""}`,
-      });
-    }
   }
 
   if (params.minPrice !== undefined && params.minPrice > 0) {
-    const withoutMinPrice = await safeGetCount({
-      ...params,
-      minPrice: undefined,
+    checks.push({
+      filter: "minPrice",
+      label: `min price ($${params.minPrice})`,
+      suggestionTemplate: (n) => `Lower your minimum budget to see ${n} more listing${n > 1 ? "s" : ""}`,
+      countParams: { ...params, minPrice: undefined },
     });
-    if (withoutMinPrice !== null && withoutMinPrice > 0) {
-      suggestions.push({
-        filter: "minPrice",
-        label: `min price ($${params.minPrice})`,
-        resultsWithout: withoutMinPrice,
-        suggestion: `Lower your minimum budget to see ${withoutMinPrice} more listing${withoutMinPrice > 1 ? "s" : ""}`,
-      });
-    }
   }
 
-  // Test removing amenities
   if (params.amenities && params.amenities.length > 0) {
-    const withoutAmenities = await safeGetCount({ ...params, amenities: [] });
-    if (withoutAmenities !== null && withoutAmenities > 0) {
-      suggestions.push({
-        filter: "amenities",
-        label: `amenities (${params.amenities.join(", ")})`,
-        resultsWithout: withoutAmenities,
-        suggestion: `Remove amenity filters to see ${withoutAmenities} listing${withoutAmenities > 1 ? "s" : ""}`,
-      });
-    }
+    checks.push({
+      filter: "amenities",
+      label: `amenities (${params.amenities.join(", ")})`,
+      suggestionTemplate: (n) => `Remove amenity filters to see ${n} listing${n > 1 ? "s" : ""}`,
+      countParams: { ...params, amenities: [] },
+    });
   }
 
-  // Test removing house rules
   if (params.houseRules && params.houseRules.length > 0) {
-    const withoutHouseRules = await safeGetCount({ ...params, houseRules: [] });
-    if (withoutHouseRules !== null && withoutHouseRules > 0) {
-      suggestions.push({
-        filter: "houseRules",
-        label: `house rules (${params.houseRules.join(", ")})`,
-        resultsWithout: withoutHouseRules,
-        suggestion: `Remove house rules filters to see ${withoutHouseRules} listing${withoutHouseRules > 1 ? "s" : ""}`,
-      });
-    }
+    checks.push({
+      filter: "houseRules",
+      label: `house rules (${params.houseRules.join(", ")})`,
+      suggestionTemplate: (n) => `Remove house rules filters to see ${n} listing${n > 1 ? "s" : ""}`,
+      countParams: { ...params, houseRules: [] },
+    });
   }
 
-  // Test removing room type
   if (params.roomType) {
-    const withoutRoomType = await safeGetCount({
-      ...params,
-      roomType: undefined,
+    checks.push({
+      filter: "roomType",
+      label: `room type (${params.roomType})`,
+      suggestionTemplate: (n) => `Include all room types to see ${n} listing${n > 1 ? "s" : ""}`,
+      countParams: { ...params, roomType: undefined },
     });
-    if (withoutRoomType !== null && withoutRoomType > 0) {
-      suggestions.push({
-        filter: "roomType",
-        label: `room type (${params.roomType})`,
-        resultsWithout: withoutRoomType,
-        suggestion: `Include all room types to see ${withoutRoomType} listing${withoutRoomType > 1 ? "s" : ""}`,
-      });
-    }
   }
 
-  // Test removing lease duration
   if (params.leaseDuration) {
-    const withoutLeaseDuration = await safeGetCount({
-      ...params,
-      leaseDuration: undefined,
+    checks.push({
+      filter: "leaseDuration",
+      label: `lease duration (${params.leaseDuration})`,
+      suggestionTemplate: (n) => `Include all lease durations to see ${n} listing${n > 1 ? "s" : ""}`,
+      countParams: { ...params, leaseDuration: undefined },
     });
-    if (withoutLeaseDuration !== null && withoutLeaseDuration > 0) {
-      suggestions.push({
-        filter: "leaseDuration",
-        label: `lease duration (${params.leaseDuration})`,
-        resultsWithout: withoutLeaseDuration,
-        suggestion: `Include all lease durations to see ${withoutLeaseDuration} listing${withoutLeaseDuration > 1 ? "s" : ""}`,
-      });
-    }
   }
 
-  // Test removing location bounds (search area)
   if (params.bounds) {
-    const withoutBounds = await safeGetCount({ ...params, bounds: undefined });
-    if (withoutBounds !== null && withoutBounds > 0) {
+    checks.push({
+      filter: "location",
+      label: "search area",
+      suggestionTemplate: (n) => `Expand your search area to see ${n} listing${n > 1 ? "s" : ""}`,
+      countParams: { ...params, bounds: undefined },
+    });
+  }
+
+  if (checks.length === 0) return [];
+
+  // Run all count queries in parallel
+  const counts = await Promise.all(
+    checks.map((check) => safeGetCount(check.countParams)),
+  );
+
+  // Build suggestions from results
+  const suggestions: FilterSuggestion[] = [];
+  for (let i = 0; i < checks.length; i++) {
+    const count = counts[i];
+    if (count !== null && count > 0) {
       suggestions.push({
-        filter: "location",
-        label: "search area",
-        resultsWithout: withoutBounds,
-        suggestion: `Expand your search area to see ${withoutBounds} listing${withoutBounds > 1 ? "s" : ""}`,
+        filter: checks[i].filter,
+        label: checks[i].label,
+        resultsWithout: count,
+        suggestion: checks[i].suggestionTemplate(count),
       });
     }
   }

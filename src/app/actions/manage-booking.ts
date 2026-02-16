@@ -322,7 +322,9 @@ export async function getMyBookings() {
             include: {
                 listing: {
                     include: {
-                        location: true,
+                        location: {
+                            select: { address: true, city: true, state: true, zip: true }
+                        },
                         owner: {
                             select: { id: true, name: true, image: true }
                         }
@@ -340,7 +342,9 @@ export async function getMyBookings() {
             include: {
                 listing: {
                     include: {
-                        location: true
+                        location: {
+                            select: { address: true, city: true, state: true, zip: true }
+                        }
                     }
                 },
                 tenant: {

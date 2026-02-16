@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 type DirtyReason =
   | "listing_created"
@@ -42,7 +43,7 @@ export async function markListingDirty(
   } catch (error) {
     // Log but don't fail - dirty marking is best-effort
     // The next full backfill will catch any missed updates
-    console.error("[SearchDoc] Failed to mark listing dirty:", {
+    logger.sync.error("[SearchDoc] Failed to mark listing dirty", {
       listingId: listingId.slice(0, 8) + "...",
       reason,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -69,7 +70,7 @@ export async function markListingsDirty(
         marked_at = NOW()
     `;
   } catch (error) {
-    console.error("[SearchDoc] Failed to mark listings dirty:", {
+    logger.sync.error("[SearchDoc] Failed to mark listings dirty", {
       count: listingIds.length,
       reason,
       error: error instanceof Error ? error.message : "Unknown error",

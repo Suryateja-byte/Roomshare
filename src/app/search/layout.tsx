@@ -1,5 +1,6 @@
 import SearchLayoutView from "@/components/SearchLayoutView";
 import SearchHeaderWrapper from "@/components/SearchHeaderWrapper";
+import { SkipLink } from "@/components/ui/SkipLink";
 import { MapBoundsProvider } from "@/contexts/MapBoundsContext";
 import { SearchTransitionProvider } from "@/contexts/SearchTransitionContext";
 import { FilterStateProvider } from "@/contexts/FilterStateContext";
@@ -40,6 +41,7 @@ export default function SearchLayout({
       <FilterStateProvider>
         <MobileSearchProvider>
           <div className="h-screen-safe flex flex-col bg-white dark:bg-zinc-950 overflow-hidden">
+            <SkipLink href="#search-results">Skip to search results</SkipLink>
             {/* Search Header - Persistent across navigations, fixed position */}
             <header className="fixed top-0 left-0 right-0 w-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800 z-[1100]">
               <nav aria-label="Search navigation">

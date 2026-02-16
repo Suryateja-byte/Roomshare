@@ -15,22 +15,8 @@ import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension';
 import { withIdempotency } from '@/lib/idempotency';
 import { upsertSearchDocSync } from '@/lib/search/search-doc-sync';
 import { triggerInstantAlerts } from '@/lib/search-alerts';
-
-const normalizeStringList = (value: unknown): string[] => {
-    if (Array.isArray(value)) {
-        return value
-            .filter((item): item is string => typeof item === 'string')
-            .map(item => item.trim())
-            .filter(Boolean);
-    }
-    if (typeof value === 'string') {
-        return value
-            .split(',')
-            .map(item => item.trim())
-            .filter(Boolean);
-    }
-    return [];
-};
+import { captureApiError } from '@/lib/api-error-handler';
+import { normalizeStringList } from '@/lib/utils';
 
 export async function GET(request: Request) {
     // P2-3: Add rate limiting to prevent scraping
@@ -94,13 +80,7 @@ export async function GET(request: Request) {
             }
         }
 
-        logger.sync.error('Error fetching listings', {
-            route: '/api/listings',
-            method: 'GET',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            durationMs: Date.now() - startTime,
-        });
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/listings', method: 'GET' });
     }
 }
 
@@ -374,17 +354,6 @@ export async function POST(request: Request) {
         return response;
 
     } catch (error) {
-        logger.sync.error('Error creating listing', {
-            route: '/api/listings',
-            method: 'POST',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            durationMs: Date.now() - startTime,
-        });
-        return NextResponse.json({
-            error: 'Internal Server Error',
-            details: process.env.NODE_ENV === 'development'
-                ? (error instanceof Error ? error.message : 'Unknown error')
-                : undefined
-        }, { status: 500 });
+        return captureApiError(error, { route: '/api/listings', method: 'POST' });
     }
 }

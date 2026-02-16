@@ -1,5 +1,3 @@
-'use server';
-
 import { getListingsPaginated, ListingData } from '@/lib/data';
 import FeaturedListingsClient from './FeaturedListingsClient';
 

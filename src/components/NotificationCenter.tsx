@@ -84,8 +84,11 @@ export default function NotificationCenter() {
 
     useEffect(() => {
         fetchNotifications();
-        // Poll for new notifications every 30 seconds
-        const interval = setInterval(fetchNotifications, 30000);
+        // Poll for new notifications every 30 seconds, skip when tab not visible
+        const interval = setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+            fetchNotifications();
+        }, 30000);
         return () => clearInterval(interval);
     }, []);
 

@@ -7,6 +7,8 @@ import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
+import { headers } from 'next/headers';
+import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from '@/lib/rate-limit';
 
 const sendMessageSchema = z.object({
     conversationId: z.string().trim().min(1).max(100),
@@ -16,6 +18,12 @@ const sendMessageSchema = z.object({
 export async function startConversation(listingId: string) {
     const session = await auth();
     if (!session?.user?.id) return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
+
+    // Rate limiting
+    const headersList = await headers();
+    const ip = getClientIPFromHeaders(headersList);
+    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'startConversation', RATE_LIMITS.chatStartConversation);
+    if (!rl.success) return { error: 'Too many attempts. Please wait.' };
 
     const suspension = await checkSuspension();
     if (suspension.suspended) {
@@ -81,6 +89,12 @@ export async function sendMessage(conversationId: string, content: string) {
     if (!session?.user?.id) {
         return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
+
+    // Rate limiting
+    const headersList = await headers();
+    const ip = getClientIPFromHeaders(headersList);
+    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'sendMessage', RATE_LIMITS.chatSendMessage);
+    if (!rl.success) return { error: 'Too many messages. Please wait.' };
 
     const suspension = await checkSuspension();
     if (suspension.suspended) {
@@ -155,20 +169,21 @@ export async function sendMessage(conversationId: string, content: string) {
         return msg;
     });
 
-    // Get sender info
-    const sender = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { name: true }
-    });
+    // Use session.user.name (already available) instead of an extra DB query
+    const senderName = session.user.name || 'Someone';
 
-    for (const participant of conversation.participants) {
-        if (participant.id !== session.user.id) {
+    // Send notifications to other participants in parallel
+    const otherParticipants = conversation.participants.filter(
+        (p) => p.id !== session.user.id,
+    );
+    await Promise.all(
+        otherParticipants.map(async (participant) => {
             // Create in-app notification
             await createInternalNotification({
                 userId: participant.id,
                 type: 'NEW_MESSAGE',
                 title: 'New Message',
-                message: `${sender?.name || 'Someone'}: ${safeContent.substring(0, 50)}${safeContent.length > 50 ? '...' : ''}`,
+                message: `${senderName}: ${safeContent.substring(0, 50)}${safeContent.length > 50 ? '...' : ''}`,
                 link: `/messages/${safeConversationId}`
             });
 
@@ -176,13 +191,13 @@ export async function sendMessage(conversationId: string, content: string) {
             if (participant.email) {
                 await sendNotificationEmailWithPreference('newMessage', participant.id, participant.email, {
                     recipientName: participant.name || 'User',
-                    senderName: sender?.name || 'Someone',
+                    senderName,
                     messagePreview: safeContent,
                     conversationId: safeConversationId
                 });
             }
-        }
-    }
+        }),
+    );
 
     return message;
 }
@@ -591,8 +606,23 @@ export async function pollMessages(conversationId: string, lastMessageId?: strin
             return { messages: [], typingUsers: [], hasNewMessages: false };
         }
 
-        // Get typing status
-        const { typingUsers } = await getTypingStatus(conversationId);
+        // Inline typing status query — avoids redundant membership re-verification in getTypingStatus
+        const fiveSecondsAgo = new Date(Date.now() - 5000);
+        const typingStatuses = await prisma.typingStatus.findMany({
+            where: {
+                conversationId,
+                userId: { not: session.user.id },
+                isTyping: true,
+                updatedAt: { gte: fiveSecondsAgo }
+            },
+            include: {
+                user: { select: { id: true, name: true } }
+            }
+        });
+        const typingUsers = typingStatuses.map(ts => ({
+            id: ts.user.id,
+            name: ts.user.name
+        }));
 
         // P1-14 FIX: Validate lastMessageId before using in query
         let lastMessageTime: Date | null = null;

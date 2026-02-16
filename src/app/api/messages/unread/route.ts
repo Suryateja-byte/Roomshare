@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getUnreadMessageCount } from '@/app/actions/chat';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { captureApiError } from '@/lib/api-error-handler';
 import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {
@@ -28,9 +29,6 @@ export async function GET(request: Request) {
 
         return NextResponse.json({ count });
     } catch (error) {
-        logger.sync.error('Error fetching unread count', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/messages/unread', method: 'GET' });
     }
 }

@@ -18,6 +18,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { withTimeout, DEFAULT_TIMEOUTS, isTimeoutError } from "./timeout-wrapper";
 import { circuitBreakers, isCircuitOpenError } from "./circuit-breaker";
+import { logger } from "./logger";
 
 // ============ IN-MEMORY RATE LIMIT FALLBACK ============
 // P1-09 FIX: Provides rate limiting when Redis is unavailable
@@ -285,7 +286,7 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
     !process.env.UPSTASH_REDIS_REST_URL ||
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
-    console.warn("[RateLimit] Redis not configured, using in-memory fallback");
+    logger.sync.warn("[RateLimit] Redis not configured, using in-memory fallback");
     return checkInMemoryRateLimits("chat", ip);
   }
 
@@ -321,14 +322,14 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
   } catch (error) {
     // P1-08 FIX: Handle timeout and circuit breaker errors
     if (isTimeoutError(error)) {
-      console.error("[RateLimit] Redis timeout:", error);
+      logger.sync.error("[RateLimit] Redis timeout", { error: error instanceof Error ? error.message : "Unknown" });
     } else if (isCircuitOpenError(error)) {
-      console.error("[RateLimit] Circuit breaker open:", error);
+      logger.sync.error("[RateLimit] Circuit breaker open", { error: error instanceof Error ? error.message : "Unknown" });
     } else {
-      console.error("[RateLimit] Redis error:", error);
+      logger.sync.error("[RateLimit] Redis error", { error: error instanceof Error ? error.message : "Unknown" });
     }
     // P1-09 FIX: Use in-memory fallback instead of failing open
-    console.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
+    logger.sync.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
       error: error instanceof Error ? error.message : "Unknown",
       ip: ip.substring(0, 8) + "...", // Partial IP for debugging (no full PII)
     });
@@ -351,7 +352,7 @@ export async function checkMetricsRateLimit(
     !process.env.UPSTASH_REDIS_REST_URL ||
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
-    console.warn("[RateLimit] Redis not configured, using in-memory fallback");
+    logger.sync.warn("[RateLimit] Redis not configured, using in-memory fallback");
     return checkInMemoryRateLimits("metrics", ip);
   }
 
@@ -387,14 +388,14 @@ export async function checkMetricsRateLimit(
   } catch (error) {
     // P1-08 FIX: Handle timeout and circuit breaker errors
     if (isTimeoutError(error)) {
-      console.error("[RateLimit] Redis timeout:", error);
+      logger.sync.error("[RateLimit] Redis timeout", { error: error instanceof Error ? error.message : "Unknown" });
     } else if (isCircuitOpenError(error)) {
-      console.error("[RateLimit] Circuit breaker open:", error);
+      logger.sync.error("[RateLimit] Circuit breaker open", { error: error instanceof Error ? error.message : "Unknown" });
     } else {
-      console.error("[RateLimit] Redis error:", error);
+      logger.sync.error("[RateLimit] Redis error", { error: error instanceof Error ? error.message : "Unknown" });
     }
     // P1-09 FIX: Use in-memory fallback instead of failing open
-    console.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
+    logger.sync.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
       error: error instanceof Error ? error.message : "Unknown",
       ip: ip.substring(0, 8) + "...", // Partial IP for debugging (no full PII)
     });
@@ -415,7 +416,7 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
     !process.env.UPSTASH_REDIS_REST_URL ||
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
-    console.warn("[RateLimit] Redis not configured, using in-memory fallback");
+    logger.sync.warn("[RateLimit] Redis not configured, using in-memory fallback");
     return checkInMemoryRateLimits("map", ip);
   }
 
@@ -451,14 +452,14 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
   } catch (error) {
     // P1-08 FIX: Handle timeout and circuit breaker errors
     if (isTimeoutError(error)) {
-      console.error("[RateLimit] Redis timeout:", error);
+      logger.sync.error("[RateLimit] Redis timeout", { error: error instanceof Error ? error.message : "Unknown" });
     } else if (isCircuitOpenError(error)) {
-      console.error("[RateLimit] Circuit breaker open:", error);
+      logger.sync.error("[RateLimit] Circuit breaker open", { error: error instanceof Error ? error.message : "Unknown" });
     } else {
-      console.error("[RateLimit] Redis error:", error);
+      logger.sync.error("[RateLimit] Redis error", { error: error instanceof Error ? error.message : "Unknown" });
     }
     // P1-09 FIX: Use in-memory fallback instead of failing open
-    console.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
+    logger.sync.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
       error: error instanceof Error ? error.message : "Unknown",
       ip: ip.substring(0, 8) + "...", // Partial IP for debugging (no full PII)
     });
@@ -481,7 +482,7 @@ export async function checkSearchCountRateLimit(
     !process.env.UPSTASH_REDIS_REST_URL ||
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
-    console.warn("[RateLimit] Redis not configured, using in-memory fallback");
+    logger.sync.warn("[RateLimit] Redis not configured, using in-memory fallback");
     return checkInMemoryRateLimits("searchCount", ip);
   }
 
@@ -517,14 +518,14 @@ export async function checkSearchCountRateLimit(
   } catch (error) {
     // P1-08 FIX: Handle timeout and circuit breaker errors
     if (isTimeoutError(error)) {
-      console.error("[RateLimit] Redis timeout:", error);
+      logger.sync.error("[RateLimit] Redis timeout", { error: error instanceof Error ? error.message : "Unknown" });
     } else if (isCircuitOpenError(error)) {
-      console.error("[RateLimit] Circuit breaker open:", error);
+      logger.sync.error("[RateLimit] Circuit breaker open", { error: error instanceof Error ? error.message : "Unknown" });
     } else {
-      console.error("[RateLimit] Redis error:", error);
+      logger.sync.error("[RateLimit] Redis error", { error: error instanceof Error ? error.message : "Unknown" });
     }
     // P1-09 FIX: Use in-memory fallback instead of failing open
-    console.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
+    logger.sync.warn("[RateLimit] Redis unavailable, using in-memory fallback", {
       error: error instanceof Error ? error.message : "Unknown",
       ip: ip.substring(0, 8) + "...", // Partial IP for debugging (no full PII)
     });

@@ -11,20 +11,29 @@ jest.mock("@/lib/prisma", () => ({
   },
 }));
 
+jest.mock("@/lib/logger", () => ({
+  logger: {
+    info: jest.fn().mockResolvedValue(undefined),
+    warn: jest.fn().mockResolvedValue(undefined),
+    error: jest.fn().mockResolvedValue(undefined),
+    sync: {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    },
+  },
+}));
+
 import {
   markListingDirty,
   markListingsDirty,
 } from "@/lib/search/search-doc-dirty";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 describe("search-doc-dirty", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(console, "error").mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
   });
 
   describe("markListingDirty", () => {
@@ -47,9 +56,9 @@ describe("search-doc-dirty", () => {
         markListingDirty("listing-123", "listing_updated"),
       ).resolves.toBeUndefined();
 
-      // Should log the error
-      expect(console.error).toHaveBeenCalledWith(
-        "[SearchDoc] Failed to mark listing dirty:",
+      // Should log the error via structured logger
+      expect(logger.sync.error).toHaveBeenCalledWith(
+        "[SearchDoc] Failed to mark listing dirty",
         expect.objectContaining({
           listingId: "listing-...",
           reason: "listing_updated",
@@ -103,8 +112,8 @@ describe("search-doc-dirty", () => {
         markListingsDirty(["listing-1", "listing-2"], "review_changed"),
       ).resolves.toBeUndefined();
 
-      expect(console.error).toHaveBeenCalledWith(
-        "[SearchDoc] Failed to mark listings dirty:",
+      expect(logger.sync.error).toHaveBeenCalledWith(
+        "[SearchDoc] Failed to mark listings dirty",
         expect.objectContaining({
           count: 2,
           reason: "review_changed",

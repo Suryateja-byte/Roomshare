@@ -33,17 +33,20 @@ if (SENTRY_DSN) {
 
     // Filter out known non-actionable errors
     beforeSend(event, hint) {
-      const error = hint.originalException;
+      const error = hint?.originalException;
 
-      // Ignore cancelled requests and network errors from extensions
+      // Skip cancelled/aborted requests (DOMException or plain Error)
+      if (error instanceof DOMException && error.name === 'AbortError') return null;
+
       if (error instanceof Error) {
-        if (
-          error.message.includes('AbortError') ||
-          error.message.includes('Failed to fetch') ||
-          error.message.includes('Load failed')
-        ) {
-          return null;
-        }
+        // Skip abort/cancel by name (covers fetch AbortController and other cancellations)
+        if (error.name === 'AbortError' || error.name === 'CancelledError') return null;
+        // Skip dynamic import failures (usually transient network issues)
+        if (error.message?.includes('ChunkLoadError')) return null;
+        // Skip network errors commonly caused by browser extensions or connectivity
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('Load failed')) return null;
+        // Skip ResizeObserver loop errors (benign browser noise)
+        if (error.message?.includes('ResizeObserver loop')) return null;
       }
 
       return event;

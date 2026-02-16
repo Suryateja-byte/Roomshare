@@ -6,6 +6,7 @@ import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from '@/app/actions/suspension';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { logger } from '@/lib/logger';
+import { captureApiError } from '@/lib/api-error-handler';
 import { z } from 'zod';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
 import {
@@ -46,7 +47,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
-        const body = await request.json();
+        if (!session.user.emailVerified) {
+            return NextResponse.json({ error: 'Email verification required' }, { status: 403 });
+        }
+
+        let body;
+        try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
         // P2-2: Zod validation
         const parsed = createReviewSchema.safeParse(body);
@@ -131,7 +137,7 @@ export async function POST(request: Request) {
         // Fire-and-forget: mark listing dirty for search doc refresh
         if (listingId) {
             markListingDirty(listingId, 'review_changed').catch((err) => {
-                console.warn("[API] Failed to mark listing dirty", {
+                logger.sync.warn("[API] Failed to mark listing dirty", {
                     listingId: listingId,
                     error: err instanceof Error ? err.message : String(err)
                 });
@@ -186,11 +192,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json(review, { status: 201 });
     } catch (error) {
-        logger.sync.error('Error creating review', {
-            action: 'createReview',
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/reviews', method: 'POST' });
     }
 }
 
@@ -257,11 +259,7 @@ export async function GET(request: Request) {
             }
         );
     } catch (error) {
-        logger.sync.error('Error fetching reviews', {
-            action: 'getReviews',
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/reviews', method: 'GET' });
     }
 }
 
@@ -281,7 +279,8 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
-        const body = await request.json();
+        let body;
+        try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
         // P2-2: Zod validation
         const parsed = updateReviewSchema.safeParse(body);
@@ -327,7 +326,7 @@ export async function PUT(request: Request) {
         // Fire-and-forget: mark listing dirty for search doc refresh
         if (existingReview.listingId) {
             markListingDirty(existingReview.listingId, 'review_changed').catch((err) => {
-                console.warn("[API] Failed to mark listing dirty", {
+                logger.sync.warn("[API] Failed to mark listing dirty", {
                     listingId: existingReview.listingId,
                     error: err instanceof Error ? err.message : String(err)
                 });
@@ -336,11 +335,7 @@ export async function PUT(request: Request) {
 
         return NextResponse.json(updatedReview);
     } catch (error) {
-        logger.sync.error('Error updating review', {
-            action: 'updateReview',
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/reviews', method: 'PUT' });
     }
 }
 
@@ -388,7 +383,7 @@ export async function DELETE(request: Request) {
         // Fire-and-forget: mark listing dirty for search doc refresh
         if (existingReview.listingId) {
             markListingDirty(existingReview.listingId, 'review_changed').catch((err) => {
-                console.warn("[API] Failed to mark listing dirty", {
+                logger.sync.warn("[API] Failed to mark listing dirty", {
                     listingId: existingReview.listingId,
                     error: err instanceof Error ? err.message : String(err)
                 });
@@ -397,10 +392,6 @@ export async function DELETE(request: Request) {
 
         return NextResponse.json({ success: true, message: 'Review deleted successfully' });
     } catch (error) {
-        logger.sync.error('Error deleting review', {
-            action: 'deleteReview',
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/reviews', method: 'DELETE' });
     }
 }

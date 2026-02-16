@@ -26,6 +26,7 @@ export async function GET(request: Request) {
     const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || 'dev';
 
     // Prometheus text format (https://prometheus.io/docs/instrumenting/exposition_formats/)
+    // Reduced info exposure: omit Node.js version, array buffer details, and external memory
     const prometheusFormat = [
         `# HELP process_uptime_seconds Process uptime in seconds`,
         `# TYPE process_uptime_seconds gauge`,
@@ -39,21 +40,13 @@ export async function GET(request: Request) {
         `# TYPE nodejs_heap_size_total_bytes gauge`,
         `nodejs_heap_size_total_bytes ${memory.heapTotal}`,
         ``,
-        `# HELP nodejs_external_memory_bytes External memory in bytes`,
-        `# TYPE nodejs_external_memory_bytes gauge`,
-        `nodejs_external_memory_bytes ${memory.external}`,
-        ``,
         `# HELP nodejs_rss_bytes Resident set size in bytes`,
         `# TYPE nodejs_rss_bytes gauge`,
         `nodejs_rss_bytes ${memory.rss}`,
         ``,
-        `# HELP nodejs_array_buffers_bytes Memory used by ArrayBuffers in bytes`,
-        `# TYPE nodejs_array_buffers_bytes gauge`,
-        `nodejs_array_buffers_bytes ${memory.arrayBuffers}`,
-        ``,
-        `# HELP app_info Application information`,
+        `# HELP app_info Application version`,
         `# TYPE app_info gauge`,
-        `app_info{version="${version}",node_version="${process.version}"} 1`,
+        `app_info{version="${version}"} 1`,
     ].join('\n');
 
     return new Response(prometheusFormat, {

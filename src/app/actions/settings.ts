@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { revalidatePath } from 'next/cache';
 import { logger } from '@/lib/logger';
+import { z } from 'zod';
+import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from '@/lib/rate-limit';
+import { headers } from 'next/headers';
 
 export interface NotificationPreferences {
     emailBookingRequests: boolean;
@@ -45,6 +48,15 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
     };
 }
 
+const notificationPreferencesSchema = z.object({
+    emailBookingRequests: z.boolean(),
+    emailBookingUpdates: z.boolean(),
+    emailMessages: z.boolean(),
+    emailReviews: z.boolean(),
+    emailSearchAlerts: z.boolean(),
+    emailMarketing: z.boolean(),
+}).strict();
+
 export async function updateNotificationPreferences(
     preferences: NotificationPreferences
 ): Promise<{ success: boolean; error?: string }> {
@@ -53,10 +65,16 @@ export async function updateNotificationPreferences(
         return { success: false, error: 'Not authenticated' };
     }
 
+    // Zod validation — replaces `as any` cast
+    const parsed = notificationPreferencesSchema.safeParse(preferences);
+    if (!parsed.success) {
+        return { success: false, error: 'Invalid notification preferences' };
+    }
+
     try {
         await prisma.user.update({
             where: { id: session.user.id },
-            data: { notificationPreferences: preferences as any }
+            data: { notificationPreferences: parsed.data as Record<string, boolean> }
         });
 
         revalidatePath('/settings');
@@ -78,6 +96,12 @@ export async function changePassword(
     if (!session?.user?.id) {
         return { success: false, error: 'Not authenticated' };
     }
+
+    // Rate limiting
+    const headersList = await headers();
+    const ip = getClientIPFromHeaders(headersList);
+    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'changePassword', RATE_LIMITS.changePassword);
+    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' };
 
     if (newPassword.length < 12) {
         return { success: false, error: 'New password must be at least 12 characters' };
@@ -125,6 +149,12 @@ export async function verifyPassword(
     if (!session?.user?.id) {
         return { success: false, error: 'Not authenticated' };
     }
+
+    // Rate limiting
+    const headersList = await headers();
+    const ip = getClientIPFromHeaders(headersList);
+    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'verifyPassword', RATE_LIMITS.verifyPassword);
+    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' };
 
     try {
         const user = await prisma.user.findUnique({
@@ -177,6 +207,12 @@ export async function deleteAccount(
     if (!session?.user?.id) {
         return { success: false, error: 'Not authenticated' };
     }
+
+    // Rate limiting
+    const headersList = await headers();
+    const ip = getClientIPFromHeaders(headersList);
+    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'deleteAccount', RATE_LIMITS.deleteAccount);
+    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' };
 
     try {
         // Verify password for accounts that have one
@@ -231,7 +267,9 @@ export async function getUserSettings() {
     if (!user) return null;
 
     return {
-        ...user,
+        id: user.id,
+        name: user.name,
+        email: user.email,
         hasPassword: !!user.password,
         notificationPreferences: user.notificationPreferences
             ? { ...DEFAULT_PREFERENCES, ...(user.notificationPreferences as Partial<NotificationPreferences>) }

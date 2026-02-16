@@ -74,7 +74,7 @@ export async function checkRateLimit(
   const expiresAt = new Date(now.getTime() + windowMs);
 
   try {
-    // Clean up expired entries for this identifier/endpoint (opportunistic cleanup)
+    // Opportunistic cleanup of expired entries
     await prisma.rateLimitEntry.deleteMany({
       where: {
         identifier,
@@ -83,44 +83,8 @@ export async function checkRateLimit(
       },
     });
 
-    // Try to find existing entry within the current window
-    const existing = await prisma.rateLimitEntry.findUnique({
-      where: {
-        identifier_endpoint: { identifier, endpoint },
-      },
-    });
-
-    if (existing && existing.windowStart > windowStart) {
-      // Entry exists and is within the current window
-      if (existing.count >= limit) {
-        const resetAt = new Date(existing.windowStart.getTime() + windowMs);
-        const retryAfter = Math.ceil(
-          (resetAt.getTime() - now.getTime()) / 1000,
-        );
-        return {
-          success: false,
-          remaining: 0,
-          resetAt,
-          retryAfter: Math.max(1, retryAfter),
-        };
-      }
-
-      // Increment the count
-      const updated = await prisma.rateLimitEntry.update({
-        where: { id: existing.id },
-        data: { count: existing.count + 1 },
-      });
-
-      const resetAt = new Date(existing.windowStart.getTime() + windowMs);
-      return {
-        success: true,
-        remaining: Math.max(0, limit - updated.count),
-        resetAt,
-      };
-    }
-
-    // Create new entry or reset the window
-    await prisma.rateLimitEntry.upsert({
+    // Atomic upsert: create or increment in a single operation to avoid TOCTOU
+    const result = await prisma.rateLimitEntry.upsert({
       where: {
         identifier_endpoint: { identifier, endpoint },
       },
@@ -132,16 +96,49 @@ export async function checkRateLimit(
         expiresAt,
       },
       update: {
-        count: 1,
-        windowStart: now,
-        expiresAt,
+        count: { increment: 1 },
       },
     });
 
+    // Check if the window has expired — if so, reset atomically
+    if (result.windowStart <= windowStart) {
+      // Window expired: reset count to 1 and start a new window
+      const reset = await prisma.rateLimitEntry.update({
+        where: {
+          identifier_endpoint: { identifier, endpoint },
+        },
+        data: {
+          count: 1,
+          windowStart: now,
+          expiresAt,
+        },
+      });
+      return {
+        success: true,
+        remaining: limit - reset.count,
+        resetAt: expiresAt,
+      };
+    }
+
+    // Window is still active — check if over limit
+    const resetAt = new Date(result.windowStart.getTime() + windowMs);
+
+    if (result.count > limit) {
+      const retryAfter = Math.ceil(
+        (resetAt.getTime() - now.getTime()) / 1000,
+      );
+      return {
+        success: false,
+        remaining: 0,
+        resetAt,
+        retryAfter: Math.max(1, retryAfter),
+      };
+    }
+
     return {
       success: true,
-      remaining: limit - 1,
-      resetAt: expiresAt,
+      remaining: Math.max(0, limit - result.count),
+      resetAt,
     };
   } catch {
     // FAIL CLOSED: Deny by default on DB errors (security over availability)
@@ -204,6 +201,17 @@ export const RATE_LIMITS = {
   getReviews: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   // Listing status check (freshness polling)
   listingStatus: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
+  // Sensitive account actions
+  changePassword: { limit: 5, windowMs: 60 * 60 * 1000 }, // 5 per hour
+  verifyPassword: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
+  deleteAccount: { limit: 3, windowMs: 24 * 60 * 60 * 1000 }, // 3 per day
+  // Server action rate limits
+  filterSuggestions: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
+  getListingsInBounds: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
+  chatSendMessage: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100 per hour
+  chatStartConversation: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
+  savedListings: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
+  notifications: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
 } as const;
 
 function getFirstForwardedIp(forwardedFor: string | null): string | null {

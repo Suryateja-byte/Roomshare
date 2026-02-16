@@ -18,7 +18,7 @@ async function main() {
     console.log('Owner ID:', listing.ownerId);
 
     if (listing.location) {
-        console.log('Location found:', listing.location.address);
+        console.log('Location found: [REDACTED]');
 
         // Check for coordinates using raw query
         const result: any[] = await prisma.$queryRaw`

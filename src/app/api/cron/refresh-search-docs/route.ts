@@ -14,6 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 
 // Number of dirty listings to process per cron run
@@ -155,81 +156,6 @@ async function fetchListingsWithData(
 }
 
 /**
- * Upsert a single search doc
- */
-async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
-  const recommendedScore = computeRecommendedScore(
-    listing.avgRating,
-    listing.viewCount,
-    listing.reviewCount,
-    listing.createdAt,
-  );
-
-  // Compute lowercase arrays for case-insensitive filtering
-  const amenitiesLower = listing.amenities.map((a) => a.toLowerCase());
-  const houseRulesLower = listing.houseRules.map((r) => r.toLowerCase());
-  const householdLanguagesLower = listing.householdLanguages.map((l) =>
-    l.toLowerCase(),
-  );
-
-  await prisma.$executeRaw`
-    INSERT INTO listing_search_docs (
-      id, owner_id, title, description, price, images,
-      amenities, house_rules, household_languages, primary_home_language,
-      lease_duration, room_type, move_in_date, total_slots, available_slots,
-      view_count, status, listing_created_at,
-      address, city, state, zip, location_geog, lat, lng,
-      avg_rating, review_count, recommended_score,
-      amenities_lower, house_rules_lower, household_languages_lower,
-      doc_created_at, doc_updated_at
-    ) VALUES (
-      ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
-      ${listing.amenities}, ${listing.houseRules}, ${listing.householdLanguages}, ${listing.primaryHomeLanguage},
-      ${listing.leaseDuration}, ${listing.roomType}, ${listing.moveInDate}, ${listing.totalSlots}, ${listing.availableSlots},
-      ${listing.viewCount}, ${listing.status}, ${listing.createdAt},
-      ${listing.address}, ${listing.city}, ${listing.state}, ${listing.zip},
-      ST_SetSRID(ST_MakePoint(${listing.lng}, ${listing.lat}), 4326)::geography,
-      ${listing.lat}, ${listing.lng},
-      ${listing.avgRating}, ${listing.reviewCount}, ${recommendedScore},
-      ${amenitiesLower}, ${houseRulesLower}, ${householdLanguagesLower},
-      NOW(), NOW()
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      owner_id = EXCLUDED.owner_id,
-      title = EXCLUDED.title,
-      description = EXCLUDED.description,
-      price = EXCLUDED.price,
-      images = EXCLUDED.images,
-      amenities = EXCLUDED.amenities,
-      house_rules = EXCLUDED.house_rules,
-      household_languages = EXCLUDED.household_languages,
-      primary_home_language = EXCLUDED.primary_home_language,
-      lease_duration = EXCLUDED.lease_duration,
-      room_type = EXCLUDED.room_type,
-      move_in_date = EXCLUDED.move_in_date,
-      total_slots = EXCLUDED.total_slots,
-      available_slots = EXCLUDED.available_slots,
-      view_count = EXCLUDED.view_count,
-      status = EXCLUDED.status,
-      listing_created_at = EXCLUDED.listing_created_at,
-      address = EXCLUDED.address,
-      city = EXCLUDED.city,
-      state = EXCLUDED.state,
-      zip = EXCLUDED.zip,
-      location_geog = EXCLUDED.location_geog,
-      lat = EXCLUDED.lat,
-      lng = EXCLUDED.lng,
-      avg_rating = EXCLUDED.avg_rating,
-      review_count = EXCLUDED.review_count,
-      recommended_score = EXCLUDED.recommended_score,
-      amenities_lower = EXCLUDED.amenities_lower,
-      house_rules_lower = EXCLUDED.house_rules_lower,
-      household_languages_lower = EXCLUDED.household_languages_lower,
-      doc_updated_at = NOW()
-  `;
-}
-
-/**
  * Delete dirty flags for processed listings
  */
 async function clearDirtyFlags(listingIds: string[]): Promise<number> {
@@ -322,19 +248,90 @@ export async function GET(request: NextRequest) {
     const listings = await fetchListingsWithData(dirtyIds);
     const foundIds = new Set(listings.map((l) => l.id));
 
-    // 3. Upsert search docs for each listing
+    // 3. Batch upsert search docs using a transaction (reduces N round-trips to 1)
     let upsertedCount = 0;
     const errors: string[] = [];
 
-    for (const listing of listings) {
+    if (listings.length > 0) {
       try {
-        await upsertSearchDoc(listing);
-        upsertedCount++;
+        const upsertOps = listings.map((listing) => {
+          const recommendedScore = computeRecommendedScore(
+            listing.avgRating,
+            listing.viewCount,
+            listing.reviewCount,
+            listing.createdAt,
+          );
+          const amenitiesLower = listing.amenities.map((a) => a.toLowerCase());
+          const houseRulesLower = listing.houseRules.map((r) => r.toLowerCase());
+          const householdLanguagesLower = listing.householdLanguages.map((l) =>
+            l.toLowerCase(),
+          );
+
+          return prisma.$executeRaw`
+            INSERT INTO listing_search_docs (
+              id, owner_id, title, description, price, images,
+              amenities, house_rules, household_languages, primary_home_language,
+              lease_duration, room_type, move_in_date, total_slots, available_slots,
+              view_count, status, listing_created_at,
+              address, city, state, zip, location_geog, lat, lng,
+              avg_rating, review_count, recommended_score,
+              amenities_lower, house_rules_lower, household_languages_lower,
+              doc_created_at, doc_updated_at
+            ) VALUES (
+              ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
+              ${listing.amenities}, ${listing.houseRules}, ${listing.householdLanguages}, ${listing.primaryHomeLanguage},
+              ${listing.leaseDuration}, ${listing.roomType}, ${listing.moveInDate}, ${listing.totalSlots}, ${listing.availableSlots},
+              ${listing.viewCount}, ${listing.status}, ${listing.createdAt},
+              ${listing.address}, ${listing.city}, ${listing.state}, ${listing.zip},
+              ST_SetSRID(ST_MakePoint(${listing.lng}, ${listing.lat}), 4326)::geography,
+              ${listing.lat}, ${listing.lng},
+              ${listing.avgRating}, ${listing.reviewCount}, ${recommendedScore},
+              ${amenitiesLower}, ${houseRulesLower}, ${householdLanguagesLower},
+              NOW(), NOW()
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              owner_id = EXCLUDED.owner_id,
+              title = EXCLUDED.title,
+              description = EXCLUDED.description,
+              price = EXCLUDED.price,
+              images = EXCLUDED.images,
+              amenities = EXCLUDED.amenities,
+              house_rules = EXCLUDED.house_rules,
+              household_languages = EXCLUDED.household_languages,
+              primary_home_language = EXCLUDED.primary_home_language,
+              lease_duration = EXCLUDED.lease_duration,
+              room_type = EXCLUDED.room_type,
+              move_in_date = EXCLUDED.move_in_date,
+              total_slots = EXCLUDED.total_slots,
+              available_slots = EXCLUDED.available_slots,
+              view_count = EXCLUDED.view_count,
+              status = EXCLUDED.status,
+              listing_created_at = EXCLUDED.listing_created_at,
+              address = EXCLUDED.address,
+              city = EXCLUDED.city,
+              state = EXCLUDED.state,
+              zip = EXCLUDED.zip,
+              location_geog = EXCLUDED.location_geog,
+              lat = EXCLUDED.lat,
+              lng = EXCLUDED.lng,
+              avg_rating = EXCLUDED.avg_rating,
+              review_count = EXCLUDED.review_count,
+              recommended_score = EXCLUDED.recommended_score,
+              amenities_lower = EXCLUDED.amenities_lower,
+              house_rules_lower = EXCLUDED.house_rules_lower,
+              household_languages_lower = EXCLUDED.household_languages_lower,
+              doc_updated_at = NOW()
+          `;
+        });
+
+        await prisma.$transaction(upsertOps);
+        upsertedCount = listings.length;
       } catch (error) {
-        // Log error without PII (only listing ID)
-        errors.push(
-          `Listing ${listing.id}: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
+        // If batch fails, log error for all listings in the batch
+        const batchError = error instanceof Error ? error.message : "Unknown error";
+        for (const listing of listings) {
+          errors.push(`Listing ${listing.id}: ${batchError}`);
+        }
       }
     }
 
@@ -373,6 +370,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("[SearchDoc Cron] Error:", error);
+    Sentry.captureException(error, { tags: { cron: 'refresh-search-docs' } });
     return NextResponse.json(
       { error: "SearchDoc refresh failed" },
       { status: 500 },

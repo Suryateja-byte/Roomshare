@@ -3,8 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension';
 import { checkBlockBeforeAction } from '@/app/actions/block';
-import { logger } from '@/lib/logger';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { captureApiError } from '@/lib/api-error-handler';
 import {
     parsePaginationParams,
     buildPaginationResponse,
@@ -115,11 +115,7 @@ export async function GET(request: Request) {
         }
 
     } catch (error: unknown) {
-        logger.sync.error('Failed to fetch messages', {
-            action: 'getMessages',
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/messages', method: 'GET' });
     }
 }
 
@@ -148,7 +144,8 @@ export async function POST(request: Request) {
 
         const userId = session.user.id;
 
-        const body = await request.json();
+        let body;
+        try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
         const { conversationId, content } = body;
 
         if (!conversationId || !content) {
@@ -193,7 +190,7 @@ export async function POST(request: Request) {
                     data: {
                         senderId: userId,
                         conversationId,
-                        content,
+                        content: trimmedContent,
                     },
                     include: {
                         sender: { select: { id: true, name: true, image: true } },
@@ -217,11 +214,7 @@ export async function POST(request: Request) {
         return response;
 
     } catch (error: unknown) {
-        logger.sync.error('Failed to send message', {
-            action: 'sendMessage',
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/messages', method: 'POST' });
     }
 }
 

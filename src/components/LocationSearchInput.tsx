@@ -106,7 +106,7 @@ export default function LocationSearchInput({
     }
 
     // Check cache first
-    const cached = getCachedResults(sanitized);
+    const cached = await getCachedResults(sanitized);
     if (cached) {
       setSuggestions(cached as LocationSuggestion[]);
       setSelectedIndex(-1);
@@ -138,8 +138,8 @@ export default function LocationSearchInput({
 
       const features = results as LocationSuggestion[];
 
-      // Cache the results
-      setCachedResults(sanitized, features as GeocodingResult[]);
+      // Cache the results (fire-and-forget; don't block rendering)
+      void setCachedResults(sanitized, features as GeocodingResult[]);
 
       setSuggestions(features);
       setSelectedIndex(-1);
