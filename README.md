@@ -121,7 +121,7 @@ src/
     search/         # Search UI: filters, results, bottom sheet, category tabs
     map/            # Map: markers, popups, boundary layers, privacy circles
     listings/       # Listing cards, carousels, image uploaders
-    chat/           # Chat window, nearby places cards
+    chat/           # Blocked conversation banner, nearby places cards
     filters/        # Filter chips and applied filter display
     auth/           # Turnstile widget, password modal
   hooks/            # 15 custom hooks (filters, debouncing, rate limits, media queries)
@@ -135,7 +135,7 @@ src/
     places/         # Neighborhood cache and types
     validation/     # Input validation utilities
   types/            # TypeScript type definitions
-  styles/           # Global CSS styles
+  styles/           # Component-specific CSS (nearby-map)
 prisma/             # Prisma schema (24 models) and 21 migrations
 tests/e2e/          # Playwright E2E test suites
 scripts/            # Seed scripts and utilities
@@ -146,7 +146,7 @@ public/             # Static assets, map styles, service worker
 
 ### Prerequisites
 
-- **Node.js** 18+
+- **Node.js** 20+
 - **pnpm** (package manager)
 - **PostgreSQL** with PostGIS extension
 - **Redis** (optional -- falls back to database rate limiting)
@@ -189,7 +189,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development setup guide and 
 | `pnpm test:unit` | Run unit tests only (lib, hooks, utils) |
 | `pnpm test:api` | Run API route tests |
 | `pnpm test:components` | Run component tests |
-| `pnpm test:filters:all` | Run full filter test suite (schema + integration + property + e2e + perf) |
+| `pnpm test:filters:all` | Run full filter test suite (schema + integration + property + e2e + regression + perf) |
 | `pnpm test:e2e` | Run Playwright E2E tests (seeds DB, cleans locks) |
 | `pnpm test:e2e:ui` | Run E2E tests with Playwright UI mode |
 | `pnpm test:e2e:headed` | Run E2E tests in headed browser |

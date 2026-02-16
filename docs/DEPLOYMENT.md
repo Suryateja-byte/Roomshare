@@ -103,7 +103,7 @@ These are enforced by `/api/chat` and `/api/metrics` to reject cross-origin requ
 | `SENTRY_DSN` | Recommended | Sentry Data Source Name | Sentry > Project Settings > Client Keys (DSN) |
 | `SENTRY_AUTH_TOKEN` | Recommended | For source map uploads | Sentry > Settings > Auth Tokens |
 
-**Note:** Client-side uses `NEXT_PUBLIC_SENTRY_DSN` (auto-mapped by `@sentry/nextjs`).
+**Important:** Client-side error tracking requires `NEXT_PUBLIC_SENTRY_DSN` to be set explicitly (it is NOT auto-mapped from `SENTRY_DSN`). Set both `SENTRY_DSN` (server-side) and `NEXT_PUBLIC_SENTRY_DSN` (client-side) in your environment.
 
 ### Supabase (Storage and Realtime)
 

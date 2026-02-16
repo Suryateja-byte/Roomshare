@@ -345,7 +345,7 @@ All scripts use `pnpm`. Run `pnpm <script>` from the project root.
 1. Create the component in `src/components/<domain>/`.
 2. Follow the client/server component split -- mark client components with `"use client"`.
 3. Use Radix UI primitives for interactive elements (dialogs, dropdowns, etc.).
-4. Add tests in `src/__tests__/components/<component>.test.ts`.
+4. Add tests in `src/__tests__/components/<component>.test.tsx`.
 
 ### New custom hook
 
@@ -363,7 +363,7 @@ All scripts use `pnpm`. Run `pnpm <script>` from the project root.
 
 ### New server action
 
-1. Create the action in `src/actions/<domain>.ts`.
+1. Create the action in `src/app/actions/<domain>.ts`.
 2. Add `"use server"` directive at the top.
 3. Validate all inputs server-side. Never trust client data.
 4. Add tests in `src/__tests__/actions/<domain>.test.ts`.

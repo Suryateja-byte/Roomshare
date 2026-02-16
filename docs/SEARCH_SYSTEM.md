@@ -227,7 +227,7 @@ All filters are validated through a canonical Zod schema with case-insensitive m
 | Filter | Type | Validation | DB Operation |
 |--------|------|------------|--------------|
 | `query` | text | Max 200 chars, sanitized | Full-text search (tsvector/plainto_tsquery) |
-| `minPrice` / `maxPrice` | number | 0 to 50,000, clamped | `d.price >= $N` / `d.price <= $N` |
+| `minPrice` / `maxPrice` | number | 0 to 1,000,000,000, clamped | `d.price >= $N` / `d.price <= $N` |
 | `amenities` | string[] | Allowlist, case-insensitive | `d.amenities_lower @> $N::text[]` (AND logic, GIN) |
 | `houseRules` | string[] | Allowlist, case-insensitive | `d.house_rules_lower @> $N::text[]` (AND logic, GIN) |
 | `languages` | string[] | Normalized via language map | `d.household_languages_lower && $N::text[]` (OR logic, GIN) |
@@ -255,7 +255,7 @@ mtm         -> Month-to-month
 - `minLat > maxLat` throws a validation error
 - Longitude is NOT swapped to support antimeridian crossing
 - Array filters capped at `MAX_ARRAY_ITEMS` to prevent abuse
-- Price clamped to `MAX_SAFE_PRICE` (50,000)
+- Price clamped to `MAX_SAFE_PRICE` (1,000,000,000)
 - Page clamped to `MAX_SAFE_PAGE`
 
 ---

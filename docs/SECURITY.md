@@ -253,7 +253,7 @@ Used when Redis is not configured, or as a general-purpose rate limiter for API 
 | Create Listing | 5 | 24 hours |
 | Update Listing | 20 | 24 hours |
 | Delete Listing | 10 | 24 hours |
-| Listings Read | 10 | 24 hours |
+| Listings (general) | 10 | 24 hours |
 | Create Review | 10 | 24 hours |
 | Update Review | 30 | 24 hours |
 | Delete Review | 30 | 24 hours |
@@ -301,7 +301,7 @@ Priority order for IP extraction:
 1. `x-real-ip` (Vercel Edge, trusted)
 2. `cf-connecting-ip` (Cloudflare)
 3. `true-client-ip` (CDN)
-4. `x-forwarded-for` (first entry, only trusted in dev or with `TRUST_PROXY=true`)
+4. `x-forwarded-for` (first entry, trusted in dev, with `TRUST_PROXY=true`, or when `x-forwarded-proto` header is present)
 5. Anonymous fingerprint (SHA-256 hash of User-Agent + Accept-Language + sec-ch-ua)
 
 ### Cleanup
@@ -396,7 +396,7 @@ model BlockedUser {
 All log output is automatically redacted:
 
 **Field-level redaction** (key name matching, case-insensitive):
-`password`, `token`, `secret`, `apikey`, `authorization`, `cookie`, `sessiontoken`, `accesstoken`, `refreshtoken`, `bearer`, `credential`, `private_key`, `ssn`, `creditcard`, `cardnumber`, `cvv`, `cvc`
+`password`, `token`, `secret`, `apikey`, `api_key`, `authorization`, `cookie`, `sessiontoken`, `accesstoken`, `refreshtoken`, `bearer`, `credential`, `private_key`, `privatekey`, `ssn`, `creditcard`, `credit_card`, `cardnumber`, `cvv`, `cvc`
 
 **Pattern-level redaction** (regex on string values):
 

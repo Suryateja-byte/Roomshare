@@ -452,7 +452,7 @@ npx playwright install-deps  # Install system dependencies (Linux)
 
 The `ErrorBoundary` component (`src/components/error/ErrorBoundary.tsx`) catches React rendering errors:
 
-- In **development**: Shows error details (message + stack trace) with a retry button.
+- In **development**: Shows error details (message + stack trace) with retry and reload buttons.
 - In **production**: Shows a generic "Something went wrong" message with retry and reload buttons.
 - Reports errors to **Sentry** with component stack traces.
 
@@ -499,6 +499,7 @@ Rate-limited endpoints return HTTP **429 Too Many Requests**.
 |---|---|
 | Registration | 5 per hour |
 | Forgot password | 3 per hour |
+| Messages (read) | 60 per hour |
 | Send message | 100 per hour |
 
 **If you hit rate limits in development**:

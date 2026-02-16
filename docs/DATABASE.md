@@ -895,7 +895,7 @@ COMMIT (or ROLLBACK on any failure, removing the key)
 - **FOR UPDATE lock** -- blocks concurrent requests until the transaction completes
 - **Request hash verification** -- SHA-256 of the deterministic-JSON-stringified request body prevents key reuse attacks
 - **24-hour expiry** -- keys auto-expire for cleanup; a cron job deletes expired entries
-- **Retry with backoff** -- serialization failures (SQLSTATE 40001 / Prisma P2034) are retried up to 3 times with exponential backoff (100ms, 200ms, 400ms)
+- **Retry with backoff** -- serialization failures (SQLSTATE 40001 / Prisma P2034) are retried up to 3 total attempts with exponential backoff (100ms, 200ms)
 
 ### Error Responses
 
@@ -903,7 +903,6 @@ COMMIT (or ROLLBACK on any failure, removing the key)
 |--------|---------|
 | 200 | Success (with `X-Idempotency-Replayed: true` header if cached) |
 | 400 | Key reused with different request body |
-| 409 | Request already in progress (concurrent duplicate) |
 
 ---
 

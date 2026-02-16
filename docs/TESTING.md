@@ -418,7 +418,10 @@ tests/e2e/
   global-setup.ts         # Data seeding
   helpers/                # Shared test utilities
   page-objects/           # Page object models
+  fixtures/               # Test data fixtures
   a11y/                   # Accessibility audit tests
+  admin/                  # Admin panel tests
+  auth/                   # Authentication flow tests
   booking/                # Booking flow tests
   create-listing/         # Listing creation tests
   dark-mode/              # Dark mode tests
@@ -436,7 +439,8 @@ tests/e2e/
   performance/            # Performance measurement tests
   search-filters/         # Individual filter tests
   search-*.spec.ts        # Search page tests
-  session/                # Session management tests
+  settings/               # User settings tests
+  session-expiry/         # Session expiry tests
   visual/                 # Visual regression tests
 ```
 

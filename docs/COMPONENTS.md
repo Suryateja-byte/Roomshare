@@ -529,7 +529,7 @@ Two-way list-map hover/selection synchronization.
 | `scrollRequest` | One-shot scroll command with nonce deduplication |
 | `focusSource` | Where hover originated (`"map"` or `"list"`) to prevent loops |
 
-Hooks: `useListingFocus()`, `useIsListingFocused(id)`, `useSetListingHover()`.
+Hooks: `useListingFocus()`, `useIsListingFocused(id)`.
 
 ### SearchV2DataContext
 
@@ -586,7 +586,7 @@ Custom React hooks in `src/hooks/`.
 
 | Hook | File | Purpose |
 |---|---|---|
-| `useDebouncedFilterCount` | `hooks/useDebouncedFilterCount.ts` | Debounced filter count preview (600ms) |
+| `useDebouncedFilterCount` | `hooks/useDebouncedFilterCount.ts` | Debounced filter count preview (300ms) |
 | `useFilterImpactCount` | `hooks/useFilterImpactCount.ts` | Filter impact count with caching |
 | `useBatchedFilters` | `hooks/useBatchedFilters.ts` | Batched filter state updates |
 | `useFacets` | `hooks/useFacets.ts` | Search facets data (price histogram, counts) |

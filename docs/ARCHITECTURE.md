@@ -86,8 +86,8 @@ graph TB
             CR[Cron Jobs<br/>search-alerts, cleanup,<br/>refresh-search-docs]
         end
 
-        subgraph Middleware
-            MW[Middleware<br/>Suspension Check<br/>Auth Guard]
+        subgraph Proxy ["Proxy (src/proxy.ts)"]
+            MW[Request Proxy<br/>Suspension Check<br/>Auth Guard]
         end
 
         subgraph Services ["Service Layer (src/lib)"]
@@ -332,6 +332,7 @@ roomshare/
 │   │   ├── Footer.tsx             # Footer
 │   │   ├── Providers.tsx          # Client-side provider composition
 │   │   └── ...                    # Feature-specific components
+│   ├── auth.ts                    # NextAuth configuration and session management
 │   ├── contexts/                  # React contexts (see UI Layer)
 │   ├── hooks/                     # Custom hooks (see UI Layer)
 │   └── lib/                       # Shared business logic
@@ -384,8 +385,7 @@ roomshare/
 ├── instrumentation.ts             # Sentry init + graceful shutdown registration
 ├── sentry.client.config.ts        # Client-side Sentry
 ├── sentry.server.config.ts        # Server-side Sentry
-├── sentry.edge.config.ts          # Edge runtime Sentry
-└── auth.ts                        # NextAuth configuration and session management
+└── sentry.edge.config.ts          # Edge runtime Sentry
 ```
 
 ---

@@ -313,17 +313,23 @@ Fetch all active listings with optional text search.
 **Success Response (200):**
 
 ```json
-[
-  {
-    "id": "clx...",
-    "title": "Sunny Room in Downtown",
-    "description": "...",
-    "price": 1200,
-    "images": ["https://..."],
-    "amenities": ["Wifi", "AC"],
-    "status": "ACTIVE"
-  }
-]
+{
+  "items": [
+    {
+      "id": "clx...",
+      "title": "Sunny Room in Downtown",
+      "description": "...",
+      "price": 1200,
+      "images": ["https://..."],
+      "amenities": ["Wifi", "AC"],
+      "status": "ACTIVE"
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "limit": 12,
+  "totalPages": 4
+}
 ```
 
 **Headers:** `x-request-id`, `Vary: Accept-Encoding`
@@ -1761,7 +1767,7 @@ Some endpoints include additional fields:
 The `POST /api/listings` endpoint supports idempotency via the `X-Idempotency-Key` header. When provided:
 - First request: Executes the operation and caches the result.
 - Subsequent requests with the same key + user + body hash: Returns cached result with `X-Idempotency-Replayed: true` header.
-- Mismatched body: Returns a 409 conflict error.
+- Mismatched body: Returns a 400 error.
 
 ### Request Context
 
