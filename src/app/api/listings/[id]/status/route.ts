@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { withRateLimit } from '@/lib/with-rate-limit';
 
 // Public endpoint - no auth required
 // Used by ListingFreshnessCheck to verify listing availability for all viewers
@@ -7,6 +8,10 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    // Rate limit to prevent polling abuse
+    const rateLimitResponse = await withRateLimit(request, { type: 'listingStatus' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const { id } = await params;
 

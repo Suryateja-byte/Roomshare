@@ -60,6 +60,11 @@ export async function updateListingStatus(listingId: string, status: ListingStat
 }
 
 export async function incrementViewCount(listingId: string) {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized' };
+    }
+
     try {
         await prisma.listing.update({
             where: { id: listingId },

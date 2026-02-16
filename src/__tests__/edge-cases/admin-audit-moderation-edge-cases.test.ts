@@ -199,7 +199,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
             previousState: false,
             newState: true,
             userName: "John Doe",
-            userEmail: "john@example.com",
+            targetUserId: "user-789",
           }),
         }),
       );

@@ -276,6 +276,11 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const suspension = await checkSuspension();
+        if (suspension.suspended) {
+            return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
+        }
+
         const body = await request.json();
 
         // P2-2: Zod validation
@@ -348,6 +353,11 @@ export async function DELETE(request: Request) {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const suspension = await checkSuspension();
+        if (suspension.suspended) {
+            return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
         const { searchParams } = new URL(request.url);
