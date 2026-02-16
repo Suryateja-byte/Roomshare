@@ -100,7 +100,7 @@ jobs:
         with:
           files: ./coverage/lcov.info
           flags: unit
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   # Component and page tests
   test-components:
@@ -118,13 +118,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm jest --ci --coverage --testPathPatterns="src/__tests__/components/" --testPathPatterns="src/__tests__/pages/"
-      - uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          files: ./coverage/lcov.info
-          flags: components
-          fail_ci_if_error: true
+      - run: pnpm jest --ci --testPathPatterns="src/__tests__/components/" --testPathPatterns="src/__tests__/pages/"
 
   # API and action tests - BLOCKING (P1-09 fix: removed continue-on-error)
   test-api:

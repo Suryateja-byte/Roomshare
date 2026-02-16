@@ -54,6 +54,15 @@ describe("filter-chip-utils", () => {
     });
 
     describe("move-in date handling", () => {
+      beforeEach(() => {
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date("2026-01-01T12:00:00Z"));
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
       it("formats date correctly", () => {
         const params = new URLSearchParams("moveInDate=2026-02-15");
         const chips = urlToFilterChips(params);
