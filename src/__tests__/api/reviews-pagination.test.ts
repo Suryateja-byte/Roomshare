@@ -46,6 +46,22 @@ jest.mock('@/lib/email', () => ({
   sendNotificationEmailWithPreference: jest.fn().mockResolvedValue({}),
 }));
 
+jest.mock('@/lib/logger', () => ({
+  logger: { sync: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() } },
+}));
+
+jest.mock('@/lib/api-error-handler', () => ({
+  captureApiError: jest.fn((_error, _context) => ({
+    status: 500,
+    json: async () => ({ error: 'Internal server error' }),
+    headers: new Map(),
+  })),
+}));
+
+jest.mock('@/lib/search/search-doc-dirty', () => ({
+  markListingDirty: jest.fn().mockResolvedValue(undefined),
+}));
+
 // Mock next/server to avoid NextRequest issues in Jest
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -285,7 +301,7 @@ describe('Reviews Pagination (P1-02)', () => {
   describe('POST /api/reviews - Max Length Validation', () => {
     beforeEach(() => {
       (auth as jest.Mock).mockResolvedValue({
-        user: { id: 'user-123', email: 'test@example.com' },
+        user: { id: 'user-123', email: 'test@example.com', emailVerified: new Date() },
       });
       (prisma.booking.findFirst as jest.Mock).mockResolvedValue({
         id: 'booking-1',

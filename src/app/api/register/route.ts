@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { captureApiError } from '@/lib/api-error-handler';
+import { logger } from '@/lib/logger';
 import { normalizeEmail } from '@/lib/normalize-email';
 import { createTokenPair } from '@/lib/token-security';
 import { verifyTurnstileToken } from '@/lib/turnstile';
@@ -92,23 +94,19 @@ export async function POST(request: Request) {
         });
         const verificationEmailSent = Boolean(emailResult?.success);
         if (!verificationEmailSent) {
-            console.error('Failed to send welcome email:', emailResult?.error ?? 'Unknown email error');
+            logger.sync.error('Failed to send welcome email', {
+                route: '/api/register',
+                method: 'POST',
+            });
         }
 
-        // Remove password from response
-        const { password: userPasswordHash, ...userWithoutPassword } = user;
-        void userPasswordHash;
-
+        // Return minimal response — do not leak user object fields to the client
         return NextResponse.json(
-            {
-                ...userWithoutPassword,
-                verificationEmailSent,
-            },
+            { success: true, verificationEmailSent },
             { status: 201 }
         );
 
     } catch (error) {
-        console.error('Registration error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/register', method: 'POST' });
     }
 }

@@ -6,6 +6,26 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Normalize a value to a string array.
+ * Handles arrays, comma-separated strings, and unknown input.
+ */
+export const normalizeStringList = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+        return value
+            .filter((item): item is string => typeof item === 'string')
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+    if (typeof value === 'string') {
+        return value
+            .split(',')
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+    return [];
+};
+
+/**
  * Parse a YYYY-MM-DD date string as local date (not UTC)
  * Fixes timezone bug where new Date("2025-01-15") is parsed as UTC midnight
  * which can appear as the previous day in timezones behind UTC

@@ -371,7 +371,7 @@ describe('POST /api/nearby - Server Edge Cases', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Internal Server Error');
+      expect(data.error).toBe('Internal server error');
       // Should not contain internal details
       expect(JSON.stringify(data)).not.toContain('secret123');
       expect(JSON.stringify(data)).not.toContain('Database');
@@ -384,7 +384,7 @@ describe('POST /api/nearby - Server Edge Cases', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Internal Server Error');
+      expect(data.error).toBe('Internal server error');
     });
   });
 

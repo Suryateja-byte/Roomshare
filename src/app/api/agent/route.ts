@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/auth';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { logger } from '@/lib/logger';
 
@@ -82,6 +83,12 @@ export async function POST(request: NextRequest) {
   // 3. RATE LIMITING
   const rateLimitResponse = await withRateLimit(request, { type: 'agent' });
   if (rateLimitResponse) return rateLimitResponse;
+
+  // Session auth - require authenticated user for LLM endpoints
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
 
   try {
     // 4. BODY SIZE GUARD

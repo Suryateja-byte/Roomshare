@@ -145,7 +145,7 @@ export async function toggleUserAdmin(userId: string) {
                 previousState: user.isAdmin,
                 newState: !user.isAdmin,
                 userName: user.name,
-                userEmail: user.email
+                targetUserId: userId
             }
         });
 
@@ -198,7 +198,7 @@ export async function suspendUser(userId: string, suspend: boolean) {
                 previousState: user.isSuspended,
                 newState: suspend,
                 userName: user.name,
-                userEmail: user.email
+                targetUserId: userId
             }
         });
 

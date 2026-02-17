@@ -138,7 +138,7 @@ export async function getAuditLogs(params: GetAuditLogsParams = {}) {
 /**
  * Get audit logs for a specific target (e.g., all actions taken on a user)
  */
-export async function getTargetAuditHistory(targetType: TargetType, targetId: string) {
+export async function getTargetAuditHistory(targetType: TargetType, targetId: string, limit = 100) {
     return prisma.auditLog.findMany({
         where: {
             targetType,
@@ -153,7 +153,8 @@ export async function getTargetAuditHistory(targetType: TargetType, targetId: st
                 }
             }
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        take: limit
     });
 }
 

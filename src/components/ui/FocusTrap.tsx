@@ -80,7 +80,7 @@ export function FocusTrap({
   }, [active, returnFocus]);
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} data-focus-trap={active ? "" : undefined}>
       {children}
     </div>
   );

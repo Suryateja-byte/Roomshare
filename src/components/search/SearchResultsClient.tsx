@@ -72,6 +72,9 @@ export function SearchResultsClient({
   const allListings = [...initialListings, ...extraListings];
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
 
+  // O(1) lookup for saved listing IDs instead of O(n) .includes()
+  const savedIdsSet = useMemo(() => new Set(savedListingIds), [savedListingIds]);
+
   // Derive estimatedMonths from moveInDate/moveOutDate, falling back to leaseDuration
   const estimatedMonths = useMemo(() => {
     const sp = new URLSearchParams(searchParamsString);
@@ -215,7 +218,7 @@ export function SearchResultsClient({
               <ListingCard
                 key={listing.id}
                 listing={listing}
-                isSaved={savedListingIds.includes(listing.id)}
+                isSaved={savedIdsSet.has(listing.id)}
                 priority={index < 4}
                 showTotalPrice={showTotalPrice}
                 estimatedMonths={estimatedMonths}

@@ -8,6 +8,10 @@ import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { captureApiError } from '@/lib/api-error-handler';
+import { logger } from '@/lib/logger';
+import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension';
+import { normalizeStringList } from '@/lib/utils';
 import { z } from 'zod';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,22 +22,6 @@ function extractStoragePath(publicUrl: string): string | null {
     const match = publicUrl.match(/\/storage\/v1\/object\/public\/images\/(.+)$/);
     return match ? match[1] : null;
 }
-
-const normalizeStringList = (value: unknown): string[] => {
-    if (Array.isArray(value)) {
-        return value
-            .filter((item): item is string => typeof item === 'string')
-            .map(item => item.trim())
-            .filter(Boolean);
-    }
-    if (typeof value === 'string') {
-        return value
-            .split(',')
-            .map(item => item.trim())
-            .filter(Boolean);
-    }
-    return [];
-};
 
 const updateListingSchema = z.object({
     title: z.string().trim().min(1).max(150),
@@ -73,70 +61,92 @@ export async function DELETE(
 
         const { id } = await params;
 
-        // Check if listing exists and user is the owner
-        const listing = await prisma.listing.findUnique({
-            where: { id },
-            select: { ownerId: true, title: true, images: true }
-        });
+        // Wrap ownership check + delete in interactive transaction with FOR UPDATE
+        // to prevent TOCTOU race between check and delete
+        let listingTitle: string | null = null;
+        let listingImages: string[] = [];
+        let pendingBookings: { id: string; tenantId: string }[] = [];
 
-        if (!listing) {
-            return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
-        }
+        try {
+            await prisma.$transaction(async (tx) => {
+                // Lock the listing row to prevent concurrent modifications
+                const [listing] = await tx.$queryRaw<Array<{ ownerId: string; title: string; images: string[] }>>`
+                    SELECT "ownerId", "title", "images" FROM "Listing"
+                    WHERE "id" = ${id}
+                    FOR UPDATE
+                `;
 
-        if (listing.ownerId !== session.user.id) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-
-        // Check for active ACCEPTED bookings - block deletion if any exist
-        const activeAcceptedBookings = await prisma.booking.count({
-            where: {
-                listingId: id,
-                status: 'ACCEPTED',
-                endDate: { gte: new Date() }
-            }
-        });
-
-        if (activeAcceptedBookings > 0) {
-            return NextResponse.json(
-                {
-                    error: 'Cannot delete listing with active bookings',
-                    message: 'You have active bookings for this listing. Please cancel them before deleting.',
-                    activeBookings: activeAcceptedBookings
-                },
-                { status: 400 }
-            );
-        }
-
-        // Get all PENDING bookings to notify tenants before deletion
-        const pendingBookings = await prisma.booking.findMany({
-            where: {
-                listingId: id,
-                status: 'PENDING'
-            },
-            select: {
-                id: true,
-                tenantId: true
-            }
-        });
-
-        // Create notifications for tenants with pending bookings
-        const notificationPromises = pendingBookings.map(booking =>
-            prisma.notification.create({
-                data: {
-                    userId: booking.tenantId,
-                    type: 'BOOKING_CANCELLED',
-                    title: 'Booking Request Cancelled',
-                    message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
-                    link: '/bookings'
+                if (!listing || listing.ownerId !== session.user.id) {
+                    throw new Error('NOT_FOUND_OR_UNAUTHORIZED');
                 }
-            })
-        );
 
-        // Clean up images from Supabase storage
-        if (listing.images && listing.images.length > 0 && supabaseUrl && supabaseServiceKey) {
+                listingTitle = listing.title;
+                listingImages = listing.images || [];
+
+                // Check for active ACCEPTED bookings - block deletion if any exist
+                const activeAcceptedBookings = await tx.booking.count({
+                    where: {
+                        listingId: id,
+                        status: 'ACCEPTED',
+                        endDate: { gte: new Date() }
+                    }
+                });
+
+                if (activeAcceptedBookings > 0) {
+                    throw new Error('ACTIVE_BOOKINGS');
+                }
+
+                // Get all PENDING bookings to notify tenants before deletion
+                pendingBookings = await tx.booking.findMany({
+                    where: {
+                        listingId: id,
+                        status: 'PENDING'
+                    },
+                    select: {
+                        id: true,
+                        tenantId: true
+                    }
+                });
+
+                // Create notifications for tenants with pending bookings
+                for (const booking of pendingBookings) {
+                    await tx.notification.create({
+                        data: {
+                            userId: booking.tenantId,
+                            type: 'BOOKING_CANCELLED',
+                            title: 'Booking Request Cancelled',
+                            message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
+                            link: '/bookings'
+                        }
+                    });
+                }
+
+                // Delete listing — Location and bookings cascade-deleted automatically
+                await tx.listing.delete({ where: { id } });
+            });
+        } catch (error) {
+            if (error instanceof Error) {
+                if (error.message === 'NOT_FOUND_OR_UNAUTHORIZED') {
+                    return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+                }
+                if (error.message === 'ACTIVE_BOOKINGS') {
+                    return NextResponse.json(
+                        {
+                            error: 'Cannot delete listing with active bookings',
+                            message: 'You have active bookings for this listing. Please cancel them before deleting.',
+                        },
+                        { status: 400 }
+                    );
+                }
+            }
+            throw error;
+        }
+
+        // Clean up images from Supabase storage (outside transaction — best-effort)
+        if (listingImages.length > 0 && supabaseUrl && supabaseServiceKey) {
             try {
                 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-                const paths = listing.images
+                const paths = listingImages
                     .map(extractStoragePath)
                     .filter((p): p is string => p !== null);
 
@@ -144,26 +154,21 @@ export async function DELETE(
                     await supabase.storage.from('images').remove(paths);
                 }
             } catch (storageError) {
-                console.error('Failed to delete images from storage:', storageError);
-                // Continue with listing deletion even if storage cleanup fails
+                logger.sync.error('Failed to delete images from storage', {
+                    error: storageError instanceof Error ? storageError.message : 'Unknown error',
+                    route: '/api/listings/[id]',
+                    method: 'DELETE',
+                });
+                // Continue even if storage cleanup fails
             }
         }
-
-        // Delete listing and create notifications in transaction
-        // Location and bookings will be cascade deleted automatically
-        await prisma.$transaction([
-            ...notificationPromises,
-            prisma.location.deleteMany({ where: { listingId: id } }),
-            prisma.listing.delete({ where: { id } })
-        ]);
 
         return NextResponse.json({
             success: true,
             notifiedTenants: pendingBookings.length
         }, { status: 200 });
     } catch (error) {
-        console.error('Error deleting listing:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/listings/[id]', method: 'DELETE' });
     }
 }
 
@@ -178,6 +183,16 @@ export async function PATCH(
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const suspension = await checkSuspension();
+        if (suspension.suspended) {
+            return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
+        }
+
+        const emailCheck = await checkEmailVerified();
+        if (!emailCheck.verified) {
+            return NextResponse.json({ error: emailCheck.error || 'Email verification required' }, { status: 403 });
         }
 
         const { id } = await params;
@@ -323,11 +338,6 @@ export async function PATCH(
 
         return NextResponse.json(result, { status: 200 });
     } catch (error) {
-        console.error('Error updating listing:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        return NextResponse.json({
-            error: 'Internal Server Error',
-            details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
-        }, { status: 500 });
+        return captureApiError(error, { route: '/api/listings/[id]', method: 'PATCH' });
     }
 }

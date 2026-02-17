@@ -210,6 +210,19 @@ export const RATE_LIMITS = {
   nearbySearch: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
   // P1-05: Rate limit for reviews GET endpoint
   getReviews: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
+  // Listing status check (freshness polling)
+  listingStatus: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
+  // Sensitive account actions
+  changePassword: { limit: 5, windowMs: 60 * 60 * 1000 }, // 5 per hour
+  verifyPassword: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
+  deleteAccount: { limit: 3, windowMs: 24 * 60 * 60 * 1000 }, // 3 per day
+  // Server action rate limits
+  filterSuggestions: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
+  getListingsInBounds: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
+  chatSendMessage: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100 per hour
+  chatStartConversation: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
+  savedListings: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
+  notifications: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
 } as const;
 
 function getFirstForwardedIp(forwardedFor: string | null): string | null {

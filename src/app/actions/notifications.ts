@@ -8,6 +8,8 @@ import {
     type CreateNotificationInput,
 } from '@/lib/notifications';
 import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
+import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from '@/lib/rate-limit';
 
 export async function createNotification(input: CreateNotificationInput) {
     const session = await auth();
@@ -36,8 +38,14 @@ export async function getNotifications(limit = 20) {
         return { notifications: [], unreadCount: 0, hasMore: false };
     }
 
+    // Rate limiting
+    const headersList = await headers();
+    const ip = getClientIPFromHeaders(headersList);
+    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'notifications', RATE_LIMITS.notifications);
+    if (!rl.success) return { notifications: [], unreadCount: 0, hasMore: false };
+
     try {
-        const [notifications, unreadCount, totalCount] = await Promise.all([
+        const [notifications, unreadCount] = await Promise.all([
             prisma.notification.findMany({
                 where: { userId: session.user.id },
                 orderBy: { createdAt: 'desc' },
@@ -46,9 +54,6 @@ export async function getNotifications(limit = 20) {
             prisma.notification.count({
                 where: { userId: session.user.id, read: false }
             }),
-            prisma.notification.count({
-                where: { userId: session.user.id }
-            })
         ]);
 
         const hasMore = notifications.length > limit;
@@ -58,7 +63,6 @@ export async function getNotifications(limit = 20) {
             notifications: paginatedNotifications,
             unreadCount,
             hasMore,
-            totalCount
         };
     } catch (error) {
         logger.sync.error('Failed to fetch notifications', {
@@ -110,6 +114,12 @@ export async function markNotificationAsRead(notificationId: string) {
     if (!session?.user?.id) {
         return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
+
+    // Rate limiting
+    const headersList = await headers();
+    const ip = getClientIPFromHeaders(headersList);
+    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'markNotificationRead', RATE_LIMITS.notifications);
+    if (!rl.success) return { error: 'Too many attempts. Please wait.' };
 
     try {
         await prisma.notification.update({
@@ -210,6 +220,12 @@ export async function deleteAllNotifications() {
     if (!session?.user?.id) {
         return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
+
+    // Rate limiting
+    const headersList3 = await headers();
+    const ip3 = getClientIPFromHeaders(headersList3);
+    const rl3 = await checkRateLimit(`${ip3}:${session.user.id}`, 'deleteAllNotifications', RATE_LIMITS.notifications);
+    if (!rl3.success) return { error: 'Too many attempts. Please wait.' };
 
     try {
         const result = await prisma.notification.deleteMany({

@@ -53,6 +53,36 @@ jest.mock('@/lib/with-rate-limit', () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }))
 
+// Mock logger and captureApiError
+jest.mock('@/lib/logger', () => ({
+  logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
+}))
+
+jest.mock('@/lib/api-error-handler', () => ({
+  captureApiError: jest.fn((_error: unknown, _context: { route: string; method: string }) => {
+    return {
+      status: 500,
+      json: async () => ({ error: 'Internal server error' }),
+      headers: new Map(),
+    }
+  }),
+}))
+
+// Mock search-doc-dirty (fire-and-forget)
+jest.mock('@/lib/search/search-doc-dirty', () => ({
+  markListingDirty: jest.fn().mockResolvedValue(undefined),
+}))
+
+// Mock pagination-schema
+jest.mock('@/lib/pagination-schema', () => ({
+  parsePaginationParams: jest.fn().mockReturnValue({ success: true, data: { cursor: undefined, limit: 20 } }),
+  buildPaginationResponse: jest.fn((items: any[], _limit: number, total: number) => ({
+    items,
+    pagination: { total, hasMore: false, nextCursor: null },
+  })),
+  buildPrismaQueryOptions: jest.fn().mockReturnValue({}),
+}))
+
 import { POST, GET } from '@/app/api/reviews/route'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
@@ -65,6 +95,7 @@ describe('/api/reviews', () => {
       id: 'user-123',
       name: 'Test User',
       email: 'test@example.com',
+      emailVerified: new Date(),
     },
   }
 

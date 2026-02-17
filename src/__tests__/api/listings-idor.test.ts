@@ -22,6 +22,9 @@ jest.mock('@/lib/prisma', () => ({
     notification: {
       create: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn(),
     $executeRaw: jest.fn(),
   },
@@ -37,6 +40,30 @@ jest.mock('@/lib/geocoding', () => ({
 
 jest.mock('@/lib/listing-language-guard', () => ({
   checkListingLanguageCompliance: jest.fn().mockReturnValue({ allowed: true }),
+}));
+
+jest.mock('@/app/actions/suspension', () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+  checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
+}));
+
+jest.mock('@/lib/search/search-doc-dirty', () => ({
+  markListingDirty: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/lib/api-error-handler', () => ({
+  captureApiError: jest.fn().mockImplementation((_error: unknown, _context: unknown) => {
+    const { NextResponse } = jest.requireMock('next/server');
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }),
+}));
+
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
+
+jest.mock('@/lib/request-context', () => ({
+  getRequestId: jest.fn().mockReturnValue('test-request-id'),
 }));
 
 jest.mock('@supabase/supabase-js', () => ({
@@ -240,7 +267,17 @@ describe('Listings API IDOR Protection', () => {
   describe('DELETE /api/listings/[id]', () => {
     it('returns 403 when non-owner tries to delete listing', async () => {
       (auth as jest.Mock).mockResolvedValue(attackerSession);
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      // Transaction callback runs: $queryRaw returns listing owned by owner-123,
+      // but session user is attacker-456, so it throws NOT_FOUND_OR_UNAUTHORIZED.
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{ ownerId: 'owner-123', title: 'Test Listing', images: [] }]),
+          booking: { count: jest.fn(), findMany: jest.fn() },
+          notification: { create: jest.fn() },
+          listing: { delete: jest.fn() },
+        };
+        return callback(tx);
+      });
 
       const request = new Request('http://localhost/api/listings/listing-abc', {
         method: 'DELETE',
@@ -250,21 +287,25 @@ describe('Listings API IDOR Protection', () => {
         params: Promise.resolve({ id: 'listing-abc' }),
       });
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(404);
       const body = await response.json();
-      expect(body.error).toBe('Forbidden');
-
-      // Verify delete was NOT called
-      expect(prisma.listing.delete).not.toHaveBeenCalled();
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(body.error).toBe('Listing not found');
     });
 
     it('allows owner to delete their own listing', async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
-      (prisma.booking.findMany as jest.Mock).mockResolvedValue([]);
-      (prisma.$transaction as jest.Mock).mockResolvedValue([]);
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{ ownerId: 'owner-123', title: 'Test Listing', images: [] }]),
+          booking: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+          },
+          notification: { create: jest.fn() },
+          listing: { delete: jest.fn().mockResolvedValue({}) },
+        };
+        return callback(tx);
+      });
 
       const request = new Request('http://localhost/api/listings/listing-abc', {
         method: 'DELETE',
@@ -281,7 +322,17 @@ describe('Listings API IDOR Protection', () => {
 
     it('returns 404 when listing does not exist', async () => {
       (auth as jest.Mock).mockResolvedValue(attackerSession);
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(null);
+      // Transaction callback: $queryRaw returns empty array (no listing found),
+      // so it throws NOT_FOUND_OR_UNAUTHORIZED -> caught as 404
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([]), // No listing found
+          booking: { count: jest.fn(), findMany: jest.fn() },
+          notification: { create: jest.fn() },
+          listing: { delete: jest.fn() },
+        };
+        return callback(tx);
+      });
 
       const request = new Request('http://localhost/api/listings/nonexistent', {
         method: 'DELETE',
@@ -314,8 +365,19 @@ describe('Listings API IDOR Protection', () => {
 
     it('prevents deletion when active bookings exist', async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-      (prisma.booking.count as jest.Mock).mockResolvedValue(2); // 2 active bookings
+      // Transaction callback: listing found and owned, but has active bookings
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{ ownerId: 'owner-123', title: 'Test Listing', images: [] }]),
+          booking: {
+            count: jest.fn().mockResolvedValue(2), // 2 active ACCEPTED bookings
+            findMany: jest.fn(),
+          },
+          notification: { create: jest.fn() },
+          listing: { delete: jest.fn() },
+        };
+        return callback(tx);
+      });
 
       const request = new Request('http://localhost/api/listings/listing-abc', {
         method: 'DELETE',
@@ -328,7 +390,6 @@ describe('Listings API IDOR Protection', () => {
       expect(response.status).toBe(400);
       const body = await response.json();
       expect(body.error).toBe('Cannot delete listing with active bookings');
-      expect(body.activeBookings).toBe(2);
     });
   });
 

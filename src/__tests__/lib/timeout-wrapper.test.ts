@@ -159,15 +159,15 @@ describe('timeout-wrapper', () => {
   });
 
   describe('fetchWithTimeout', () => {
-    const originalFetch = global.fetch;
+    let fetchSpy: jest.SpyInstance;
 
     beforeEach(() => {
       // Reset fetch mock before each test
-      global.fetch = jest.fn();
+      fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(jest.fn());
     });
 
     afterEach(() => {
-      global.fetch = originalFetch;
+      fetchSpy.mockRestore();
     });
 
     it('returns response when fetch completes before timeout', async () => {

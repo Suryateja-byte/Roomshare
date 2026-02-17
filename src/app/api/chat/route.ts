@@ -1,6 +1,8 @@
 import { streamText, tool, zodSchema, stepCountIs, type CoreMessage, type UIMessage } from 'ai';
 import { createGroq } from '@ai-sdk/groq';
 import { z } from 'zod';
+import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
 import { checkChatRateLimit } from '@/lib/rate-limit-redis';
 import { getClientIP } from '@/lib/rate-limit';
 import { checkFairHousingPolicy, POLICY_REFUSAL_MESSAGE } from '@/lib/fair-housing-policy';
@@ -262,6 +264,12 @@ function determineSearchParams(query: string): {
 
 export async function POST(request: Request) {
   try {
+    // 0. SESSION AUTH - require authenticated user for LLM endpoints
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     // 1. ORIGIN/HOST ENFORCEMENT (exact match)
     const origin = request.headers.get('origin');
     const host = request.headers.get('host');

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { captureApiError } from '@/lib/api-error-handler';
 import { z } from 'zod';
 
 // P2-5: Zod schema for request validation
@@ -22,7 +23,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
+        let body;
+        try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
         // P2-5: Zod validation
         const parsed = createReportSchema.safeParse(body);
@@ -63,7 +65,6 @@ export async function POST(request: Request) {
 
         return NextResponse.json(report);
     } catch (error) {
-        console.error('Error creating report:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/reports', method: 'POST' });
     }
 }

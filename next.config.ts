@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from '@sentry/nextjs';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -27,8 +28,6 @@ const nextConfig: NextConfig = {
       'lucide-react',
       'framer-motion',
       '@radix-ui/react-icons',
-      'date-fns',
-      '@heroicons/react',
     ],
   },
 
@@ -126,4 +125,15 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  disableLogger: true,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+  autoInstrumentServerFunctions: true,
+  autoInstrumentMiddleware: true,
+});

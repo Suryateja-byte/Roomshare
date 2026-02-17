@@ -16,7 +16,7 @@ export default function Providers({ children, session }: ProvidersProps) {
     <SessionProvider
       session={session}
       refetchOnWindowFocus={true}
-      refetchInterval={60} // Refresh session every 1 minute
+      refetchInterval={300} // Refresh session every 5 minutes
     >
       <ThemeProvider>
         {children}

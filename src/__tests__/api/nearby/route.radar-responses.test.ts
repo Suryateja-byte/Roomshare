@@ -326,7 +326,7 @@ describe("POST /api/nearby - Radar Response Handling", () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe("Internal Server Error");
+      expect(data.error).toBe("Internal server error");
     });
 
     it("handles fetch rejection gracefully", async () => {
@@ -336,7 +336,7 @@ describe("POST /api/nearby - Radar Response Handling", () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe("Internal Server Error");
+      expect(data.error).toBe("Internal server error");
     });
   });
 
@@ -433,7 +433,7 @@ describe("POST /api/nearby - Radar Response Handling", () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe("Internal Server Error");
+      expect(data.error).toBe("Internal server error");
     });
 
     it("handles response with missing places array gracefully", async () => {

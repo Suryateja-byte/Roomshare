@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { logger } from '@/lib/logger';
+import { captureApiError } from '@/lib/api-error-handler';
 import { z } from 'zod';
 
 // P2-4: Zod schema for request validation
@@ -21,7 +22,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
+        let body;
+        try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
         // P2-4: Zod validation
         const parsed = toggleFavoriteSchema.safeParse(body);
@@ -72,10 +74,6 @@ export async function POST(request: Request) {
         }
 
     } catch (error) {
-        logger.sync.error('Error toggling favorite', {
-            action: 'toggleFavorite',
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return captureApiError(error, { route: '/api/favorites', method: 'POST' });
     }
 }

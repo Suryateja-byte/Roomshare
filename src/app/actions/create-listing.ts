@@ -39,7 +39,7 @@ export type CreateListingState = {
  * called by the create listing form but remains functional for backwards compatibility.
  */
 export async function createListing(_prevState: CreateListingState, formData: FormData): Promise<CreateListingState> {
-    console.warn('[DEPRECATED] createListing server action called — use POST /api/listings instead');
+    logger.sync.warn('[DEPRECATED] createListing server action called — use POST /api/listings instead');
 
     // Rate limiting (defense-in-depth for deprecated action)
     const headersList = await headers();
@@ -217,6 +217,6 @@ export async function createListing(_prevState: CreateListingState, formData: Fo
             action: 'createListing',
             error: errorMessage,
         });
-        return { success: false, error: `Server Error: ${errorMessage}` };
+        return { success: false, error: 'An unexpected error occurred. Please try again.' };
     }
 }

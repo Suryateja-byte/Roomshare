@@ -41,18 +41,16 @@ jest.mock('@/lib/email-templates', () => ({
   emailTemplates: mockEmailTemplates,
 }))
 
-// Store original fetch
-const originalFetch = global.fetch
-
 describe('email utilities', () => {
+  let fetchSpy: jest.SpyInstance
+
   beforeEach(() => {
     jest.clearAllMocks()
-    // Reset fetch mock
-    global.fetch = jest.fn()
+    fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(jest.fn())
   })
 
-  afterAll(() => {
-    global.fetch = originalFetch
+  afterEach(() => {
+    fetchSpy.mockRestore()
   })
 
   describe('sendEmail behavior patterns', () => {

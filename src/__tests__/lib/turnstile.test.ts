@@ -22,7 +22,7 @@ beforeEach(() => {
   // Reset env to known state
   delete process.env.TURNSTILE_ENABLED;
   delete process.env.TURNSTILE_SECRET_KEY;
-  global.fetch = jest.fn();
+  jest.spyOn(global, 'fetch').mockImplementation(jest.fn());
 });
 
 afterEach(() => {

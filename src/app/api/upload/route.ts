@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createClient } from '@supabase/supabase-js';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { captureApiError, apiErrorResponse } from '@/lib/api-error-handler';
+import { logger } from '@/lib/logger';
 import { z } from 'zod';
 
 // Initialize Supabase client with service role for storage operations
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
 
         // Check Supabase configuration
         if (!supabaseUrl || !supabaseServiceKey) {
-            console.error('Missing Supabase config:', {
+            logger.sync.error('Missing Supabase config', {
                 hasUrl: !!supabaseUrl,
                 hasKey: !!supabaseServiceKey
             });
@@ -135,7 +137,7 @@ export async function POST(request: NextRequest) {
             });
 
         if (uploadError) {
-            console.error('Supabase upload error:', {
+            logger.sync.error('Supabase upload error', {
                 message: uploadError.message,
                 name: uploadError.name,
                 bucket,
@@ -166,20 +168,16 @@ export async function POST(request: NextRequest) {
             path: path
         });
     } catch (error) {
-        console.error('Upload error:', error);
-
         // Handle specific error types
         if (error instanceof TypeError && error.message.includes('fetch')) {
+            captureApiError(error, { route: '/api/upload', method: 'POST' });
             return NextResponse.json(
                 { error: 'Unable to connect to storage service' },
                 { status: 503 }
             );
         }
 
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        return captureApiError(error, { route: '/api/upload', method: 'POST' });
     }
 }
 
@@ -238,7 +236,7 @@ export async function DELETE(request: NextRequest) {
             .remove([path]);
 
         if (deleteError) {
-            console.error('Delete error:', deleteError);
+            logger.sync.error('Supabase delete error', { error: deleteError.message });
             return NextResponse.json(
                 { error: 'Failed to delete file' },
                 { status: 500 }
@@ -247,10 +245,6 @@ export async function DELETE(request: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Delete error:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        return captureApiError(error, { route: '/api/upload', method: 'DELETE' });
     }
 }

@@ -26,6 +26,27 @@ jest.mock("bcryptjs", () => ({
   hash: jest.fn(),
 }));
 
+// Mock rate limiting to allow all requests
+jest.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({ success: true, remaining: 10, resetAt: new Date() }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
+  RATE_LIMITS: {
+    changePassword: { limit: 5, windowMs: 3600000 },
+    verifyPassword: { limit: 10, windowMs: 3600000 },
+    deleteAccount: { limit: 3, windowMs: 86400000 },
+  },
+}));
+
+// Mock next/headers
+jest.mock("next/headers", () => ({
+  headers: jest.fn().mockResolvedValue(new Headers()),
+}));
+
+// Mock logger
+jest.mock("@/lib/logger", () => ({
+  logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
+}));
+
 import {
   getNotificationPreferences,
   updateNotificationPreferences,

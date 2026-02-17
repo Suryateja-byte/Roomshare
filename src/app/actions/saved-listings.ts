@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { checkSuspension } from './suspension';
 import { logger } from '@/lib/logger';
+import { headers } from 'next/headers';
+import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from '@/lib/rate-limit';
 
 export async function toggleSaveListing(listingId: string) {
     const session = await auth();
@@ -13,42 +15,48 @@ export async function toggleSaveListing(listingId: string) {
         return { error: 'You must be logged in to save listings', saved: false };
     }
 
+    // Rate limiting
+    const headersList = await headers();
+    const ip = getClientIPFromHeaders(headersList);
+    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'toggleSaveListing', RATE_LIMITS.savedListings);
+    if (!rl.success) return { error: 'Too many attempts. Please wait.', saved: false };
+
     const suspension = await checkSuspension();
     if (suspension.suspended) {
         return { error: suspension.error || 'Account suspended', saved: false };
     }
 
     try {
-        // Check if already saved
-        const existing = await prisma.savedListing.findUnique({
-            where: {
-                userId_listingId: {
-                    userId: session.user.id,
-                    listingId
+        // Atomic toggle using transaction to prevent TOCTOU race
+        const saved = await prisma.$transaction(async (tx) => {
+            const existing = await tx.savedListing.findUnique({
+                where: {
+                    userId_listingId: {
+                        userId: session.user.id,
+                        listingId
+                    }
                 }
+            });
+
+            if (existing) {
+                await tx.savedListing.delete({
+                    where: { id: existing.id }
+                });
+                return false;
+            } else {
+                await tx.savedListing.create({
+                    data: {
+                        userId: session.user.id,
+                        listingId
+                    }
+                });
+                return true;
             }
         });
 
-        if (existing) {
-            // Unsave
-            await prisma.savedListing.delete({
-                where: { id: existing.id }
-            });
-            revalidatePath(`/listings/${listingId}`);
-            revalidatePath('/saved');
-            return { saved: false };
-        } else {
-            // Save
-            await prisma.savedListing.create({
-                data: {
-                    userId: session.user.id,
-                    listingId
-                }
-            });
-            revalidatePath(`/listings/${listingId}`);
-            revalidatePath('/saved');
-            return { saved: true };
-        }
+        revalidatePath(`/listings/${listingId}`);
+        revalidatePath('/saved');
+        return { saved };
     } catch (error) {
         logger.sync.error('Failed to toggle saved listing', {
             action: 'toggleSaveListing',

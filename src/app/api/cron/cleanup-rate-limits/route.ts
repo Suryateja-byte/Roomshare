@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import * as Sentry from '@sentry/nextjs';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
     try {
@@ -9,7 +11,7 @@ export async function GET(request: NextRequest) {
 
         // Defense in depth: validate secret configuration
         if (!cronSecret || cronSecret.length < 32) {
-            console.error('[Cron] CRON_SECRET not configured or too short (min 32 chars)');
+            logger.sync.error('[Cron] CRON_SECRET not configured or too short (min 32 chars)');
             return NextResponse.json(
                 { error: 'Server configuration error' },
                 { status: 500 }
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest) {
 
         // Reject placeholder values
         if (cronSecret.includes('change-in-production') || cronSecret.startsWith('your-') || cronSecret.startsWith('generate-')) {
-            console.error('[Cron] CRON_SECRET contains placeholder value');
+            logger.sync.error('[Cron] CRON_SECRET contains placeholder value');
             return NextResponse.json(
                 { error: 'Server configuration error' },
                 { status: 500 }
@@ -41,7 +43,7 @@ export async function GET(request: NextRequest) {
             }
         });
 
-        console.log(`[Cleanup Cron] Deleted ${result.count} expired rate limit entries`);
+        logger.sync.info(`[Cleanup Cron] Deleted ${result.count} expired rate limit entries`);
 
         return NextResponse.json({
             success: true,
@@ -49,7 +51,10 @@ export async function GET(request: NextRequest) {
             timestamp: now.toISOString()
         });
     } catch (error) {
-        console.error('Rate limit cleanup error:', error);
+        logger.sync.error('Rate limit cleanup error', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        Sentry.captureException(error, { tags: { cron: 'cleanup-rate-limits' } });
         return NextResponse.json(
             { error: 'Cleanup failed' },
             { status: 500 }

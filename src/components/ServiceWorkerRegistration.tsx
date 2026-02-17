@@ -19,6 +19,8 @@ export function ServiceWorkerRegistration({
       return;
     }
 
+    let updateInterval: ReturnType<typeof setInterval> | null = null;
+
     const registerSW = async () => {
       try {
         const reg = await navigator.serviceWorker.register("/sw.js", {
@@ -49,7 +51,7 @@ export function ServiceWorkerRegistration({
         });
 
         // Check for updates periodically (every hour)
-        setInterval(() => {
+        updateInterval = setInterval(() => {
           reg.update();
         }, 60 * 60 * 1000);
 
@@ -64,8 +66,14 @@ export function ServiceWorkerRegistration({
       registerSW();
     } else {
       window.addEventListener("load", registerSW);
-      return () => window.removeEventListener("load", registerSW);
     }
+
+    return () => {
+      window.removeEventListener("load", registerSW);
+      if (updateInterval) {
+        clearInterval(updateInterval);
+      }
+    };
   }, [onUpdate, onSuccess]);
 
   const handleUpdate = () => {

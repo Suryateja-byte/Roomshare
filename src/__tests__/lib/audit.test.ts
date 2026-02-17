@@ -292,6 +292,7 @@ describe('Audit Logging', () => {
           },
         },
         orderBy: { createdAt: 'desc' },
+        take: 100,
       })
       expect(result).toEqual(mockHistory)
     })

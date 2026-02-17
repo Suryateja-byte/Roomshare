@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';
+import { captureApiError } from '@/lib/api-error-handler';
 
 // P1-10 FIX: Development-only test endpoint
 export async function GET() {
@@ -35,6 +36,6 @@ export async function GET() {
             listing
         });
     } catch (error) {
-        return NextResponse.json({ error: String(error) }, { status: 500 });
+        return captureApiError(error, { route: '/api/verify', method: 'GET' });
     }
 }

@@ -82,9 +82,9 @@ export function ErrorFallback({
       className="flex min-h-[400px] flex-col items-center justify-center p-8 text-center"
     >
       {/* Error icon */}
-      <div className="mb-4 rounded-full bg-red-100 p-3 ">
+      <div className="mb-4 rounded-full bg-red-100 dark:bg-red-900/30 p-3">
         <svg
-          className="h-8 w-8 text-red-600 "
+          className="h-8 w-8 text-red-600 dark:text-red-400"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -99,20 +99,20 @@ export function ErrorFallback({
         </svg>
       </div>
 
-      <h2 className="mb-2 text-xl font-semibold text-zinc-900 ">
+      <h2 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-white">
         {title}
       </h2>
 
-      <p className="mb-6 max-w-md text-zinc-600 ">
+      <p className="mb-6 max-w-md text-zinc-600 dark:text-zinc-400">
         {description}
       </p>
 
       {process.env.NODE_ENV === "development" && error && (
-        <details className="mb-6 max-w-lg rounded-lg bg-zinc-100 p-4 text-left ">
-          <summary className="cursor-pointer text-sm font-medium text-zinc-700 ">
+        <details className="mb-6 max-w-lg rounded-lg bg-zinc-100 dark:bg-zinc-800 p-4 text-left">
+          <summary className="cursor-pointer text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Error details (development only)
           </summary>
-          <pre className="mt-2 overflow-auto text-xs text-red-600 ">
+          <pre className="mt-2 overflow-auto text-xs text-red-600 dark:text-red-400">
             {error.message}
             {error.stack && `\n\n${error.stack}`}
           </pre>
@@ -123,7 +123,7 @@ export function ErrorFallback({
         {onRetry && (
           <button
             onClick={onRetry}
-            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 "
+            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-sm font-medium text-white dark:text-zinc-900 transition-colors hover:bg-zinc-800 dark:hover:bg-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900"
           >
             <svg
               className="h-4 w-4"
@@ -144,7 +144,7 @@ export function ErrorFallback({
         )}
         <button
           onClick={() => window.location.reload()}
-          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 "
+          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900"
         >
           Reload page
         </button>

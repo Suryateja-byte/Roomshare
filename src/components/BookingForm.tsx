@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { FocusTrap } from '@/components/ui/FocusTrap';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { createBooking, BookingResult } from '@/app/actions/booking';
@@ -680,6 +681,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
 
             {/* Confirmation Modal - Using Portal to escape sticky container stacking context */}
             {showConfirmModal && bookingInfo && typeof document !== 'undefined' && createPortal(
+                <FocusTrap active={showConfirmModal}>
                 <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
                     {/* Backdrop - disabled during loading to prevent accidental dismissal */}
                     <div
@@ -790,7 +792,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                             </Button>
                         </div>
                     </div>
-                </div>,
+                </div>
+                </FocusTrap>,
                 document.body
             )}
         </div>

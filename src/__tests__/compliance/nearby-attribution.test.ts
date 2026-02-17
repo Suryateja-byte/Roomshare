@@ -235,7 +235,7 @@ describe('Nearby Places API - Compliance & Legal', () => {
       const responseStr = JSON.stringify(data);
       expect(responseStr).not.toContain('prj_');
       expect(responseStr).not.toContain('API key');
-      expect(data.error).toBe('Internal Server Error');
+      expect(data.error).toBe('Internal server error');
     });
   });
 

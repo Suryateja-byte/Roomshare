@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { processSearchAlerts } from '@/lib/search-alerts';
+import { logger } from '@/lib/logger';
 
 // Vercel Cron or external cron service endpoint
 // Secured with CRON_SECRET in all environments
@@ -10,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     // Defense in depth: validate secret configuration
     if (!cronSecret || cronSecret.length < 32) {
-        console.error('[Cron] CRON_SECRET not configured or too short (min 32 chars)');
+        logger.sync.error('[Cron] CRON_SECRET not configured or too short (min 32 chars)');
         return NextResponse.json(
             { error: 'Server configuration error' },
             { status: 500 }
@@ -19,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     // Reject placeholder values
     if (cronSecret.includes('change-in-production') || cronSecret.startsWith('your-') || cronSecret.startsWith('generate-')) {
-        console.error('[Cron] CRON_SECRET contains placeholder value');
+        logger.sync.error('[Cron] CRON_SECRET contains placeholder value');
         return NextResponse.json(
             { error: 'Server configuration error' },
             { status: 500 }
@@ -34,13 +36,13 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        console.log('Starting search alerts processing...');
+        logger.sync.info('Starting search alerts processing...');
         const startTime = Date.now();
 
         const result = await processSearchAlerts();
 
         const duration = Date.now() - startTime;
-        console.log(`Search alerts completed in ${duration}ms:`, result);
+        logger.sync.info(`Search alerts completed in ${duration}ms`, { ...result, duration });
 
         return NextResponse.json({
             success: true,
@@ -49,7 +51,10 @@ export async function GET(request: NextRequest) {
         });
 
     } catch (error) {
-        console.error('Search alerts cron error:', error);
+        logger.sync.error('Search alerts cron error', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        Sentry.captureException(error, { tags: { cron: 'search-alerts' } });
         return NextResponse.json(
             {
                 success: false,
@@ -58,9 +63,4 @@ export async function GET(request: NextRequest) {
             { status: 500 }
         );
     }
-}
-
-// Also support POST for flexibility
-export async function POST(request: NextRequest) {
-    return GET(request);
 }

@@ -60,9 +60,9 @@ const FROM_EMAIL = process.env.FROM_EMAIL || 'RoomShare <onboarding@resend.dev>'
 // Email sending function with retry logic and circuit breaker protection
 export async function sendEmail({ to, subject, html, text }: EmailOptions): Promise<{ success: boolean; error?: string }> {
     if (!RESEND_API_KEY) {
-        console.warn('RESEND_API_KEY not configured. Email not sent:', { to, subject });
-        // In development, just log the email
-        console.log('Email would be sent:', { to, subject, html: html.substring(0, 200) });
+        console.warn('RESEND_API_KEY not configured. Email not sent:', { subject });
+        // In development, just log the email (no PII — omit recipient address)
+        console.log('Email would be sent:', { subject, htmlLength: html.length });
         return { success: true }; // Return success in dev mode
     }
 

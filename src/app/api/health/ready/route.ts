@@ -30,10 +30,10 @@ export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
     checks.database = { status: 'ok', latency: Date.now() - dbStart };
-  } catch (error) {
+  } catch {
     checks.database = {
       status: 'error',
-      error: error instanceof Error ? error.message : String(error)
+      error: 'Database connection failed'
     };
     healthy = false;
   }
@@ -57,10 +57,10 @@ export async function GET() {
       checks.redis = response.ok
         ? { status: 'ok', latency: Date.now() - redisStart }
         : { status: 'error', error: `HTTP ${response.status}` };
-    } catch (error) {
+    } catch {
       checks.redis = {
         status: 'error',
-        error: error instanceof Error ? error.message : String(error)
+        error: 'Redis connection failed'
       };
       // Redis failure is non-fatal - map/metrics/search fall back to DB; chat fails closed
     }

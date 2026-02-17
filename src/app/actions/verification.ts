@@ -234,20 +234,21 @@ export async function approveVerification(requestId: string) {
             return { error: 'Request not found' };
         }
 
-        // Update request status
-        await prisma.verificationRequest.update({
-            where: { id: requestId },
-            data: {
-                status: 'APPROVED',
-                reviewedAt: new Date(),
-                reviewedBy: session.user.id
-            }
-        });
+        // Atomically update both request status and user verification in a transaction
+        await prisma.$transaction(async (tx) => {
+            await tx.verificationRequest.update({
+                where: { id: requestId },
+                data: {
+                    status: 'APPROVED',
+                    reviewedAt: new Date(),
+                    reviewedBy: session.user.id
+                }
+            });
 
-        // Update user verification status
-        await prisma.user.update({
-            where: { id: request.userId },
-            data: { isVerified: true }
+            await tx.user.update({
+                where: { id: request.userId },
+                data: { isVerified: true }
+            });
         });
 
         // Send email notification
