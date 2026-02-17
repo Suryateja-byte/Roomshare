@@ -327,7 +327,10 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
-    // The date picker should NOT show the past date (it's validated on parse)
+    // Wait for the client-side mount effect to strip the invalid past date from URL
+    await page.waitForURL((url) => !url.toString().includes("moveInDate"), { timeout: 10_000 });
+
+    // The date picker should NOT show the past date (it's validated on mount)
     const modal = await openFilterModal(page);
     const dateBtn = modal.locator("#filter-move-in");
     if (await dateBtn.isVisible()) {

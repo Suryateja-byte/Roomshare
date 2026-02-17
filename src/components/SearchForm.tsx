@@ -158,9 +158,18 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     useEffect(() => {
         setHasMounted(true);
         // Validate moveInDate on mount to clear invalid past dates
-        const validated = validateMoveInDate(searchParams.get('moveInDate'));
+        const rawMoveInDate = searchParams.get('moveInDate');
+        const validated = validateMoveInDate(rawMoveInDate);
         if (validated !== moveInDate) {
             setPending({ moveInDate: validated });
+        }
+        // Strip invalid moveInDate from URL so the sync effect in
+        // useBatchedFilters doesn't re-override the cleanup from committed state
+        if (rawMoveInDate && !validated) {
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete('moveInDate');
+            const qs = params.toString();
+            router.replace(`${window.location.pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
         }
     }, []);
 
