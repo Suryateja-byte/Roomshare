@@ -318,14 +318,48 @@ test.describe("Group 1: Desktop Sort Interaction", () => {
     await expect(listbox).toBeVisible({ timeout: 5_000 });
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
 
-    // Arrow down navigates through options
+    // Wait for all options to render and Radix open animation to settle.
+    // With modal={false}, focus transfer to the portal content can lag
+    // in headless CI environments with constrained CPU.
+    await expect(page.locator('[role="option"]')).toHaveCount(5, {
+      timeout: 5_000,
+    });
+
+    // Snapshot which option is highlighted before navigating.
+    // Radix highlights the selected item on open ("Recommended").
+    const hlBefore = await listbox
+      .locator('[role="option"][data-highlighted]')
+      .textContent()
+      .catch(() => null);
+
+    // Arrow down navigates through options.
     await page.keyboard.press("ArrowDown");
+
+    // Wait for the highlight to move — confirms Radix processed ArrowDown
+    // before we fire the next keyboard event.
+    if (hlBefore) {
+      await expect
+        .poll(
+          () =>
+            listbox
+              .locator('[role="option"][data-highlighted]')
+              .textContent()
+              .catch(() => null),
+          { timeout: 3_000, message: "ArrowDown to move highlight" },
+        )
+        .not.toBe(hlBefore);
+    } else {
+      // data-highlighted not present (modal={false} variant) — fall back
+      // to a brief pause so Radix can process the event.
+      await page.waitForTimeout(500);
+    }
 
     // Enter selects the focused option
     await page.keyboard.press("Enter");
 
-    // Dropdown should close after selection
-    await expect(listbox).not.toBeVisible({ timeout: 5_000 });
+    // Dropdown should close after selection.
+    // Generous timeout: CI close animation + URL navigation + re-render.
+    await expect(listbox).not.toBeVisible({ timeout: 10_000 });
 
     // Verify the interaction completed -- results should still render
     await waitForResults(page);
@@ -887,6 +921,13 @@ test.describe("Group 6: Sort Edge Cases", () => {
   test("6.2 sort with zero results does not crash", async ({ page }) => {
     await page.goto(`/search?sort=price_asc&maxPrice=1&${boundsQS}`);
     await page.waitForLoadState("domcontentloaded");
+
+    // Zero-result searches may take longer in CI because the DB still runs
+    // the full query before returning empty.  Wait for either cards, the
+    // zero-results heading, OR the container itself to confirm the page
+    // rendered without crashing.
+    const container = page.locator(DESKTOP);
+    await expect(container).toBeAttached({ timeout: 30_000 });
 
     const { cards, zeroResults } = await waitForResults(page);
     const cardCount = await cards.count();
