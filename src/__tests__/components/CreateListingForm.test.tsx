@@ -51,18 +51,17 @@ jest.mock('@/components/listings/ImageUploader', () => ({
   ),
 }))
 
-// Mock fetch
-global.fetch = jest.fn()
-
 import { useFormPersistence } from '@/hooks/useFormPersistence'
 
 describe('CreateListingForm', () => {
+  let fetchSpy: jest.SpyInstance
+
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(global.fetch as jest.Mock).mockResolvedValue({
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: 'listing-123' }),
-    })
+    } as Response)
     ;(useFormPersistence as jest.Mock).mockReturnValue({
       persistedData: null,
       hasDraft: false,
@@ -71,6 +70,10 @@ describe('CreateListingForm', () => {
       clearPersistedData: jest.fn(),
       isHydrated: true,
     })
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
   })
 
   describe('rendering', () => {

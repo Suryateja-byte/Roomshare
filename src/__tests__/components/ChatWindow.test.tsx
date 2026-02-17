@@ -22,9 +22,6 @@ jest.mock('sonner', () => ({
 // Mock scrollIntoView
 Element.prototype.scrollIntoView = jest.fn()
 
-// Mock fetch
-global.fetch = jest.fn()
-
 describe('ChatWindow', () => {
   const defaultProps = {
     conversationId: 'conv-123',
@@ -48,18 +45,21 @@ describe('ChatWindow', () => {
     },
   ]
 
+  let fetchSpy: jest.SpyInstance
+
   beforeEach(() => {
     jest.clearAllMocks()
     jest.useFakeTimers()
     mockIsOffline.isOffline = false
-    ;(global.fetch as jest.Mock).mockResolvedValue({
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockMessages),
-    })
+    } as Response)
   })
 
   afterEach(() => {
     jest.useRealTimers()
+    fetchSpy.mockRestore()
   })
 
   describe('rendering', () => {
@@ -73,7 +73,7 @@ describe('ChatWindow', () => {
     })
 
     it('shows empty state when no messages', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValue({
+      ;fetchSpy.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve([]),
       })
@@ -86,7 +86,7 @@ describe('ChatWindow', () => {
     })
 
     it('shows error state when fetch fails', async () => {
-      ;(global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'))
+      ;fetchSpy.mockRejectedValue(new Error('Network error'))
 
       render(<ChatWindow {...defaultProps} />)
 
@@ -102,7 +102,7 @@ describe('ChatWindow', () => {
       render(<ChatWindow {...defaultProps} />)
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
+        expect(fetchSpy).toHaveBeenCalledWith(
           '/api/messages?conversationId=conv-123'
         )
       })
@@ -112,7 +112,7 @@ describe('ChatWindow', () => {
       render(<ChatWindow {...defaultProps} />)
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledTimes(1)
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
       })
 
       act(() => {
@@ -120,12 +120,12 @@ describe('ChatWindow', () => {
       })
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledTimes(2)
+        expect(fetchSpy).toHaveBeenCalledTimes(2)
       })
     })
 
     it('retries on error button click', async () => {
-      ;(global.fetch as jest.Mock)
+      ;fetchSpy
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({
           ok: true,
@@ -149,7 +149,7 @@ describe('ChatWindow', () => {
 
   describe('message sending', () => {
     it('sends message on form submit', async () => {
-      ;(global.fetch as jest.Mock)
+      ;fetchSpy
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
@@ -167,14 +167,14 @@ describe('ChatWindow', () => {
       fireEvent.submit(form)
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/messages', expect.objectContaining({
+        expect(fetchSpy).toHaveBeenCalledWith('/api/messages', expect.objectContaining({
           method: 'POST',
         }))
       })
     })
 
     it('clears input after sending', async () => {
-      ;(global.fetch as jest.Mock)
+      ;fetchSpy
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
@@ -197,7 +197,7 @@ describe('ChatWindow', () => {
     })
 
     it('does not send empty message', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValue({
+      ;fetchSpy.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockMessages),
       })
@@ -209,7 +209,7 @@ describe('ChatWindow', () => {
       })
 
       // Clear the call count after initial fetch
-      const initialFetchCount = (global.fetch as jest.Mock).mock.calls.length
+      const initialFetchCount = fetchSpy.mock.calls.length
 
       const input = screen.getByPlaceholderText('Type a message...')
       const form = input.closest('form')!
@@ -218,14 +218,14 @@ describe('ChatWindow', () => {
       fireEvent.submit(form)
 
       // No additional fetch should be made for empty message
-      expect((global.fetch as jest.Mock).mock.calls.length).toBe(initialFetchCount)
+      expect(fetchSpy.mock.calls.length).toBe(initialFetchCount)
     })
   })
 
   describe('offline handling', () => {
     it('shows offline banner when offline', async () => {
       mockIsOffline.isOffline = true
-      ;(global.fetch as jest.Mock).mockResolvedValue({
+      ;fetchSpy.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockMessages),
       })
@@ -239,7 +239,7 @@ describe('ChatWindow', () => {
 
     it('shows offline placeholder in input when offline', async () => {
       mockIsOffline.isOffline = true
-      ;(global.fetch as jest.Mock).mockResolvedValue({
+      ;fetchSpy.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockMessages),
       })
@@ -254,7 +254,7 @@ describe('ChatWindow', () => {
     it('shows toast error when trying to send while offline', async () => {
       // Start with offline state to ensure component renders with offline UI
       mockIsOffline.isOffline = true
-      ;(global.fetch as jest.Mock).mockResolvedValue({
+      ;fetchSpy.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockMessages),
       })
@@ -277,7 +277,7 @@ describe('ChatWindow', () => {
 
   describe('failed message handling', () => {
     it('shows failed message indicator when send fails', async () => {
-      ;(global.fetch as jest.Mock)
+      ;fetchSpy
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
         .mockRejectedValueOnce(new Error('Failed'))
 
@@ -321,7 +321,7 @@ describe('ChatWindow', () => {
 
   describe('accessibility', () => {
     it('has accessible input placeholder', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValue({
+      ;fetchSpy.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockMessages),
       })

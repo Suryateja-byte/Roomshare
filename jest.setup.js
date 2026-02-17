@@ -156,39 +156,62 @@ const mockPrismaModel = {
   count: jest.fn().mockResolvedValue(0),
   aggregate: jest.fn().mockResolvedValue({}),
   groupBy: jest.fn().mockResolvedValue([]),
+  updateMany: jest.fn().mockResolvedValue({ count: 0 }),
 }
 
+// Build the mock prisma client once so $transaction can pass it as the tx argument.
+// This ensures code like `fn(tx)` inside $transaction receives a client with all
+// model methods rather than an empty `{}`.
+const mockPrismaClient = {
+  $connect: jest.fn().mockResolvedValue(undefined),
+  $disconnect: jest.fn().mockResolvedValue(undefined),
+  $executeRaw: jest.fn().mockResolvedValue(0),
+  $executeRawUnsafe: jest.fn().mockResolvedValue(0),
+  $queryRaw: jest.fn().mockResolvedValue([]),
+  $queryRawUnsafe: jest.fn().mockResolvedValue([]),
+  user: { ...mockPrismaModel },
+  listing: { ...mockPrismaModel },
+  location: { ...mockPrismaModel },
+  review: { ...mockPrismaModel },
+  booking: { ...mockPrismaModel },
+  message: { ...mockPrismaModel },
+  conversation: { ...mockPrismaModel },
+  notification: { ...mockPrismaModel },
+  account: { ...mockPrismaModel },
+  session: { ...mockPrismaModel },
+  verificationToken: { ...mockPrismaModel },
+  hold: { ...mockPrismaModel },
+  waitlist: { ...mockPrismaModel },
+  spot: { ...mockPrismaModel },
+  spotApplication: { ...mockPrismaModel },
+  spotMessage: { ...mockPrismaModel },
+  spotPhoto: { ...mockPrismaModel },
+  block: { ...mockPrismaModel },
+  idempotencyToken: { ...mockPrismaModel },
+  idempotencyKey: { ...mockPrismaModel },
+  rateLimit: { ...mockPrismaModel },
+  rateLimitEntry: { ...mockPrismaModel },
+  report: { ...mockPrismaModel },
+  savedListing: { ...mockPrismaModel },
+  savedSearch: { ...mockPrismaModel },
+  reviewResponse: { ...mockPrismaModel },
+  recentlyViewed: { ...mockPrismaModel },
+  blockedUser: { ...mockPrismaModel },
+  verificationRequest: { ...mockPrismaModel },
+  auditLog: { ...mockPrismaModel },
+  typingStatus: { ...mockPrismaModel },
+  conversationDeletion: { ...mockPrismaModel },
+  passwordResetToken: { ...mockPrismaModel },
+  // listing_search_docs is a raw SQL table, no Prisma model
+}
+
+// Add $transaction to the client — interactive transactions receive the full client as `tx`
+mockPrismaClient.$transaction = jest.fn((fn) =>
+  typeof fn === 'function' ? fn(mockPrismaClient) : Promise.all(fn)
+)
+
 jest.mock('@/lib/prisma', () => ({
-  prisma: {
-    $connect: jest.fn().mockResolvedValue(undefined),
-    $disconnect: jest.fn().mockResolvedValue(undefined),
-    $executeRaw: jest.fn().mockResolvedValue(0),
-    $executeRawUnsafe: jest.fn().mockResolvedValue(0),
-    $queryRaw: jest.fn().mockResolvedValue([]),
-    $queryRawUnsafe: jest.fn().mockResolvedValue([]),
-    $transaction: jest.fn((fn) => (typeof fn === 'function' ? fn({}) : Promise.all(fn))),
-    user: { ...mockPrismaModel },
-    listing: { ...mockPrismaModel },
-    location: { ...mockPrismaModel },
-    review: { ...mockPrismaModel },
-    booking: { ...mockPrismaModel },
-    message: { ...mockPrismaModel },
-    conversation: { ...mockPrismaModel },
-    notification: { ...mockPrismaModel },
-    account: { ...mockPrismaModel },
-    session: { ...mockPrismaModel },
-    verificationToken: { ...mockPrismaModel },
-    hold: { ...mockPrismaModel },
-    waitlist: { ...mockPrismaModel },
-    spot: { ...mockPrismaModel },
-    spotApplication: { ...mockPrismaModel },
-    spotMessage: { ...mockPrismaModel },
-    spotPhoto: { ...mockPrismaModel },
-    block: { ...mockPrismaModel },
-    idempotencyToken: { ...mockPrismaModel },
-    rateLimit: { ...mockPrismaModel },
-    // listing_search_docs is a raw SQL table, no Prisma model
-  },
+  prisma: mockPrismaClient,
 }))
 
 // Mock window.matchMedia (only in jsdom environment)
