@@ -110,6 +110,8 @@ function createSearchDocMapCacheKey(params: FilterParams): string {
     roomType: params.roomType?.toLowerCase() || "",
     leaseDuration: params.leaseDuration?.toLowerCase() || "",
     moveInDate: params.moveInDate || "",
+    genderPreference: params.genderPreference || "",
+    householdGender: params.householdGender || "",
     bounds: params.bounds
       ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",

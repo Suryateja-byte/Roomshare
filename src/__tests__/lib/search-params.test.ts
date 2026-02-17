@@ -2,6 +2,7 @@ import {
   parseSearchParams,
   validateSearchFilters,
   buildRawParamsFromSearchParams,
+  buildCanonicalFilterParamsFromSearchParams,
   MAX_SAFE_PAGE,
   MAX_SAFE_PRICE,
   MAX_ARRAY_ITEMS,
@@ -424,6 +425,23 @@ describe("parseSearchParams - sort cases", () => {
   });
 });
 
+describe("parseSearchParams - nearMatches cases", () => {
+  const cases: Array<[string, string | undefined, boolean | undefined]> = [
+    ["numeric on", "1", true],
+    ["numeric off", "0", false],
+    ["boolean on", "true", true],
+    ["boolean off", "false", false],
+    ["invalid token", "yes", undefined],
+    ["empty", "", undefined],
+    ["missing", undefined, undefined],
+  ];
+
+  test.each(cases)("%s", (_label, nearMatches, expected) => {
+    const result = parseSearchParams({ nearMatches });
+    expect(result.filterParams.nearMatches).toBe(expected);
+  });
+});
+
 describe("parseSearchParams - page cases", () => {
   const cases: Array<[string, string | undefined, number]> = [
     ["undefined page", undefined, 1],
@@ -785,5 +803,38 @@ describe("buildRawParamsFromSearchParams", () => {
     // URLSearchParams automatically decodes the values
     expect(result.q).toBe("Austin, TX");
     expect(result.sort).toBe("price_asc");
+  });
+});
+
+describe("buildCanonicalFilterParamsFromSearchParams", () => {
+  it("normalizes language aliases to canonical codes", () => {
+    const searchParams = new URLSearchParams(
+      "languages=Telugu&languages=English",
+    );
+    const result = buildCanonicalFilterParamsFromSearchParams(searchParams);
+
+    expect(result.getAll("languages")).toEqual(["te", "en"]);
+  });
+
+  it("excludes pagination and sort keys", () => {
+    const searchParams = new URLSearchParams(
+      "q=room&page=3&sort=price_desc&cursor=abc",
+    );
+    const result = buildCanonicalFilterParamsFromSearchParams(searchParams);
+
+    expect(result.get("q")).toBe("room");
+    expect(result.has("page")).toBe(false);
+    expect(result.has("sort")).toBe(false);
+    expect(result.has("cursor")).toBe(false);
+  });
+
+  it("canonicalizes budget aliases to minPrice/maxPrice", () => {
+    const searchParams = new URLSearchParams("minBudget=700&maxBudget=1400");
+    const result = buildCanonicalFilterParamsFromSearchParams(searchParams);
+
+    expect(result.get("minPrice")).toBe("700");
+    expect(result.get("maxPrice")).toBe("1400");
+    expect(result.has("minBudget")).toBe(false);
+    expect(result.has("maxBudget")).toBe(false);
   });
 });

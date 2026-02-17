@@ -84,6 +84,25 @@ export interface ParsedSearchParams {
 }
 
 /**
+ * Canonical filter params that affect the result set.
+ * Excludes pagination/sort and map viewport keys.
+ */
+export const FILTER_QUERY_KEYS = [
+  "q",
+  "minPrice",
+  "maxPrice",
+  "amenities",
+  "moveInDate",
+  "leaseDuration",
+  "houseRules",
+  "languages",
+  "roomType",
+  "genderPreference",
+  "householdGender",
+  "nearMatches",
+] as const;
+
+/**
  * Convert URLSearchParams to a raw params object, preserving duplicate keys as arrays.
  * This is needed because Object.fromEntries(searchParams.entries()) loses duplicates.
  *
@@ -110,6 +129,73 @@ export function buildRawParamsFromSearchParams(
   });
 
   return rawParams;
+}
+
+/**
+ * Build canonical filter query params from URLSearchParams.
+ * This ensures every consumer (list/map/count/cache keys) uses the same parsed filter set.
+ */
+export function buildCanonicalFilterParamsFromSearchParams(
+  searchParams: URLSearchParams,
+): URLSearchParams {
+  const canonical = new URLSearchParams();
+
+  try {
+    const raw = buildRawParamsFromSearchParams(searchParams);
+    const parsed = parseSearchParams(raw);
+    const { filterParams } = parsed;
+
+    if (filterParams.query) {
+      canonical.set("q", filterParams.query);
+    }
+    if (filterParams.minPrice !== undefined) {
+      canonical.set("minPrice", String(filterParams.minPrice));
+    }
+    if (filterParams.maxPrice !== undefined) {
+      canonical.set("maxPrice", String(filterParams.maxPrice));
+    }
+
+    filterParams.amenities?.forEach((value) =>
+      canonical.append("amenities", value),
+    );
+    filterParams.houseRules?.forEach((value) =>
+      canonical.append("houseRules", value),
+    );
+    filterParams.languages?.forEach((value) =>
+      canonical.append("languages", value),
+    );
+
+    if (filterParams.moveInDate) {
+      canonical.set("moveInDate", filterParams.moveInDate);
+    }
+    if (filterParams.leaseDuration) {
+      canonical.set("leaseDuration", filterParams.leaseDuration);
+    }
+    if (filterParams.roomType) {
+      canonical.set("roomType", filterParams.roomType);
+    }
+    if (filterParams.genderPreference) {
+      canonical.set("genderPreference", filterParams.genderPreference);
+    }
+    if (filterParams.householdGender) {
+      canonical.set("householdGender", filterParams.householdGender);
+    }
+    if (typeof filterParams.nearMatches === "boolean") {
+      canonical.set(
+        "nearMatches",
+        filterParams.nearMatches ? "true" : "false",
+      );
+    }
+  } catch {
+    // Best-effort fallback when parsing fails (for malformed URLs).
+    for (const key of FILTER_QUERY_KEYS) {
+      const values = searchParams.getAll(key);
+      values.forEach((value) => canonical.append(key, value));
+    }
+  }
+
+  canonical.sort();
+  return canonical;
 }
 
 export const VALID_AMENITIES = [
@@ -434,12 +520,14 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     VALID_HOUSEHOLD_GENDERS as readonly string[],
   );
 
-  // Parse nearMatches boolean flag
+  // Parse nearMatches boolean flag.
+  // Accept both boolean strings and numeric toggles for backward compatibility:
+  // true/false and 1/0.
   const nearMatchesRaw = getFirstValue(raw.nearMatches);
   const nearMatches =
-    nearMatchesRaw === "true"
+    nearMatchesRaw === "true" || nearMatchesRaw === "1"
       ? true
-      : nearMatchesRaw === "false"
+      : nearMatchesRaw === "false" || nearMatchesRaw === "0"
         ? false
         : undefined;
 

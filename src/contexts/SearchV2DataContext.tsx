@@ -33,34 +33,15 @@ import {
   ReactNode,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
 import type {
   SearchV2GeoJSON,
   SearchV2Pin,
   SearchV2Mode,
 } from "@/lib/search/types";
 
-const FILTER_RELEVANT_KEYS = [
-  "q",
-  "minPrice",
-  "maxPrice",
-  "amenities",
-  "moveInDate",
-  "leaseDuration",
-  "houseRules",
-  "languages",
-  "roomType",
-  "genderPreference",
-  "householdGender",
-  "nearMatches",
-] as const;
-
 function getFilterRelevantParams(sp: URLSearchParams): string {
-  const filtered = new URLSearchParams();
-  for (const key of FILTER_RELEVANT_KEYS) {
-    sp.getAll(key).forEach((v) => filtered.append(key, v));
-  }
-  filtered.sort();
-  return filtered.toString();
+  return buildCanonicalFilterParamsFromSearchParams(sp).toString();
 }
 
 const BOUNDS_KEYS = ["minLat", "maxLat", "minLng", "maxLng"] as const;

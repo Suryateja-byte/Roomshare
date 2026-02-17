@@ -53,6 +53,7 @@ global.fetch = mockFetch;
 
 // Import component after mocks
 import PersistentMapWrapper from "@/components/PersistentMapWrapper";
+const MAP_FETCH_DEBOUNCE_MS = 250;
 
 describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
   beforeEach(() => {
@@ -104,9 +105,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
         <PersistentMapWrapper shouldRenderMap={true} />
       );
 
-      // Advance timer to trigger throttled fetch (2000ms)
+      // Advance timer to trigger debounced fetch
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       // Verify fetch was called
@@ -154,7 +155,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
       // Advance timer to trigger fetch
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       // Unmount immediately
@@ -178,22 +179,22 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     });
   });
 
-  describe("Request Throttling (2000ms)", () => {
-    it("waits 2000ms before making API request", async () => {
+  describe("Request Debounce (250ms)", () => {
+    it("waits for debounce before making API request", async () => {
       render(<PersistentMapWrapper shouldRenderMap={true} />);
 
       // Initially no fetch
       expect(mockFetch).not.toHaveBeenCalled();
 
-      // Advance 1000ms - still no fetch
+      // Advance half debounce time - still no fetch
       await act(async () => {
-        jest.advanceTimersByTime(1000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS / 2);
       });
       expect(mockFetch).not.toHaveBeenCalled();
 
-      // Advance remaining 1000ms - fetch should trigger
+      // Advance remaining half debounce - fetch should trigger
       await act(async () => {
-        jest.advanceTimersByTime(1000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS / 2);
       });
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
@@ -219,7 +220,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
       // Trigger first fetch
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       // Verify abort signal was captured
@@ -236,7 +237,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
       // First fetch
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
@@ -245,7 +246,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
       // Advance timer
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       // No additional fetch
@@ -261,7 +262,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       render(<PersistentMapWrapper shouldRenderMap={true} />);
 
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -273,6 +274,23 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       expect(fetchUrl).toContain("maxPrice=1500");
     });
 
+    it("normalizes language filters before map fetch", async () => {
+      mockSearchParams.set("languages", "Telugu");
+
+      render(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const fetchUrl = mockFetch.mock.calls[0][0];
+
+      // Language names should be canonicalized to codes so map/list use identical filters.
+      expect(fetchUrl).toContain("languages=te");
+      expect(fetchUrl).not.toContain("languages=Telugu");
+    });
+
     it("does NOT refetch when pagination params change", async () => {
       const { rerender } = render(
         <PersistentMapWrapper shouldRenderMap={true} />
@@ -280,7 +298,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
       // First fetch
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
@@ -290,7 +308,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       rerender(<PersistentMapWrapper shouldRenderMap={true} />);
 
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       // No additional fetch - page is not map-relevant
@@ -341,6 +359,71 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       const map = getByTestId("dynamic-map");
       expect(map).toHaveAttribute("data-listings-count", "0");
     });
+
+    it("clears stale cached v2 data when switching to v1 mode", async () => {
+      // Start in v2 mode with v2 data present
+      mockIsV2Enabled = true;
+      mockHasV2Data = true;
+
+      const { rerender, getByTestId } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      // v2 features are empty in this test fixture
+      expect(getByTestId("dynamic-map")).toHaveAttribute(
+        "data-listings-count",
+        "0"
+      );
+
+      // Switch to v1 mode with no v2 data
+      mockIsV2Enabled = false;
+      mockHasV2Data = false;
+
+      rerender(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      // Trigger throttled v1 fetch
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      // Should now render fetched v1 listing count (not stale v2 cache)
+      await waitFor(() => {
+        expect(getByTestId("dynamic-map")).toHaveAttribute(
+          "data-listings-count",
+          "1"
+        );
+      });
+    });
+
+    it("ignores stale v2 map data when v2 mode is disabled", async () => {
+      // Simulate stale context: v2MapData still present but mode is disabled.
+      mockIsV2Enabled = false;
+      mockHasV2Data = true;
+
+      const { getByTestId } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      // Should fall back to v1 API fetch instead of rendering stale v2 markers.
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("dynamic-map")).toHaveAttribute(
+          "data-listings-count",
+          "1",
+        );
+      });
+    });
   });
 
   describe("Error Handling", () => {
@@ -356,7 +439,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       );
 
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       // Error banner should be visible
@@ -380,9 +463,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
         <PersistentMapWrapper shouldRenderMap={true} />
       );
 
-      // Initial fetch after 2000ms throttle
+      // Initial fetch after debounce
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       // First 429 schedules a retry - advance past retry delay (2000ms from Retry-After: 2)
@@ -417,7 +500,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
       // First fetch fails
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       // Error shown
@@ -464,7 +547,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
       // Fetch should proceed with clamped bounds
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
       expect(mockFetch).toHaveBeenCalled();
     });
@@ -485,7 +568,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
       // Fetch should proceed
       await act(async () => {
-        jest.advanceTimersByTime(2000);
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
 
       expect(mockFetch).toHaveBeenCalled();
