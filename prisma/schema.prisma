@@ -102,7 +102,7 @@ model Listing {
   ownerId             String
   title               String
   description         String
-  price               Float
+  price               Decimal            @db.Decimal(10, 2)
   images              String[]         @default([])
   amenities           String[]
   houseRules          String[]
@@ -184,7 +184,7 @@ model Booking {
   startDate       DateTime
   endDate         DateTime
   status          BookingStatus @default(PENDING)
-  totalPrice      Float
+  totalPrice      Decimal       @db.Decimal(10, 2)
   rejectionReason String? // Optional reason when host rejects booking
   version         Int           @default(1) // P0-04: Optimistic locking for race-safe updates
   createdAt       DateTime      @default(now())

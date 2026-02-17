@@ -25,6 +25,8 @@ import {
 } from "@/lib/request-context";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
+import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Check if v2 is enabled via feature flag or URL param.
@@ -123,7 +125,12 @@ export async function GET(request: NextRequest) {
           error.message.includes("Invalid") ||
           error.message.includes("must be"));
 
-      console.error("Search v2 API error:", { error, requestId });
+      logger.sync.error("Search v2 API error", {
+        error: error instanceof Error ? error.message : String(error),
+        route: "/api/search/v2",
+        requestId,
+      });
+      Sentry.captureException(error);
 
       return NextResponse.json(
         {

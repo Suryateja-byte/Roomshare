@@ -62,9 +62,15 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
     // Check if this is the current user's own profile
     const isOwnProfile = currentUserId === id;
 
+    // Convert Prisma Decimal price fields to plain numbers at the query boundary
+    const userWithNumberPrices = {
+        ...user,
+        listings: user.listings.map(l => ({ ...l, price: Number(l.price) })),
+    };
+
     return (
         <UserProfileClient
-            user={user}
+            user={userWithNumberPrices}
             isOwnProfile={isOwnProfile}
             averageRating={avgRating}
             currentUserId={currentUserId}

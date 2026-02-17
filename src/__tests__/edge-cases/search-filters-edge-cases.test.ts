@@ -414,7 +414,7 @@ describe("Search Filters Edge Cases - Category D", () => {
 
       // Verify ascending order
       for (let i = 1; i < listings.length; i++) {
-        expect(listings[i].price).toBeGreaterThanOrEqual(listings[i - 1].price);
+        expect(Number(listings[i].price)).toBeGreaterThanOrEqual(Number(listings[i - 1].price));
       }
     });
 
@@ -431,7 +431,7 @@ describe("Search Filters Edge Cases - Category D", () => {
 
       // Verify descending order
       for (let i = 1; i < listings.length; i++) {
-        expect(listings[i].price).toBeLessThanOrEqual(listings[i - 1].price);
+        expect(Number(listings[i].price)).toBeLessThanOrEqual(Number(listings[i - 1].price));
       }
     });
 

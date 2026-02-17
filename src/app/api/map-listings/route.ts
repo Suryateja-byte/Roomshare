@@ -20,6 +20,8 @@ import {
   parseSearchParams,
 } from "@/lib/search-params";
 import { LAT_OFFSET_DEGREES } from "@/lib/constants";
+import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
@@ -131,7 +133,12 @@ export async function GET(request: NextRequest) {
         },
       );
     } catch (error) {
-      console.error("Map listings API error:", { error, requestId });
+      logger.sync.error("Map listings API error", {
+        error: error instanceof Error ? error.message : String(error),
+        route: "/api/map-listings",
+        requestId,
+      });
+      Sentry.captureException(error);
       return NextResponse.json(
         { error: "Failed to fetch map listings" },
         {

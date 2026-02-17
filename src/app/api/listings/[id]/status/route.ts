@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/nextjs';
 
 // Public endpoint - no auth required
 // Used by ListingFreshnessCheck to verify listing availability for all viewers
@@ -37,7 +39,11 @@ export async function GET(
             updatedAt: listing.updatedAt
         });
     } catch (error) {
-        console.error('Error checking listing status:', error);
+        logger.sync.error('Error checking listing status', {
+            error: error instanceof Error ? error.message : String(error),
+            route: '/api/listings/[id]/status',
+        });
+        Sentry.captureException(error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

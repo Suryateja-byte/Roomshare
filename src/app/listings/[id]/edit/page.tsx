@@ -36,7 +36,7 @@ export default async function EditListingPage({ params }: PageProps) {
                     <h1 className="text-3xl font-bold text-foreground">Edit Listing</h1>
                     <p className="text-muted-foreground mt-2">Update your listing details</p>
                 </div>
-                <EditListingForm listing={listing} />
+                <EditListingForm listing={{ ...listing, price: Number(listing.price) }} />
             </div>
         </div>
     );

@@ -81,7 +81,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
         if (pendingKey) {
             // Recover the pending key - this will be used if user resubmits
             idempotencyKeyRef.current = pendingKey;
-            console.log('Recovered pending idempotency key:', pendingKey);
+            // Recovered pending idempotency key for retry
         } else {
             // Generate a new key for this session
             idempotencyKeyRef.current = `booking_${listingId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -324,7 +324,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
             }
         } catch (error) {
             // Catch unexpected errors (network failures, etc.)
-            console.error('Booking submission error:', error);
+            // Booking submission error caught — user sees generic message below
             setErrorType('server');
             setMessage('An unexpected error occurred. Please try again.');
         } finally {

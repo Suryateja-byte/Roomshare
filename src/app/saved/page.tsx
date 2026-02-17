@@ -17,5 +17,8 @@ export default async function SavedPage() {
 
     const savedListings = await getSavedListings();
 
-    return <SavedListingsClient initialListings={savedListings} />;
+    // Convert Prisma Decimal price fields to plain numbers at the query boundary
+    const listings = savedListings.map(l => ({ ...l, price: Number(l.price) }));
+
+    return <SavedListingsClient initialListings={listings} />;
 }

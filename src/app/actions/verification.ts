@@ -266,8 +266,6 @@ export async function approveVerification(requestId: string) {
             targetId: requestId,
             details: {
                 userId: request.userId,
-                userName: request.user.name,
-                userEmail: request.user.email,
                 documentType: request.documentType
             }
         });
@@ -341,8 +339,6 @@ export async function rejectVerification(requestId: string, reason: string) {
             targetId: requestId,
             details: {
                 userId: request.userId,
-                userName: request.user.name,
-                userEmail: request.user.email,
                 documentType: request.documentType,
                 rejectionReason: reason
             }

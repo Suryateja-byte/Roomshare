@@ -27,10 +27,17 @@ export default async function BookingsPage() {
         );
     }
 
+    // Convert Prisma Decimal fields to plain numbers at the query boundary
+    const convertBooking = (b: any) => ({
+        ...b,
+        totalPrice: Number(b.totalPrice),
+        listing: { ...b.listing, price: Number(b.listing.price) },
+    });
+
     return (
         <BookingsClient
-            sentBookings={sentBookings || []}
-            receivedBookings={receivedBookings || []}
+            sentBookings={(sentBookings || []).map(convertBooking)}
+            receivedBookings={(receivedBookings || []).map(convertBooking)}
         />
     );
 }

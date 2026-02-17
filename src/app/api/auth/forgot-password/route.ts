@@ -5,6 +5,8 @@ import { withRateLimit } from '@/lib/with-rate-limit';
 import { normalizeEmail } from '@/lib/normalize-email';
 import { createTokenPair } from '@/lib/token-security';
 import { verifyTurnstileToken } from '@/lib/turnstile';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/nextjs';
 
 export async function POST(request: NextRequest) {
     // Rate limit: 3 password reset requests per hour per IP
@@ -75,9 +77,9 @@ export async function POST(request: NextRequest) {
         // For now, we'll log the reset link (in development) and return success
         const resetUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
 
-        // Log in development only
+        // Log in development only (no PII — token is ephemeral)
         if (process.env.NODE_ENV === 'development') {
-            console.log('Password reset link:', resetUrl);
+            logger.sync.debug('Password reset link generated', { route: '/api/auth/forgot-password' });
         }
 
         // Send password reset email
@@ -86,14 +88,21 @@ export async function POST(request: NextRequest) {
             resetLink: resetUrl
         });
         if (!emailResult.success) {
-            console.error('Failed to send password reset email:', emailResult.error);
+            logger.sync.error('Failed to send password reset email', {
+                error: String(emailResult.error),
+                route: '/api/auth/forgot-password',
+            });
         }
 
         return NextResponse.json({
             message: 'If an account with that email exists, a password reset link has been sent.',
         });
     } catch (error) {
-        console.error('Forgot password error:', error);
+        logger.sync.error('Forgot password error', {
+            error: error instanceof Error ? error.message : String(error),
+            route: '/api/auth/forgot-password',
+        });
+        Sentry.captureException(error);
         return NextResponse.json(
             { error: 'An error occurred. Please try again.' },
             { status: 500 }

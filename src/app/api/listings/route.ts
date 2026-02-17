@@ -326,14 +326,14 @@ export async function POST(request: Request) {
 
             // Side effects only for non-cached results
             if (!cached) {
-                await fireSideEffects(result);
+                await fireSideEffects({ ...result, price: Number(result.price) });
             }
         } else {
             // 13. Non-idempotent path: regular prisma.$transaction
             result = await prisma.$transaction(createListingInTx);
 
             // Side effects
-            await fireSideEffects(result);
+            await fireSideEffects({ ...result, price: Number(result.price) });
         }
 
         await logger.info('Listing created successfully', {
@@ -346,7 +346,7 @@ export async function POST(request: Request) {
         });
 
         // 18. Return 201 with no-cache headers
-        const response = NextResponse.json(result, { status: 201 });
+        const response = NextResponse.json({ ...result, price: Number(result.price) }, { status: 201 });
         response.headers.set('Cache-Control', 'no-store');
         if (cached) {
             response.headers.set('X-Idempotency-Replayed', 'true');

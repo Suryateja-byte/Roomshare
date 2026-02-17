@@ -315,7 +315,7 @@ export async function POST(request: Request) {
     } catch (error) {
       // Handle circuit breaker or timeout errors
       if (isCircuitOpenError(error)) {
-        console.error("Radar API circuit breaker open - service unavailable");
+        logger.sync.error("Radar API circuit breaker open - service unavailable", { route: '/api/nearby' });
         return NextResponse.json(
           {
             error: "Nearby search temporarily unavailable",
@@ -325,7 +325,7 @@ export async function POST(request: Request) {
         );
       }
       if (isTimeoutError(error)) {
-        console.error(`Radar API timeout: ${error.message}`);
+        logger.sync.error("Radar API timeout", { error: error.message, route: '/api/nearby' });
         return NextResponse.json(
           {
             error: "Nearby search timed out",

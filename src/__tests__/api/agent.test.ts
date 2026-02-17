@@ -401,4 +401,83 @@ describe('POST /api/agent', () => {
       expect(data.error).toBe('Internal server error');
     });
   });
+
+  // ── Additional edge cases ──
+
+  describe('coordinate boundary values', () => {
+    it('accepts exact boundary coordinates (-90, -180)', async () => {
+      const res = await POST(createRequest({ question: 'What is nearby?', lat: -90, lng: -180 }));
+      expect(res.status).toBe(200);
+    });
+
+    it('accepts exact boundary coordinates (90, 180)', async () => {
+      const res = await POST(createRequest({ question: 'What is nearby?', lat: 90, lng: 180 }));
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects lat just outside range (90.001)', async () => {
+      const res = await POST(createRequest({ question: 'What is nearby?', lat: 90.001, lng: 0 }));
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects lng just outside range (-180.001)', async () => {
+      const res = await POST(createRequest({ question: 'What is nearby?', lat: 0, lng: -180.001 }));
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects Infinity coordinates', async () => {
+      const res = await POST(createRequest({ question: 'What is nearby?', lat: Infinity, lng: 0 }));
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('origin validation edge cases (production)', () => {
+    beforeEach(() => {
+      process.env = {
+        ...process.env,
+        NODE_ENV: 'production',
+        ALLOWED_ORIGINS: 'https://roomshare.app,https://www.roomshare.app',
+        ALLOWED_HOSTS: 'roomshare.app,www.roomshare.app',
+      } as unknown as NodeJS.ProcessEnv;
+    });
+
+    it('allows second origin in comma-separated list', async () => {
+      const res = await POST(createRequest(validBody, {
+        origin: 'https://www.roomshare.app',
+        host: 'www.roomshare.app',
+      }) as any);
+      expect(res.status).toBe(200);
+    });
+
+    it('allows valid host fallback when origin is absent', async () => {
+      const res = await POST(createRequest(validBody, { host: 'www.roomshare.app' }) as any);
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects when both origin and host are missing in production', async () => {
+      const res = await POST(createRequest(validBody, {}) as any);
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('question edge cases', () => {
+    it('returns 400 for whitespace-only question (too short after trim)', async () => {
+      const res = await POST(createRequest({ question: '   ', lat: 37.7749, lng: -122.4194 }));
+      expect(res.status).toBe(400);
+    });
+
+    it('accepts exactly 2-char question', async () => {
+      const res = await POST(createRequest({ question: 'Hi', lat: 37.7749, lng: -122.4194 }));
+      expect(res.status).toBe(200);
+    });
+
+    it('accepts exactly 500-char question', async () => {
+      const res = await POST(createRequest({
+        question: 'x'.repeat(500),
+        lat: 37.7749,
+        lng: -122.4194,
+      }));
+      expect(res.status).toBe(200);
+    });
+  });
 });

@@ -194,7 +194,7 @@ export async function createListing(_prevState: CreateListingState, formData: Fo
             id: listing.id,
             title: listing.title,
             description: listing.description,
-            price: listing.price,
+            price: Number(listing.price),
             city,
             state,
             roomType: null, // Not included in basic create form
@@ -209,7 +209,7 @@ export async function createListing(_prevState: CreateListingState, formData: Fo
             });
         });
 
-        return { success: true, data: listing };
+        return { success: true, data: { ...listing, price: Number(listing.price) } };
 
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
