@@ -6,11 +6,13 @@ import userEvent from '@testing-library/user-event'
 
 // Mock useSearchParams and useRouter
 const mockPush = jest.fn()
+const mockReplace = jest.fn()
 const mockSearchParams = new URLSearchParams()
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
+    replace: mockReplace,
     refresh: jest.fn(),
   }),
   useSearchParams: () => mockSearchParams,
