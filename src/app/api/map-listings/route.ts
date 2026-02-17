@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const requestId = getRequestId();
 
     try {
-      // Rate limiting via Redis (fail-closed in production)
+      // Rate limiting via Redis (falls back to DB rate limiting when Redis unavailable)
       const rateLimitResponse = await withRateLimitRedis(request, {
         type: "map",
       });

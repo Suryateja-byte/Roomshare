@@ -62,7 +62,7 @@ export async function GET() {
         status: 'error',
         error: 'Redis connection failed'
       };
-      // Redis failure is non-fatal - we have DB fallback for rate limiting
+      // Redis failure is non-fatal - map/metrics/search fall back to DB; chat fails closed
     }
   } else {
     checks.redis = { status: 'ok', latency: 0 }; // Not configured, using DB fallback

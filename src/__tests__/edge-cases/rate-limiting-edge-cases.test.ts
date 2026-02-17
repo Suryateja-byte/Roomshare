@@ -14,6 +14,7 @@
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
+    $queryRaw: jest.fn(),
     rateLimitEntry: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
@@ -49,6 +50,7 @@ jest.mock("@upstash/redis", () => ({
 }));
 
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 describe("Rate Limiting Edge Cases - Category B", () => {
   beforeEach(() => {
@@ -127,63 +129,51 @@ describe("Rate Limiting Edge Cases - Category B", () => {
     });
   });
 
-  // B2: Concurrent requests race condition
+  // B2: Concurrent requests race condition — now uses atomic SQL
   describe("B2: Concurrent rate limit updates", () => {
-    it("handles simultaneous requests from same IP", async () => {
-      let count = 0;
+    it("handles simultaneous requests via atomic SQL (no TOCTOU)", async () => {
+      const now = new Date();
+      let atomicCount = 2;
 
-      (prisma.rateLimitEntry.update as jest.Mock).mockImplementation(
-        async () => {
-          count++;
-          // Simulate atomic increment
-          return { id: "entry-123", count };
-        },
-      );
+      // Each concurrent call to $queryRaw atomically increments and returns
+      (prisma.$queryRaw as jest.Mock).mockImplementation(async () => {
+        atomicCount++;
+        return [{ id: "entry-123", count: atomicCount, windowStart: now, expiresAt: new Date(now.getTime() + 60000) }];
+      });
+      (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
 
-      // Simulate concurrent requests
-      await Promise.all([
-        prisma.rateLimitEntry.update({
-          where: { id: "entry-123" },
-          data: { count: { increment: 1 } },
-        }),
-        prisma.rateLimitEntry.update({
-          where: { id: "entry-123" },
-          data: { count: { increment: 1 } },
-        }),
-        prisma.rateLimitEntry.update({
-          where: { id: "entry-123" },
-          data: { count: { increment: 1 } },
-        }),
+      const config = { limit: 10, windowMs: 60000 };
+      const results = await Promise.all([
+        checkRateLimit("127.0.0.1", "/api/test", config),
+        checkRateLimit("127.0.0.1", "/api/test", config),
+        checkRateLimit("127.0.0.1", "/api/test", config),
       ]);
 
-      expect(count).toBe(3);
+      // All 3 should succeed (counts 3, 4, 5 — all under limit 10)
+      expect(results.every(r => r.success)).toBe(true);
+      // Atomic SQL used, not findUnique+update
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+      expect(prisma.rateLimitEntry.update).not.toHaveBeenCalled();
     });
 
-    it("maintains consistency with atomic operations", async () => {
-      let finalCount = 0;
+    it("atomically denies concurrent requests at limit", async () => {
+      const now = new Date();
 
-      (prisma.rateLimitEntry.upsert as jest.Mock).mockImplementation(
-        async () => {
-          finalCount++;
-          return { count: finalCount };
-        },
-      );
+      // Atomic UPDATE returns empty (count >= limit)
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+      (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue({
+        id: "entry-123", count: 10, windowStart: now, expiresAt: new Date(now.getTime() + 60000),
+      });
 
-      const expiresAt = new Date(Date.now() + 3600000);
+      const config = { limit: 10, windowMs: 60000 };
       const results = await Promise.all([
-        prisma.rateLimitEntry.upsert({
-          where: { id: "entry-123" },
-          update: { count: { increment: 1 } },
-          create: { identifier: "ip", endpoint: "/api", count: 1, expiresAt },
-        }),
-        prisma.rateLimitEntry.upsert({
-          where: { id: "entry-123" },
-          update: { count: { increment: 1 } },
-          create: { identifier: "ip", endpoint: "/api", count: 1, expiresAt },
-        }),
+        checkRateLimit("127.0.0.1", "/api/test", config),
+        checkRateLimit("127.0.0.1", "/api/test", config),
       ]);
 
-      expect(results.length).toBe(2);
+      // Both should be denied
+      expect(results.every(r => !r.success)).toBe(true);
     });
   });
 

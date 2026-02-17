@@ -85,7 +85,7 @@ Local Docker default: `postgresql://postgres:password@localhost:5433/roomshare?s
 |----------|----------|-------------|---------------|
 | `CRON_SECRET` | Prod only | Authenticates cron job requests (min 32 chars) | `openssl rand -base64 32` |
 | `LOG_HMAC_SECRET` | Recommended | HMAC key for privacy-safe metric logging | `openssl rand -hex 32` |
-| `METRICS_SECRET` | Recommended | Bearer token for `/api/metrics/ops` endpoint (default-deny if unset) | `openssl rand -base64 32` |
+| `METRICS_SECRET` | Prod only | Bearer token for `/api/metrics/ops` endpoint, min 32 chars (default-deny if unset) | `openssl rand -base64 32` |
 
 ### Origin/Host Security (Production)
 
@@ -94,7 +94,7 @@ Local Docker default: `postgresql://postgres:password@localhost:5433/roomshare?s
 | `ALLOWED_ORIGINS` | Prod only | Comma-separated allowed origins | `https://roomshare.com,https://www.roomshare.com` |
 | `ALLOWED_HOSTS` | Prod only | Comma-separated allowed hosts | `roomshare.com,www.roomshare.com` |
 
-These are enforced by `/api/chat` and `/api/metrics` to reject cross-origin requests.
+These are enforced by `/api/agent`, `/api/chat`, and `/api/metrics` to reject cross-origin requests.
 
 ### Error Tracking (Sentry)
 

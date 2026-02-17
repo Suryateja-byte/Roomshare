@@ -4,6 +4,7 @@
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
+    $queryRaw: jest.fn(),
     rateLimitEntry: {
       deleteMany: jest.fn(),
       findUnique: jest.fn(),
@@ -33,16 +34,13 @@ describe("rate-limit", () => {
 
     describe("successful requests", () => {
       it("allows first request and creates new entry", async () => {
-        const now = new Date();
+        // Atomic UPDATE returns empty → no valid entry
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 0,
         });
-        // Atomic upsert returns the created/updated entry
-        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
-          count: 1,
-          windowStart: now,
-          expiresAt: new Date(now.getTime() + config.windowMs),
-        });
+        (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue(null);
+        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({});
 
         const result = await checkRateLimit(identifier, endpoint, config);
 
@@ -51,16 +49,14 @@ describe("rate-limit", () => {
         expect(result.resetAt).toBeInstanceOf(Date);
       });
 
-      it("allows requests within limit", async () => {
+      it("allows requests within limit via atomic increment", async () => {
         const now = new Date();
+        // Atomic UPDATE succeeds (count under limit)
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([
+          { id: "entry-123", count: 3, windowStart: now, expiresAt: new Date(now.getTime() + 60000) },
+        ]);
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 0,
-        });
-        // Upsert increments count; returns entry with count=3
-        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
-          count: 3,
-          windowStart: now,
-          expiresAt: new Date(now.getTime() + config.windowMs),
         });
 
         const result = await checkRateLimit(identifier, endpoint, config);
@@ -69,45 +65,28 @@ describe("rate-limit", () => {
         expect(result.remaining).toBe(2); // 5 - 3
       });
 
-      it("increments count atomically via upsert", async () => {
+      it("uses atomic SQL increment (not stale JS value)", async () => {
         const now = new Date();
-        (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
-          count: 0,
-        });
-        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
-          count: 2,
-          windowStart: now,
-          expiresAt: new Date(now.getTime() + config.windowMs),
-        });
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([
+          { id: "entry-123", count: 2, windowStart: now, expiresAt: new Date(now.getTime() + 60000) },
+        ]);
+        (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
 
-        await checkRateLimit(identifier, endpoint, config);
+        const result = await checkRateLimit(identifier, endpoint, config);
 
-        expect(prisma.rateLimitEntry.upsert).toHaveBeenCalledWith({
-          where: {
-            identifier_endpoint: { identifier, endpoint },
-          },
-          create: {
-            identifier,
-            endpoint,
-            count: 1,
-            windowStart: expect.any(Date),
-            expiresAt: expect.any(Date),
-          },
-          update: {
-            count: { increment: 1 },
-          },
-        });
+        expect(result.success).toBe(true);
+        expect(result.remaining).toBe(3);
+        expect(prisma.$queryRaw).toHaveBeenCalled();
+        expect(prisma.rateLimitEntry.update).not.toHaveBeenCalled();
       });
 
       it("returns correct remaining count", async () => {
         const now = new Date();
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([
+          { id: "entry-123", count: 4, windowStart: now, expiresAt: new Date(now.getTime() + 60000) },
+        ]);
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 0,
-        });
-        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
-          count: 4,
-          windowStart: now,
-          expiresAt: new Date(now.getTime() + config.windowMs),
         });
 
         const result = await checkRateLimit(identifier, endpoint, config);
@@ -117,41 +96,54 @@ describe("rate-limit", () => {
 
       it("resets window for expired entry", async () => {
         const oldWindowStart = new Date(Date.now() - 120000); // 2 minutes ago
+        // Atomic UPDATE returns empty (expired window doesn't match)
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 0,
         });
-        // Upsert returns an entry with an expired windowStart
-        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
-          count: 6, // Over limit but window expired
+        // findUnique returns expired entry
+        (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue({
+          id: "entry-123",
+          count: 5,
           windowStart: oldWindowStart,
-          expiresAt: new Date(oldWindowStart.getTime() + config.windowMs),
         });
-        // After detecting expired window, production code resets via update
-        (prisma.rateLimitEntry.update as jest.Mock).mockResolvedValue({
-          count: 1,
-          windowStart: new Date(),
-          expiresAt: new Date(Date.now() + config.windowMs),
-        });
+        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({});
 
         const result = await checkRateLimit(identifier, endpoint, config);
 
         expect(result.success).toBe(true);
-        expect(result.remaining).toBe(4); // limit - reset.count (5 - 1)
-        expect(prisma.rateLimitEntry.update).toHaveBeenCalled();
+        expect(result.remaining).toBe(4); // New window starts
+        expect(prisma.rateLimitEntry.upsert).toHaveBeenCalled();
+      });
+
+      it("creates new window when atomic UPDATE matches 0 rows and no valid entry", async () => {
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+        (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+        (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue(null);
+        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({});
+
+        const result = await checkRateLimit(identifier, endpoint, config);
+
+        expect(result.success).toBe(true);
+        expect(result.remaining).toBe(4);
+        expect(prisma.rateLimitEntry.upsert).toHaveBeenCalled();
       });
     });
 
     describe("blocked requests", () => {
-      it("blocks when limit exceeded", async () => {
+      it("atomically denies when count >= limit (no TOCTOU gap)", async () => {
         const now = new Date();
+        // Atomic UPDATE returns empty (count >= limit)
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 0,
         });
-        // Upsert returns count > limit (already incremented past limit)
-        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
-          count: 6, // > limit of 5
+        // findUnique shows existing entry at limit with valid window
+        (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue({
+          id: "entry-123",
+          count: 5,
           windowStart: now,
-          expiresAt: new Date(now.getTime() + config.windowMs),
+          expiresAt: new Date(now.getTime() + 60000),
         });
 
         const result = await checkRateLimit(identifier, endpoint, config);
@@ -159,17 +151,20 @@ describe("rate-limit", () => {
         expect(result.success).toBe(false);
         expect(result.remaining).toBe(0);
         expect(result.retryAfter).toBeGreaterThan(0);
+        expect(prisma.rateLimitEntry.update).not.toHaveBeenCalled();
       });
 
       it("returns retryAfter in seconds", async () => {
         const now = new Date();
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 0,
         });
-        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
-          count: 6,
+        (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue({
+          id: "entry-123",
+          count: 5,
           windowStart: now,
-          expiresAt: new Date(now.getTime() + config.windowMs),
+          expiresAt: new Date(now.getTime() + 60000),
         });
 
         const result = await checkRateLimit(identifier, endpoint, config);
@@ -181,13 +176,15 @@ describe("rate-limit", () => {
 
       it("provides resetAt timestamp when blocked", async () => {
         const now = new Date();
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 0,
         });
-        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
-          count: 6,
+        (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue({
+          id: "entry-123",
+          count: 5,
           windowStart: now,
-          expiresAt: new Date(now.getTime() + config.windowMs),
+          expiresAt: new Date(now.getTime() + 60000),
         });
 
         const result = await checkRateLimit(identifier, endpoint, config);
@@ -199,15 +196,11 @@ describe("rate-limit", () => {
 
     describe("cleanup", () => {
       it("cleans up expired entries", async () => {
-        const now = new Date();
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 2,
         });
-        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
-          count: 1,
-          windowStart: now,
-          expiresAt: new Date(now.getTime() + config.windowMs),
-        });
+        (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue(null);
+        (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({});
 
         await checkRateLimit(identifier, endpoint, config);
 

@@ -74,7 +74,7 @@ export async function checkRateLimit(
   const expiresAt = new Date(now.getTime() + windowMs);
 
   try {
-    // Opportunistic cleanup of expired entries
+    // Clean up expired entries for this identifier/endpoint (opportunistic cleanup)
     await prisma.rateLimitEntry.deleteMany({
       where: {
         identifier,
@@ -83,47 +83,37 @@ export async function checkRateLimit(
       },
     });
 
-    // Atomic upsert: create or increment in a single operation to avoid TOCTOU
-    const result = await prisma.rateLimitEntry.upsert({
-      where: {
-        identifier_endpoint: { identifier, endpoint },
-      },
-      create: {
-        identifier,
-        endpoint,
-        count: 1,
-        windowStart: now,
-        expiresAt,
-      },
-      update: {
-        count: { increment: 1 },
-      },
-    });
+    // Atomic: increment count only if within window AND under limit
+    const updated = await prisma.$queryRaw<
+      Array<{ id: string; count: number; windowStart: Date; expiresAt: Date }>
+    >`
+      UPDATE "RateLimitEntry"
+      SET count = count + 1
+      WHERE identifier = ${identifier}
+        AND endpoint = ${endpoint}
+        AND "windowStart" > ${windowStart}
+        AND count < ${limit}
+      RETURNING id, count, "windowStart", "expiresAt"
+    `;
 
-    // Check if the window has expired — if so, reset atomically
-    if (result.windowStart <= windowStart) {
-      // Window expired: reset count to 1 and start a new window
-      const reset = await prisma.rateLimitEntry.update({
-        where: {
-          identifier_endpoint: { identifier, endpoint },
-        },
-        data: {
-          count: 1,
-          windowStart: now,
-          expiresAt,
-        },
-      });
+    if (updated.length > 0) {
+      const row = updated[0];
+      const resetAt = new Date(row.windowStart.getTime() + windowMs);
       return {
         success: true,
-        remaining: limit - reset.count,
-        resetAt: expiresAt,
+        remaining: Math.max(0, limit - row.count),
+        resetAt,
       };
     }
 
-    // Window is still active — check if over limit
-    const resetAt = new Date(result.windowStart.getTime() + windowMs);
+    // 0 rows: either (a) no valid entry → create window, or (b) count >= limit → deny
+    const existing = await prisma.rateLimitEntry.findUnique({
+      where: { identifier_endpoint: { identifier, endpoint } },
+    });
 
-    if (result.count > limit) {
+    if (existing && existing.windowStart > windowStart) {
+      // (b) Entry exists, valid window, but count >= limit → DENY
+      const resetAt = new Date(existing.windowStart.getTime() + windowMs);
       const retryAfter = Math.ceil(
         (resetAt.getTime() - now.getTime()) / 1000,
       );
@@ -135,10 +125,31 @@ export async function checkRateLimit(
       };
     }
 
+    // (a) No valid entry or expired → create/reset window
+
+    // Create new entry or reset the window
+    await prisma.rateLimitEntry.upsert({
+      where: {
+        identifier_endpoint: { identifier, endpoint },
+      },
+      create: {
+        identifier,
+        endpoint,
+        count: 1,
+        windowStart: now,
+        expiresAt,
+      },
+      update: {
+        count: 1,
+        windowStart: now,
+        expiresAt,
+      },
+    });
+
     return {
       success: true,
-      remaining: Math.max(0, limit - result.count),
-      resetAt,
+      remaining: limit - 1,
+      resetAt: expiresAt,
     };
   } catch {
     // FAIL CLOSED: Deny by default on DB errors (security over availability)

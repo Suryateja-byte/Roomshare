@@ -68,39 +68,13 @@ const nextConfig: NextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 160, 256, 384],
   },
 
-  // Headers for security and performance
+  // Security headers fallback for paths excluded from middleware matcher
+  // CSP is now set per-request by src/middleware.ts with nonce injection
   async headers() {
-    const isDev = process.env.NODE_ENV !== 'production';
-    const scriptSrc = [
-      "script-src 'self'",
-      "'unsafe-inline'",
-      ...(isDev ? ["'unsafe-eval'"] : []),
-      "https://maps.googleapis.com",
-    ].join(' ');
-
     return [
       {
         source: "/(.*)",
         headers: [
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              scriptSrc,
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https:",
-              "object-src 'none'",
-              "font-src 'self' https://tiles.openfreemap.org",
-              "connect-src 'self' https://photon.komoot.io https://nominatim.openstreetmap.org https://tiles.openfreemap.org https://maps.googleapis.com https://places.googleapis.com https://*.supabase.co https://api.groq.com wss://*.supabase.co https://api.radar.io https://tiles.stadiamaps.com https://api.stadiamaps.com",
-              "worker-src 'self' blob:",
-              "child-src blob:",
-              "frame-src 'self' https://accounts.google.com",
-              "frame-ancestors 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "upgrade-insecure-requests",
-            ].join("; "),
-          },
           {
             key: "X-Frame-Options",
             value: "DENY",

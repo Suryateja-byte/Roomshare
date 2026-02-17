@@ -17,6 +17,7 @@ describe("Turnstile production enforcement", () => {
       GOOGLE_CLIENT_ID: "test-client-id",
       GOOGLE_CLIENT_SECRET: "test-client-secret",
       CRON_SECRET: "b".repeat(32),
+      METRICS_SECRET: "m".repeat(32),
     } as unknown as NodeJS.ProcessEnv;
   });
 

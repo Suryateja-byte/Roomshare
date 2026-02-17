@@ -28,7 +28,7 @@ export function buildCspHeader(nonce?: string): string {
     "default-src 'self'",
     `script-src ${scriptSrcTokens.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://picsum.photos https://i.pravatar.cc https://lh3.googleusercontent.com https://*.googleusercontent.com",
+    "img-src 'self' data: blob: https:",
     "object-src 'none'",
     "font-src 'self' https://tiles.openfreemap.org",
     `connect-src ${CONNECT_SRC_ORIGINS.join(" ")}`,
