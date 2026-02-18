@@ -214,7 +214,7 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
   // Pending state — initialized from URL, updated locally
   const [pending, setPendingState] = useState<BatchedFilterValues>(committed);
   const previousCommittedRef = useRef(committed);
-  const forceSyncFromUrlRef = useRef(false);
+  const forceSyncUntilRef = useRef(0);
 
   // Sync pending with URL when URL filter values change.
   // If only non-filter params change (for example map bounds), preserve unsaved edits.
@@ -223,8 +223,9 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
       const previousCommitted = previousCommittedRef.current;
       const committedFiltersChanged = !filtersEqual(committed, previousCommitted);
       const hasUnsavedEdits = !filtersEqual(prevPending, previousCommitted);
+      const isPostCommitSyncActive = Date.now() < forceSyncUntilRef.current;
       const shouldPreserveDirtyEdits =
-        !forceSyncFromUrlRef.current &&
+        !isPostCommitSyncActive &&
         !committedFiltersChanged &&
         hasUnsavedEdits;
 
@@ -235,7 +236,6 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
       return committed;
     });
     previousCommittedRef.current = committed;
-    forceSyncFromUrlRef.current = false;
   }, [committed]);
 
   const isDirty = useMemo(
@@ -263,9 +263,9 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
   }, [committed]);
 
   const commit = useCallback(() => {
-    // After an explicit apply action, prioritize URL state on the next sync.
-    // This avoids preserving stale dirty state during back/forward transitions.
-    forceSyncFromUrlRef.current = true;
+    // After an explicit apply action, prioritize URL state for a short window.
+    // This avoids preserving stale dirty state during immediate back/forward transitions.
+    forceSyncUntilRef.current = Date.now() + 10_000;
 
     // Start from current URL to preserve non-filter params (bounds, sort, q, lat, lng, nearMatches)
     const params = new URLSearchParams(searchParams.toString());
