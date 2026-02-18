@@ -264,37 +264,37 @@ describe('buildCspHeader', () => {
   })
 })
 
-describe('proxy matcher config', () => {
+describe('middleware matcher config', () => {
   /**
-   * proxy.ts imports auth which pulls in next-auth ESM modules that Jest
+   * middleware.ts imports auth which pulls in next-auth ESM modules that Jest
    * cannot transform directly. Instead of importing the module, we read the
    * source file and verify the matcher config structurally.
    */
-  let proxySource: string
+  let middlewareSource: string
 
   beforeAll(async () => {
     const fs = await import('fs')
     const path = await import('path')
-    proxySource = fs.readFileSync(
-      path.join(process.cwd(), 'src/proxy.ts'),
+    middlewareSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/middleware.ts'),
       'utf-8'
     )
   })
 
   it('exports a config with matcher array', () => {
-    expect(proxySource).toContain('export const config')
-    expect(proxySource).toContain('matcher:')
+    expect(middlewareSource).toContain('export const config')
+    expect(middlewareSource).toContain('matcher:')
   })
 
   it('matcher pattern excludes _next/static files', () => {
-    expect(proxySource).toContain('_next/static')
+    expect(middlewareSource).toContain('_next/static')
   })
 
   it('matcher pattern excludes _next/image files', () => {
-    expect(proxySource).toContain('_next/image')
+    expect(middlewareSource).toContain('_next/image')
   })
 
   it('matcher pattern excludes favicon.ico', () => {
-    expect(proxySource).toContain('favicon.ico')
+    expect(middlewareSource).toContain('favicon.ico')
   })
 })

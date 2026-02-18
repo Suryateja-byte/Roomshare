@@ -71,9 +71,7 @@ export function RecommendedFilters() {
         selected.push(suggestion.value);
       }
       params.delete(suggestion.param);
-      if (selected.length > 0) {
-        params.set(suggestion.param, selected.join(','));
-      }
+      selected.forEach((v) => params.append(suggestion.param, v));
     } else {
       params.set(suggestion.param, suggestion.value);
     }

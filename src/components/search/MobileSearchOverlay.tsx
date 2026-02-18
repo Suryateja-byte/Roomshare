@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Search, Clock, X } from "lucide-react";
+import { ArrowLeft, Clock, X } from "lucide-react";
 import { useRecentSearches } from "@/hooks/useRecentSearches";
+import LocationSearchInput from "@/components/LocationSearchInput";
 
 interface MobileSearchOverlayProps {
   /** Whether the overlay is open */
@@ -11,7 +12,7 @@ interface MobileSearchOverlayProps {
   /** Close the overlay */
   onClose: () => void;
   /** Called when user selects a recent search or submits */
-  onSearch: (query: string) => void;
+  onSearch: (query: string, coords?: { lat: number; lng: number }) => void;
   /** Current search query */
   currentQuery?: string;
 }
@@ -27,14 +28,21 @@ export default function MobileSearchOverlay({
   onSearch,
   currentQuery = "",
 }: MobileSearchOverlayProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [inputValue, setInputValue] = useState(currentQuery);
   const { recentSearches, removeRecentSearch, formatSearch } = useRecentSearches();
+
+  useEffect(() => {
+    setInputValue(currentQuery);
+  }, [currentQuery]);
 
   // Auto-focus input when opened
   useEffect(() => {
     if (isOpen) {
-      // Small delay to let animation start
-      const timer = setTimeout(() => inputRef.current?.focus(), 100);
+      const timer = setTimeout(() => {
+        const input = containerRef.current?.querySelector('input');
+        input?.focus();
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -61,7 +69,7 @@ export default function MobileSearchOverlay({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const value = inputRef.current?.value.trim();
+    const value = inputValue.trim();
     if (value) {
       onSearch(value);
       onClose();
@@ -95,15 +103,16 @@ export default function MobileSearchOverlay({
               </button>
 
               <form onSubmit={handleSubmit} className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    defaultValue={currentQuery}
+                <div ref={containerRef} className="relative">
+                  <LocationSearchInput
+                    value={inputValue}
+                    onChange={(v) => setInputValue(v)}
+                    onLocationSelect={(loc) => {
+                      onSearch(loc.name, { lat: loc.lat, lng: loc.lng });
+                      onClose();
+                    }}
                     placeholder="Search by city, neighborhood..."
-                    className="w-full h-10 pl-9 pr-4 bg-zinc-100 dark:bg-zinc-800 rounded-full text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-white/20"
-                    enterKeyHint="search"
+                    id="mobile-search-input"
                   />
                 </div>
               </form>

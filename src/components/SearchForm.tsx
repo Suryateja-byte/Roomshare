@@ -141,6 +141,20 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // AbortController for canceling in-flight async operations on rapid filter changes
     const abortControllerRef = useRef<AbortController | null>(null);
 
+    // Ref capturing all filter state so handleSearch can read fresh values
+    // without listing every filter variable in its useCallback dependency array.
+    // Updating a ref on every render is cheaper than a useEffect for this purpose.
+    const filtersRef = useRef({
+        location, minPrice, maxPrice, selectedCoords, moveInDate,
+        leaseDuration, roomType, amenities, houseRules, languages,
+        genderPreference, householdGender, isSearching,
+    });
+    filtersRef.current = {
+        location, minPrice, maxPrice, selectedCoords, moveInDate,
+        leaseDuration, roomType, amenities, houseRules, languages,
+        genderPreference, householdGender, isSearching,
+    };
+
     // Recent searches from canonical hook (handles localStorage, migration, enhanced format)
     const { recentSearches, saveRecentSearch, clearRecentSearches } = useRecentSearches();
     const [showRecentSearches, setShowRecentSearches] = useState(false);
@@ -248,11 +262,15 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const handleSearch = useCallback((e: React.FormEvent) => {
         e.preventDefault();
 
+        // Read all filter state from ref to avoid listing every filter in deps.
+        // filtersRef.current is synced on every render (see declaration above).
+        const filters = filtersRef.current;
+
         // Try natural language parsing: if the input contains structured filters
         // (price, room type, amenities, etc.), parse and redirect with those params
-        const trimmedLocation = location.trim();
+        const trimmedLocation = filters.location.trim();
         const nlParsed = trimmedLocation ? parseNaturalLanguageQuery(trimmedLocation) : null;
-        if (nlParsed && !selectedCoords) {
+        if (nlParsed && !filters.selectedCoords) {
             // NL query detected — build URL from parsed filters
             const nlParams = nlQueryToSearchParams(nlParsed);
             // Preserve map bounds and sort from current URL
@@ -272,7 +290,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
         // Prevent unbounded searches: if user typed location but didn't select from dropdown,
         // don't submit (this prevents full-table scans on the server)
-        if (trimmedLocation.length > 2 && !selectedCoords) {
+        if (trimmedLocation.length > 2 && !filters.selectedCoords) {
             // User needs to select a location from dropdown
             // Scroll the warning into view and briefly shake it for emphasis
             const warningEl = document.getElementById('location-warning');
@@ -324,7 +342,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         // Clear bounds when a new location was selected from autocomplete
         // This allows the map to fly to and set bounds for the new location
         // (bounds are preserved for filter-only changes to maintain current map view)
-        if (selectedCoords) {
+        if (filters.selectedCoords) {
             params.delete('minLat');
             params.delete('maxLat');
             params.delete('minLng');
@@ -337,8 +355,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
 
         // Price validation with auto-swap if inverted
-        let finalMinPrice = minPrice ? parseFloat(minPrice) : null;
-        let finalMaxPrice = maxPrice ? parseFloat(maxPrice) : null;
+        let finalMinPrice = filters.minPrice ? parseFloat(filters.minPrice) : null;
+        let finalMaxPrice = filters.maxPrice ? parseFloat(filters.maxPrice) : null;
 
         // Enforce non-negative values
         if (finalMinPrice !== null && finalMinPrice < 0) finalMinPrice = 0;
@@ -354,26 +372,26 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
         // Include coordinates if a location was selected from suggestions
         // Only include if location text is not empty (prevents stale coords)
-        if (selectedCoords) {
-            params.set('lat', selectedCoords.lat.toString());
-            params.set('lng', selectedCoords.lng.toString());
+        if (filters.selectedCoords) {
+            params.set('lat', filters.selectedCoords.lat.toString());
+            params.set('lng', filters.selectedCoords.lng.toString());
         }
 
-        if (moveInDate) params.set('moveInDate', moveInDate);
-        if (leaseDuration) params.set('leaseDuration', leaseDuration);
+        if (filters.moveInDate) params.set('moveInDate', filters.moveInDate);
+        if (filters.leaseDuration) params.set('leaseDuration', filters.leaseDuration);
         const override = formRef.current?.dataset.roomTypeOverride;
-        const effectiveRoomType = override !== undefined ? override : roomType;
+        const effectiveRoomType = override !== undefined ? override : filters.roomType;
         if (effectiveRoomType) params.set('roomType', effectiveRoomType);
-        amenities.forEach(a => params.append('amenities', a));
-        houseRules.forEach(r => params.append('houseRules', r));
-        languages.forEach(l => params.append('languages', l));
-        if (genderPreference) params.set('genderPreference', genderPreference);
-        if (householdGender) params.set('householdGender', householdGender);
+        filters.amenities.forEach(a => params.append('amenities', a));
+        filters.houseRules.forEach(r => params.append('houseRules', r));
+        filters.languages.forEach(l => params.append('languages', l));
+        if (filters.genderPreference) params.set('genderPreference', filters.genderPreference);
+        if (filters.householdGender) params.set('householdGender', filters.householdGender);
 
         const searchUrl = `/search?${params.toString()}`;
 
         // Prevent duplicate searches (same URL within debounce window)
-        if (searchUrl === lastSearchRef.current && isSearching) {
+        if (searchUrl === lastSearchRef.current && filters.isSearching) {
             return;
         }
 
@@ -385,16 +403,16 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         // Save to recent searches when navigating (with filters for enhanced format)
         if (trimmedLocation) {
             const activeFilters: Partial<RecentSearchFilters> = {};
-            if (minPrice) activeFilters.minPrice = minPrice;
-            if (maxPrice) activeFilters.maxPrice = maxPrice;
-            if (roomType) activeFilters.roomType = roomType;
-            if (leaseDuration) activeFilters.leaseDuration = leaseDuration;
-            if (amenities.length > 0) activeFilters.amenities = amenities;
-            if (houseRules.length > 0) activeFilters.houseRules = houseRules;
+            if (filters.minPrice) activeFilters.minPrice = filters.minPrice;
+            if (filters.maxPrice) activeFilters.maxPrice = filters.maxPrice;
+            if (filters.roomType) activeFilters.roomType = filters.roomType;
+            if (filters.leaseDuration) activeFilters.leaseDuration = filters.leaseDuration;
+            if (filters.amenities.length > 0) activeFilters.amenities = filters.amenities;
+            if (filters.houseRules.length > 0) activeFilters.houseRules = filters.houseRules;
 
             saveRecentSearch(
                 trimmedLocation,
-                selectedCoords || undefined,
+                filters.selectedCoords || undefined,
                 Object.keys(activeFilters).length > 0 ? activeFilters : undefined
             );
         }
@@ -420,7 +438,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             // Reset searching state after navigation starts
             setTimeout(() => setIsSearching(false), 500);
         }, SEARCH_DEBOUNCE_MS);
-    }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching, saveRecentSearch, searchParams]);
+    }, [router, searchParams, saveRecentSearch, transitionContext]);
 
     // Cleanup timeout and abort controller on unmount
     useEffect(() => {

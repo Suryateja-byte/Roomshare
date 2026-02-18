@@ -910,7 +910,7 @@ test.describe("Map Marker Interactions", () => {
       }
 
       // Check for visible focus indicator (the component uses a focus ring)
-      // The MapClient.tsx shows focus ring when keyboardFocusedId matches
+      // The Map.tsx shows focus ring when keyboardFocusedId matches
       const focusRing = page.locator(
         '.maplibregl-marker [data-focus-state="hovered"], .maplibregl-marker [data-focus-state="active"]'
       );
