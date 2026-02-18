@@ -257,6 +257,11 @@ export const clientEnv: ClientEnv = new Proxy({} as ClientEnv, {
   get: (_, prop) => getClientEnv()[prop as keyof ClientEnv],
 });
 
+export const CURSOR_SECRET = process.env.CURSOR_SECRET ?? "";
+if (!CURSOR_SECRET && process.env.NODE_ENV === "production") {
+  console.error("[SECURITY] CURSOR_SECRET is not set — cursor HMAC disabled");
+}
+
 // Helper to check if a feature is available
 // Uses getters to defer env access to runtime (prevents import-time validation noise)
 export const features = {

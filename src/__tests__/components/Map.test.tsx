@@ -23,6 +23,41 @@ import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-libra
 // Track map instance for assertions
 let mockMapInstance: ReturnType<typeof createMockMapInstance>;
 const onCallbacks: Record<string, ((...args: unknown[]) => void)[]> = {};
+const mockReplace = jest.fn();
+const mockReplaceWithTransition = jest.fn();
+let mockSearchParams = new URLSearchParams();
+let mockCanvas: ReturnType<typeof createMockCanvas>;
+
+function createMockCanvas() {
+  const listeners: Record<string, EventListener[]> = {};
+  return {
+    tabIndex: 0,
+    addEventListener: jest.fn((type: string, listener: EventListener) => {
+      if (!listeners[type]) listeners[type] = [];
+      listeners[type].push(listener);
+    }),
+    removeEventListener: jest.fn((type: string, listener: EventListener) => {
+      if (!listeners[type]) return;
+      listeners[type] = listeners[type].filter(cb => cb !== listener);
+    }),
+    emit: (type: string, event?: Event) => {
+      const callbacks = listeners[type] || [];
+      callbacks.forEach((callback) => callback(event ?? new Event(type)));
+    },
+  };
+}
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: mockReplace,
+    prefetch: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    refresh: jest.fn(),
+  }),
+  useSearchParams: () => mockSearchParams,
+}));
 
 // Mock listings for querySourceFeatures to return
 let mockQuerySourceFeaturesData: Array<{
@@ -86,7 +121,7 @@ function createMockMapInstance() {
     resize: jest.fn(),
     loaded: jest.fn(() => true),
     isSourceLoaded: jest.fn(() => true),
-    getCanvas: jest.fn(() => ({ tabIndex: 0 })),
+    getCanvas: jest.fn(() => mockCanvas),
   };
 }
 
@@ -241,6 +276,12 @@ const mockSetResetHandler = jest.fn();
 const mockSetSearchLocation = jest.fn();
 const mockSetProgrammaticMove = jest.fn();
 const mockIsProgrammaticMoveRef = { current: false };
+type PrivacyCircleListing = { id: string; location: { lat: number; lng: number } };
+type PrivacyCircleProps = {
+  listings: PrivacyCircleListing[];
+  isDarkMode?: boolean;
+};
+const mockPrivacyCircle = jest.fn((props: PrivacyCircleProps) => null);
 
 jest.mock('@/contexts/ListingFocusContext', () => ({
   useListingFocus: () => ({
@@ -255,7 +296,7 @@ jest.mock('@/contexts/ListingFocusContext', () => ({
 jest.mock('@/contexts/SearchTransitionContext', () => ({
   useSearchTransitionSafe: () => ({
     isPending: false,
-    replaceWithTransition: jest.fn(),
+    replaceWithTransition: mockReplaceWithTransition,
   }),
 }));
 
@@ -292,7 +333,10 @@ jest.mock('@/components/map/MapGestureHint', () => ({
 }));
 
 jest.mock('@/components/map/PrivacyCircle', () => ({
-  PrivacyCircle: () => null,
+  PrivacyCircle: (props: PrivacyCircleProps) => {
+    mockPrivacyCircle(props);
+    return null;
+  },
 }));
 
 jest.mock('@/components/map/BoundaryLayer', () => ({
@@ -362,8 +406,13 @@ describe('Map Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockReplace.mockClear();
+    mockReplaceWithTransition.mockClear();
+    mockPrivacyCircle.mockClear();
+    mockSearchParams = new URLSearchParams();
 
     // Reset mock map instance
+    mockCanvas = createMockCanvas();
     mockMapInstance = createMockMapInstance();
 
     // Clear callback tracking
@@ -532,7 +581,7 @@ describe('Map Component', () => {
       expect(mockSetHasUserMoved).not.toHaveBeenCalledWith(true);
     });
 
-    it('should respect debounce timing (600ms)', async () => {
+    it('should respect debounce timing (300ms)', async () => {
       // Enable search as move for this test
       jest.spyOn(require('@/contexts/MapBoundsContext'), 'useMapBounds').mockReturnValue({
         searchAsMove: true,
@@ -573,13 +622,147 @@ describe('Map Component', () => {
         });
       });
       
-      // Advance only 300ms (less than debounce)
+      // Advance only 150ms (less than debounce)
       await act(async () => {
-        jest.advanceTimersByTime(300);
+        jest.advanceTimersByTime(150);
       });
       
       // Bounds should be updated immediately (for location conflict detection)
       expect(mockSetCurrentMapBounds).toHaveBeenCalled();
+    });
+
+    it('clears location query when map search starts from lat/lng and preserves active filters', async () => {
+      jest.spyOn(require('@/contexts/MapBoundsContext'), 'useMapBounds').mockReturnValue({
+        searchAsMove: true,
+        setSearchAsMove: mockSetSearchAsMove,
+        setHasUserMoved: mockSetHasUserMoved,
+        setBoundsDirty: mockSetBoundsDirty,
+        setCurrentMapBounds: mockSetCurrentMapBounds,
+        setSearchHandler: mockSetSearchHandler,
+        setResetHandler: mockSetResetHandler,
+        setSearchLocation: mockSetSearchLocation,
+        setProgrammaticMove: mockSetProgrammaticMove,
+        isProgrammaticMoveRef: mockIsProgrammaticMoveRef,
+      });
+
+      mockSearchParams = new URLSearchParams('q=Austin&lat=30.2672&lng=-97.7431&languages=te&minPrice=500');
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (window as unknown as Record<string, { onMoveEnd?: (e: unknown) => void }>).__mapHandlers;
+
+      // Skip initial moveEnd
+      await act(async () => {
+        handlers?.onMoveEnd?.({
+          viewState: { zoom: 12 },
+          target: {
+            getBounds: () => ({
+              getWest: () => -122.5,
+              getEast: () => -122.3,
+              getSouth: () => 37.7,
+              getNorth: () => 37.85,
+            }),
+          },
+        });
+      });
+
+      await act(async () => {
+        handlers?.onMoveEnd?.({
+          viewState: { zoom: 12 },
+          target: {
+            getBounds: () => ({
+              getWest: () => -122.48,
+              getEast: () => -122.28,
+              getSouth: () => 37.69,
+              getNorth: () => 37.86,
+            }),
+          },
+        });
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(700);
+      });
+
+      expect(mockReplaceWithTransition).toHaveBeenCalledTimes(1);
+      const nextUrl = mockReplaceWithTransition.mock.calls[0][0] as string;
+      const params = new URLSearchParams(nextUrl.split('?')[1] ?? '');
+
+      expect(params.get('languages')).toBe('te');
+      expect(params.get('minPrice')).toBe('500');
+      expect(params.has('q')).toBe(false);
+      expect(params.has('lat')).toBe(false);
+      expect(params.has('lng')).toBe(false);
+      expect(params.has('minLat')).toBe(true);
+      expect(params.has('maxLat')).toBe(true);
+      expect(params.has('minLng')).toBe(true);
+      expect(params.has('maxLng')).toBe(true);
+    });
+
+    it('shows guidance when viewport is too wide with search-as-move enabled', async () => {
+      jest.spyOn(require('@/contexts/MapBoundsContext'), 'useMapBounds').mockReturnValue({
+        searchAsMove: true,
+        setSearchAsMove: mockSetSearchAsMove,
+        setHasUserMoved: mockSetHasUserMoved,
+        setBoundsDirty: mockSetBoundsDirty,
+        setCurrentMapBounds: mockSetCurrentMapBounds,
+        setSearchHandler: mockSetSearchHandler,
+        setResetHandler: mockSetResetHandler,
+        setSearchLocation: mockSetSearchLocation,
+        setProgrammaticMove: mockSetProgrammaticMove,
+        isProgrammaticMoveRef: mockIsProgrammaticMoveRef,
+      });
+
+      mockSearchParams = new URLSearchParams('languages=te');
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (window as unknown as Record<string, { onMoveEnd?: (e: unknown) => void }>).__mapHandlers;
+
+      // Skip initial moveEnd
+      await act(async () => {
+        handlers?.onMoveEnd?.({
+          viewState: { zoom: 8 },
+          target: {
+            getBounds: () => ({
+              getWest: () => -122.5,
+              getEast: () => -122.3,
+              getSouth: () => 37.7,
+              getNorth: () => 37.85,
+            }),
+          },
+        });
+      });
+
+      // Oversized viewport (> 5 degrees lat/lng span)
+      await act(async () => {
+        handlers?.onMoveEnd?.({
+          viewState: { zoom: 4 },
+          target: {
+            getBounds: () => ({
+              getWest: () => -130,
+              getEast: () => -110,
+              getSouth: () => 25,
+              getNorth: () => 45,
+            }),
+          },
+        });
+      });
+
+      expect(screen.getByText('Zoom in further to update results')).toBeInTheDocument();
+
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+      expect(mockReplaceWithTransition).not.toHaveBeenCalled();
     });
 
     it('should clear programmatic flag on moveEnd', async () => {
@@ -701,6 +884,55 @@ describe('Map Component', () => {
 
       // Popup should be visible
       expect(screen.getByTestId('map-popup')).toBeInTheDocument();
+    });
+
+    it('passes displayed marker positions to PrivacyCircle for overlapping listings', async () => {
+      const overlappingListings = [
+        {
+          id: 'overlap-1',
+          title: 'Overlap 1',
+          price: 1000,
+          availableSlots: 1,
+          ownerId: 'owner-1',
+          images: [],
+          location: { lat: 37.7749, lng: -122.4194 },
+        },
+        {
+          id: 'overlap-2',
+          title: 'Overlap 2',
+          price: 1100,
+          availableSlots: 1,
+          ownerId: 'owner-2',
+          images: [],
+          location: { lat: 37.7749, lng: -122.4194 },
+        },
+      ];
+
+      mockQuerySourceFeaturesData = listingsToFeatures(overlappingListings);
+      render(<MapComponent listings={overlappingListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (window as unknown as Record<string, { onIdle?: () => void }>).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const calls = mockPrivacyCircle.mock.calls;
+      const lastCall = calls[calls.length - 1]?.[0];
+
+      expect(lastCall).toBeDefined();
+      if (!lastCall) return;
+      expect(lastCall.listings).toHaveLength(2);
+
+      // For overlapping points, displayed marker positions should be offset
+      // (not collapsed to the same center coordinate).
+      const uniqueCoords = new Set(
+        lastCall.listings.map((entry) => `${entry.location.lat}:${entry.location.lng}`)
+      );
+      expect(uniqueCoords.size).toBe(2);
     });
   });
 
@@ -901,6 +1133,77 @@ describe('Map Component', () => {
       
       // Markers should be removed from DOM
       expect(screen.queryAllByTestId('map-marker')).toHaveLength(0);
+    });
+  });
+
+  describe('webgl context recovery', () => {
+    it('shows paused overlay and repaints when WebGL context is restored', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      expect(mockCanvas.addEventListener).toHaveBeenCalledWith('webglcontextlost', expect.any(Function));
+      expect(mockCanvas.addEventListener).toHaveBeenCalledWith('webglcontextrestored', expect.any(Function));
+
+      const lostEvent = { preventDefault: jest.fn() } as unknown as Event;
+      await act(async () => {
+        mockCanvas.emit('webglcontextlost', lostEvent);
+      });
+
+      expect(lostEvent.preventDefault).toHaveBeenCalled();
+      expect(screen.getByLabelText('Map paused')).toBeInTheDocument();
+
+      await act(async () => {
+        mockCanvas.emit('webglcontextrestored');
+        jest.advanceTimersByTime(10);
+      });
+
+      expect(mockMapInstance.triggerRepaint).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(screen.queryByLabelText('Map paused')).not.toBeInTheDocument();
+      });
+
+      warnSpy.mockRestore();
+    });
+
+    it('remounts map if WebGL context restore times out', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      await act(async () => {
+        mockCanvas.emit('webglcontextlost', { preventDefault: jest.fn() } as unknown as Event);
+      });
+
+      expect(screen.getByLabelText('Map paused')).toBeInTheDocument();
+
+      await act(async () => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(20);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByLabelText('Map paused')).not.toBeInTheDocument();
+      });
+      expect(mockCanvas.removeEventListener).toHaveBeenCalledWith('webglcontextlost', expect.any(Function));
+      expect(mockCanvas.removeEventListener).toHaveBeenCalledWith('webglcontextrestored', expect.any(Function));
+      expect(
+        mockCanvas.addEventListener.mock.calls.filter((call) => call[0] === 'webglcontextlost').length
+      ).toBeGreaterThanOrEqual(2);
+      expect(
+        mockCanvas.addEventListener.mock.calls.filter((call) => call[0] === 'webglcontextrestored').length
+      ).toBeGreaterThanOrEqual(2);
+
+      warnSpy.mockRestore();
     });
   });
 

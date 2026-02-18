@@ -214,19 +214,6 @@ describe('Listings API', () => {
       })
     })
 
-    it('returns 400 for parseSearchParams validation errors', async () => {
-      ;(parseSearchParams as jest.Mock).mockImplementationOnce(() => {
-        throw new Error('minPrice cannot exceed maxPrice')
-      })
-
-      const request = new Request('http://localhost/api/listings?minPrice=500&maxPrice=100')
-      const response = await GET(request)
-
-      expect(response.status).toBe(400)
-      const data = await response.json()
-      expect(data.error).toBe('minPrice cannot exceed maxPrice')
-    })
-
     it('returns 400 for unbounded text search (wrapped DataError)', async () => {
       const { QueryError } = jest.requireActual('@/lib/errors/data-errors')
       const wrapped = new QueryError(

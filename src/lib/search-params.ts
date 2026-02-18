@@ -3,6 +3,7 @@ import {
   MAX_SAFE_PRICE,
   MAX_SAFE_PAGE,
   MAX_ARRAY_ITEMS,
+  MAX_QUERY_LENGTH,
   LAT_OFFSET_DEGREES,
 } from "./constants";
 
@@ -402,7 +403,11 @@ const safeParseDate = (value: string | undefined): string | undefined => {
 
 export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
   const rawQuery = getFirstValue(raw.q);
-  const query = rawQuery ? rawQuery.trim() : "";
+  const trimmed = rawQuery ? rawQuery.trim() : "";
+  const query =
+    trimmed.length > MAX_QUERY_LENGTH
+      ? trimmed.slice(0, MAX_QUERY_LENGTH)
+      : trimmed;
   const q = query || undefined;
 
   const requestedPage = safeParseInt(
@@ -424,14 +429,15 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     MAX_SAFE_PRICE,
   );
 
-  // P1-13: Reject inverted price ranges instead of silently swapping
-  // This matches the behavior in filter-schema.ts normalizeFilters()
+  let effectiveMinPrice = validMinPrice;
+  let effectiveMaxPrice = validMaxPrice;
   if (
     validMinPrice !== undefined &&
     validMaxPrice !== undefined &&
     validMinPrice > validMaxPrice
   ) {
-    throw new Error("minPrice cannot exceed maxPrice");
+    effectiveMinPrice = undefined;
+    effectiveMaxPrice = undefined;
   }
 
   const validLat = safeParseFloat(getFirstValue(raw.lat), -90, 90);
@@ -441,13 +447,15 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
   const validMinLng = safeParseFloat(getFirstValue(raw.minLng), -180, 180);
   const validMaxLng = safeParseFloat(getFirstValue(raw.maxLng), -180, 180);
 
-  // P1-3: Lat inversion now throws (consistent with price inversion)
+  let effectiveMinLat = validMinLat;
+  let effectiveMaxLat = validMaxLat;
   if (
     validMinLat !== undefined &&
     validMaxLat !== undefined &&
     validMinLat > validMaxLat
   ) {
-    throw new Error("minLat cannot exceed maxLat");
+    effectiveMinLat = undefined;
+    effectiveMaxLat = undefined;
   }
 
   const amenitiesList = safeParseArray(raw.amenities, VALID_AMENITIES);
@@ -469,14 +477,14 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
 
   let bounds: FilterParams["bounds"];
   if (
-    validMinLat !== undefined &&
-    validMaxLat !== undefined &&
+    effectiveMinLat !== undefined &&
+    effectiveMaxLat !== undefined &&
     validMinLng !== undefined &&
     validMaxLng !== undefined
   ) {
     bounds = {
-      minLat: validMinLat,
-      maxLat: validMaxLat,
+      minLat: effectiveMinLat,
+      maxLat: effectiveMaxLat,
       minLng: validMinLng,
       maxLng: validMaxLng,
     };
@@ -533,8 +541,8 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
 
   const filterParams: FilterParams = {
     query: q,
-    minPrice: validMinPrice,
-    maxPrice: validMaxPrice,
+    minPrice: effectiveMinPrice,
+    maxPrice: effectiveMaxPrice,
     amenities: amenitiesList,
     moveInDate: validMoveInDate,
     leaseDuration: validLeaseDuration,

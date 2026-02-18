@@ -1,12 +1,10 @@
 import { auth } from '@/auth';
-import { getListingsPaginated, getSavedListingIds, analyzeFilterImpact, PaginatedResult, PaginatedResultHybrid, ListingData } from '@/lib/data';
+import { getListingsPaginated, getSavedListingIds, analyzeFilterImpact, PaginatedResult, PaginatedResultHybrid, ListingData, type FilterSuggestion } from '@/lib/data';
 import SortSelect from '@/components/SortSelect';
 import SaveSearchButton from '@/components/SaveSearchButton';
 import { SearchResultsClient } from '@/components/search/SearchResultsClient';
 import Link from 'next/link';
-import { Search, Clock } from 'lucide-react';
-import { headers } from 'next/headers';
-import { checkServerComponentRateLimit } from '@/lib/with-rate-limit';
+import { Search } from 'lucide-react';
 import { parseSearchParams, buildRawParamsFromSearchParams } from '@/lib/search-params';
 import { executeSearchV2 } from '@/lib/search/search-v2-service';
 import { V2MapDataSetter } from '@/components/search/V2MapDataSetter';
@@ -19,8 +17,36 @@ import type { V2MapData } from '@/contexts/SearchV2DataContext';
 import { features } from '@/lib/env';
 import { preload } from 'react-dom';
 import { withTimeout, DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
+import type { Metadata } from 'next';
 
-const ITEMS_PER_PAGE = 12;
+type SearchPageSearchParams = {
+    q?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    amenities?: string | string[];
+    moveInDate?: string;
+    leaseDuration?: string;
+    houseRules?: string | string[];
+    languages?: string | string[];
+    roomType?: string;
+    genderPreference?: string;
+    householdGender?: string;
+    minLat?: string;
+    maxLat?: string;
+    minLng?: string;
+    maxLng?: string;
+    lat?: string;
+    lng?: string;
+    page?: string;
+    sort?: string;
+    cursor?: string;
+    v2?: string;
+};
+
+interface SearchPageProps {
+    searchParams: Promise<SearchPageSearchParams>;
+}
 
 // P2-FIX (#141): Helper for retry with exponential backoff for transient V2 search failures
 // Single retry is sufficient - multiple retries would delay SSR too much
@@ -66,58 +92,72 @@ function getFirstImageUrl(listing: { id: string; images?: string[] }): string {
     return PLACEHOLDER_IMAGES[placeholderIndex];
 }
 
+export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
+    const rawParams = await searchParams;
+    const { q, filterParams } = parseSearchParams(rawParams);
+    const hasPagination = Boolean(rawParams.page || rawParams.cursor);
+    const activeFilterCount = [
+        filterParams.minPrice !== undefined,
+        filterParams.maxPrice !== undefined,
+        Boolean(filterParams.roomType),
+        Boolean(filterParams.moveInDate),
+        Boolean(filterParams.leaseDuration),
+        (filterParams.amenities?.length ?? 0) > 0,
+        (filterParams.houseRules?.length ?? 0) > 0,
+        (filterParams.languages?.length ?? 0) > 0,
+        Boolean(filterParams.genderPreference),
+        Boolean(filterParams.householdGender),
+        Boolean(filterParams.bounds),
+    ].filter(Boolean).length;
+    const isHighlyFiltered = activeFilterCount >= 3;
+    const shouldNoIndex = hasPagination || isHighlyFiltered;
+
+    const title = q
+        ? `Rooms for rent in ${q} | Roomshare`
+        : 'Find Rooms & Roommates | Roomshare';
+
+    const filterSummary: string[] = [];
+    if (filterParams.minPrice !== undefined || filterParams.maxPrice !== undefined) {
+        const minPrice = filterParams.minPrice !== undefined ? `$${Math.round(filterParams.minPrice)}` : 'any';
+        const maxPrice = filterParams.maxPrice !== undefined ? `$${Math.round(filterParams.maxPrice)}` : 'any';
+        filterSummary.push(`Price: ${minPrice}-${maxPrice}`);
+    }
+    if (filterParams.roomType) {
+        filterSummary.push(`Room type: ${filterParams.roomType}`);
+    }
+
+    const baseDescription = `Browse ${q ? `${q} ` : ''}room listings on Roomshare.`;
+    const description = `${baseDescription}${filterSummary.length > 0 ? ` ${filterSummary.join(' · ')}` : ''}`.substring(0, 160);
+
+    return {
+        title,
+        description,
+        openGraph: {
+            title,
+            description,
+            type: 'website',
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title,
+            description,
+        },
+        robots: shouldNoIndex
+            ? {
+                index: false,
+                follow: true,
+            }
+            : undefined,
+        alternates: {
+            canonical: `/search${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+        },
+    };
+}
+
 export default async function SearchPage({
     searchParams,
-}: {
-    searchParams: Promise<{
-        q?: string;
-        minPrice?: string;
-        maxPrice?: string;
-        amenities?: string | string[];
-        moveInDate?: string;
-        leaseDuration?: string;
-        houseRules?: string | string[];
-        languages?: string | string[];
-        roomType?: string;
-        genderPreference?: string;
-        householdGender?: string;
-        minLat?: string;
-        maxLat?: string;
-        minLng?: string;
-        maxLng?: string;
-        lat?: string;
-        lng?: string;
-        page?: string;
-        sort?: string;
-        cursor?: string;
-        v2?: string;
-    }>;
-}) {
+}: SearchPageProps) {
     const rawParams = await searchParams;
-
-    // P0 fix: Rate limit check before any database queries
-    const headersList = await headers();
-    const rateLimit = await checkServerComponentRateLimit(headersList, 'search', '/search');
-    if (!rateLimit.allowed) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-                <div className="text-center p-8 max-w-md">
-                    <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
-                        <Clock className="w-8 h-8 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
-                        Too Many Requests
-                    </h1>
-                    <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-                        You are searching too quickly. Please wait a moment before trying again.
-                    </p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-500">
-                        Try again in {rateLimit.retryAfter || 60} seconds
-                    </p>
-                </div>
-            </div>
-        );
-    }
 
     const session = await auth();
     const userId = session?.user?.id;
@@ -187,7 +227,7 @@ export default async function SearchPage({
                 () => withTimeout(
                     executeSearchV2({
                         rawParams: rawParamsForV2,
-                        limit: ITEMS_PER_PAGE,
+                        limit: DEFAULT_PAGE_SIZE,
                     }),
                     DEFAULT_TIMEOUTS.DATABASE,
                     'SSR-executeSearchV2'
@@ -228,7 +268,7 @@ export default async function SearchPage({
         // P0 FIX: Add timeout protection to V1 fallback to prevent indefinite hangs
         // Critical data - let errors bubble up to error boundary
         paginatedResult = await withTimeout(
-            getListingsPaginated({ ...filterParams, page: requestedPage, limit: ITEMS_PER_PAGE }),
+            getListingsPaginated({ ...filterParams, page: requestedPage, limit: DEFAULT_PAGE_SIZE }),
             DEFAULT_TIMEOUTS.DATABASE,
             'v1-search-fallback'
         );
@@ -252,7 +292,13 @@ export default async function SearchPage({
     const hasConfirmedZeroResults = total !== null && total === 0;
 
     // Analyze filter impact only when there are confirmed zero results
-    const filterSuggestions = hasConfirmedZeroResults ? await analyzeFilterImpact(filterParams) : [];
+    const filterSuggestions = hasConfirmedZeroResults
+        ? await withTimeout(
+            analyzeFilterImpact(filterParams),
+            DEFAULT_TIMEOUTS.DATABASE,
+            'analyzeFilterImpact',
+        ).catch(() => [] as FilterSuggestion[])
+        : [];
 
     // P2-2: Preload first 4 listing images for LCP optimization
     // This emits <link rel="preload" as="image"> in the server-rendered HTML

@@ -87,6 +87,18 @@ function formatDate(dateStr: string): string {
 }
 
 /**
+ * Parse array-like URL params that may be encoded as repeated params
+ * (?languages=en&languages=te) and/or CSV (?languages=en,te).
+ */
+function parseArrayParam(searchParams: URLSearchParams, key: string): string[] {
+  return searchParams
+    .getAll(key)
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+/**
  * Convert URLSearchParams to an array of filter chips
  */
 export function urlToFilterChips(
@@ -99,19 +111,19 @@ export function urlToFilterChips(
   const minPrice = getPriceParam(searchParams, "min");
   const maxPrice = getPriceParam(searchParams, "max");
 
-  if (minPrice && maxPrice) {
+  if (minPrice !== undefined && maxPrice !== undefined) {
     chips.push({
       id: "price-range",
       label: `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`,
       paramKey: "price-range", // Special key for combined price
     });
-  } else if (minPrice) {
+  } else if (minPrice !== undefined) {
     chips.push({
       id: "minPrice",
       label: `Min ${formatPrice(minPrice)}`,
       paramKey: "minPrice",
     });
-  } else if (maxPrice) {
+  } else if (maxPrice !== undefined) {
     chips.push({
       id: "maxPrice",
       label: `Max ${formatPrice(maxPrice)}`,
@@ -178,10 +190,9 @@ export function urlToFilterChips(
   }
 
   // Amenities - one chip per amenity (validated + deduplicated)
-  const amenities = searchParams.get("amenities");
-  if (amenities) {
+  const amenityList = parseArrayParam(searchParams, "amenities");
+  if (amenityList.length > 0) {
     const seen = new Set<string>();
-    const amenityList = amenities.split(",").filter(Boolean);
     for (const amenity of amenityList) {
       const lower = amenity.toLowerCase();
       const canonical = (VALID_AMENITIES as readonly string[]).find(
@@ -200,10 +211,9 @@ export function urlToFilterChips(
   }
 
   // House rules - one chip per rule (validated + deduplicated)
-  const houseRules = searchParams.get("houseRules");
-  if (houseRules) {
+  const ruleList = parseArrayParam(searchParams, "houseRules");
+  if (ruleList.length > 0) {
     const seen = new Set<string>();
-    const ruleList = houseRules.split(",").filter(Boolean);
     for (const rule of ruleList) {
       const lower = rule.toLowerCase();
       const canonical = (VALID_HOUSE_RULES as readonly string[]).find(
@@ -222,10 +232,9 @@ export function urlToFilterChips(
   }
 
   // Languages - one chip per language (validated + deduplicated)
-  const languages = searchParams.get("languages");
-  if (languages) {
+  const langList = parseArrayParam(searchParams, "languages");
+  if (langList.length > 0) {
     const seen = new Set<string>();
-    const langList = languages.split(",").filter(Boolean);
     for (const lang of langList) {
       const displayName = getLanguageName(lang);
       // Skip if getLanguageName returns the raw code (meaning it's not a recognized language)
@@ -243,7 +252,7 @@ export function urlToFilterChips(
 
   // Near matches toggle
   const nearMatches = searchParams.get("nearMatches");
-  if (nearMatches === "1") {
+  if (nearMatches === "1" || nearMatches === "true") {
     chips.push({
       id: "nearMatches",
       label: "Near matches",
@@ -312,14 +321,13 @@ export function removeFilterFromUrl(
   }
   // Handle array params (amenities, houseRules, languages)
   else if (chip.paramValue) {
-    const currentValue = newParams.get(chip.paramKey);
-    if (currentValue) {
-      const values = currentValue.split(",").filter(Boolean);
+    const values = parseArrayParam(newParams, chip.paramKey);
+    if (values.length > 0) {
       const newValues = values.filter((v) => v !== chip.paramValue);
+      // Normalize to a single CSV param after removal for URL consistency.
+      newParams.delete(chip.paramKey);
       if (newValues.length > 0) {
         newParams.set(chip.paramKey, newValues.join(","));
-      } else {
-        newParams.delete(chip.paramKey);
       }
     }
   }
@@ -330,6 +338,9 @@ export function removeFilterFromUrl(
 
   // Reset to page 1 when filters change
   newParams.delete("page");
+  newParams.delete("cursor");
+  newParams.delete("cursorStack");
+  newParams.delete("pageNumber");
 
   return newParams.toString();
 }

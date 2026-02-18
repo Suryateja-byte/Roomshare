@@ -44,6 +44,28 @@ const CACHE_TTL = 30;
 // Maximum results per facet to prevent expensive aggregations
 const MAX_FACET_RESULTS = 100;
 
+const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english"]);
+
+function assertParameterizedWhereClause(whereClause: string): void {
+  if (process.env.NODE_ENV === "production") return;
+
+  const literalPattern = /'([^']*)'/g;
+  for (const match of whereClause.matchAll(literalPattern)) {
+    const literalValue = match[1];
+    if (!ALLOWED_SQL_STRING_LITERALS.has(literalValue)) {
+      throw new Error(
+        "SECURITY: Raw string detected in whereClause — use parameterized $N placeholders",
+      );
+    }
+  }
+}
+
+function joinWhereClauseWithSecurityInvariant(conditions: string[]): string {
+  const whereClause = conditions.join(" AND ");
+  assertParameterizedWhereClause(whereClause);
+  return whereClause;
+}
+
 /**
  * A single histogram bucket for price distribution
  */
@@ -107,6 +129,10 @@ function buildFacetWhereConditions(
   },
   excludeFilter?: "amenities" | "houseRules" | "roomType" | "price",
 ): WhereBuilder {
+  // SECURITY INVARIANT:
+  // - All user-derived values must be pushed to `params` and referenced as $N placeholders.
+  // - `conditions` entries must remain static SQL fragments.
+  // - Never inject user input directly into a condition string.
   const {
     query,
     minPrice,
@@ -255,7 +281,7 @@ async function getAmenitiesFacet(
     filterParams,
     "amenities",
   );
-  const whereClause = conditions.join(" AND ");
+  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
   // Unnest amenities array and count occurrences
   // Use original amenities array (not lowercase) for display
@@ -271,6 +297,7 @@ async function getAmenitiesFacet(
     LIMIT $${paramIndex}
   `;
 
+  // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
   const results = await prisma.$queryRawUnsafe<
     { amenity: string; count: bigint }[]
   >(query, ...params, MAX_FACET_RESULTS);
@@ -292,7 +319,7 @@ async function getHouseRulesFacet(
     filterParams,
     "houseRules",
   );
-  const whereClause = conditions.join(" AND ");
+  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
   // Unnest house_rules array and count occurrences
   const query = `
@@ -307,6 +334,7 @@ async function getHouseRulesFacet(
     LIMIT $${paramIndex}
   `;
 
+  // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
   const results = await prisma.$queryRawUnsafe<
     { rule: string; count: bigint }[]
   >(query, ...params, MAX_FACET_RESULTS);
@@ -328,7 +356,7 @@ async function getRoomTypesFacet(
     filterParams,
     "roomType",
   );
-  const whereClause = conditions.join(" AND ");
+  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
   // Simple GROUP BY on room_type column
   const query = `
@@ -343,6 +371,7 @@ async function getRoomTypesFacet(
     LIMIT $${paramIndex}
   `;
 
+  // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
   const results = await prisma.$queryRawUnsafe<
     { roomType: string; count: bigint }[]
   >(query, ...params, MAX_FACET_RESULTS);
@@ -364,7 +393,7 @@ async function getPriceRanges(
     filterParams,
     "price",
   );
-  const whereClause = conditions.join(" AND ");
+  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
   // Get min, max, and median (50th percentile) for prices
   const query = `
@@ -377,6 +406,7 @@ async function getPriceRanges(
       AND d.price IS NOT NULL
   `;
 
+  // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
   const results = await prisma.$queryRawUnsafe<
     { min: number | null; max: number | null; median: number | null }[]
   >(query, ...params);
@@ -421,7 +451,7 @@ async function getPriceHistogram(
     filterParams,
     "price",
   );
-  const whereClause = conditions.join(" AND ");
+  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
   const query = `
     SELECT
@@ -434,6 +464,7 @@ async function getPriceHistogram(
     ORDER BY bucket_min
   `;
 
+  // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
   const results = await prisma.$queryRawUnsafe<
     { bucket_min: number; count: bigint }[]
   >(query, ...params, bucketWidth);

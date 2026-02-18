@@ -51,6 +51,18 @@ describe("filter-chip-utils", () => {
 
         expect(chips[0].label).toBe("$10,000 - $50,000");
       });
+
+      it("supports zero as a valid min price", () => {
+        const params = new URLSearchParams("minPrice=0");
+        const chips = urlToFilterChips(params);
+
+        expect(chips).toHaveLength(1);
+        expect(chips[0]).toEqual({
+          id: "minPrice",
+          label: "Min $0",
+          paramKey: "minPrice",
+        });
+      });
     });
 
     describe("move-in date handling", () => {
@@ -137,6 +149,20 @@ describe("filter-chip-utils", () => {
         expect(chips).toHaveLength(1);
         expect(chips[0].paramValue).toBe("Wifi");
       });
+
+      it("handles repeated and CSV amenity params together", () => {
+        const params = new URLSearchParams(
+          "amenities=Wifi&amenities=AC,Parking&amenities=Wifi",
+        );
+        const chips = urlToFilterChips(params);
+
+        expect(chips).toHaveLength(3);
+        expect(chips.map((chip) => chip.id).sort()).toEqual([
+          "amenities:AC",
+          "amenities:Parking",
+          "amenities:Wifi",
+        ]);
+      });
     });
 
     describe("house rules handling", () => {
@@ -187,11 +213,37 @@ describe("filter-chip-utils", () => {
           paramValue: "te",
         });
       });
+
+      it("supports repeated language params and deduplicates chips", () => {
+        const params = new URLSearchParams(
+          "languages=en&languages=te,es&languages=te",
+        );
+        const chips = urlToFilterChips(params);
+
+        expect(chips).toHaveLength(3);
+        expect(chips.map((chip) => chip.id).sort()).toEqual([
+          "languages:en",
+          "languages:es",
+          "languages:te",
+        ]);
+      });
     });
 
     describe("nearMatches handling", () => {
       it("creates chip when nearMatches is 1", () => {
         const params = new URLSearchParams("nearMatches=1");
+        const chips = urlToFilterChips(params);
+
+        expect(chips).toHaveLength(1);
+        expect(chips[0]).toEqual({
+          id: "nearMatches",
+          label: "Near matches",
+          paramKey: "nearMatches",
+        });
+      });
+
+      it("creates chip when nearMatches is true", () => {
+        const params = new URLSearchParams("nearMatches=true");
         const chips = urlToFilterChips(params);
 
         expect(chips).toHaveLength(1);
@@ -369,6 +421,20 @@ describe("filter-chip-utils", () => {
 
         expect(result).toBe("languages=en%2Cte");
       });
+
+      it("removes from repeated language params and normalizes result", () => {
+        const params = new URLSearchParams("languages=en&languages=es,te");
+        const chip: FilterChipData = {
+          id: "languages:es",
+          label: "Spanish",
+          paramKey: "languages",
+          paramValue: "es",
+        };
+
+        const result = removeFilterFromUrl(params, chip);
+
+        expect(result).toBe("languages=en%2Cte");
+      });
     });
 
     describe("page reset on filter change", () => {
@@ -385,6 +451,25 @@ describe("filter-chip-utils", () => {
 
         expect(result).toBe("");
         expect(result).not.toContain("page");
+      });
+
+      it("removes keyset pagination params when removing filter", () => {
+        const params = new URLSearchParams(
+          "languages=en,te&cursor=abc&cursorStack=a,b&pageNumber=4",
+        );
+        const chip: FilterChipData = {
+          id: "languages:te",
+          label: "Telugu",
+          paramKey: "languages",
+          paramValue: "te",
+        };
+
+        const result = removeFilterFromUrl(params, chip);
+
+        expect(result).toBe("languages=en");
+        expect(result).not.toContain("cursor=");
+        expect(result).not.toContain("cursorStack=");
+        expect(result).not.toContain("pageNumber=");
       });
     });
 

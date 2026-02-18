@@ -7,6 +7,7 @@ import {
   MAX_SAFE_PRICE,
   MAX_ARRAY_ITEMS,
 } from "@/lib/search-params";
+import { MAX_QUERY_LENGTH } from "@/lib/constants";
 
 const formatLocalDate = (date: Date) => {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -74,6 +75,12 @@ describe("parseSearchParams - query cases", () => {
     expect(result.q).toBe(expected);
     expect(result.filterParams.query).toBe(expected);
   });
+
+  it("truncates queries longer than MAX_QUERY_LENGTH", () => {
+    const longQuery = "x".repeat(MAX_QUERY_LENGTH + 25);
+    const result = parseSearchParams({ q: longQuery });
+    expect(result.q).toHaveLength(MAX_QUERY_LENGTH);
+  });
 });
 
 describe("parseSearchParams - price cases", () => {
@@ -111,10 +118,10 @@ describe("parseSearchParams - price cases", () => {
     },
   );
 
-  // P1-13: Inverted price ranges now throw error instead of silently swapping
-  it("throws error for inverted price range", () => {
-    expect(() => parseSearchParams({ minPrice: "2000", maxPrice: "1000" }))
-      .toThrow("minPrice cannot exceed maxPrice");
+  it("drops inverted price range instead of throwing", () => {
+    const result = parseSearchParams({ minPrice: "2000", maxPrice: "1000" });
+    expect(result.filterParams.minPrice).toBeUndefined();
+    expect(result.filterParams.maxPrice).toBeUndefined();
   });
 });
 
@@ -340,16 +347,14 @@ describe("parseSearchParams - bounds cases", () => {
     expect(result.filterParams.bounds).toBeUndefined();
   });
 
-  test("explicit bounds throw for inverted lat (P1-3: consistent with price)", () => {
-    // P1-3: Lat inversion now throws like price inversion
-    expect(() =>
-      parseSearchParams({
-        minLat: "20",
-        maxLat: "10",
-        minLng: "3",
-        maxLng: "4",
-      })
-    ).toThrow("minLat cannot exceed maxLat");
+  test("drops inverted explicit lat bounds instead of throwing", () => {
+    const result = parseSearchParams({
+      minLat: "20",
+      maxLat: "10",
+      minLng: "3",
+      maxLng: "4",
+    });
+    expect(result.filterParams.bounds).toBeUndefined();
   });
 
   test("explicit bounds preserve antimeridian lng", () => {

@@ -55,12 +55,9 @@ export async function GET(request: Request) {
             },
         });
     } catch (error) {
-        // Detect user-facing validation errors (return 400 instead of 500):
-        // - parseSearchParams throws plain Error ("minPrice cannot exceed maxPrice")
-        // - getListingsPaginated wraps errors via wrapDatabaseError;
-        //   original message is in error.cause.message
-        const isUserError = (msg: string) =>
-            msg.includes('cannot exceed') || msg.includes('Unbounded text search');
+        // Detect user-facing validation errors (return 400 instead of 500).
+        // getListingsPaginated wraps errors via wrapDatabaseError; original message is in error.cause.message.
+        const isUserError = (msg: string) => msg.includes('Unbounded text search');
 
         if (error instanceof Error) {
             const causeMsg = isDataError(error) && error.cause
