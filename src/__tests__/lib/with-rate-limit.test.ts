@@ -31,10 +31,18 @@ describe('Rate Limit Wrapper', () => {
   const originalE2EBypass = process.env.E2E_DISABLE_RATE_LIMIT
   const originalNodeEnv = process.env.NODE_ENV
 
+  const setNodeEnv = (value: string | undefined) => {
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value,
+      writable: true,
+      configurable: true,
+    })
+  }
+
   beforeEach(() => {
     jest.clearAllMocks()
     delete process.env.E2E_DISABLE_RATE_LIMIT
-    process.env.NODE_ENV = originalNodeEnv
+    setNodeEnv(originalNodeEnv)
   })
 
   afterAll(() => {
@@ -43,7 +51,7 @@ describe('Rate Limit Wrapper', () => {
     } else {
       delete process.env.E2E_DISABLE_RATE_LIMIT
     }
-    process.env.NODE_ENV = originalNodeEnv
+    setNodeEnv(originalNodeEnv)
   })
 
   describe('withRateLimit', () => {
@@ -233,7 +241,7 @@ describe('Rate Limit Wrapper', () => {
 
   describe('checkServerComponentRateLimit', () => {
     it('bypasses rate limit when E2E_DISABLE_RATE_LIMIT is enabled', async () => {
-      process.env.NODE_ENV = 'development'
+      setNodeEnv('development')
       process.env.E2E_DISABLE_RATE_LIMIT = 'true'
 
       const result = await checkServerComponentRateLimit(
@@ -248,7 +256,7 @@ describe('Rate Limit Wrapper', () => {
     })
 
     it('enforces rate limit when bypass env is not enabled', async () => {
-      process.env.NODE_ENV = 'development'
+      setNodeEnv('development')
       mockCheckRateLimit.mockResolvedValue({
         success: false,
         remaining: 0,
