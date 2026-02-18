@@ -10,9 +10,21 @@
 
 // Mock prisma before importing route
 jest.mock("@/lib/prisma", () => ({
-  prisma: {
-    $queryRawUnsafe: jest.fn(),
-  },
+  prisma: (() => {
+    const queryRawUnsafe = jest.fn();
+    const executeRawUnsafe = jest.fn();
+    return {
+      $queryRawUnsafe: queryRawUnsafe,
+      $executeRawUnsafe: executeRawUnsafe,
+      $transaction: jest.fn(async (callback: (tx: {
+        $executeRawUnsafe: jest.Mock;
+        $queryRawUnsafe: jest.Mock;
+      }) => Promise<unknown>) => callback({
+        $executeRawUnsafe: executeRawUnsafe,
+        $queryRawUnsafe: queryRawUnsafe,
+      })),
+    };
+  })(),
 }));
 
 // Mock rate limiting to return null (allow request)
@@ -60,6 +72,9 @@ import { GET } from "@/app/api/search/facets/route";
 import { prisma } from "@/lib/prisma";
 import type { NextRequest } from "next/server";
 
+const mockQueryRawUnsafe = prisma.$queryRawUnsafe as jest.Mock;
+const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as jest.Mock;
+
 // Clean up Next.js 16 unhandledRejection listeners that cause recursive setImmediate
 // stack overflow during Jest teardown (see: next/src/server/node-environment-extensions)
 // Use preImport count since Next.js adds listeners during module initialization
@@ -76,9 +91,6 @@ afterAll(() => {
   }
 });
 
-// Get the mocked function
-const mockQueryRawUnsafe = prisma.$queryRawUnsafe as jest.Mock;
-
 // Helper to create a mock NextRequest with searchParams
 function createRequest(params: Record<string, string> = {}): NextRequest {
   const searchParams = new URLSearchParams(params);
@@ -94,6 +106,7 @@ function createRequest(params: Record<string, string> = {}): NextRequest {
 describe("/api/search/facets", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockExecuteRawUnsafe.mockResolvedValue(undefined);
     // Default mock returns for each facet query
     mockQueryRawUnsafe
       // Amenities query

@@ -8,14 +8,22 @@
 import { NextResponse } from "next/server";
 import {
   checkChatRateLimit,
+  checkListingsReadRateLimit,
   checkMapRateLimit,
   checkMetricsRateLimit,
+  checkSearchV2RateLimit,
   checkSearchCountRateLimit,
 } from "./rate-limit-redis";
 import { getClientIP } from "./rate-limit";
 import { getRequestId } from "./request-context";
 
-export type RedisRateLimitType = "chat" | "map" | "metrics" | "search-count";
+export type RedisRateLimitType =
+  | "chat"
+  | "map"
+  | "metrics"
+  | "search-count"
+  | "search-v2"
+  | "listings-read";
 
 interface RateLimitRedisOptions {
   /** The rate limit type to check */
@@ -33,6 +41,8 @@ const RATE_LIMIT_CONFIGS: Record<
   map: { burstLimit: 60, sustainedLimit: 300 },
   metrics: { burstLimit: 100, sustainedLimit: 500 },
   "search-count": { burstLimit: 30, sustainedLimit: 200 },
+  "search-v2": { burstLimit: 60, sustainedLimit: 300 },
+  "listings-read": { burstLimit: 30, sustainedLimit: 100 },
 };
 
 /**
@@ -77,6 +87,12 @@ export async function withRateLimitRedis(
       break;
     case "search-count":
       result = await checkSearchCountRateLimit(identifier);
+      break;
+    case "search-v2":
+      result = await checkSearchV2RateLimit(identifier);
+      break;
+    case "listings-read":
+      result = await checkListingsReadRateLimit(identifier);
       break;
   }
 

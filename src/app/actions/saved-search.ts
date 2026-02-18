@@ -8,6 +8,8 @@ import { validateSearchFilters } from '@/lib/search-params';
 import type { Prisma } from '@prisma/client';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { headers } from 'next/headers';
+import { checkServerComponentRateLimit } from '@/lib/with-rate-limit';
 
 type AlertFrequency = 'INSTANT' | 'DAILY' | 'WEEKLY';
 
@@ -20,11 +22,29 @@ interface SaveSearchInput {
 
 const savedSearchNameSchema = z.string().trim().min(1).max(100);
 
+async function enforceSavedSearchMutationRateLimit(action: string) {
+    const headersList = await headers();
+    const rateLimit = await checkServerComponentRateLimit(
+        headersList,
+        'savedSearchMutations',
+        `/actions/saved-search/${action}`,
+    );
+
+    if (!rateLimit.allowed) {
+        return { error: 'Too many requests. Please wait before trying again.' };
+    }
+
+    return null;
+}
+
 export async function saveSearch(input: SaveSearchInput) {
     const session = await auth();
     if (!session?.user?.id) {
         return { error: 'Unauthorized' };
     }
+
+    const rateLimited = await enforceSavedSearchMutationRateLimit('save');
+    if (rateLimited) return rateLimited;
 
     try {
         const nameValidation = savedSearchNameSchema.safeParse(input.name);
@@ -96,6 +116,9 @@ export async function deleteSavedSearch(searchId: string) {
         return { error: 'Unauthorized' };
     }
 
+    const rateLimited = await enforceSavedSearchMutationRateLimit('delete');
+    if (rateLimited) return rateLimited;
+
     try {
         await prisma.savedSearch.delete({
             where: {
@@ -122,6 +145,9 @@ export async function toggleSearchAlert(searchId: string, enabled: boolean) {
     if (!session?.user?.id) {
         return { error: 'Unauthorized' };
     }
+
+    const rateLimited = await enforceSavedSearchMutationRateLimit('toggle-alert');
+    if (rateLimited) return rateLimited;
 
     try {
         await prisma.savedSearch.update({
@@ -151,6 +177,9 @@ export async function updateSavedSearchName(searchId: string, name: string) {
     if (!session?.user?.id) {
         return { error: 'Unauthorized' };
     }
+
+    const rateLimited = await enforceSavedSearchMutationRateLimit('rename');
+    if (rateLimited) return rateLimited;
 
     try {
         const nameValidation = savedSearchNameSchema.safeParse(name);

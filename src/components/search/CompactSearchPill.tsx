@@ -45,10 +45,8 @@ export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPill
       const val = searchParams.get(key);
       if (val && val !== 'any') count++;
     }
-    const amenities = searchParams.get('amenities');
-    if (amenities) count += amenities.split(',').length;
-    const houseRules = searchParams.get('houseRules');
-    if (houseRules) count += houseRules.split(',').length;
+    count += searchParams.getAll('amenities').filter(Boolean).length;
+    count += searchParams.getAll('houseRules').filter(Boolean).length;
     if (minPrice) count++;
     if (maxPrice) count++;
     return count;

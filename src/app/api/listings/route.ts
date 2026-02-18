@@ -7,6 +7,7 @@ import { buildRawParamsFromSearchParams, parseSearchParams } from '@/lib/search-
 import { logger } from '@/lib/logger';
 import { isDataError } from '@/lib/errors/data-errors';
 import { withRateLimit } from '@/lib/with-rate-limit';
+import { withRateLimitRedis } from '@/lib/with-rate-limit-redis';
 import { createListingApiSchema } from '@/lib/schemas';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
@@ -19,8 +20,8 @@ import { captureApiError } from '@/lib/api-error-handler';
 import { normalizeStringList } from '@/lib/utils';
 
 export async function GET(request: Request) {
-    // P2-3: Add rate limiting to prevent scraping
-    const rateLimitResponse = await withRateLimit(request, { type: 'listingsRead' });
+    // Use Redis-backed limiter for high-volume read path consistency.
+    const rateLimitResponse = await withRateLimitRedis(request, { type: 'listings-read' });
     if (rateLimitResponse) return rateLimitResponse;
 
     const startTime = Date.now();

@@ -13,6 +13,24 @@ const degradedModeCache = new Map<
 >();
 const DEGRADED_MODE_LIMIT = 10;
 const DEGRADED_MODE_WINDOW_MS = 60_000; // 1 minute
+const DEGRADED_MODE_MAX_ENTRIES = 10_000;
+
+function setDegradedModeEntry(
+  key: string,
+  value: { count: number; windowStart: number },
+): void {
+  if (!degradedModeCache.has(key)) {
+    while (degradedModeCache.size >= DEGRADED_MODE_MAX_ENTRIES) {
+      const oldestKey = degradedModeCache.keys().next().value as
+        | string
+        | undefined;
+      if (!oldestKey) break;
+      degradedModeCache.delete(oldestKey);
+    }
+  }
+
+  degradedModeCache.set(key, value);
+}
 
 function checkDegradedModeLimit(identifier: string): boolean {
   const now = Date.now();
@@ -28,7 +46,7 @@ function checkDegradedModeLimit(identifier: string): boolean {
   }
 
   if (!entry || now - entry.windowStart > DEGRADED_MODE_WINDOW_MS) {
-    degradedModeCache.set(identifier, { count: 1, windowStart: now });
+    setDegradedModeEntry(identifier, { count: 1, windowStart: now });
     return true; // Allow
   }
 
@@ -225,6 +243,7 @@ export const RATE_LIMITS = {
   chatStartConversation: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
   savedListings: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
   notifications: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
+  savedSearchMutations: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
 } as const;
 
 function getFirstForwardedIp(forwardedFor: string | null): string | null {

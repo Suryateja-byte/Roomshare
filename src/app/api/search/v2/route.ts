@@ -27,6 +27,7 @@ import { executeSearchV2 } from "@/lib/search/search-v2-service";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
+import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
 
 /**
  * Check if v2 is enabled via feature flag or URL param.
@@ -60,9 +61,10 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      // Rate limiting via Redis (using map type as it has similar search semantics)
+      // Rate limiting via Redis with per-user differentiation for authenticated users.
       const rateLimitResponse = await withRateLimitRedis(request, {
-        type: "map",
+        type: "search-v2",
+        getIdentifier: getSearchRateLimitIdentifier,
       });
       if (rateLimitResponse) return rateLimitResponse;
 
@@ -121,9 +123,7 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       const isValidationError =
         error instanceof Error &&
-        (error.message.includes("cannot exceed") ||
-          error.message.includes("Invalid") ||
-          error.message.includes("must be"));
+        /cannot exceed|invalid|must be|required|bounds/i.test(error.message);
 
       logger.sync.error("Search v2 API error", {
         error: error instanceof Error ? error.message : String(error),
@@ -135,8 +135,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           error: isValidationError
-            ? (error as Error).message
+            ? "Invalid search parameters"
             : "Failed to fetch search results",
+          ...(process.env.NODE_ENV !== "production" &&
+          isValidationError &&
+          error instanceof Error
+            ? { details: error.message }
+            : {}),
         },
         {
           status: isValidationError ? 400 : 500,

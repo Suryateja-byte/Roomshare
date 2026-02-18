@@ -141,6 +141,17 @@ describe('Listings API IDOR Protection', () => {
     },
   };
 
+  const validPatchPayload = {
+    title: 'Updated Title',
+    description: 'Updated description',
+    price: '1200',
+    totalSlots: '2',
+    address: '123 Main St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94102',
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -153,14 +164,11 @@ describe('Listings API IDOR Protection', () => {
       const request = new Request('http://localhost/api/listings/listing-abc', {
         method: 'PATCH',
         body: JSON.stringify({
+          ...validPatchPayload,
           title: 'Hacked Title',
           description: 'Hacked description',
           price: '1',
           totalSlots: '1',
-          address: '123 Main St',
-          city: 'San Francisco',
-          state: 'CA',
-          zip: '94102',
         }),
       });
 
@@ -180,9 +188,14 @@ describe('Listings API IDOR Protection', () => {
     it('allows owner to update their own listing', async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      const queryRawMock = jest.fn().mockResolvedValue([
+        { ownerId: 'owner-123', totalSlots: 2, availableSlots: 2 },
+      ]);
+      const updateMock = jest.fn().mockResolvedValue({ ...mockListing, title: 'Updated Title' });
       (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
         const tx = {
-          listing: { update: jest.fn().mockResolvedValue({ ...mockListing, title: 'Updated Title' }) },
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
           location: { update: jest.fn() },
           $executeRaw: jest.fn(),
         };
@@ -191,16 +204,7 @@ describe('Listings API IDOR Protection', () => {
 
       const request = new Request('http://localhost/api/listings/listing-abc', {
         method: 'PATCH',
-        body: JSON.stringify({
-          title: 'Updated Title',
-          description: 'Updated description',
-          price: '1200',
-          totalSlots: '2',
-          address: '123 Main St',
-          city: 'San Francisco',
-          state: 'CA',
-          zip: '94102',
-        }),
+        body: JSON.stringify(validPatchPayload),
       });
 
       const response = await PATCH(request, {
@@ -208,6 +212,77 @@ describe('Listings API IDOR Protection', () => {
       });
 
       expect(response.status).toBe(200);
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(queryRawMock).toHaveBeenCalled();
+      expect(updateMock).toHaveBeenCalled();
+    });
+
+    it('returns 403 when transaction lock recheck finds ownership changed', async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      const queryRawMock = jest
+        .fn()
+        .mockResolvedValue([{ ownerId: 'attacker-456', totalSlots: 2, availableSlots: 2 }]);
+      const updateMock = jest.fn();
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+        };
+        return callback(tx);
+      });
+
+      const request = new Request('http://localhost/api/listings/listing-abc', {
+        method: 'PATCH',
+        body: JSON.stringify(validPatchPayload),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: 'listing-abc' }),
+      });
+
+      expect(response.status).toBe(403);
+      const body = await response.json();
+      expect(body.error).toBe('Forbidden');
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(queryRawMock).toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when listing disappears before transaction lock recheck', async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      const queryRawMock = jest.fn().mockResolvedValue([]);
+      const updateMock = jest.fn();
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+        };
+        return callback(tx);
+      });
+
+      const request = new Request('http://localhost/api/listings/listing-abc', {
+        method: 'PATCH',
+        body: JSON.stringify(validPatchPayload),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: 'listing-abc' }),
+      });
+
+      expect(response.status).toBe(404);
+      const body = await response.json();
+      expect(body.error).toBe('Listing not found');
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(queryRawMock).toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
     });
 
     it('returns 404 when listing does not exist', async () => {
@@ -217,14 +292,11 @@ describe('Listings API IDOR Protection', () => {
       const request = new Request('http://localhost/api/listings/nonexistent', {
         method: 'PATCH',
         body: JSON.stringify({
+          ...validPatchPayload,
           title: 'Hacked Title',
           description: 'Test',
           price: '1000',
           totalSlots: '1',
-          address: '123 Main St',
-          city: 'San Francisco',
-          state: 'CA',
-          zip: '94102',
         }),
       });
 
@@ -243,14 +315,11 @@ describe('Listings API IDOR Protection', () => {
       const request = new Request('http://localhost/api/listings/listing-abc', {
         method: 'PATCH',
         body: JSON.stringify({
+          ...validPatchPayload,
           title: 'Hacked Title',
           description: 'Test',
           price: '1000',
           totalSlots: '1',
-          address: '123 Main St',
-          city: 'San Francisco',
-          state: 'CA',
-          zip: '94102',
         }),
       });
 
@@ -400,14 +469,11 @@ describe('Listings API IDOR Protection', () => {
       const request = new Request('http://localhost/api/listings/listing-abc', {
         method: 'PATCH',
         body: JSON.stringify({
+          ...validPatchPayload,
           title: 'Test',
           description: 'Test',
           price: '1000',
           totalSlots: '1',
-          address: '123 Main St',
-          city: 'San Francisco',
-          state: 'CA',
-          zip: '94102',
         }),
       });
 

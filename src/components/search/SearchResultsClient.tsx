@@ -78,7 +78,10 @@ export function SearchResultsClient({
     setIsLoadingMore(false);
     isLoadingRef.current = false;
     seenIdsRef.current = new Set(initialListings.map((l) => l.id));
-  }, [searchParamsString, initialListings, initialNextCursor]);
+    // The component is keyed by searchParamsString in the parent route.
+    // Reset only when params change to avoid unnecessary load-more state loss.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParamsString]);
 
   const allListings = [...initialListings, ...extraListings];
   const reachedCap = allListings.length >= MAX_ACCUMULATED;

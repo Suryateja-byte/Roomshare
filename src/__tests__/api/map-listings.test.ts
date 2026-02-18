@@ -13,6 +13,10 @@ jest.mock("@/lib/with-rate-limit-redis", () => ({
   withRateLimitRedis: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock("@/lib/search-rate-limit-identifier", () => ({
+  getSearchRateLimitIdentifier: jest.fn().mockResolvedValue("127.0.0.1"),
+}));
+
 jest.mock("@/lib/request-context", () => ({
   createContextFromHeaders: jest
     .fn()

@@ -37,9 +37,11 @@ import {
   MAX_LNG_SPAN,
 } from "@/lib/validation";
 import { logger } from "@/lib/logger";
+import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 
 // Cache TTL in seconds
 const CACHE_TTL = 30;
+const FACET_QUERY_TIMEOUT_MS = 5000;
 
 // Maximum results per facet to prevent expensive aggregations
 const MAX_FACET_RESULTS = 100;
@@ -64,6 +66,23 @@ function joinWhereClauseWithSecurityInvariant(conditions: string[]): string {
   const whereClause = conditions.join(" AND ");
   assertParameterizedWhereClause(whereClause);
   return whereClause;
+}
+
+/**
+ * Execute facet queries with a local statement timeout.
+ * Prevents expensive UNNEST/GROUP BY calls from hanging connections.
+ */
+async function queryWithTimeout<T>(
+  query: string,
+  params: unknown[],
+): Promise<T[]> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(
+      "SET LOCAL statement_timeout = $1",
+      `${FACET_QUERY_TIMEOUT_MS}`,
+    );
+    return tx.$queryRawUnsafe<T[]>(query, ...params);
+  });
 }
 
 /**
@@ -298,9 +317,10 @@ async function getAmenitiesFacet(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await prisma.$queryRawUnsafe<
-    { amenity: string; count: bigint }[]
-  >(query, ...params, MAX_FACET_RESULTS);
+  const results = await queryWithTimeout<{ amenity: string; count: bigint }>(
+    query,
+    [...params, MAX_FACET_RESULTS],
+  );
 
   const facets: Record<string, number> = {};
   for (const row of results) {
@@ -335,9 +355,10 @@ async function getHouseRulesFacet(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await prisma.$queryRawUnsafe<
-    { rule: string; count: bigint }[]
-  >(query, ...params, MAX_FACET_RESULTS);
+  const results = await queryWithTimeout<{ rule: string; count: bigint }>(
+    query,
+    [...params, MAX_FACET_RESULTS],
+  );
 
   const facets: Record<string, number> = {};
   for (const row of results) {
@@ -372,9 +393,10 @@ async function getRoomTypesFacet(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await prisma.$queryRawUnsafe<
-    { roomType: string; count: bigint }[]
-  >(query, ...params, MAX_FACET_RESULTS);
+  const results = await queryWithTimeout<{ roomType: string; count: bigint }>(
+    query,
+    [...params, MAX_FACET_RESULTS],
+  );
 
   const facets: Record<string, number> = {};
   for (const row of results) {
@@ -407,9 +429,11 @@ async function getPriceRanges(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await prisma.$queryRawUnsafe<
-    { min: number | null; max: number | null; median: number | null }[]
-  >(query, ...params);
+  const results = await queryWithTimeout<{
+    min: number | null;
+    max: number | null;
+    median: number | null;
+  }>(query, params);
 
   const row = results[0];
   return {
@@ -465,9 +489,10 @@ async function getPriceHistogram(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await prisma.$queryRawUnsafe<
-    { bucket_min: number; count: bigint }[]
-  >(query, ...params, bucketWidth);
+  const results = await queryWithTimeout<{ bucket_min: number; count: bigint }>(
+    query,
+    [...params, bucketWidth],
+  );
 
   const buckets: PriceHistogramBucket[] = results.map((row) => ({
     min: Number(row.bucket_min),
@@ -650,7 +675,11 @@ export async function GET(request: NextRequest) {
         { revalidate: CACHE_TTL },
       );
 
-      const facets = await cachedFn();
+      const facets = await withTimeout(
+        cachedFn(),
+        DEFAULT_TIMEOUTS.DATABASE,
+        "search-facets-getFacetsInternal",
+      );
 
       return NextResponse.json(facets, {
         headers: {

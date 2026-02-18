@@ -22,6 +22,7 @@ import {
 import { LAT_OFFSET_DEGREES } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
+import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
 
 export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
       // Rate limiting via Redis (falls back to DB rate limiting when Redis unavailable)
       const rateLimitResponse = await withRateLimitRedis(request, {
         type: "map",
+        getIdentifier: getSearchRateLimitIdentifier,
       });
       if (rateLimitResponse) return rateLimitResponse;
 

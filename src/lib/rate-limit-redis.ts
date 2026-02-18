@@ -31,6 +31,24 @@ interface InMemoryRateLimitEntry {
 
 // Separate maps for different rate limit types (burst vs sustained)
 const inMemoryRateLimits = new Map<string, InMemoryRateLimitEntry>();
+const MAX_IN_MEMORY_FALLBACK_ENTRIES = 10_000;
+
+function setInMemoryRateLimitWithCap(
+  key: string,
+  value: InMemoryRateLimitEntry,
+): void {
+  if (!inMemoryRateLimits.has(key)) {
+    while (inMemoryRateLimits.size >= MAX_IN_MEMORY_FALLBACK_ENTRIES) {
+      const oldestKey = inMemoryRateLimits.keys().next().value as
+        | string
+        | undefined;
+      if (!oldestKey) break;
+      inMemoryRateLimits.delete(oldestKey);
+    }
+  }
+
+  inMemoryRateLimits.set(key, value);
+}
 
 // Clean up expired entries periodically to prevent memory leaks
 const CLEANUP_INTERVAL_MS = 60000; // 1 minute
@@ -75,7 +93,7 @@ function checkInMemoryRateLimit(
 
   // No existing entry or window expired - start fresh
   if (!entry || now >= entry.resetAt) {
-    inMemoryRateLimits.set(key, { count: 1, resetAt: now + windowMs });
+    setInMemoryRateLimitWithCap(key, { count: 1, resetAt: now + windowMs });
     return { success: true };
   }
 
@@ -107,6 +125,14 @@ const RATE_LIMITS = {
     burst: { limit: 60, windowMs: 60 * 1000 }, // 60/min
     sustained: { limit: 300, windowMs: 60 * 60 * 1000 }, // 300/hour
   },
+  searchV2: {
+    burst: { limit: 60, windowMs: 60 * 1000 }, // 60/min
+    sustained: { limit: 300, windowMs: 60 * 60 * 1000 }, // 300/hour
+  },
+  listingsRead: {
+    burst: { limit: 30, windowMs: 60 * 1000 }, // 30/min
+    sustained: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100/hour
+  },
   searchCount: {
     burst: { limit: 30, windowMs: 60 * 1000 }, // 30/min
     sustained: { limit: 200, windowMs: 60 * 60 * 1000 }, // 200/hour
@@ -118,6 +144,8 @@ const DB_FALLBACK_CONFIGS: Record<keyof typeof RATE_LIMITS, { limit: number; win
   chat: { limit: 5, windowMs: 60 * 1000 },
   metrics: { limit: 100, windowMs: 60 * 1000 },
   map: { limit: 60, windowMs: 60 * 1000 },
+  searchV2: { limit: 60, windowMs: 60 * 1000 },
+  listingsRead: { limit: 30, windowMs: 60 * 1000 },
   searchCount: { limit: 30, windowMs: 60 * 1000 },
 };
 
@@ -240,6 +268,52 @@ export const mapSustainedLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(300, "1 h"),
   prefix: "map-sustained",
+  analytics: true,
+});
+
+// ============ SEARCH V2 LIMITERS ============
+
+/**
+ * Search V2 burst limiter: 60 requests per minute
+ * Dedicated bucket for search API traffic.
+ */
+export const searchV2BurstLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(60, "1 m"),
+  prefix: "search-v2-burst",
+  analytics: true,
+});
+
+/**
+ * Search V2 sustained limiter: 300 requests per hour
+ * Protects against prolonged scraping and abuse.
+ */
+export const searchV2SustainedLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(300, "1 h"),
+  prefix: "search-v2-sustained",
+  analytics: true,
+});
+
+// ============ LISTINGS READ LIMITERS ============
+
+/**
+ * Listings read burst limiter: 30 requests per minute.
+ */
+export const listingsReadBurstLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(30, "1 m"),
+  prefix: "listings-read-burst",
+  analytics: true,
+});
+
+/**
+ * Listings read sustained limiter: 100 requests per hour.
+ */
+export const listingsReadSustainedLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(100, "1 h"),
+  prefix: "listings-read-sustained",
   analytics: true,
 });
 
@@ -479,6 +553,116 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
       console.error("[RateLimit] Redis error:", error);
     }
     return checkDbFallbackRateLimit("map", ip);
+  }
+}
+
+/**
+ * Check search-v2 rate limits (both burst and sustained).
+ * Returns success: false if either limit is exceeded.
+ *
+ * @param ip - Client IP address
+ * @returns Rate limit result with optional retry-after seconds
+ */
+export async function checkSearchV2RateLimit(
+  ip: string,
+): Promise<RateLimitResult> {
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL ||
+    !process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
+    return checkDbFallbackRateLimit("searchV2", ip);
+  }
+
+  try {
+    const burstResult = await protectedRateLimitCheck(
+      searchV2BurstLimiter,
+      ip,
+      "search-v2-burst-limit",
+    );
+    if (!burstResult.success) {
+      return {
+        success: false,
+        retryAfter: Math.ceil((burstResult.reset - Date.now()) / 1000),
+      };
+    }
+
+    const sustainedResult = await protectedRateLimitCheck(
+      searchV2SustainedLimiter,
+      ip,
+      "search-v2-sustained-limit",
+    );
+    if (!sustainedResult.success) {
+      return {
+        success: false,
+        retryAfter: Math.ceil((sustainedResult.reset - Date.now()) / 1000),
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      console.error("[RateLimit] Redis timeout:", error);
+    } else if (isCircuitOpenError(error)) {
+      console.error("[RateLimit] Circuit breaker open:", error);
+    } else {
+      console.error("[RateLimit] Redis error:", error);
+    }
+    return checkDbFallbackRateLimit("searchV2", ip);
+  }
+}
+
+/**
+ * Check listings read rate limits (both burst and sustained).
+ * Returns success: false if either limit is exceeded.
+ *
+ * @param ip - Client IP address
+ * @returns Rate limit result with optional retry-after seconds
+ */
+export async function checkListingsReadRateLimit(
+  ip: string,
+): Promise<RateLimitResult> {
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL ||
+    !process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
+    return checkDbFallbackRateLimit("listingsRead", ip);
+  }
+
+  try {
+    const burstResult = await protectedRateLimitCheck(
+      listingsReadBurstLimiter,
+      ip,
+      "listings-read-burst-limit",
+    );
+    if (!burstResult.success) {
+      return {
+        success: false,
+        retryAfter: Math.ceil((burstResult.reset - Date.now()) / 1000),
+      };
+    }
+
+    const sustainedResult = await protectedRateLimitCheck(
+      listingsReadSustainedLimiter,
+      ip,
+      "listings-read-sustained-limit",
+    );
+    if (!sustainedResult.success) {
+      return {
+        success: false,
+        retryAfter: Math.ceil((sustainedResult.reset - Date.now()) / 1000),
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      console.error("[RateLimit] Redis timeout:", error);
+    } else if (isCircuitOpenError(error)) {
+      console.error("[RateLimit] Circuit breaker open:", error);
+    } else {
+      console.error("[RateLimit] Redis error:", error);
+    }
+    return checkDbFallbackRateLimit("listingsRead", ip);
   }
 }
 

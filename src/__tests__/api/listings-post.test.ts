@@ -44,6 +44,10 @@ jest.mock('@/lib/with-rate-limit', () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }))
 
+jest.mock('@/lib/with-rate-limit-redis', () => ({
+  withRateLimitRedis: jest.fn().mockResolvedValue(null),
+}))
+
 jest.mock('@/lib/logger', () => ({
   logger: {
     info: jest.fn().mockResolvedValue(undefined),

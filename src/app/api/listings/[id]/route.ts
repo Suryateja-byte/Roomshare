@@ -285,53 +285,91 @@ export async function PATCH(
         const normalizedAmenities = normalizeStringList(amenities);
         const normalizedHouseRules = normalizeStringList(houseRules);
 
-        // Update in transaction
-        const result = await prisma.$transaction(async (tx) => {
-            // Update listing
-            const updatedListing = await tx.listing.update({
-                where: { id },
-                data: {
-                    title,
-                    description,
-                    price,
-                    amenities: normalizedAmenities,
-                    houseRules: normalizedHouseRules,
-                    householdLanguages: Array.isArray(householdLanguages)
-                        ? householdLanguages.map((l: string) => l.trim().toLowerCase()).filter(isValidLanguageCode)
-                        : [],
-                    genderPreference: genderPreference || null,
-                    householdGender: householdGender || null,
-                    leaseDuration: leaseDuration || null,
-                    roomType: roomType || null,
-                    totalSlots,
-                    availableSlots: Math.max(0, Math.min(listing.availableSlots + (totalSlots - listing.totalSlots), totalSlots)),
-                    moveInDate: moveInDate ? new Date(moveInDate) : null,
-                    ...(Array.isArray(images) && { images }),
-                }
-            });
+        let result;
+        try {
+            // Ownership is re-validated inside the transaction under row lock
+            // to prevent TOCTOU between pre-check and update.
+            result = await prisma.$transaction(async (tx) => {
+                const [lockedListing] = await tx.$queryRaw<Array<{
+                    ownerId: string;
+                    totalSlots: number;
+                    availableSlots: number;
+                }>>`
+                    SELECT "ownerId", "totalSlots", "availableSlots"
+                    FROM "Listing"
+                    WHERE "id" = ${id}
+                    FOR UPDATE
+                `;
 
-            // Update location if it exists and address changed
-            if (addressChanged && listing.location && coords) {
-                await tx.location.update({
-                    where: { id: listing.location.id },
+                if (!lockedListing) {
+                    throw new Error('NOT_FOUND');
+                }
+
+                if (lockedListing.ownerId !== session.user.id) {
+                    throw new Error('FORBIDDEN');
+                }
+
+                const updatedListing = await tx.listing.update({
+                    where: { id },
                     data: {
-                        address,
-                        city,
-                        state,
-                        zip,
+                        title,
+                        description,
+                        price,
+                        amenities: normalizedAmenities,
+                        houseRules: normalizedHouseRules,
+                        householdLanguages: Array.isArray(householdLanguages)
+                            ? householdLanguages.map((l: string) => l.trim().toLowerCase()).filter(isValidLanguageCode)
+                            : [],
+                        genderPreference: genderPreference || null,
+                        householdGender: householdGender || null,
+                        leaseDuration: leaseDuration || null,
+                        roomType: roomType || null,
+                        totalSlots,
+                        availableSlots: Math.max(
+                            0,
+                            Math.min(
+                                lockedListing.availableSlots + (totalSlots - lockedListing.totalSlots),
+                                totalSlots
+                            )
+                        ),
+                        moveInDate: moveInDate ? new Date(moveInDate) : null,
+                        ...(Array.isArray(images) && { images }),
                     }
                 });
 
-                const point = `POINT(${coords.lng} ${coords.lat})`;
-                await tx.$executeRaw`
-                    UPDATE "Location"
-                    SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
-                    WHERE id = ${listing.location.id}
-                `;
-            }
+                // Update location if it exists and address changed
+                if (addressChanged && listing.location && coords) {
+                    await tx.location.update({
+                        where: { id: listing.location.id },
+                        data: {
+                            address,
+                            city,
+                            state,
+                            zip,
+                        }
+                    });
 
-            return updatedListing;
-        });
+                    const point = `POINT(${coords.lng} ${coords.lat})`;
+                    await tx.$executeRaw`
+                        UPDATE "Location"
+                        SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
+                        WHERE id = ${listing.location.id}
+                    `;
+                }
+
+                return updatedListing;
+            });
+        } catch (error) {
+            if (error instanceof Error) {
+                if (error.message === 'NOT_FOUND') {
+                    return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+                }
+                if (error.message === 'FORBIDDEN') {
+                    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+                }
+            }
+            throw error;
+        }
 
         // Fire-and-forget: mark listing dirty for search doc refresh
         markListingDirty(id, 'listing_updated').catch(() => {});

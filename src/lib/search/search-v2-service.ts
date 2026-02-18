@@ -399,14 +399,13 @@ export async function executeSearchV2(
     };
 
     const searchDurationMs = Math.round(performance.now() - searchStartTime);
-    console.log(JSON.stringify({
-      event: "search_latency",
+    logger.sync.info("search_latency", {
       durationMs: searchDurationMs,
       listCount: listResult?.items?.length ?? 0,
       mapCount: mapListings?.length ?? 0,
       mode,
       cached: false,
-    }));
+    });
 
     return { response, paginatedResult: { ...listResult, nextCursor } };
   } catch (error) {

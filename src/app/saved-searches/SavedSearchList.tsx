@@ -32,7 +32,7 @@ export default function SavedSearchList({ initialSearches }: SavedSearchListProp
         setLoadingId(id);
         try {
             const result = await toggleSearchAlert(id, !currentEnabled);
-            if (result.success) {
+            if ('success' in result && result.success) {
                 setSearches(prev =>
                     prev.map(s =>
                         s.id === id ? { ...s, alertEnabled: !currentEnabled } : s
@@ -52,7 +52,7 @@ export default function SavedSearchList({ initialSearches }: SavedSearchListProp
         setLoadingId(id);
         try {
             const result = await deleteSavedSearch(id);
-            if (result.success) {
+            if ('success' in result && result.success) {
                 setSearches(prev => prev.filter(s => s.id !== id));
             }
         } catch (error) {

@@ -29,10 +29,25 @@ interface ProcessResult {
     details: string[];
 }
 
+type SavedSearchForAlerts = {
+    id: string;
+    name: string;
+    filters: Prisma.JsonValue;
+    lastAlertAt: Date | null;
+    createdAt: Date;
+    user: {
+        id: string;
+        name: string | null;
+        email: string | null;
+        notificationPreferences: Prisma.JsonValue | null;
+    };
+};
+
 const parseDateOnly = (value: string): Date => {
     const [year, month, day] = value.split('-').map(Number);
     return new Date(year, month - 1, day);
 };
+const SEARCH_ALERT_BATCH_SIZE = 100;
 
 function isSearchAlertsEnabled(notificationPreferences: unknown): boolean {
     if (!notificationPreferences || typeof notificationPreferences !== 'object') {
@@ -55,184 +70,204 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-        // Find saved searches that need alerts
-        const savedSearches = await prisma.savedSearch.findMany({
-            where: {
-                alertEnabled: true,
-                OR: [
-                    // Never alerted
-                    { lastAlertAt: null },
-                    // Daily alerts - last alert more than 24 hours ago
-                    {
-                        alertFrequency: 'DAILY',
-                        lastAlertAt: { lt: oneDayAgo }
-                    },
-                    // Weekly alerts - last alert more than 7 days ago
-                    {
-                        alertFrequency: 'WEEKLY',
-                        lastAlertAt: { lt: oneWeekAgo }
-                    }
-                ]
-            },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        notificationPreferences: true
-                    }
+        const baseWhere = {
+            alertEnabled: true,
+            OR: [
+                // Never alerted
+                { lastAlertAt: null },
+                // Daily alerts - last alert more than 24 hours ago
+                {
+                    alertFrequency: 'DAILY',
+                    lastAlertAt: { lt: oneDayAgo }
+                },
+                // Weekly alerts - last alert more than 7 days ago
+                {
+                    alertFrequency: 'WEEKLY',
+                    lastAlertAt: { lt: oneWeekAgo }
                 }
-            }
-        });
+            ]
+        } satisfies Prisma.SavedSearchWhereInput;
 
-        result.details.push(`Found ${savedSearches.length} saved searches to process`);
+        let processedCandidates = 0;
+        let cursorId: string | null = null;
 
-        for (const savedSearch of savedSearches) {
-            result.processed++;
-
-            try {
-                // Check user notification preferences
-                if (!isSearchAlertsEnabled(savedSearch.user.notificationPreferences)) {
-                    result.details.push(`Skipping ${savedSearch.id} - user disabled search alerts`);
-                    continue;
-                }
-
-                if (!savedSearch.user.email) {
-                    result.details.push(`Skipping ${savedSearch.id} - no user email`);
-                    continue;
-                }
-
-                const filters = savedSearch.filters as SearchFilters;
-                const sinceDate = savedSearch.lastAlertAt || savedSearch.createdAt;
-
-                // Build query to find new matching listings
-                const whereClause: Prisma.ListingWhereInput = {
-                    status: 'ACTIVE',
-                    createdAt: { gt: sinceDate }
-                };
-
-                // Apply filters
-                if (filters.minPrice !== undefined) {
-                    const existingPriceFilter = (whereClause.price ?? {}) as Record<string, unknown>;
-                    whereClause.price = { ...existingPriceFilter, gte: filters.minPrice };
-                }
-                if (filters.maxPrice !== undefined) {
-                    const existingPriceFilter = (whereClause.price ?? {}) as Record<string, unknown>;
-                    whereClause.price = { ...existingPriceFilter, lte: filters.maxPrice };
-                }
-                if (filters.roomType) {
-                    whereClause.roomType = filters.roomType;
-                }
-                if (filters.leaseDuration) {
-                    whereClause.leaseDuration = filters.leaseDuration;
-                }
-                if (filters.moveInDate) {
-                    const targetDate = parseDateOnly(filters.moveInDate);
-                    const existingAnd = Array.isArray(whereClause.AND)
-                        ? whereClause.AND
-                        : whereClause.AND ? [whereClause.AND] : [];
-                    whereClause.AND = [
-                        ...existingAnd,
-                        {
-                            OR: [
-                                { moveInDate: null },
-                                { moveInDate: { lte: targetDate } }
-                            ]
+        while (true) {
+            const savedSearches: SavedSearchForAlerts[] = await prisma.savedSearch.findMany({
+                where: baseWhere,
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            notificationPreferences: true
                         }
-                    ];
-                }
-                if (filters.amenities && filters.amenities.length > 0) {
-                    whereClause.amenities = { hasEvery: filters.amenities };
-                }
-                if (filters.houseRules && filters.houseRules.length > 0) {
-                    whereClause.houseRules = { hasEvery: filters.houseRules };
-                }
-                if (filters.languages && filters.languages.length > 0) {
-                    whereClause.householdLanguages = { hasSome: filters.languages };
-                }
-                if (filters.genderPreference) {
-                    whereClause.genderPreference = filters.genderPreference;
-                }
-                if (filters.householdGender) {
-                    whereClause.householdGender = filters.householdGender;
-                }
-                if (filters.query) {
-                    whereClause.OR = [
-                        { title: { contains: filters.query, mode: 'insensitive' } },
-                        { description: { contains: filters.query, mode: 'insensitive' } }
-                    ];
-                }
+                    }
+                },
+                orderBy: { id: 'asc' },
+                take: SEARCH_ALERT_BATCH_SIZE,
+                ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+            });
 
-                // City filter via location
-                if (filters.city) {
-                    whereClause.location = {
-                        city: { contains: filters.city, mode: 'insensitive' }
+            if (!savedSearches || savedSearches.length === 0) {
+                break;
+            }
+
+            processedCandidates += savedSearches.length;
+            cursorId = savedSearches[savedSearches.length - 1].id;
+
+            for (const savedSearch of savedSearches) {
+                result.processed++;
+
+                try {
+                    // Check user notification preferences
+                    if (!isSearchAlertsEnabled(savedSearch.user.notificationPreferences)) {
+                        result.details.push(`Skipping ${savedSearch.id} - user disabled search alerts`);
+                        continue;
+                    }
+
+                    if (!savedSearch.user.email) {
+                        result.details.push(`Skipping ${savedSearch.id} - no user email`);
+                        continue;
+                    }
+
+                    const filters = savedSearch.filters as SearchFilters;
+                    const sinceDate = savedSearch.lastAlertAt || savedSearch.createdAt;
+
+                    // Build query to find new matching listings
+                    const whereClause: Prisma.ListingWhereInput = {
+                        status: 'ACTIVE',
+                        createdAt: { gt: sinceDate }
                     };
-                }
 
-                // Count matching listings
-                const newListingsCount = await prisma.listing.count({
-                    where: whereClause
-                });
+                    // Apply filters
+                    if (filters.minPrice !== undefined) {
+                        const existingPriceFilter = (whereClause.price ?? {}) as Record<string, unknown>;
+                        whereClause.price = { ...existingPriceFilter, gte: filters.minPrice };
+                    }
+                    if (filters.maxPrice !== undefined) {
+                        const existingPriceFilter = (whereClause.price ?? {}) as Record<string, unknown>;
+                        whereClause.price = { ...existingPriceFilter, lte: filters.maxPrice };
+                    }
+                    if (filters.roomType) {
+                        whereClause.roomType = filters.roomType;
+                    }
+                    if (filters.leaseDuration) {
+                        whereClause.leaseDuration = filters.leaseDuration;
+                    }
+                    if (filters.moveInDate) {
+                        const targetDate = parseDateOnly(filters.moveInDate);
+                        const existingAnd = Array.isArray(whereClause.AND)
+                            ? whereClause.AND
+                            : whereClause.AND ? [whereClause.AND] : [];
+                        whereClause.AND = [
+                            ...existingAnd,
+                            {
+                                OR: [
+                                    { moveInDate: null },
+                                    { moveInDate: { lte: targetDate } }
+                                ]
+                            }
+                        ];
+                    }
+                    if (filters.amenities && filters.amenities.length > 0) {
+                        whereClause.amenities = { hasEvery: filters.amenities };
+                    }
+                    if (filters.houseRules && filters.houseRules.length > 0) {
+                        whereClause.houseRules = { hasEvery: filters.houseRules };
+                    }
+                    if (filters.languages && filters.languages.length > 0) {
+                        whereClause.householdLanguages = { hasSome: filters.languages };
+                    }
+                    if (filters.genderPreference) {
+                        whereClause.genderPreference = filters.genderPreference;
+                    }
+                    if (filters.householdGender) {
+                        whereClause.householdGender = filters.householdGender;
+                    }
+                    if (filters.query) {
+                        whereClause.OR = [
+                            { title: { contains: filters.query, mode: 'insensitive' } },
+                            { description: { contains: filters.query, mode: 'insensitive' } }
+                        ];
+                    }
 
-                if (newListingsCount > 0) {
-                    // Send email notification
-                    const emailResult = await sendNotificationEmail('searchAlert', savedSearch.user.email, {
-                        userName: savedSearch.user.name || 'User',
-                        searchQuery: savedSearch.name,
-                        newListingsCount,
-                        searchId: savedSearch.id
+                    // City filter via location
+                    if (filters.city) {
+                        whereClause.location = {
+                            city: { contains: filters.city, mode: 'insensitive' }
+                        };
+                    }
+
+                    // Count matching listings
+                    const newListingsCount = await prisma.listing.count({
+                        where: whereClause
                     });
 
-                    if (emailResult.success) {
-                        result.alertsSent++;
-                        result.details.push(`Sent alert for ${savedSearch.id}: ${newListingsCount} new listings`);
-                    } else {
-                        result.errors++;
-                        result.details.push(`Failed to send email for ${savedSearch.id}: ${emailResult.error}`);
-                    }
+                    if (newListingsCount > 0) {
+                        // Send email notification
+                        const emailResult = await sendNotificationEmail('searchAlert', savedSearch.user.email, {
+                            userName: savedSearch.user.name || 'User',
+                            searchQuery: savedSearch.name,
+                            newListingsCount,
+                            searchId: savedSearch.id
+                        });
 
-                    // P0 FIX: Use Promise.allSettled for batch resilience
-                    // Ensures notification creation and lastAlertAt update are both attempted
-                    // even if one fails, preventing inconsistent state
-                    const [notificationResult, updateResult] = await Promise.allSettled([
-                        prisma.notification.create({
-                            data: {
-                                userId: savedSearch.user.id,
-                                type: 'SEARCH_ALERT',
-                                title: 'New listings match your search!',
-                                message: `${newListingsCount} new listing${newListingsCount > 1 ? 's' : ''} match your saved search "${savedSearch.name}"`,
-                                link: buildSearchUrl(filters)
-                            }
-                        }),
-                        prisma.savedSearch.update({
+                        if (emailResult.success) {
+                            result.alertsSent++;
+                            result.details.push(`Sent alert for ${savedSearch.id}: ${newListingsCount} new listings`);
+                        } else {
+                            result.errors++;
+                            result.details.push(`Failed to send email for ${savedSearch.id}: ${emailResult.error}`);
+                        }
+
+                        // P0 FIX: Use Promise.allSettled for batch resilience
+                        // Ensures notification creation and lastAlertAt update are both attempted
+                        // even if one fails, preventing inconsistent state
+                        const [notificationResult, updateResult] = await Promise.allSettled([
+                            prisma.notification.create({
+                                data: {
+                                    userId: savedSearch.user.id,
+                                    type: 'SEARCH_ALERT',
+                                    title: 'New listings match your search!',
+                                    message: `${newListingsCount} new listing${newListingsCount > 1 ? 's' : ''} match your saved search "${savedSearch.name}"`,
+                                    link: buildSearchUrl(filters)
+                                }
+                            }),
+                            prisma.savedSearch.update({
+                                where: { id: savedSearch.id },
+                                data: { lastAlertAt: now }
+                            })
+                        ]);
+
+                        // Log any partial failures for debugging
+                        if (notificationResult.status === 'rejected') {
+                            result.details.push(`Warning: notification creation failed for ${savedSearch.id}: ${notificationResult.reason}`);
+                        }
+                        if (updateResult.status === 'rejected') {
+                            result.details.push(`Warning: lastAlertAt update failed for ${savedSearch.id}: ${updateResult.reason}`);
+                        }
+                    } else {
+                        // P0 FIX: Still update lastAlertAt even when no new listings
+                        // Prevents re-processing the same time window repeatedly
+                        await prisma.savedSearch.update({
                             where: { id: savedSearch.id },
                             data: { lastAlertAt: now }
-                        })
-                    ]);
+                        });
+                    }
 
-                    // Log any partial failures for debugging
-                    if (notificationResult.status === 'rejected') {
-                        result.details.push(`Warning: notification creation failed for ${savedSearch.id}: ${notificationResult.reason}`);
-                    }
-                    if (updateResult.status === 'rejected') {
-                        result.details.push(`Warning: lastAlertAt update failed for ${savedSearch.id}: ${updateResult.reason}`);
-                    }
-                } else {
-                    // P0 FIX: Still update lastAlertAt even when no new listings
-                    // Prevents re-processing the same time window repeatedly
-                    await prisma.savedSearch.update({
-                        where: { id: savedSearch.id },
-                        data: { lastAlertAt: now }
-                    });
+                } catch (error) {
+                    result.errors++;
+                    result.details.push(`Error processing ${savedSearch.id}: ${error}`);
                 }
+            }
 
-            } catch (error) {
-                result.errors++;
-                result.details.push(`Error processing ${savedSearch.id}: ${error}`);
+            if (savedSearches.length < SEARCH_ALERT_BATCH_SIZE) {
+                break;
             }
         }
+
+        result.details.unshift(`Found ${processedCandidates} saved searches to process`);
 
         return result;
 

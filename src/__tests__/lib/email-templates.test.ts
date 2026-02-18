@@ -51,6 +51,25 @@ describe('emailTemplates', () => {
       expect(result.html).toContain('August 1, 2024')
       expect(result.html).toContain('/bookings')
     })
+
+    it('should escape user-controlled booking fields in HTML', () => {
+      const data = {
+        hostName: '<img src=x onerror=alert(1)>',
+        tenantName: '<script>alert(1)</script>',
+        listingTitle: '\"><b>Cozy</b>',
+        startDate: '<svg/onload=alert(1)>',
+        endDate: '2024-08-01',
+        listingId: 'listing-123',
+      }
+
+      const result = emailTemplates.bookingRequest(data)
+
+      expect(result.html).not.toContain('<script>alert(1)</script>')
+      expect(result.html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+      expect(result.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+      expect(result.html).toContain('&quot;&gt;&lt;b&gt;Cozy&lt;/b&gt;')
+      expect(result.html).toContain('&lt;svg/onload=alert(1)&gt;')
+    })
   })
 
   describe('bookingAccepted', () => {
@@ -118,6 +137,24 @@ describe('emailTemplates', () => {
 
       expect(result.html).toContain('...')
       expect(result.html).not.toContain(longMessage)
+    })
+
+    it('should escape message fields and encode conversation id in link', () => {
+      const data = {
+        recipientName: '<img src=x onerror=alert(1)>',
+        senderName: '<script>alert(1)</script>',
+        messagePreview: '\"><b>hello</b>',
+        conversationId: '../../"><script>alert(1)</script>',
+      }
+
+      const result = emailTemplates.newMessage(data)
+
+      expect(result.subject).toBe('New message from <script>alert(1)</script>')
+      expect(result.html).not.toContain('<script>alert(1)</script>')
+      expect(result.html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+      expect(result.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+      expect(result.html).toContain('&quot;&gt;&lt;b&gt;hello&lt;/b&gt;')
+      expect(result.html).toContain('/messages/..%2F..%2F%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E')
     })
   })
 
@@ -199,6 +236,34 @@ describe('emailTemplates', () => {
       const result = emailTemplates.searchAlert(data)
 
       expect(result.subject).toBe('1 new listings match your search')
+    })
+
+    it('should escape user-controlled search fields in HTML', () => {
+      const data = {
+        userName: '<img src=x onerror=alert(1)>',
+        searchQuery: '\"><script>alert(1)</script>',
+        newListingsCount: 2,
+        searchId: 'search-123',
+      }
+
+      const result = emailTemplates.searchAlert(data)
+
+      expect(result.html).not.toContain('<script>alert(1)</script>')
+      expect(result.html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+      expect(result.html).toContain('&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;')
+    })
+
+    it('should encode search query in alert link', () => {
+      const data = {
+        userName: 'John',
+        searchQuery: 'Austin & Pets',
+        newListingsCount: 3,
+        searchId: 'search-123',
+      }
+
+      const result = emailTemplates.searchAlert(data)
+
+      expect(result.html).toContain('/search?q=Austin%20%26%20Pets')
     })
   })
 
