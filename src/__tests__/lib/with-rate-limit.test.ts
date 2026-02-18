@@ -6,23 +6,44 @@
 jest.mock('@/lib/rate-limit', () => ({
   checkRateLimit: jest.fn(),
   getClientIP: jest.fn(() => '127.0.0.1'),
+  getClientIPFromHeaders: jest.fn(() => '127.0.0.1'),
   RATE_LIMITS: {
     register: { limit: 5, windowMs: 3600000 },
     forgotPassword: { limit: 3, windowMs: 3600000 },
     login: { limit: 10, windowMs: 900000 },
+    search: { limit: 60, windowMs: 60000 },
   },
 }))
 
-import { withRateLimit, addRateLimitHeaders } from '@/lib/with-rate-limit'
-import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
+import {
+  withRateLimit,
+  addRateLimitHeaders,
+  checkServerComponentRateLimit,
+} from '@/lib/with-rate-limit'
+import { checkRateLimit, getClientIP, getClientIPFromHeaders } from '@/lib/rate-limit'
 import { NextResponse } from 'next/server'
 
 const mockCheckRateLimit = checkRateLimit as jest.Mock
 const mockGetClientIP = getClientIP as jest.Mock
+const mockGetClientIPFromHeaders = getClientIPFromHeaders as jest.Mock
 
 describe('Rate Limit Wrapper', () => {
+  const originalE2EBypass = process.env.E2E_DISABLE_RATE_LIMIT
+  const originalNodeEnv = process.env.NODE_ENV
+
   beforeEach(() => {
     jest.clearAllMocks()
+    delete process.env.E2E_DISABLE_RATE_LIMIT
+    process.env.NODE_ENV = originalNodeEnv
+  })
+
+  afterAll(() => {
+    if (originalE2EBypass !== undefined) {
+      process.env.E2E_DISABLE_RATE_LIMIT = originalE2EBypass
+    } else {
+      delete process.env.E2E_DISABLE_RATE_LIMIT
+    }
+    process.env.NODE_ENV = originalNodeEnv
   })
 
   describe('withRateLimit', () => {
@@ -207,6 +228,51 @@ describe('Rate Limit Wrapper', () => {
       const result = addRateLimitHeaders(response, 0, 5, resetAt)
 
       expect(result.headers.get('X-RateLimit-Remaining')).toBe('0')
+    })
+  })
+
+  describe('checkServerComponentRateLimit', () => {
+    it('bypasses rate limit when E2E_DISABLE_RATE_LIMIT is enabled', async () => {
+      process.env.NODE_ENV = 'development'
+      process.env.E2E_DISABLE_RATE_LIMIT = 'true'
+
+      const result = await checkServerComponentRateLimit(
+        new Headers(),
+        'search',
+        '/search'
+      )
+
+      expect(result.allowed).toBe(true)
+      expect(result.remaining).toBe(999)
+      expect(mockCheckRateLimit).not.toHaveBeenCalled()
+    })
+
+    it('enforces rate limit when bypass env is not enabled', async () => {
+      process.env.NODE_ENV = 'development'
+      mockCheckRateLimit.mockResolvedValue({
+        success: false,
+        remaining: 0,
+        retryAfter: 15,
+        resetAt: new Date(),
+      })
+
+      const result = await checkServerComponentRateLimit(
+        new Headers({ 'x-real-ip': '1.2.3.4' }),
+        'search',
+        '/search'
+      )
+
+      expect(mockGetClientIPFromHeaders).toHaveBeenCalled()
+      expect(mockCheckRateLimit).toHaveBeenCalledWith(
+        '127.0.0.1',
+        '/search',
+        expect.any(Object)
+      )
+      expect(result).toEqual({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 15,
+      })
     })
   })
 })
