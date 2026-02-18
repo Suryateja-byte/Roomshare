@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useRouter } from "next/navigation";
@@ -213,11 +213,23 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
 
   // Pending state — initialized from URL, updated locally
   const [pending, setPendingState] = useState<BatchedFilterValues>(committed);
+  const previousCommittedRef = useRef(committed);
 
-  // Sync pending with URL when URL changes (e.g. back/forward navigation,
-  // external filter changes from CategoryBar, etc.)
+  // Sync pending with URL when URL filter values change.
+  // If only non-filter params change (for example map bounds), preserve unsaved edits.
   useEffect(() => {
-    setPendingState(committed);
+    setPendingState((prevPending) => {
+      const previousCommitted = previousCommittedRef.current;
+      const committedFiltersChanged = !filtersEqual(committed, previousCommitted);
+      const hasUnsavedEdits = !filtersEqual(prevPending, previousCommitted);
+
+      if (!committedFiltersChanged && hasUnsavedEdits) {
+        return prevPending;
+      }
+
+      return committed;
+    });
+    previousCommittedRef.current = committed;
   }, [committed]);
 
   const isDirty = useMemo(
