@@ -5,6 +5,7 @@ import { Search, X, MapPin, SlidersHorizontal, Navigation } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import type { FilterSuggestion } from '@/lib/data';
+import { LAT_OFFSET_DEGREES } from '@/lib/constants';
 
 /**
  * Nearby area suggestions for zero-result searches.
@@ -47,17 +48,96 @@ export default function ZeroResultsSuggestions({ suggestions, query }: ZeroResul
                 params.delete('leaseDuration');
                 break;
             case 'location':
-                params.delete('lat');
-                params.delete('lng');
-                params.delete('minLat');
-                params.delete('maxLat');
-                params.delete('minLng');
-                params.delete('maxLng');
+                // Expand current search area instead of dropping location entirely.
+                // This keeps query + location valid and avoids bounds-required redirects.
+                {
+                    const normalizeLng360 = (value: number) => ((value % 360) + 360) % 360;
+                    const toSignedLng = (value: number) => (value > 180 ? value - 360 : value);
+
+                    const minLat = parseFloat(params.get('minLat') ?? '');
+                    const maxLat = parseFloat(params.get('maxLat') ?? '');
+                    const minLng = parseFloat(params.get('minLng') ?? '');
+                    const maxLng = parseFloat(params.get('maxLng') ?? '');
+                    const hasExplicitBounds =
+                        Number.isFinite(minLat) &&
+                        Number.isFinite(maxLat) &&
+                        Number.isFinite(minLng) &&
+                        Number.isFinite(maxLng) &&
+                        minLat <= maxLat;
+
+                    if (hasExplicitBounds) {
+                        const latCenter = (minLat + maxLat) / 2;
+                        const latSpan = Math.max(0.02, maxLat - minLat);
+                        const expandedLatSpan = latSpan * 1.75;
+
+                        // Handle both normal bounds and antimeridian-crossing bounds.
+                        const crossesAntimeridian = minLng > maxLng;
+                        const normalizedMin = normalizeLng360(minLng);
+                        let normalizedMax = normalizeLng360(maxLng);
+                        if (crossesAntimeridian) {
+                            normalizedMax += 360;
+                        }
+                        const rawLngSpan = Math.max(0.02, normalizedMax - normalizedMin);
+                        const expandedLngSpan = Math.min(359.9, rawLngSpan * 1.75);
+                        const lngCenterNormalized = normalizedMin + (normalizedMax - normalizedMin) / 2;
+                        const lngHalfSpan = expandedLngSpan / 2;
+                        const expandedMinLng = toSignedLng(
+                            normalizeLng360(lngCenterNormalized - lngHalfSpan)
+                        );
+                        const expandedMaxLng = toSignedLng(
+                            normalizeLng360(lngCenterNormalized + lngHalfSpan)
+                        );
+
+                        params.set('minLat', Math.max(-90, latCenter - expandedLatSpan / 2).toString());
+                        params.set('maxLat', Math.min(90, latCenter + expandedLatSpan / 2).toString());
+                        params.set('minLng', expandedMinLng.toString());
+                        params.set('maxLng', expandedMaxLng.toString());
+                        params.delete('lat');
+                        params.delete('lng');
+                        break;
+                    }
+
+                    const lat = parseFloat(params.get('lat') ?? '');
+                    const lng = parseFloat(params.get('lng') ?? '');
+                    const hasPointCoords =
+                        Number.isFinite(lat) &&
+                        Number.isFinite(lng) &&
+                        lat >= -90 &&
+                        lat <= 90 &&
+                        lng >= -180 &&
+                        lng <= 180;
+
+                    if (hasPointCoords) {
+                        const expandedLatOffset = LAT_OFFSET_DEGREES * 2;
+                        const cosLat = Math.cos((lat * Math.PI) / 180);
+                        const lngOffset = cosLat < 0.01 ? 180 : expandedLatOffset / cosLat;
+
+                        params.set('minLat', Math.max(-90, lat - expandedLatOffset).toString());
+                        params.set('maxLat', Math.min(90, lat + expandedLatOffset).toString());
+                        params.set('minLng', Math.max(-180, lng - lngOffset).toString());
+                        params.set('maxLng', Math.min(180, lng + lngOffset).toString());
+                        params.delete('lat');
+                        params.delete('lng');
+                        break;
+                    }
+
+                    // Last-resort fallback: avoid invalid q-without-bounds state.
+                    params.delete('q');
+                    params.delete('lat');
+                    params.delete('lng');
+                    params.delete('minLat');
+                    params.delete('maxLat');
+                    params.delete('minLng');
+                    params.delete('maxLng');
+                }
                 break;
         }
 
         // Reset to page 1 when modifying filters
         params.delete('page');
+        params.delete('cursor');
+        params.delete('cursorStack');
+        params.delete('pageNumber');
 
         router.push(`/search?${params.toString()}`);
     };

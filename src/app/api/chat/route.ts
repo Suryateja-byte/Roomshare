@@ -7,6 +7,9 @@ import { checkChatRateLimit } from '@/lib/rate-limit-redis';
 import { getClientIP } from '@/lib/rate-limit';
 import { checkFairHousingPolicy, POLICY_REFUSAL_MESSAGE } from '@/lib/fair-housing-policy';
 import { DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/nextjs';
+import { isOriginAllowed, isHostAllowed } from '@/lib/origin-guard';
 
 /**
  * Neighborhood Chat API Route
@@ -31,39 +34,6 @@ import { DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
 
 // CRITICAL: Force Node.js runtime for crypto compatibility
 export const runtime = 'nodejs';
-
-// ============ ORIGIN/HOST ENFORCEMENT ============
-
-function getAllowedOrigins(): string[] {
-  const origins = process.env.ALLOWED_ORIGINS || '';
-  const parsed = origins.split(',').map((o) => o.trim()).filter(Boolean);
-  if (process.env.NODE_ENV === 'development') {
-    parsed.push('http://localhost:3000');
-  }
-  return parsed;
-}
-
-function getAllowedHosts(): string[] {
-  const hosts = process.env.ALLOWED_HOSTS || '';
-  const parsed = hosts.split(',').map((h) => h.trim()).filter(Boolean);
-  if (process.env.NODE_ENV === 'development') {
-    parsed.push('localhost:3000', 'localhost');
-  }
-  return parsed;
-}
-
-// Exact origin matching (not startsWith)
-function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return false;
-  return getAllowedOrigins().includes(origin);
-}
-
-function isHostAllowed(host: string | null): boolean {
-  if (!host) return false;
-  const allowed = getAllowedHosts();
-  const hostWithoutPort = host.split(':')[0];
-  return allowed.some((h) => h === host || h === hostWithoutPort);
-}
 
 // ============ COORDINATE VALIDATION ============
 
@@ -378,7 +348,7 @@ export async function POST(request: Request) {
 
     // Safety check: ensure we have at least one message
     if (simpleMessages.length === 0) {
-      console.error('[Chat] No valid messages after conversion. Message count:', messages.length);
+      logger.sync.error('[Chat] No valid messages after conversion', { messageCount: messages.length, route: '/api/chat' });
       return new Response(JSON.stringify({ error: 'No valid messages' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -460,7 +430,7 @@ Be friendly and concise. Focus on being helpful without making up specific infor
 
       // P0-05: Handle abort/timeout specifically
       if (streamError instanceof Error && streamError.name === 'AbortError') {
-        console.error('[Chat] LLM streaming timed out after', DEFAULT_TIMEOUTS.LLM_STREAM, 'ms');
+        logger.sync.error('[Chat] LLM streaming timed out', { timeoutMs: DEFAULT_TIMEOUTS.LLM_STREAM, route: '/api/chat' });
         return new Response(JSON.stringify({ error: 'Chat response timed out. Please try again.' }), {
           status: 504,
           headers: { 'Content-Type': 'application/json' },
@@ -472,7 +442,11 @@ Be friendly and concise. Focus on being helpful without making up specific infor
     }
   } catch (error) {
     // Log error without user content - sanitize for privacy
-    console.error('[Chat] API error:', error instanceof Error ? error.message : 'Unknown error');
+    logger.sync.error('[Chat] API error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      route: '/api/chat',
+    });
+    Sentry.captureException(error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

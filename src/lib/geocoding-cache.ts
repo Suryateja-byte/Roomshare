@@ -15,7 +15,7 @@ export interface GeocodingResult {
   bbox?: [number, number, number, number];
 }
 
-const TTL_SECONDS = 5 * 60; // 5 minutes
+const TTL_SECONDS = 24 * 60 * 60; // 24 hours (geocoding results are stable)
 const CACHE_PREFIX = "geocode:";
 
 // --- Redis client (lazy singleton) ---

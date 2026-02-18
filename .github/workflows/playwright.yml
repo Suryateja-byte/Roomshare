@@ -74,6 +74,7 @@ jobs:
       E2E_TEST_PASSWORD: TestPassword123!
       E2E_ADMIN_EMAIL: e2e-admin@roomshare.dev
       E2E_ADMIN_PASSWORD: TestPassword123!
+      E2E_DISABLE_RATE_LIMIT: 'true'
       NODE_OPTIONS: '--max-old-space-size=4096'
       CI: 'true'
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'

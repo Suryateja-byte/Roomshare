@@ -13,6 +13,8 @@
  */
 
 import { z } from "zod";
+import { createHmac, timingSafeEqual } from "crypto";
+import { CURSOR_SECRET } from "@/lib/env";
 
 // ============================================================================
 // Browser-compatible Base64url Encoding
@@ -125,7 +127,15 @@ const EXPECTED_KEY_COUNTS: Record<SortOption, number> = {
  */
 export function encodeKeysetCursor(cursor: KeysetCursor): string {
   const payload = JSON.stringify(cursor);
-  return toBase64Url(payload);
+  if (!CURSOR_SECRET) {
+    return toBase64Url(payload);
+  }
+
+  const signature = createHmac("sha256", CURSOR_SECRET)
+    .update(payload)
+    .digest("base64url");
+  const envelope = JSON.stringify({ p: payload, s: signature });
+  return toBase64Url(envelope);
 }
 
 /**
@@ -147,7 +157,46 @@ export function decodeKeysetCursor(
   expectedSort?: SortOption,
 ): KeysetCursor | null {
   try {
-    const payload = fromBase64Url(cursorStr);
+    const decoded = fromBase64Url(cursorStr);
+    let payload = decoded;
+
+    if (CURSOR_SECRET) {
+      const parsedEnvelope = JSON.parse(decoded) as unknown;
+      if (
+        parsedEnvelope === null ||
+        typeof parsedEnvelope !== "object" ||
+        !("p" in parsedEnvelope) ||
+        !("s" in parsedEnvelope) ||
+        typeof parsedEnvelope.p !== "string" ||
+        typeof parsedEnvelope.s !== "string"
+      ) {
+        return null;
+      }
+
+      const expectedSignature = createHmac("sha256", CURSOR_SECRET)
+        .update(parsedEnvelope.p)
+        .digest("base64url");
+
+      const provided = Buffer.from(parsedEnvelope.s);
+      const expected = Buffer.from(expectedSignature);
+      if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+        return null;
+      }
+
+      payload = parsedEnvelope.p;
+    } else {
+      const parsedEnvelope = JSON.parse(decoded) as unknown;
+      if (
+        parsedEnvelope !== null &&
+        typeof parsedEnvelope === "object" &&
+        "p" in parsedEnvelope &&
+        "s" in parsedEnvelope &&
+        typeof parsedEnvelope.p === "string"
+      ) {
+        payload = parsedEnvelope.p;
+      }
+    }
+
     const parsed = JSON.parse(payload);
 
     // Validate against Zod schema

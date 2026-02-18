@@ -436,7 +436,9 @@ describe('POST /api/nearby', () => {
       expect(response.status).toBe(504)
       expect(data.error).toBe('Nearby search timed out')
       expect(data.details).toContain('too long')
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('timeout'))
+      expect(consoleSpy).toHaveBeenCalled()
+      const timeoutLog = consoleSpy.mock.calls[0].map(String).join(' ')
+      expect(timeoutLog).toContain('timeout')
 
       consoleSpy.mockRestore()
     })
@@ -455,7 +457,9 @@ describe('POST /api/nearby', () => {
       expect(response.status).toBe(503)
       expect(data.error).toBe('Nearby search temporarily unavailable')
       expect(data.details).toContain('recovering')
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('circuit breaker'))
+      expect(consoleSpy).toHaveBeenCalled()
+      const circuitBreakerLog = consoleSpy.mock.calls[0].map(String).join(' ')
+      expect(circuitBreakerLog).toContain('circuit breaker')
 
       consoleSpy.mockRestore()
     })

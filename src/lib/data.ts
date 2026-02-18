@@ -439,6 +439,10 @@ export function sortListings(
 // Maximum results to return for performance (prevents memory issues on wide map bounds)
 const MAX_RESULTS_CAP = 500;
 
+/**
+ * @deprecated Use getListingsPaginated() or SearchDoc queries instead.
+ * This function has no pagination and may return unbounded results.
+ */
 export async function getListings(
   params: FilterParams = {},
 ): Promise<ListingData[]> {
@@ -501,6 +505,7 @@ export async function getListings(
         AND ST_X(loc.coords::geometry) BETWEEN -180 AND 180
       GROUP BY l.id, loc.id
       ORDER BY l."createdAt" DESC
+      LIMIT 1000
   `;
 
     let results = (listings as any[]).map((l) => ({
@@ -1683,7 +1688,7 @@ export async function getSavedListings(userId: string): Promise<ListingData[]> {
       id: l.id,
       title: l.title,
       description: l.description,
-      price: l.price,
+      price: Number(l.price),
       images: l.images || [],
       availableSlots: l.availableSlots,
       totalSlots: l.totalSlots,

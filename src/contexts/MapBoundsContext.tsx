@@ -47,6 +47,7 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
+import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
 import { PROGRAMMATIC_MOVE_TIMEOUT_MS, AREA_COUNT_DEBOUNCE_MS, AREA_COUNT_CACHE_TTL_MS } from "@/lib/constants";
 
 /** Coordinates for map bounds */
@@ -426,14 +427,8 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
 
     // Build cache key from current map bounds + URL filter params
     const boundsKey = `${currentMapBounds.minLat},${currentMapBounds.maxLat},${currentMapBounds.minLng},${currentMapBounds.maxLng}`;
-    // Filter cache key to only include map-relevant params (exclude sort/page/cursor)
-    const filteredParams = new URLSearchParams(searchParams.toString());
-    filteredParams.delete('sort');
-    filteredParams.delete('page');
-    filteredParams.delete('cursor');
-    filteredParams.delete('cursorStack');
-    filteredParams.delete('pageNumber');
-    const filterKey = filteredParams.toString();
+    // Canonical filter key (shared parser output) avoids stale cache hits from non-filter URL noise.
+    const filterKey = buildCanonicalFilterParamsFromSearchParams(searchParams).toString();
     const cacheKey = `${boundsKey}|${filterKey}`;
 
     // Check cache

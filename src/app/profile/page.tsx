@@ -35,5 +35,11 @@ export default async function ProfilePage() {
         redirect('/login');
     }
 
-    return <ProfileClient user={user} />;
+    // Convert Prisma Decimal price fields to plain numbers at the query boundary
+    const userWithNumberPrices = {
+        ...user,
+        listings: user.listings.map(l => ({ ...l, price: Number(l.price) })),
+    };
+
+    return <ProfileClient user={userWithNumberPrices} />;
 }

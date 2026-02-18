@@ -114,11 +114,11 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
 
                 // Apply filters
                 if (filters.minPrice !== undefined) {
-                    const existingPriceFilter = (whereClause.price ?? {}) as Prisma.FloatFilter<'Listing'>;
+                    const existingPriceFilter = (whereClause.price ?? {}) as Record<string, unknown>;
                     whereClause.price = { ...existingPriceFilter, gte: filters.minPrice };
                 }
                 if (filters.maxPrice !== undefined) {
-                    const existingPriceFilter = (whereClause.price ?? {}) as Prisma.FloatFilter<'Listing'>;
+                    const existingPriceFilter = (whereClause.price ?? {}) as Record<string, unknown>;
                     whereClause.price = { ...existingPriceFilter, lte: filters.maxPrice };
                 }
                 if (filters.roomType) {

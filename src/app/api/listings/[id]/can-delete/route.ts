@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/nextjs';
 
 export async function GET(
     request: Request,
@@ -59,7 +61,11 @@ export async function GET(
             activeConversations
         });
     } catch (error) {
-        console.error('Error checking deletability:', error);
+        logger.sync.error('Error checking deletability', {
+            error: error instanceof Error ? error.message : String(error),
+            route: '/api/listings/[id]/can-delete',
+        });
+        Sentry.captureException(error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

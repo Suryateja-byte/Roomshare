@@ -91,8 +91,8 @@ export async function GET(request: NextRequest) {
         { count },
         {
           headers: {
-            // No caching - client handles debouncing and in-memory caching
-            "Cache-Control": "private, no-store",
+            // Short CDN cache for identical requests; private fallback for auth-dependent counts
+            "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
           },
         },
       );

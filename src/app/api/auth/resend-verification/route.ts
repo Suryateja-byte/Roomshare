@@ -5,6 +5,8 @@ import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { normalizeEmail } from '@/lib/normalize-email';
 import { createTokenPair } from '@/lib/token-security';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/nextjs';
 
 export async function POST(request: NextRequest) {
     // Rate limit: 3 resend requests per hour
@@ -76,7 +78,11 @@ export async function POST(request: NextRequest) {
             message: 'Verification email sent successfully'
         });
     } catch (error) {
-        console.error('Resend verification error:', error);
+        logger.sync.error('Resend verification error', {
+            error: error instanceof Error ? error.message : String(error),
+            route: '/api/auth/resend-verification',
+        });
+        Sentry.captureException(error);
         return NextResponse.json(
             { error: 'Failed to send verification email' },
             { status: 500 }

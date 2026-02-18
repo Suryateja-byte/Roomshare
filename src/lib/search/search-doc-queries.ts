@@ -43,6 +43,10 @@ const SEARCH_QUERY_TIMEOUT_MS = 5000;
 /**
  * Execute a raw query with a statement timeout to prevent runaway queries.
  * Uses SET LOCAL inside a transaction so the timeout only applies to this query.
+ *
+ * SECURITY INVARIANT: `query` must contain ONLY hard-coded SQL template strings.
+ * ALL user-supplied values MUST be in the `params` array as $N placeholders.
+ * NEVER interpolate a value from filterParams directly into the query string.
  */
 async function queryWithTimeout<T>(query: string, params: unknown[]): Promise<T[]> {
   return prisma.$transaction(async (tx) => {
@@ -64,6 +68,28 @@ const HYBRID_COUNT_THRESHOLD = 100;
 // Prevents full-table scans while allowing homepage browsing.
 // 48 = 4 pages of 12 items - enough for initial exploration
 export const MAX_UNBOUNDED_RESULTS = 48;
+
+const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english"]);
+
+function assertParameterizedWhereClause(whereClause: string): void {
+  if (process.env.NODE_ENV === "production") return;
+
+  const literalPattern = /'([^']*)'/g;
+  for (const match of whereClause.matchAll(literalPattern)) {
+    const literalValue = match[1];
+    if (!ALLOWED_SQL_STRING_LITERALS.has(literalValue)) {
+      throw new Error(
+        "SECURITY: Raw string detected in whereClause — use parameterized $N placeholders",
+      );
+    }
+  }
+}
+
+function joinWhereClauseWithSecurityInvariant(conditions: string[]): string {
+  const whereClause = conditions.join(" AND ");
+  assertParameterizedWhereClause(whereClause);
+  return whereClause;
+}
 
 // ============================================
 // Cache Key Generators
@@ -110,6 +136,8 @@ function createSearchDocMapCacheKey(params: FilterParams): string {
     roomType: params.roomType?.toLowerCase() || "",
     leaseDuration: params.leaseDuration?.toLowerCase() || "",
     moveInDate: params.moveInDate || "",
+    genderPreference: params.genderPreference || "",
+    householdGender: params.householdGender || "",
     bounds: params.bounds
       ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",
@@ -353,6 +381,10 @@ interface WhereBuilder {
 function buildSearchDocWhereConditions(
   filterParams: FilterParams,
 ): WhereBuilder {
+  // SECURITY INVARIANT:
+  // - All user-derived values must be pushed to `params` and referenced as $N placeholders.
+  // - `conditions` entries must remain static SQL fragments.
+  // - Never inject user input directly into a condition string.
   const {
     query,
     minPrice,
@@ -552,7 +584,7 @@ async function getSearchDocLimitedCountInternal(
 
   const { conditions, params: queryParams } =
     buildSearchDocWhereConditions(params);
-  const whereClause = conditions.join(" AND ");
+  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
   // Use subquery with LIMIT 101 to efficiently check if count > threshold
   const limitedCountQuery = `
@@ -626,7 +658,7 @@ async function getSearchDocMapListingsInternal(
     params: queryParams,
     paramIndex,
   } = buildSearchDocWhereConditions(params);
-  const whereClause = conditions.join(" AND ");
+  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
   // Query with minimal fields for map markers
   // Uses precomputed lat/lng from SearchDoc (no ST_X/ST_Y needed)
@@ -735,7 +767,7 @@ async function getSearchDocListingsPaginatedInternal(
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
     } = buildSearchDocWhereConditions(params);
-    const whereClause = conditions.join(" AND ");
+    const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
     // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
     const orderByClause = buildOrderByClause(sort, ftsQueryParamIndex);
@@ -1005,7 +1037,7 @@ export async function getSearchDocListingsWithKeyset(
     const allParams = [...queryParams, ...keysetResult.params];
     let paramIndex = keysetResult.nextParamIndex;
 
-    const whereClause = conditions.join(" AND ");
+    const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
     // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
     const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex);
@@ -1183,7 +1215,7 @@ export async function getSearchDocListingsFirstPage(
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
     } = buildSearchDocWhereConditions(params);
-    const whereClause = conditions.join(" AND ");
+    const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
     // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
     const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex);

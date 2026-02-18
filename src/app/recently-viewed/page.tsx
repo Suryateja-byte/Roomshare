@@ -17,5 +17,8 @@ export default async function RecentlyViewedPage() {
 
     const recentlyViewed = await getRecentlyViewed(20);
 
-    return <RecentlyViewedClient initialListings={recentlyViewed} />;
+    // Convert Prisma Decimal price fields to plain numbers at the query boundary
+    const listings = recentlyViewed.map(l => ({ ...l, price: Number(l.price) }));
+
+    return <RecentlyViewedClient initialListings={listings} />;
 }

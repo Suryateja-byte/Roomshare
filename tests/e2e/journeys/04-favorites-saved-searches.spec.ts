@@ -187,8 +187,17 @@ test.describe("Favorites & Saved Searches Journeys", () => {
         // Select alert frequency if available
         const frequencySelect = page.getByLabel(/frequency|alert/i);
         if (await frequencySelect.isVisible().catch(() => false)) {
-          // @ts-expect-error - Playwright accepts RegExp for label matching at runtime
-          await frequencySelect.selectOption({ label: /daily/i });
+          // SaveSearchButton renders frequency as buttons, not a native <select>.
+          // Prefer clicking "Daily"; fallback to "Instant" if unavailable.
+          const dailyButton = page.getByRole("button", { name: /^Daily$/i }).first();
+          if (await dailyButton.isVisible().catch(() => false)) {
+            await dailyButton.click();
+          } else {
+            const instantButton = page.getByRole("button", { name: /^Instant$/i }).first();
+            if (await instantButton.isVisible().catch(() => false)) {
+              await instantButton.click();
+            }
+          }
         }
 
         // Save — confirm button may match multiple elements or be blocked by overlay in CI

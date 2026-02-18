@@ -163,8 +163,7 @@ describe('Health Endpoints', () => {
 
         expect(data.checks).toBeDefined()
         expect(data.checks.database.status).toBe('ok')
-        expect(data.checks.database.latency).toBeDefined()
-        expect(typeof data.checks.database.latency).toBe('number')
+        expect(data.checks.database.latency).toBeUndefined()
       })
 
       it('sets no-cache headers', async () => {
@@ -197,7 +196,7 @@ describe('Health Endpoints', () => {
         const data = await response.json()
 
         expect(data.checks.database.status).toBe('error')
-        expect(data.checks.database.error).toBe('Database connection failed')
+        expect(data.checks.database.error).toBeUndefined()
       })
     })
 

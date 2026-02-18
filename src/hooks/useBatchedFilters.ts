@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useRouter } from "next/navigation";
@@ -213,11 +213,29 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
 
   // Pending state — initialized from URL, updated locally
   const [pending, setPendingState] = useState<BatchedFilterValues>(committed);
+  const previousCommittedRef = useRef(committed);
+  const forceSyncUntilRef = useRef(0);
 
-  // Sync pending with URL when URL changes (e.g. back/forward navigation,
-  // external filter changes from CategoryBar, etc.)
+  // Sync pending with URL when URL filter values change.
+  // If only non-filter params change (for example map bounds), preserve unsaved edits.
   useEffect(() => {
-    setPendingState(committed);
+    setPendingState((prevPending) => {
+      const previousCommitted = previousCommittedRef.current;
+      const committedFiltersChanged = !filtersEqual(committed, previousCommitted);
+      const hasUnsavedEdits = !filtersEqual(prevPending, previousCommitted);
+      const isPostCommitSyncActive = Date.now() < forceSyncUntilRef.current;
+      const shouldPreserveDirtyEdits =
+        !isPostCommitSyncActive &&
+        !committedFiltersChanged &&
+        hasUnsavedEdits;
+
+      if (shouldPreserveDirtyEdits) {
+        return prevPending;
+      }
+
+      return committed;
+    });
+    previousCommittedRef.current = committed;
   }, [committed]);
 
   const isDirty = useMemo(
@@ -245,6 +263,10 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
   }, [committed]);
 
   const commit = useCallback(() => {
+    // After an explicit apply action, prioritize URL state for a short window.
+    // This avoids preserving stale dirty state during immediate back/forward transitions.
+    forceSyncUntilRef.current = Date.now() + 10_000;
+
     // Start from current URL to preserve non-filter params (bounds, sort, q, lat, lng, nearMatches)
     const params = new URLSearchParams(searchParams.toString());
 

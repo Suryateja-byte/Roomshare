@@ -369,9 +369,12 @@ export default function MapComponent({
     // Scale map label text with OS/browser font-size (Dynamic Type support)
     const [textScale, setTextScale] = useState(1);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
+    const [isWebglContextLost, setIsWebglContextLost] = useState(false);
+    const [mapRemountKey, setMapRemountKey] = useState(0);
     const [currentZoom, setCurrentZoom] = useState(12);
     const [areTilesLoading, setAreTilesLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+    const [viewportInfoMessage, setViewportInfoMessage] = useState<string | null>(null);
     const { hoveredId, activeId, setHovered, setActive, requestScrollTo } = useListingFocus();
     // Keyboard navigation state for arrow key navigation between markers
     const [keyboardFocusedId, setKeyboardFocusedId] = useState<string | null>(null);
@@ -421,6 +424,8 @@ export default function MapComponent({
     const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     // Ref for sourcedata handler cleanup
     const sourcedataHandlerRef = useRef<((e: MapSourceDataEvent) => void) | null>(null);
+    const webglCleanupRef = useRef<(() => void) | null>(null);
+    const webglRecoveryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     // Guard against rapid cluster clicks causing multiple simultaneous flyTo calls
     const isClusterExpandingRef = useRef(false);
     // Debounce timer for updateUnclusteredListings to batch rapid moveEnd events
@@ -428,8 +433,11 @@ export default function MapComponent({
     // Debounce timer for marker hover scroll (300ms delay to prevent jank)
     const hoverScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Minimum interval between map searches (prevents 429 rate limiting)
-    const MIN_SEARCH_INTERVAL_MS = 2000;
+    // Map-move auto-search tuning:
+    // - 300ms debounce keeps panning smooth while staying responsive.
+    // - 1000ms minimum interval prevents request bursts during continuous drag.
+    const MAP_MOVE_SEARCH_DEBOUNCE_MS = 300;
+    const MIN_SEARCH_INTERVAL_MS = 1000;
 
     // E2E testing instrumentation - track map instance for persistence tests
     // Only runs when NEXT_PUBLIC_E2E=true to avoid polluting production
@@ -723,6 +731,18 @@ export default function MapComponent({
     // This prevents recalculation when listings change but IDs remain the same
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [markersSourceKey]);
+
+    // Render privacy circles from the same displayed marker positions to avoid
+    // translucent "ghost clusters" when clustered/overlapping raw points split visually.
+    const privacyCircleListings = useMemo(() => {
+        return markerPositions.map((position) => ({
+            id: position.listing.id,
+            location: {
+                lat: position.lat,
+                lng: position.lng,
+            },
+        }));
+    }, [markerPositions]);
 
     // Sorted marker positions for keyboard navigation (top-to-bottom, left-to-right)
     // This provides intuitive arrow key navigation order based on visual position
@@ -1137,6 +1157,10 @@ export default function MapComponent({
             if (updateUnclusteredDebounceRef.current) {
                 clearTimeout(updateUnclusteredDebounceRef.current);
             }
+            if (webglRecoveryTimeoutRef.current) {
+                clearTimeout(webglRecoveryTimeoutRef.current);
+                webglRecoveryTimeoutRef.current = null;
+            }
             // P1-FIX (#109): Clear cluster expansion flag on unmount
             isClusterExpandingRef.current = false;
             // Remove sourcedata listener
@@ -1147,6 +1171,8 @@ export default function MapComponent({
             }
             // P2-FIX (#153): Clear refs to help garbage collection
             sourcedataHandlerRef.current = null;
+            webglCleanupRef.current?.();
+            webglCleanupRef.current = null;
             pendingBoundsRef.current = null;
             urlBoundsRef.current = null;
             lastSearchBoundsRef.current = null;
@@ -1233,10 +1259,16 @@ export default function MapComponent({
         lastSearchBoundsRef.current = { ...bounds };
 
         const params = new URLSearchParams(searchParams.toString());
+        const hadPointCoords = params.has('lat') && params.has('lng');
 
         // Remove single point coordinates since we now have bounds
         params.delete('lat');
         params.delete('lng');
+        // If the original query came from a selected point search (q + lat/lng),
+        // clear q when switching to map-area search so stale location text does not over-filter.
+        if (hadPointCoords) {
+            params.delete('q');
+        }
         // Reset pagination state when bounds change (keyset + offset)
         params.delete('page');
         params.delete('cursor');
@@ -1247,6 +1279,7 @@ export default function MapComponent({
         params.set('maxLng', bounds.maxLng.toString());
         params.set('minLat', bounds.minLat.toString());
         params.set('maxLat', bounds.maxLat.toString());
+        setViewportInfoMessage(null);
 
         lastSearchTimeRef.current = Date.now();
         pendingBoundsRef.current = null;
@@ -1406,8 +1439,10 @@ export default function MapComponent({
             const lngSpan = bounds.maxLng - bounds.minLng;
             if (latSpan > 5 || lngSpan > 5) {
                 setBoundsDirty(true);
+                setViewportInfoMessage('Zoom in further to update results');
                 return;
             }
+            setViewportInfoMessage(null);
 
             if (debounceTimer.current) {
                 clearTimeout(debounceTimer.current);
@@ -1442,10 +1477,11 @@ export default function MapComponent({
                 if (executeMapSearchRef.current) {
                     executeMapSearchRef.current(bounds);
                 }
-            }, 600); // 600ms debounce (matches project spec)
+            }, MAP_MOVE_SEARCH_DEBOUNCE_MS);
         } else {
             // Search-as-move is OFF - mark bounds as dirty so banner shows
             setBoundsDirty(true);
+            setViewportInfoMessage(null);
         }
     }, [
         updateUnclusteredListings,
@@ -1455,7 +1491,9 @@ export default function MapComponent({
         setHasUserMoved,
         searchAsMove,
         setBoundsDirty,
+        setViewportInfoMessage,
         onMoveEndProp,
+        MAP_MOVE_SEARCH_DEBOUNCE_MS,
     ]);
 
     // User pin (drop-a-pin) state — uses Nominatim reverse geocoding (no token needed)
@@ -1526,6 +1564,15 @@ export default function MapComponent({
             aria-roledescription="map"
             onWheel={(e) => e.stopPropagation()}
         >
+            {isWebglContextLost && (
+                <div className="absolute inset-0 bg-zinc-950/70 z-30 flex items-center justify-center pointer-events-none" role="status" aria-live="assertive" aria-label="Map paused">
+                    <div className="text-center px-4">
+                        <p className="text-sm font-medium text-white">Map paused</p>
+                        <p className="text-xs text-zinc-200 mt-1">Recovering map context...</p>
+                    </div>
+                </div>
+            )}
+
             {/* Initial loading skeleton */}
             {!isMapLoaded && (
                 <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center" role="status" aria-label="Loading map">
@@ -1590,6 +1637,7 @@ export default function MapComponent({
             </div>
 
             <Map
+                key={mapRemountKey}
                 ref={mapRef}
                 // Controlled mode: use viewState prop + onMove handler
                 // Uncontrolled mode: use initialViewState (default behavior)
@@ -1620,6 +1668,11 @@ export default function MapComponent({
                     }
 
                     setIsMapLoaded(true);
+                    setIsWebglContextLost(false);
+                    if (webglRecoveryTimeoutRef.current) {
+                        clearTimeout(webglRecoveryTimeoutRef.current);
+                        webglRecoveryTimeoutRef.current = null;
+                    }
                     // Defer to next tick so <Source> can mount before we query
                     setTimeout(() => updateUnclusteredListings(), 0);
 
@@ -1631,6 +1684,58 @@ export default function MapComponent({
                         const canvas = mapRef.current.getMap().getCanvas();
                         if (canvas) {
                             canvas.tabIndex = -1;
+                        }
+                    }
+
+                    // Handle WebGL context loss/restoration to recover from mobile GPU eviction.
+                    if (mapRef.current) {
+                        const map = mapRef.current.getMap();
+                        const canvas = map.getCanvas();
+
+                        webglCleanupRef.current?.();
+                        if (
+                            typeof canvas.addEventListener !== 'function' ||
+                            typeof canvas.removeEventListener !== 'function'
+                        ) {
+                            webglCleanupRef.current = null;
+                        } else {
+                            const handleContextLost = (event: Event) => {
+                                event.preventDefault();
+                                setIsWebglContextLost(true);
+                                console.warn('[Map] WebGL context lost');
+
+                                if (webglRecoveryTimeoutRef.current) {
+                                    clearTimeout(webglRecoveryTimeoutRef.current);
+                                }
+                                webglRecoveryTimeoutRef.current = setTimeout(() => {
+                                    if (!isMountedRef.current) return;
+                                    console.warn('[Map] WebGL context restore timeout - remounting map');
+                                    setIsWebglContextLost(false);
+                                    setIsMapLoaded(false);
+                                    setMapRemountKey((value) => value + 1);
+                                }, 5000);
+                            };
+
+                            const handleContextRestored = () => {
+                                console.warn('[Map] WebGL context restored');
+                                if (webglRecoveryTimeoutRef.current) {
+                                    clearTimeout(webglRecoveryTimeoutRef.current);
+                                    webglRecoveryTimeoutRef.current = null;
+                                }
+                                setIsWebglContextLost(false);
+                                map.triggerRepaint();
+                                setIsMapLoaded(false);
+                                setTimeout(() => {
+                                    if (isMountedRef.current) setIsMapLoaded(true);
+                                }, 0);
+                            };
+
+                            canvas.addEventListener('webglcontextlost', handleContextLost);
+                            canvas.addEventListener('webglcontextrestored', handleContextRestored);
+                            webglCleanupRef.current = () => {
+                                canvas.removeEventListener('webglcontextlost', handleContextLost);
+                                canvas.removeEventListener('webglcontextrestored', handleContextRestored);
+                            };
                         }
                     }
 
@@ -1749,7 +1854,7 @@ export default function MapComponent({
                 />
 
                 {/* Privacy circles — translucent ~200m radius around listings */}
-                <PrivacyCircle listings={listings} isDarkMode={isDarkMode} />
+                <PrivacyCircle listings={privacyCircleListings} isDarkMode={isDarkMode} />
 
                 {/* Clustering Source and Layers - Layer nested inside Source inherits source automatically */}
                 {useClustering && (
@@ -2110,6 +2215,19 @@ export default function MapComponent({
                     areaCount={areaCount}
                     isAreaCountLoading={isAreaCountLoading}
                 />
+            )}
+
+            {/* Info banner when search-as-move is enabled but viewport is too wide */}
+            {searchAsMove && viewportInfoMessage && (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 rounded-lg px-3 py-2 shadow-sm pointer-events-none"
+                >
+                    <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
+                        {viewportInfoMessage}
+                    </p>
+                </div>
             )}
 
             {/* Mobile gesture hint - shown once for first-time touch users */}

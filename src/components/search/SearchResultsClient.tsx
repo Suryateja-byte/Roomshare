@@ -69,6 +69,17 @@ export function SearchResultsClient({
     new Set(initialListings.map((l) => l.id)),
   );
 
+  // Reset client-side pagination state when the search query/filters change.
+  // Without this, extra listings and cursor state can leak across map/filter updates.
+  useEffect(() => {
+    setExtraListings([]);
+    setNextCursor(initialNextCursor);
+    setLoadError(null);
+    setIsLoadingMore(false);
+    isLoadingRef.current = false;
+    seenIdsRef.current = new Set(initialListings.map((l) => l.id));
+  }, [searchParamsString, initialListings, initialNextCursor]);
+
   const allListings = [...initialListings, ...extraListings];
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
 
@@ -102,9 +113,9 @@ export function SearchResultsClient({
     [allListings.length, estimatedMonths],
   );
 
-  // Parse searchParamsString into raw params for the server action (once)
-  const rawParamsRef = useRef<Record<string, string | string[] | undefined> | null>(null);
-  if (!rawParamsRef.current) {
+  // Parse searchParamsString into raw params for the server action.
+  // Keep this in sync with URL updates so fetchMore uses current filters/bounds.
+  const rawParams = useMemo(() => {
     const params: Record<string, string | string[] | undefined> = {};
     const sp = new URLSearchParams(searchParamsString);
     for (const [key, value] of sp.entries()) {
@@ -115,8 +126,8 @@ export function SearchResultsClient({
         params[key] = value;
       }
     }
-    rawParamsRef.current = params;
-  }
+    return params;
+  }, [searchParamsString]);
 
   const handleLoadMore = useCallback(async () => {
     if (!nextCursor || isLoadingRef.current) return;
@@ -127,7 +138,7 @@ export function SearchResultsClient({
     performance.mark('load-more-start');
 
     try {
-      const result = await fetchMoreListings(nextCursor, rawParamsRef.current!);
+      const result = await fetchMoreListings(nextCursor, rawParams);
       performance.mark('load-more-end');
       performance.measure('load-more', 'load-more-start', 'load-more-end');
 
@@ -148,7 +159,7 @@ export function SearchResultsClient({
       isLoadingRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [nextCursor]);
+  }, [nextCursor, rawParams]);
 
   const total = initialTotal;
 

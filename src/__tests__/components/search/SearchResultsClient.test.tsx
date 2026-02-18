@@ -313,7 +313,7 @@ describe('SearchResultsClient', () => {
     });
   });
 
-  describe('cursor reset on filter change (component remounts with key)', () => {
+  describe('cursor reset on filter change', () => {
     it('resets state when searchParamsString changes', () => {
       const { rerender } = render(<SearchResultsClient {...defaultProps} />);
 
@@ -374,6 +374,58 @@ describe('SearchResultsClient', () => {
       await waitFor(() => {
         expect(screen.getByTestId('listing-3')).toBeInTheDocument();
       });
+    });
+
+    it('uses updated search params for fetchMore after filter/map change', async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      mockFetch
+        .mockResolvedValueOnce({
+          items: [createMockListing('old-extra')],
+          nextCursor: 'cursor-2',
+          hasNextPage: true,
+        })
+        .mockResolvedValueOnce({
+          items: [createMockListing('new-extra')],
+          nextCursor: null,
+          hasNextPage: false,
+        });
+
+      const { rerender } = render(<SearchResultsClient {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /show more/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('listing-old-extra')).toBeInTheDocument();
+      });
+
+      rerender(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={[createMockListing('new-1')]}
+          initialNextCursor="new-cursor"
+          searchParamsString="languages=te&minLat=37.7&maxLat=37.85&minLng=-122.5&maxLng=-122.3"
+          query=""
+        />
+      );
+
+      expect(screen.queryByTestId('listing-old-extra')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /show more/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('listing-new-extra')).toBeInTheDocument();
+      });
+
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        'new-cursor',
+        expect.objectContaining({
+          languages: 'te',
+          minLat: '37.7',
+          maxLat: '37.85',
+          minLng: '-122.5',
+          maxLng: '-122.3',
+        })
+      );
+      expect((mockFetch.mock.calls[1][1] as Record<string, string | string[] | undefined>).q).toBeUndefined();
     });
   });
 

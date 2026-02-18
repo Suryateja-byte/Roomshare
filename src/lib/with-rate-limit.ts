@@ -113,8 +113,11 @@ export async function checkServerComponentRateLimit(
     type: RateLimitKey,
     endpoint: string
 ): Promise<ServerComponentRateLimitResult> {
-    // Skip rate limiting in test only (E2E tests hit search heavily)
-    if (process.env.NODE_ENV === 'test') {
+    // Test environments can opt out to avoid cross-shard contention in CI E2E runs.
+    if (
+        process.env.NODE_ENV === 'test' ||
+        process.env.E2E_DISABLE_RATE_LIMIT === 'true'
+    ) {
         return { allowed: true, remaining: 999, retryAfter: undefined };
     }
 

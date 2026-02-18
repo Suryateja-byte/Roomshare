@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { hashToken, isValidTokenFormat } from '@/lib/token-security';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/nextjs';
 
 export async function GET(request: NextRequest) {
     // P1-1 FIX: Add rate limiting to prevent token brute-forcing
@@ -63,7 +65,11 @@ export async function GET(request: NextRequest) {
         // Redirect to home with success message
         return NextResponse.redirect(new URL('/?verified=true', request.url));
     } catch (error) {
-        console.error('Email verification error:', error);
+        logger.sync.error('Email verification error', {
+            error: error instanceof Error ? error.message : String(error),
+            route: '/api/auth/verify-email',
+        });
+        Sentry.captureException(error);
         return NextResponse.redirect(new URL('/?error=verification_failed', request.url));
     }
 }

@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { hashToken, isValidTokenFormat } from '@/lib/token-security';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/nextjs';
 
 const resetPasswordSchema = z.object({
     token: z.string().min(1, 'Token is required'),
@@ -93,7 +95,11 @@ export async function POST(request: NextRequest) {
             message: 'Password has been reset successfully'
         });
     } catch (error) {
-        console.error('Reset password error:', error);
+        logger.sync.error('Reset password error', {
+            error: error instanceof Error ? error.message : String(error),
+            route: '/api/auth/reset-password',
+        });
+        Sentry.captureException(error);
         return NextResponse.json(
             { error: 'An error occurred. Please try again.' },
             { status: 500 }

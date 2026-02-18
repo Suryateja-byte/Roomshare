@@ -776,6 +776,99 @@ describe("useBatchedFilters hook", () => {
         expect(result.current.isDirty).toBe(false);
       });
     });
+
+    it("preserves dirty pending when only non-filter URL params change", async () => {
+      const initialParams = createMockSearchParams({
+        minPrice: "500",
+        minLat: "37.7",
+        maxLat: "37.85",
+        minLng: "-122.52",
+        maxLng: "-122.35",
+      });
+      (useSearchParams as jest.Mock).mockReturnValue(initialParams);
+
+      const { result, rerender } = renderHook(() => useBatchedFilters());
+
+      // Local unsaved edit
+      act(() => {
+        result.current.setPending({ minPrice: "" });
+      });
+      expect(result.current.pending.minPrice).toBe("");
+      expect(result.current.isDirty).toBe(true);
+
+      // Simulate map bounds update in URL (filters unchanged)
+      const boundsUpdatedParams = createMockSearchParams({
+        minPrice: "500",
+        minLat: "37.71",
+        maxLat: "37.86",
+        minLng: "-122.51",
+        maxLng: "-122.34",
+      });
+      (useSearchParams as jest.Mock).mockReturnValue(boundsUpdatedParams);
+
+      rerender();
+
+      // Pending edit should remain intact
+      await waitFor(() => {
+        expect(result.current.pending.minPrice).toBe("");
+        expect(result.current.isDirty).toBe(true);
+      });
+    });
+
+    it("syncs from URL after commit even if first URL update has no filter delta", async () => {
+      const initialParams = createMockSearchParams({
+        minLat: "37.7",
+        maxLat: "37.85",
+        minLng: "-122.52",
+        maxLng: "-122.35",
+      });
+      (useSearchParams as jest.Mock).mockReturnValue(initialParams);
+
+      const { result, rerender } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.setPending({ amenities: ["Wifi"] });
+      });
+      expect(result.current.pending.amenities).toEqual(["Wifi"]);
+      expect(result.current.isDirty).toBe(true);
+
+      act(() => {
+        result.current.commit();
+      });
+      expect(mockRouter.push).toHaveBeenCalledTimes(1);
+
+      // Intermediate URL change where filter params still haven't changed
+      // (for example, map bounds update during navigation)
+      const intermediateParams = createMockSearchParams({
+        minLat: "37.71",
+        maxLat: "37.86",
+        minLng: "-122.51",
+        maxLng: "-122.34",
+      });
+      (useSearchParams as jest.Mock).mockReturnValue(intermediateParams);
+      rerender();
+
+      await waitFor(() => {
+        expect(result.current.pending.amenities).toEqual([]);
+        expect(result.current.isDirty).toBe(false);
+      });
+
+      // Final committed URL arrives with the applied filter
+      const finalParams = createMockSearchParams({
+        minLat: "37.71",
+        maxLat: "37.86",
+        minLng: "-122.51",
+        maxLng: "-122.34",
+        amenities: "Wifi",
+      });
+      (useSearchParams as jest.Mock).mockReturnValue(finalParams);
+      rerender();
+
+      await waitFor(() => {
+        expect(result.current.pending.amenities).toEqual(["Wifi"]);
+        expect(result.current.isDirty).toBe(false);
+      });
+    });
   });
 
   describe("setPending hook behavior", () => {

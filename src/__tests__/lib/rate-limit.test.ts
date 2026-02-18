@@ -260,7 +260,7 @@ describe("rate-limit", () => {
 
         // Verify no IP address in logs
         expect(consoleSpy).toHaveBeenCalled();
-        const logMessage = consoleSpy.mock.calls[0][0];
+        const logMessage = consoleSpy.mock.calls[0].map(String).join(" ");
         expect(logMessage).not.toContain("192.168.1.100");
         expect(logMessage).toContain("RL_DB_ERR");
 

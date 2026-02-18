@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isInShutdownMode } from '@/lib/shutdown';
+import { logger } from '@/lib/logger';
 
 /**
  * Readiness probe - confirms the application can serve traffic
@@ -22,19 +23,20 @@ export async function GET() {
     );
   }
 
-  const checks: Record<string, { status: 'ok' | 'error'; latency?: number; error?: string }> = {};
+  const publicChecks: Record<string, { status: 'ok' | 'error' }> = {};
+  const internalLatency: Record<string, number> = {};
   let healthy = true;
 
   // Check database connectivity (CRITICAL)
   const dbStart = Date.now();
   try {
     await prisma.$queryRaw`SELECT 1`;
-    checks.database = { status: 'ok', latency: Date.now() - dbStart };
+    const dbLatency = Date.now() - dbStart;
+    publicChecks.database = { status: 'ok' };
+    internalLatency.database = dbLatency;
   } catch {
-    checks.database = {
-      status: 'error',
-      error: 'Database connection failed'
-    };
+    publicChecks.database = { status: 'error' };
+    internalLatency.database = Date.now() - dbStart;
     healthy = false;
   }
 
@@ -45,7 +47,7 @@ export async function GET() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-      const response = await fetch(`${process.env.UPSTASH_REDIS_REST_URL}/ping`, {
+      const fetchResponse = await fetch(`${process.env.UPSTASH_REDIS_REST_URL}/ping`, {
         headers: {
           Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`
         },
@@ -54,24 +56,29 @@ export async function GET() {
 
       clearTimeout(timeoutId);
 
-      checks.redis = response.ok
-        ? { status: 'ok', latency: Date.now() - redisStart }
-        : { status: 'error', error: `HTTP ${response.status}` };
+      const redisLatency = Date.now() - redisStart;
+      publicChecks.redis = { status: fetchResponse.ok ? 'ok' : 'error' };
+      internalLatency.redis = redisLatency;
     } catch {
-      checks.redis = {
-        status: 'error',
-        error: 'Redis connection failed'
-      };
+      publicChecks.redis = { status: 'error' };
+      internalLatency.redis = Date.now() - redisStart;
       // Redis failure is non-fatal - map/metrics/search fall back to DB; chat fails closed
     }
   } else {
-    checks.redis = { status: 'ok', latency: 0 }; // Not configured, using DB fallback
+    publicChecks.redis = { status: 'ok' }; // Not configured, using DB fallback
   }
 
   // Check Supabase connectivity (OPTIONAL - affects real-time only)
   if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    checks.supabase = { status: 'ok' }; // Just check config exists
+    publicChecks.supabase = { status: 'ok' }; // Just check config exists
   }
+
+  // Log latency internally (not exposed in public response)
+  logger.sync.debug('Health check latency', {
+    route: '/api/health/ready',
+    latency: internalLatency,
+    healthy,
+  });
 
   // P2-1: Health checks must never be cached - always return fresh data
   const response = NextResponse.json(
@@ -79,7 +86,7 @@ export async function GET() {
       status: healthy ? 'ready' : 'unhealthy',
       timestamp: new Date().toISOString(),
       version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'dev',
-      checks,
+      checks: publicChecks,
     },
     { status: healthy ? 200 : 503 }
   );

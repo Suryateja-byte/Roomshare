@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 // Number of dirty listings to process per cron run
 const BATCH_SIZE = parseInt(process.env.SEARCH_DOC_BATCH_SIZE || "100", 10);
@@ -203,8 +204,9 @@ export async function GET(request: NextRequest) {
 
     // Defense in depth: validate secret configuration
     if (!cronSecret || cronSecret.length < 32) {
-      console.error(
+      logger.sync.error(
         "[SearchDoc Cron] CRON_SECRET not configured or too short (min 32 chars)",
+        { route: "/api/cron/refresh-search-docs" },
       );
       return NextResponse.json(
         { error: "Server configuration error" },
@@ -218,7 +220,9 @@ export async function GET(request: NextRequest) {
       cronSecret.startsWith("your-") ||
       cronSecret.startsWith("generate-")
     ) {
-      console.error("[SearchDoc Cron] CRON_SECRET contains placeholder value");
+      logger.sync.error("[SearchDoc Cron] CRON_SECRET contains placeholder value", {
+        route: "/api/cron/refresh-search-docs",
+      });
       return NextResponse.json(
         { error: "Server configuration error" },
         { status: 500 },
@@ -329,6 +333,12 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         // If batch fails, log error for all listings in the batch
         const batchError = error instanceof Error ? error.message : "Unknown error";
+        logger.sync.error("[SearchDoc Cron] Batch upsert failed", {
+          error: batchError,
+          batchSize: listings.length,
+          route: "/api/cron/refresh-search-docs",
+        });
+        Sentry.captureException(error, { tags: { cron: 'refresh-search-docs', phase: 'batch-upsert' } });
         for (const listing of listings) {
           errors.push(`Listing ${listing.id}: ${batchError}`);
         }
@@ -369,7 +379,10 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[SearchDoc Cron] Error:", error);
+    logger.sync.error("[SearchDoc Cron] Error", {
+      error: error instanceof Error ? error.message : String(error),
+      route: "/api/cron/refresh-search-docs",
+    });
     Sentry.captureException(error, { tags: { cron: 'refresh-search-docs' } });
     return NextResponse.json(
       { error: "SearchDoc refresh failed" },

@@ -7,6 +7,7 @@ import { checkSuspension } from './suspension';
 import { logger } from '@/lib/logger';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
 import { z } from 'zod';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
 export type ListingStatus = 'ACTIVE' | 'PAUSED' | 'RENTED';
 
@@ -72,6 +73,12 @@ export async function incrementViewCount(listingId: string) {
     const session = await auth();
     if (!session?.user?.id) {
         return { error: 'Unauthorized' };
+    }
+
+    // Rate limit: prevent view count gaming
+    const rl = await checkRateLimit(session.user.id, 'viewCount', RATE_LIMITS.viewCount);
+    if (!rl.success) {
+        return { success: true }; // Silently succeed — don't reveal rate limiting for views
     }
 
     try {

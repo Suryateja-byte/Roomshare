@@ -55,12 +55,9 @@ export async function GET(request: Request) {
             },
         });
     } catch (error) {
-        // Detect user-facing validation errors (return 400 instead of 500):
-        // - parseSearchParams throws plain Error ("minPrice cannot exceed maxPrice")
-        // - getListingsPaginated wraps errors via wrapDatabaseError;
-        //   original message is in error.cause.message
-        const isUserError = (msg: string) =>
-            msg.includes('cannot exceed') || msg.includes('Unbounded text search');
+        // Detect user-facing validation errors (return 400 instead of 500).
+        // getListingsPaginated wraps errors via wrapDatabaseError; original message is in error.cause.message.
+        const isUserError = (msg: string) => msg.includes('Unbounded text search');
 
         if (error instanceof Error) {
             const causeMsg = isDataError(error) && error.cause
@@ -326,14 +323,14 @@ export async function POST(request: Request) {
 
             // Side effects only for non-cached results
             if (!cached) {
-                await fireSideEffects(result);
+                await fireSideEffects({ ...result, price: Number(result.price) });
             }
         } else {
             // 13. Non-idempotent path: regular prisma.$transaction
             result = await prisma.$transaction(createListingInTx);
 
             // Side effects
-            await fireSideEffects(result);
+            await fireSideEffects({ ...result, price: Number(result.price) });
         }
 
         await logger.info('Listing created successfully', {
@@ -346,7 +343,7 @@ export async function POST(request: Request) {
         });
 
         // 18. Return 201 with no-cache headers
-        const response = NextResponse.json(result, { status: 201 });
+        const response = NextResponse.json({ ...result, price: Number(result.price) }, { status: 201 });
         response.headers.set('Cache-Control', 'no-store');
         if (cached) {
             response.headers.set('X-Idempotency-Replayed', 'true');

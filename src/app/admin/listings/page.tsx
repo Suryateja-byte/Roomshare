@@ -89,7 +89,7 @@ export default async function AdminListingsPage() {
 
                 {/* Listing List */}
                 <ListingList
-                    initialListings={listings}
+                    initialListings={listings.map(l => ({ ...l, price: Number(l.price) }))}
                     totalListings={totalListings}
                 />
             </div>

@@ -93,12 +93,14 @@ async function executeBookingTransaction(
 
     // P1 FIX: Validate client-provided price against authoritative DB price
     // Reject if mismatch (tolerance $0.01 for floating-point rounding)
-    if (Math.abs(clientPricePerMonth - listing.price) > 0.01) {
+    // Note: listing.price may be Prisma.Decimal after Float→Decimal migration
+    const listingPrice = Number(listing.price);
+    if (Math.abs(clientPricePerMonth - listingPrice) > 0.01) {
         return {
             success: false,
             error: 'The listing price has changed. Please review the updated price and try again.',
             code: 'PRICE_CHANGED',
-            currentPrice: listing.price
+            currentPrice: listingPrice
         };
     }
 
@@ -188,9 +190,10 @@ async function executeBookingTransaction(
     });
 
     // P1 FIX: Calculate total price from authoritative DB price (not client value)
+    // Note: listingPrice already converted via Number() above (Decimal→number)
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const pricePerDay = listing.price / 30;
+    const pricePerDay = listingPrice / 30;
     const totalPrice = Math.round(diffDays * pricePerDay * 100) / 100;
 
     // Create the booking within the transaction

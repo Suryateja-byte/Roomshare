@@ -2,12 +2,12 @@
 
 import { headers } from "next/headers";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
-import { getListingsPaginated, type ListingData } from "@/lib/data";
-import { parseSearchParams, buildRawParamsFromSearchParams } from "@/lib/search-params";
+import { type ListingData } from "@/lib/data";
+import { buildRawParamsFromSearchParams } from "@/lib/search-params";
 import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
+import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { features } from "@/lib/env";
-
-const ITEMS_PER_PAGE = 12;
+import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 
 export interface FetchMoreResult {
   items: ListingData[];
@@ -49,10 +49,14 @@ export async function fetchMoreListings(
         )
       );
 
-      const v2Result = await executeSearchV2({
-        rawParams: rawParamsForV2,
-        limit: ITEMS_PER_PAGE,
-      });
+      const v2Result = await withTimeout(
+        executeSearchV2({
+          rawParams: rawParamsForV2,
+          limit: DEFAULT_PAGE_SIZE,
+        }),
+        DEFAULT_TIMEOUTS.DATABASE,
+        'fetchMoreListings-executeSearchV2'
+      );
 
       if (v2Result.paginatedResult) {
         return {

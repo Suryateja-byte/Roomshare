@@ -29,6 +29,7 @@ import {
   Suspense,
 } from "react";
 import type { MapListingData } from "@/lib/data";
+import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
 import { useSearchV2Data, type V2MapData } from "@/contexts/SearchV2DataContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
@@ -42,12 +43,10 @@ const LazyDynamicMap = lazy(() => import("./DynamicMap"));
 // with Mapbox native clustering handling dense markers at wide viewports
 const MAX_LAT_SPAN = 5;
 const MAX_LNG_SPAN = 5;
+const MAP_FETCH_DEBOUNCE_MS = 250;
 
-/**
- * P3a Fix: Extract only map-relevant params from URLSearchParams
- * Excludes pagination (page, cursor) and sort params that don't affect map markers.
- * This prevents unnecessary map re-fetches when user paginates or changes sort order.
- */
+// Legacy map-relevant key list kept as explicit documentation and fallback shape.
+// The active serialization path uses canonical parser output so map/list stay in sync.
 const MAP_RELEVANT_KEYS = [
   "q",
   "minLat",
@@ -69,12 +68,26 @@ const MAP_RELEVANT_KEYS = [
   "nearMatches",
 ] as const;
 
+const MAP_VIEWPORT_KEYS = MAP_RELEVANT_KEYS.filter(
+  (key) =>
+    key === "minLat" ||
+    key === "maxLat" ||
+    key === "minLng" ||
+    key === "maxLng" ||
+    key === "lat" ||
+    key === "lng",
+);
+
 function getMapRelevantParams(searchParams: URLSearchParams): string {
-  const filtered = new URLSearchParams();
-  for (const key of MAP_RELEVANT_KEYS) {
+  // Canonicalize filter params using shared parser so map and list receive identical filters.
+  const filtered = buildCanonicalFilterParamsFromSearchParams(searchParams);
+
+  // Preserve explicit viewport/location keys from current URL (including clamped bounds).
+  for (const key of MAP_VIEWPORT_KEYS) {
     const values = searchParams.getAll(key);
     values.forEach((v) => filtered.append(key, v));
   }
+
   // Sort for consistent comparison (URLSearchParams order isn't guaranteed)
   filtered.sort();
   return filtered.toString();
@@ -300,8 +313,10 @@ export default function PersistentMapWrapper({
   // Coordinate with list transitions - show overlay when list is loading
   const transitionContext = useSearchTransitionSafe();
   const isListTransitioning = transitionContext?.isPending ?? false;
-  const hasV2Data = v2MapData !== null;
-  const hasAnyV2Data = hasV2Data || lastV2Data !== null;
+  // Only trust V2 data when V2 mode is explicitly enabled.
+  // This prevents stale context data from masking fresh V1 filtered results.
+  const hasV2Data = isV2Enabled && v2MapData !== null;
+  const hasAnyV2Data = isV2Enabled && (hasV2Data || lastV2Data !== null);
 
   // P2-FIX (#115): Mark data path as determined when we receive any signal
   // Check if URL has bounds (indicates V1 path with known location)
@@ -322,19 +337,22 @@ export default function PersistentMapWrapper({
   useEffect(() => {
     if (v2MapData) {
       setLastV2Data(v2MapData);
+    } else if (!isV2Enabled) {
+      // Clear stale V2 cache when v1 path is active to prevent map/list desync.
+      setLastV2Data(null);
     }
-  }, [v2MapData]);
+  }, [v2MapData, isV2Enabled]);
 
   // Compute effective listings based on data source (v2 context or v1 fetch)
   // Memoized for stable reference to prevent unnecessary Map re-renders
   const effectiveListings = useMemo(() => {
     // P2-FIX (#124): Use lastV2Data state (not ref) so memo properly recalculates
-    const activeV2Data = v2MapData ?? lastV2Data;
+    const activeV2Data = isV2Enabled ? (v2MapData ?? lastV2Data) : null;
     if (activeV2Data) {
       return v2MapDataToListings(activeV2Data);
     }
     return listings;
-  }, [v2MapData, lastV2Data, listings]);
+  }, [isV2Enabled, v2MapData, lastV2Data, listings]);
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
@@ -559,11 +577,11 @@ export default function PersistentMapWrapper({
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    // Throttle to 2s to stay within 30 req/min rate limit
+    // Small debounce to coalesce rapid URL updates without adding noticeable lag.
     fetchTimeoutRef.current = setTimeout(() => {
       lastFetchedParamsRef.current = paramsString;
       fetchListings(paramsString, abortController.signal);
-    }, 2000);
+    }, MAP_FETCH_DEBOUNCE_MS);
 
     return () => {
       if (fetchTimeoutRef.current) {

@@ -16,6 +16,17 @@ import {
 } from "@/lib/search/cursor";
 
 describe("search/cursor", () => {
+  const originalCursorSecret = process.env.CURSOR_SECRET;
+
+  afterEach(() => {
+    if (originalCursorSecret === undefined) {
+      delete process.env.CURSOR_SECRET;
+    } else {
+      process.env.CURSOR_SECRET = originalCursorSecret;
+    }
+    jest.resetModules();
+  });
+
   describe("encodeKeysetCursor / decodeKeysetCursor roundtrip", () => {
     it("should encode and decode recommended cursor", () => {
       const cursor: KeysetCursor = {
@@ -250,6 +261,48 @@ describe("search/cursor", () => {
 
         expect(decodeKeysetCursor(correctKeyCount)).not.toBeNull();
       }
+    });
+  });
+
+  describe("HMAC-signed cursor mode", () => {
+    it("round-trips signed cursors when CURSOR_SECRET is set", async () => {
+      process.env.CURSOR_SECRET = "0123456789abcdef0123456789abcdef";
+      jest.resetModules();
+
+      const { encodeKeysetCursor: encodeSigned, decodeKeysetCursor: decodeSigned } =
+        await import("@/lib/search/cursor");
+
+      const cursor = {
+        v: 1 as const,
+        s: "newest" as const,
+        k: ["2024-01-15T10:00:00.000Z"],
+        id: "clxsigned",
+      };
+
+      const encoded = encodeSigned(cursor);
+      expect(decodeSigned(encoded)).toEqual(cursor);
+    });
+
+    it("rejects tampered signed cursors", async () => {
+      process.env.CURSOR_SECRET = "0123456789abcdef0123456789abcdef";
+      jest.resetModules();
+
+      const { encodeKeysetCursor: encodeSigned, decodeKeysetCursor: decodeSigned } =
+        await import("@/lib/search/cursor");
+
+      const cursor = {
+        v: 1 as const,
+        s: "newest" as const,
+        k: ["2024-01-15T10:00:00.000Z"],
+        id: "clxtamper",
+      };
+
+      const encoded = encodeSigned(cursor);
+      const envelope = JSON.parse(Buffer.from(encoded, "base64url").toString("utf-8"));
+      envelope.p = envelope.p.replace("clxtamper", "clxfakeid");
+      const tampered = Buffer.from(JSON.stringify(envelope)).toString("base64url");
+
+      expect(decodeSigned(tampered)).toBeNull();
     });
   });
 

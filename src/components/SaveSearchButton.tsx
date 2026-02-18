@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { saveSearch } from '@/app/actions/saved-search';
 import type { SearchFilters } from '@/lib/search-utils';
 import { parseSearchParams, type RawSearchParams } from '@/lib/search-params';
 import { Bookmark, Loader2, X, Bell, BellOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
+import { FocusTrap } from '@/components/ui/FocusTrap';
 
 interface SaveSearchButtonProps {
     className?: string;
@@ -22,6 +23,26 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const searchParams = useSearchParams();
+    const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+        return () => document.removeEventListener('keydown', handleEscape);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isOpen]);
 
     // Get current filters from URL using centralized validation
     const getCurrentFilters = (): SearchFilters => {
@@ -133,6 +154,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
     return (
         <>
             <button
+                ref={triggerButtonRef}
                 onClick={handleOpen}
                 className={`inline-flex items-center gap-2 h-11 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap ${className}`}
             >
@@ -142,132 +164,145 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
 
             {/* Modal */}
             {isOpen && (
-                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-                    {/* Backdrop */}
-                    <div
-                        className="absolute inset-0 bg-black/50"
-                        onClick={() => setIsOpen(false)}
-                    />
-
-                    {/* Modal Content */}
-                    <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-                        <button
+                <FocusTrap active={isOpen} returnFocus={true}>
+                    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+                        {/* Backdrop */}
+                        <div
+                            className="absolute inset-0 bg-black/50"
                             onClick={() => setIsOpen(false)}
-                            className="absolute top-4 right-4 p-1 text-zinc-400 hover:text-zinc-600"
+                            aria-hidden="true"
+                        />
+
+                        {/* Modal Content */}
+                        <div
+                            className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="save-search-dialog-title"
                         >
-                            <X className="w-5 h-5" />
-                        </button>
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="absolute top-4 right-4 p-1 text-zinc-400 hover:text-zinc-600"
+                                aria-label="Close save search dialog"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
 
-                        <h2 className="text-xl font-bold text-zinc-900 mb-4">Save This Search</h2>
+                            <h2 id="save-search-dialog-title" className="text-xl font-bold text-zinc-900 mb-4">Save This Search</h2>
 
-                        <div className="space-y-4">
-                            {/* Search Name */}
-                            <div>
-                                <label className="block text-sm font-medium text-zinc-700 mb-1">
-                                    Search Name
-                                </label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    placeholder="e.g., Downtown apartments under $1500"
-                                    className="w-full px-4 py-2.5 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                                    aria-describedby={error ? "save-search-error" : undefined}
-                                    aria-invalid={!!error}
-                                />
-                            </div>
-
-                            {/* Alert Toggle */}
-                            <div className="p-4 bg-zinc-50 rounded-xl space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        {alertEnabled ? (
-                                            <Bell className="w-5 h-5 text-zinc-600" />
-                                        ) : (
-                                            <BellOff className="w-5 h-5 text-zinc-400" />
-                                        )}
-                                        <div>
-                                            <p className="font-medium text-zinc-900">Email Alerts</p>
-                                            <p className="text-xs text-zinc-500">
-                                                Get notified when new listings match
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setAlertEnabled(!alertEnabled)}
-                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${alertEnabled ? 'bg-zinc-900' : 'bg-zinc-200'
-                                            }`}
-                                    >
-                                        <span
-                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertEnabled ? 'translate-x-6' : 'translate-x-1'
-                                                }`}
-                                        />
-                                    </button>
+                            <div className="space-y-4">
+                                {/* Search Name */}
+                                <div>
+                                    <label className="block text-sm font-medium text-zinc-700 mb-1">
+                                        Search Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        placeholder="e.g., Downtown apartments under $1500"
+                                        className="w-full px-4 py-2.5 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                                        aria-describedby={error ? "save-search-error" : undefined}
+                                        aria-invalid={!!error}
+                                    />
                                 </div>
 
-                                {/* Alert Frequency */}
-                                {alertEnabled && (
-                                    <div className="pt-3 border-t border-zinc-200">
-                                        <label className="block text-sm font-medium text-zinc-700 mb-2">
-                                            Alert Frequency
-                                        </label>
-                                        <div className="flex gap-2">
-                                            {(['INSTANT', 'DAILY', 'WEEKLY'] as const).map((freq) => (
-                                                <button
-                                                    key={freq}
-                                                    type="button"
-                                                    onClick={() => setAlertFrequency(freq)}
-                                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                                        alertFrequency === freq
-                                                            ? 'bg-zinc-900 text-white'
-                                                            : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'
-                                                    }`}
-                                                >
-                                                    {freq === 'INSTANT' ? 'Instant' : freq === 'DAILY' ? 'Daily' : 'Weekly'}
-                                                </button>
-                                            ))}
+                                {/* Alert Toggle */}
+                                <div className="p-4 bg-zinc-50 rounded-xl space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            {alertEnabled ? (
+                                                <Bell className="w-5 h-5 text-zinc-600" />
+                                            ) : (
+                                                <BellOff className="w-5 h-5 text-zinc-400" />
+                                            )}
+                                            <div>
+                                                <p className="font-medium text-zinc-900">Email Alerts</p>
+                                                <p className="text-xs text-zinc-500">
+                                                    Get notified when new listings match
+                                                </p>
+                                            </div>
                                         </div>
-                                        {alertFrequency === 'INSTANT' && (
-                                            <p className="mt-2 text-xs text-zinc-500">
-                                                Get notified immediately when a new listing matches your search
-                                            </p>
-                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => setAlertEnabled(!alertEnabled)}
+                                            role="switch"
+                                            aria-checked={alertEnabled}
+                                            aria-label="Email alerts"
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${alertEnabled ? 'bg-zinc-900' : 'bg-zinc-200'
+                                                }`}
+                                        >
+                                            <span
+                                                aria-hidden="true"
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertEnabled ? 'translate-x-6' : 'translate-x-1'
+                                                    }`}
+                                            />
+                                        </button>
                                     </div>
-                                )}
-                            </div>
 
-                            {/* Error */}
-                            {error && (
-                                <p id="save-search-error" role="alert" className="text-sm text-red-600">{error}</p>
-                            )}
-
-                            {/* Actions */}
-                            <div className="flex gap-3 pt-2">
-                                <button
-                                    onClick={() => setIsOpen(false)}
-                                    className="flex-1 px-4 py-2.5 border border-zinc-200 rounded-lg font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSave}
-                                    disabled={isLoading}
-                                    className="flex-1 px-4 py-2.5 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    {isLoading ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        'Save Search'
+                                    {/* Alert Frequency */}
+                                    {alertEnabled && (
+                                        <div className="pt-3 border-t border-zinc-200">
+                                            <label className="block text-sm font-medium text-zinc-700 mb-2">
+                                                Alert Frequency
+                                            </label>
+                                            <div className="flex gap-2">
+                                                {(['INSTANT', 'DAILY', 'WEEKLY'] as const).map((freq) => (
+                                                    <button
+                                                        key={freq}
+                                                        type="button"
+                                                        onClick={() => setAlertFrequency(freq)}
+                                                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                                            alertFrequency === freq
+                                                                ? 'bg-zinc-900 text-white'
+                                                                : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                                                        }`}
+                                                    >
+                                                        {freq === 'INSTANT' ? 'Instant' : freq === 'DAILY' ? 'Daily' : 'Weekly'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {alertFrequency === 'INSTANT' && (
+                                                <p className="mt-2 text-xs text-zinc-500">
+                                                    Get notified immediately when a new listing matches your search
+                                                </p>
+                                            )}
+                                        </div>
                                     )}
-                                </button>
+                                </div>
+
+                                {/* Error */}
+                                {error && (
+                                    <p id="save-search-error" role="alert" className="text-sm text-red-600">{error}</p>
+                                )}
+
+                                {/* Actions */}
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        onClick={() => setIsOpen(false)}
+                                        className="flex-1 px-4 py-2.5 border border-zinc-200 rounded-lg font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={isLoading}
+                                        className="flex-1 px-4 py-2.5 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {isLoading ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            'Save Search'
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                </FocusTrap>
             )}
         </>
     );

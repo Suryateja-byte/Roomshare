@@ -279,6 +279,10 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
+        if (!session.user.emailVerified) {
+            return NextResponse.json({ error: 'Email verification required' }, { status: 403 });
+        }
+
         let body;
         try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
@@ -353,6 +357,10 @@ export async function DELETE(request: Request) {
         const suspension = await checkSuspension();
         if (suspension.suspended) {
             return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
+        }
+
+        if (!session.user.emailVerified) {
+            return NextResponse.json({ error: 'Email verification required' }, { status: 403 });
         }
 
         const { searchParams } = new URL(request.url);

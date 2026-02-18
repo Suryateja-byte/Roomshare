@@ -4,8 +4,9 @@
  * Provides stable cache key generation and cursor encoding for pagination.
  */
 
-import { createHash } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { BOUNDS_EPSILON } from "./types";
+import { CURSOR_SECRET } from "@/lib/env";
 
 // ============================================================================
 // Keyset Cursor Re-exports
@@ -111,7 +112,15 @@ export function generateQueryHash(params: HashableFilterParams): string {
  */
 export function encodeCursor(page: number): string {
   const payload = JSON.stringify({ p: page });
-  return Buffer.from(payload).toString("base64url");
+  if (!CURSOR_SECRET) {
+    return Buffer.from(payload).toString("base64url");
+  }
+
+  const signature = createHmac("sha256", CURSOR_SECRET)
+    .update(payload)
+    .digest("base64url");
+  const envelope = JSON.stringify({ p: payload, s: signature });
+  return Buffer.from(envelope).toString("base64url");
 }
 
 /**
@@ -120,7 +129,46 @@ export function encodeCursor(page: number): string {
  */
 export function decodeCursor(cursor: string): number | null {
   try {
-    const payload = Buffer.from(cursor, "base64url").toString("utf-8");
+    const decoded = Buffer.from(cursor, "base64url").toString("utf-8");
+    let payload = decoded;
+
+    if (CURSOR_SECRET) {
+      const parsedEnvelope = JSON.parse(decoded) as unknown;
+      if (
+        parsedEnvelope === null ||
+        typeof parsedEnvelope !== "object" ||
+        !("p" in parsedEnvelope) ||
+        !("s" in parsedEnvelope) ||
+        typeof parsedEnvelope.p !== "string" ||
+        typeof parsedEnvelope.s !== "string"
+      ) {
+        return null;
+      }
+
+      const expectedSignature = createHmac("sha256", CURSOR_SECRET)
+        .update(parsedEnvelope.p)
+        .digest("base64url");
+
+      const provided = Buffer.from(parsedEnvelope.s);
+      const expected = Buffer.from(expectedSignature);
+      if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+        return null;
+      }
+
+      payload = parsedEnvelope.p;
+    } else {
+      const parsedEnvelope = JSON.parse(decoded) as unknown;
+      if (
+        parsedEnvelope !== null &&
+        typeof parsedEnvelope === "object" &&
+        "p" in parsedEnvelope &&
+        "s" in parsedEnvelope &&
+        typeof parsedEnvelope.p === "string"
+      ) {
+        payload = parsedEnvelope.p;
+      }
+    }
+
     const parsed = JSON.parse(payload);
 
     if (typeof parsed?.p === "number" && parsed.p > 0) {

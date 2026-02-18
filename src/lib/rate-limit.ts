@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
+import { logger } from "@/lib/logger";
 
 /**
  * In-process rate limiter for degraded mode (DB errors).
@@ -154,14 +155,14 @@ export async function checkRateLimit(
   } catch {
     // FAIL CLOSED: Deny by default on DB errors (security over availability)
     // Use degraded mode fallback for availability during transient DB blips
-    console.error("[RateLimit] DB error (code: RL_DB_ERR)");
+    logger.sync.error("[RateLimit] DB error (code: RL_DB_ERR)");
 
     // Best-effort in-process fallback (non-persistent, limited protection)
     const degradedAllowed = checkDegradedModeLimit(identifier);
 
     if (degradedAllowed) {
       // Degraded mode: allow with reduced capacity, log for monitoring
-      console.warn("[RateLimit] Degraded mode active (code: RL_DEGRADED)");
+      logger.sync.warn("[RateLimit] Degraded mode active (code: RL_DEGRADED)");
       return {
         success: true,
         remaining: 1,
@@ -204,8 +205,8 @@ export const RATE_LIMITS = {
   toggleFavorite: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
   createReport: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
   uploadDelete: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
-  // P0 fix: Search page rate limit to prevent DoS
-  search: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
+  // Search page rate limit (supports search-as-move interactions while limiting abuse)
+  search: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   // Nearby places search (Radar API)
   nearbySearch: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
   // P1-05: Rate limit for reviews GET endpoint
@@ -217,6 +218,7 @@ export const RATE_LIMITS = {
   verifyPassword: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
   deleteAccount: { limit: 3, windowMs: 24 * 60 * 60 * 1000 }, // 3 per day
   // Server action rate limits
+  viewCount: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute (prevent view gaming)
   filterSuggestions: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
   getListingsInBounds: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   chatSendMessage: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100 per hour

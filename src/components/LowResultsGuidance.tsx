@@ -46,6 +46,9 @@ export function LowResultsGuidance({
       params.set("nearMatches", "1");
       // Reset to page 1 when enabling near matches
       params.delete("page");
+      params.delete("cursor");
+      params.delete("cursorStack");
+      params.delete("pageNumber");
       router.push(`/search?${params.toString()}`, { scroll: false });
     });
   }, [router, searchParams]);
@@ -77,6 +80,9 @@ export function LowResultsGuidance({
 
         // Reset to page 1 when changing filters
         params.delete("page");
+        params.delete("cursor");
+        params.delete("cursorStack");
+        params.delete("pageNumber");
         router.push(`/search?${params.toString()}`, { scroll: false });
       });
     },

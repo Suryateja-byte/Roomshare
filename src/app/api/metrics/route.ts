@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import { checkMetricsRateLimit } from '@/lib/rate-limit-redis';
 import { getClientIP } from '@/lib/rate-limit';
+import { isOriginAllowed, isHostAllowed } from '@/lib/origin-guard';
 
 /**
  * Metrics API Route - Privacy-Safe Logging
@@ -65,38 +66,6 @@ const ALLOWED_PLACE_TYPES = new Set([
   'museum',
   'art_gallery',
 ]);
-
-// ============ ORIGIN/HOST HELPERS ============
-
-function getAllowedOrigins(): string[] {
-  const origins = process.env.ALLOWED_ORIGINS || '';
-  const parsed = origins.split(',').map((o) => o.trim()).filter(Boolean);
-  if (process.env.NODE_ENV === 'development') {
-    parsed.push('http://localhost:3000');
-  }
-  return parsed;
-}
-
-function getAllowedHosts(): string[] {
-  const hosts = process.env.ALLOWED_HOSTS || '';
-  const parsed = hosts.split(',').map((h) => h.trim()).filter(Boolean);
-  if (process.env.NODE_ENV === 'development') {
-    parsed.push('localhost:3000', 'localhost');
-  }
-  return parsed;
-}
-
-function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return false;
-  return getAllowedOrigins().includes(origin);
-}
-
-function isHostAllowed(host: string | null): boolean {
-  if (!host) return false;
-  const allowed = getAllowedHosts();
-  const hostWithoutPort = host.split(':')[0];
-  return allowed.some((h) => h === host || h === hostWithoutPort);
-}
 
 // ============ HMAC ============
 

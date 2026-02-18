@@ -23,6 +23,14 @@ const SUGGESTIONS = [
 
 const MAX_PILLS = 5;
 
+function parseArrayParam(searchParams: URLSearchParams, key: string): string[] {
+  return searchParams
+    .getAll(key)
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 /**
  * RecommendedFilters — Shows contextual filter suggestion pills
  * above the search results. Only displays filters not yet applied.
@@ -35,10 +43,10 @@ export function RecommendedFilters() {
 
   const available = useMemo(() => {
     return SUGGESTIONS.filter((s) => {
-      const current = searchParams.get(s.param) ?? '';
       // For array params, check if value is already in comma-separated list
       if (s.param === 'amenities' || s.param === 'houseRules') {
-        return !current.split(',').includes(s.value);
+        const selected = parseArrayParam(searchParams, s.param);
+        return !selected.includes(s.value);
       }
       // For scalar params
       if (s.param === 'maxPrice') {
@@ -47,6 +55,7 @@ export function RecommendedFilters() {
       }
       // For scalar single-select params (roomType, leaseDuration),
       // hide if any value is already set for that param
+      const current = searchParams.get(s.param) ?? '';
       return !current;
     }).slice(0, MAX_PILLS);
   }, [searchParams]);
@@ -57,11 +66,13 @@ export function RecommendedFilters() {
     const params = new URLSearchParams(searchParams.toString());
 
     if (suggestion.param === 'amenities' || suggestion.param === 'houseRules') {
-      const current = params.get(suggestion.param);
-      if (current) {
-        params.set(suggestion.param, `${current},${suggestion.value}`);
-      } else {
-        params.set(suggestion.param, suggestion.value);
+      const selected = parseArrayParam(params, suggestion.param);
+      if (!selected.includes(suggestion.value)) {
+        selected.push(suggestion.value);
+      }
+      params.delete(suggestion.param);
+      if (selected.length > 0) {
+        params.set(suggestion.param, selected.join(','));
       }
     } else {
       params.set(suggestion.param, suggestion.value);
@@ -70,6 +81,8 @@ export function RecommendedFilters() {
     // Reset pagination
     params.delete('cursor');
     params.delete('page');
+    params.delete('cursorStack');
+    params.delete('pageNumber');
 
     startTransition(() => {
       const qs = params.toString();

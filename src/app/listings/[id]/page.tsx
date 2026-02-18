@@ -157,7 +157,7 @@ export default async function ListingPage({ params }: PageProps) {
                 id: listing.id,
                 title: listing.title,
                 description: listing.description,
-                price: listing.price,
+                price: Number(listing.price),
                 images: listing.images,
                 amenities: listing.amenities,
                 householdLanguages: listing.householdLanguages,
