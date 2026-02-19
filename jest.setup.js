@@ -205,7 +205,9 @@ const mockPrismaClient = {
   // listing_search_docs is a raw SQL table, no Prisma model
 }
 
-// Add $transaction to the client — interactive transactions receive the full client as `tx`
+// Interactive transactions receive the full mock client as `tx` param,
+// so code like `prisma.$transaction(async (tx) => { tx.user.findUnique(...) })` works.
+// Array transactions (e.g. prisma.$transaction([p1, p2])) resolve with Promise.all.
 mockPrismaClient.$transaction = jest.fn((fn) =>
   typeof fn === 'function' ? fn(mockPrismaClient) : Promise.all(fn)
 )
