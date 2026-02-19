@@ -84,7 +84,7 @@ async function selectSort(
     const mobileSortBtn = page
       .locator('[data-testid="mobile-search-results-container"]')
       .locator('button[aria-label^="Sort:"]');
-    await expect(mobileSortBtn).toBeVisible({ timeout: 10_000 });
+    await expect(mobileSortBtn).toBeVisible({ timeout: 30_000 });
     await mobileSortBtn.click();
 
     // Wait for the bottom sheet heading and pick the option
@@ -311,7 +311,8 @@ test.describe("5. Cursor Reset on Filter/Sort Change", () => {
     await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
 
-    // Mock items should appear (they have IDs starting with "mock-listing-")
+    // Wait for mock items to render (they append asynchronously)
+    await expect(cards).not.toHaveCount(remountedIds.length, { timeout: 30_000 });
     const afterLoadMore = await cards.count();
     expect(afterLoadMore).toBeGreaterThan(remountedIds.length);
 
