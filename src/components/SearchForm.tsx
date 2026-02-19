@@ -155,6 +155,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     }, []);
 
     // Set hasMounted after initial render and validate moveInDate
+    // Intentionally run-once ([] deps): mount-time validation of URL params and
+    // one-time cleanup of stale moveInDate. Re-running on searchParams/moveInDate
+    // changes would fight the URL sync effect in useBatchedFilters.
     useEffect(() => {
         setHasMounted(true);
         // Validate moveInDate on mount to clear invalid past dates
@@ -171,6 +174,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             const qs = params.toString();
             router.replace(`${window.location.pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Sync non-filter state (location, coords) with URL when it changes
@@ -206,6 +210,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         window.dispatchEvent(event);
     };
 
+    // Stale closure note: geoLoading is captured at callback creation time, but
+    // the `disabled={geoLoading}` prop on the button prevents re-entry while
+    // a geolocation request is in flight, so stale geoLoading is safe here.
     const handleUseMyLocation = useCallback(() => {
         if (geoLoading) return;
         if (!navigator.geolocation) {

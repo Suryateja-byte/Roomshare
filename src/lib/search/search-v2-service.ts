@@ -295,8 +295,9 @@ export async function executeSearchV2(
     const rankerEnabled = isRankingEnabled(
       getFirstValue(params.rawParams.ranker),
     );
-    // Debug output only allowed when searchDebugRanking is enabled (non-production or explicit env flag)
-    // This prevents production users from accessing debug signals via ?debugRank=1
+    // Debug output only allowed when searchDebugRanking feature flag is enabled.
+    // In production, features.searchDebugRanking is false, so the ?debugRank=1
+    // query param is ignored — no ranking signals are exposed to end users.
     const debugRank =
       features.searchDebugRanking &&
       getFirstValue(params.rawParams.debugRank) === "1";

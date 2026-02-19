@@ -265,7 +265,9 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
   const commit = useCallback(() => {
     // After an explicit apply action, prioritize URL state for a short window.
     // This avoids preserving stale dirty state during immediate back/forward transitions.
-    forceSyncUntilRef.current = Date.now() + 10_000;
+    // 10s covers typical back/forward navigation latency with margin.
+    const FORCE_SYNC_WINDOW_MS = 10_000;
+    forceSyncUntilRef.current = Date.now() + FORCE_SYNC_WINDOW_MS;
 
     // Start from current URL to preserve non-filter params (bounds, sort, q, lat, lng, nearMatches)
     const params = new URLSearchParams(searchParams.toString());

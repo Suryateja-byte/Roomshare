@@ -193,6 +193,9 @@ export function useDebouncedFilterCount({
 
   // Fetch count function
   const fetchCount = useCallback(async () => {
+    // Skip fetch when offline to avoid wasted requests
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
     // Check cache first (restores both count and boundsRequired)
     const cached = getCachedEntry(cacheKey);
     if (cached !== undefined) {
@@ -226,7 +229,12 @@ export function useDebouncedFilterCount({
       }
 
       const data = await response.json();
-      const newCount = data.count as number | null;
+      // Runtime validation: ensure response has expected shape
+      if (typeof data !== "object" || data === null) {
+        throw new Error("Invalid count response: expected object");
+      }
+      const newCount =
+        typeof data.count === "number" ? data.count : null;
       // P3b: Parse boundsRequired from API response
       const newBoundsRequired = data.boundsRequired === true;
 
@@ -326,7 +334,10 @@ export function useDebouncedFilterCount({
         abortControllerRef.current.abort();
       }
     };
-  }, [cacheKey, isDirty, isDrawerOpen, fetchCount, count]);
+    // Note: `count` is intentionally excluded from deps — it's a result of fetching,
+    // not a trigger. Including it would cause re-fetch cycles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey, isDirty, isDrawerOpen, fetchCount]);
 
   // Format count for display
   const formattedCount = useMemo(() => {

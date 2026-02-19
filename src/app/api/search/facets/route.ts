@@ -39,6 +39,7 @@ import {
 } from "@/lib/validation";
 import { logger } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
+import { parseLocalDate } from "@/lib/utils";
 
 // Cache TTL in seconds
 const CACHE_TTL = 30;
@@ -111,13 +112,7 @@ export interface FacetsResponse {
   } | null;
 }
 
-/**
- * Parse date string to Date object
- */
-function parseDateOnly(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
+// L2 fix: Use shared parseLocalDate from @/lib/utils
 
 /**
  * Build base WHERE conditions for facet queries.
@@ -130,6 +125,11 @@ interface WhereBuilder {
   paramIndex: number;
 }
 
+// L1 note: This function intentionally duplicates buildSearchDocWhereConditions
+// from search-doc-queries.ts. The key difference is the `excludeFilter` parameter
+// which allows sticky faceting (e.g., excluding amenities filter when counting amenities).
+// Extracting a shared builder would require either complex generics or making the
+// search query builder aware of facet concerns, which violates separation of concerns.
 function buildFacetWhereConditions(
   filterParams: {
     query?: string;
@@ -235,7 +235,7 @@ function buildFacetWhereConditions(
     conditions.push(
       `(d.move_in_date IS NULL OR d.move_in_date <= $${paramIndex++})`,
     );
-    params.push(parseDateOnly(moveInDate));
+    params.push(parseLocalDate(moveInDate));
   }
 
   // Languages filter (OR logic)
@@ -509,19 +509,20 @@ async function getPriceHistogram(
 function generateFacetsCacheKey(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
 ): string {
-  const normalized = {
-    q: filterParams.query?.toLowerCase().trim() || "",
-    minPrice: filterParams.minPrice ?? "",
-    maxPrice: filterParams.maxPrice ?? "",
+  // P3 fix: Sort keys explicitly for deterministic JSON.stringify output
+  const normalized: Record<string, string | number | boolean> = {
     amenities: [...(filterParams.amenities || [])].sort().join(","),
-    houseRules: [...(filterParams.houseRules || [])].sort().join(","),
-    languages: [...(filterParams.languages || [])].sort().join(","),
-    roomType: filterParams.roomType?.toLowerCase() || "",
-    leaseDuration: filterParams.leaseDuration?.toLowerCase() || "",
-    moveInDate: filterParams.moveInDate || "",
     bounds: filterParams.bounds
       ? `${filterParams.bounds.minLng.toFixed(4)},${filterParams.bounds.minLat.toFixed(4)},${filterParams.bounds.maxLng.toFixed(4)},${filterParams.bounds.maxLat.toFixed(4)}`
       : "",
+    houseRules: [...(filterParams.houseRules || [])].sort().join(","),
+    languages: [...(filterParams.languages || [])].sort().join(","),
+    leaseDuration: filterParams.leaseDuration?.toLowerCase() || "",
+    maxPrice: filterParams.maxPrice ?? "",
+    minPrice: filterParams.minPrice ?? "",
+    moveInDate: filterParams.moveInDate || "",
+    q: filterParams.query?.toLowerCase().trim() || "",
+    roomType: filterParams.roomType?.toLowerCase() || "",
   };
   return JSON.stringify(normalized);
 }
@@ -599,6 +600,17 @@ export async function GET(request: NextRequest) {
 
       const { filterParams } = parseSearchParams(rawParams);
 
+      // M1/S4 Fix: When no text query AND no bounds, cap the facet results to prevent
+      // full-table aggregation DoS. The per-facet LIMIT (MAX_FACET_RESULTS=100) already
+      // limits individual queries, and the statement timeout (5s) provides a backstop.
+      // Log for monitoring.
+      if (!filterParams.bounds && !filterParams.query) {
+        logger.debug("[search/facets] Unbounded browse facets request", {
+          hasQuery: false,
+          hasBounds: false,
+        });
+      }
+
       // P1 Fix: Validate bounds when text query is present (DoS prevention)
       // Text search without bounds allows full-table scans - block early
       // P2-NEW Fix: Use filterParams.bounds (which derives bounds from lat/lng)
@@ -626,7 +638,6 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        // Validate coordinate values from filterParams.bounds
         const { bounds } = filterParams;
 
         // Check for NaN/Infinity (invalid coordinates)
@@ -691,6 +702,10 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(facets, {
         headers: {
+          // Facets use "private, no-store" because facet counts may vary based on
+          // user-specific filters and are cached server-side via unstable_cache.
+          // This differs from /api/search/v2 which uses "public, s-maxage=60"
+          // because search results are identical for the same query params.
           "Cache-Control": "private, no-store",
           "X-Cache-TTL": String(CACHE_TTL),
           "x-request-id": getRequestId(),

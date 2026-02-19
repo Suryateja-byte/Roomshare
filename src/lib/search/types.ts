@@ -28,7 +28,8 @@ export interface SearchV2FeatureProperties {
   price: number | null;
   image: string | null;
   availableSlots: number;
-  ownerId: string;
+  /** @deprecated No longer populated in API responses (S3 security fix) */
+  ownerId?: string;
 }
 
 /** A single point feature for the map */

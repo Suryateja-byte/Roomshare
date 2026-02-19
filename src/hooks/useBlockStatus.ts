@@ -5,6 +5,12 @@ import { supabase, safeRemoveChannel } from '@/lib/supabase';
 import { getBlockStatus, type BlockStatus } from '@/app/actions/block';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
+/** Shape of the BlockedUser table row from Supabase Realtime payload */
+interface BlockedUserRecord {
+    blockerId: string;
+    blockedId: string;
+}
+
 interface UseBlockStatusResult {
     blockStatus: BlockStatus;
     isBlocked: boolean;
@@ -68,7 +74,7 @@ export function useBlockStatus(
                 table: 'BlockedUser'
             }, (payload) => {
                 // Check if this change affects our user pair
-                const record = payload.new as any || payload.old as any;
+                const record = (payload.new as BlockedUserRecord) || (payload.old as BlockedUserRecord);
                 if (!record) return;
 
                 const isRelevant = (

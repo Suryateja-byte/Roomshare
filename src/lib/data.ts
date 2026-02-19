@@ -22,6 +22,10 @@ export { MIN_QUERY_LENGTH, MAX_QUERY_LENGTH };
 // Unified count function for API routes
 // Gates behind isSearchDocEnabled() to support V1 fallback
 // Returns null for unbounded browse (no query, no bounds) or >100 results
+//
+// Auth note: Public search endpoints (getLimitedCount, getListings, getMapListings)
+// do not require auth to enable anonymous browsing. Functions that return user-specific
+// data (e.g., getSavedListings) require auth.
 export async function getLimitedCount(
   params: FilterParams,
 ): Promise<number | null> {
@@ -672,7 +676,6 @@ export async function getListings(
       leaseDuration: l.leaseDuration,
       roomType: l.roomType,
       moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      ownerId: l.ownerId,
       createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
       viewCount: Number(l.viewCount) || 0,
       avgRating: Number(l.avg_rating) || 0,
@@ -704,7 +707,7 @@ export interface MapListingData {
   title: string;
   price: number;
   availableSlots: number;
-  ownerId: string;
+  ownerId?: string;
   images: string[];
   location: {
     lat: number;
@@ -923,7 +926,6 @@ export async function getMapListings(
       title: l.title,
       price: Number(l.price),
       availableSlots: l.availableSlots,
-      ownerId: l.ownerId,
       images: l.images || [],
       location: {
         lat: Number(l.lat) || 0,
@@ -1690,7 +1692,6 @@ export async function getSavedListings(userId: string): Promise<ListingData[]> {
       leaseDuration: l.leaseDuration ?? undefined,
       roomType: l.roomType ?? undefined,
       moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      ownerId: l.ownerId,
       location: {
         address: l.address,
         city: l.city,

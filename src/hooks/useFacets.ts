@@ -119,6 +119,9 @@ export function useFacets({
   );
 
   const fetchFacets = useCallback(async () => {
+    // Skip fetch when offline to avoid wasted requests
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
     // Check cache
     const cached = facetsCache.get(cacheKey);
     if (cached !== undefined) {
@@ -147,12 +150,17 @@ export function useFacets({
         throw new Error(`Facets request failed: ${response.status}`);
       }
 
-      const data: FacetsResponse = await response.json();
+      const data = await response.json();
+      // Runtime validation: ensure response is an object with expected facet fields
+      if (typeof data !== "object" || data === null) {
+        throw new Error("Invalid facets response: expected object");
+      }
+      const validData = data as FacetsResponse;
 
-      facetsCache.set(cacheKey, data, CACHE_TTL_MS);
+      facetsCache.set(cacheKey, validData, CACHE_TTL_MS);
 
       if (!abortController.signal.aborted) {
-        setFacets(data);
+        setFacets(validData);
         setIsLoading(false);
       }
     } catch (err) {
@@ -201,6 +209,8 @@ export function useFacets({
         abortControllerRef.current.abort();
       }
     };
+    // fetchFacets is stabilized via useCallback with [cacheKey, pending, searchParams] deps.
+    // cacheKey already captures filter+location state, so fetchFacets changes are covered.
   }, [cacheKey, isDrawerOpen, fetchFacets]);
 
   return { facets, isLoading, error };

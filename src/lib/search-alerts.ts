@@ -3,6 +3,7 @@ import { sendNotificationEmail } from './email';
 import { Prisma } from '@prisma/client';
 import { buildSearchUrl, type SearchFilters } from './search-utils';
 import { logger } from './logger';
+import { parseLocalDate } from './utils';
 
 // Type for new listing data used in instant alerts
 export interface NewListingForAlert {
@@ -43,10 +44,8 @@ type SavedSearchForAlerts = {
     };
 };
 
-const parseDateOnly = (value: string): Date => {
-    const [year, month, day] = value.split('-').map(Number);
-    return new Date(year, month - 1, day);
-};
+// L2 fix: Use shared parseLocalDate from @/lib/utils
+const parseDateOnly = parseLocalDate;
 const SEARCH_ALERT_BATCH_SIZE = 100;
 
 function isSearchAlertsEnabled(notificationPreferences: unknown): boolean {
@@ -185,6 +184,10 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
                     if (filters.householdGender) {
                         whereClause.householdGender = filters.householdGender;
                     }
+                    // TODO(M5): Replace ILIKE text matching with FTS (to_tsquery) when
+                    // search_tsv column is available on the Listing table. Currently uses
+                    // Prisma `contains` which generates ILIKE — acceptable for alert volumes
+                    // but not scalable for large datasets.
                     if (filters.query) {
                         whereClause.OR = [
                             { title: { contains: filters.query, mode: 'insensitive' } },
@@ -258,7 +261,9 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
 
                 } catch (error) {
                     result.errors++;
-                    result.details.push(`Error processing ${savedSearch.id}: ${error}`);
+                    // M7 fix: Sanitize error message to prevent PII path leakage
+                    const safeMessage = error instanceof Error ? error.message : 'Unknown error';
+                    result.details.push(`Error processing ${savedSearch.id}: ${safeMessage}`);
                 }
             }
 
@@ -273,7 +278,9 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
 
     } catch (error) {
         result.errors++;
-        result.details.push(`Fatal error: ${error}`);
+        // M7 fix: Sanitize error message to prevent PII path leakage
+        const safeMessage = error instanceof Error ? error.message : 'Unknown error';
+        result.details.push(`Fatal error: ${safeMessage}`);
         return result;
     }
 }
@@ -380,7 +387,8 @@ export async function triggerInstantAlerts(newListing: NewListingForAlert): Prom
     let errors = 0;
 
     try {
-        // Find all saved searches with INSTANT frequency and alerts enabled
+        // M3 fix: Paginate instant subscriptions to prevent unbounded fetches
+        const MAX_INSTANT_SUBSCRIPTIONS = 500;
         const instantSearches = await prisma.savedSearch.findMany({
             where: {
                 alertEnabled: true,
@@ -395,7 +403,9 @@ export async function triggerInstantAlerts(newListing: NewListingForAlert): Prom
                         notificationPreferences: true
                     }
                 }
-            }
+            },
+            take: MAX_INSTANT_SUBSCRIPTIONS,
+            orderBy: { createdAt: 'asc' },
         });
 
         logger.sync.info('Instant alerts subscriptions loaded', {

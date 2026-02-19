@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useTransition, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
+import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 
 /**
  * Filter suggestions with their corresponding URL param mappings.
@@ -40,6 +41,7 @@ export function RecommendedFilters() {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
+  const transitionContext = useSearchTransitionSafe();
 
   const available = useMemo(() => {
     return SUGGESTIONS.filter((s) => {
@@ -84,10 +86,14 @@ export function RecommendedFilters() {
     params.delete('cursorStack');
     params.delete('pageNumber');
 
-    startTransition(() => {
-      const qs = params.toString();
-      router.push(`${pathname}${qs ? `?${qs}` : ''}`);
-    });
+    const url = `${pathname}${params.size ? `?${params.toString()}` : ''}`;
+    if (transitionContext) {
+      transitionContext.navigateWithTransition(url);
+    } else {
+      startTransition(() => {
+        router.push(url);
+      });
+    }
   };
 
   return (

@@ -10,12 +10,14 @@ export function MapGestureHint() {
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(STORAGE_KEY)) return;
+      // M5-MAP FIX: Use sessionStorage instead of localStorage
+      // CLAUDE.md rule: "no cross-session localStorage persistence" for map hints
+      if (sessionStorage.getItem(STORAGE_KEY)) return;
       // Only show on touch devices
       if (!("ontouchstart" in window)) return;
       setVisible(true);
     } catch {
-      // localStorage unavailable
+      // sessionStorage unavailable
     }
   }, []);
 
@@ -24,7 +26,7 @@ export function MapGestureHint() {
   const dismiss = () => {
     setVisible(false);
     try {
-      localStorage.setItem(STORAGE_KEY, "1");
+      sessionStorage.setItem(STORAGE_KEY, "1");
     } catch {
       // fail silently
     }

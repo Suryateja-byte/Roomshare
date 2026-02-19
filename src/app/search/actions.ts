@@ -66,7 +66,7 @@ export async function fetchMoreListings(
         };
       }
     } catch (error) {
-      console.warn("[fetchMoreListings] V2 failed, falling back to v1:", {
+      console.warn("[fetchMoreListings] V2 failed, falling back to v1", {
         error: error instanceof Error ? error.message : "Unknown error",
       });
     }

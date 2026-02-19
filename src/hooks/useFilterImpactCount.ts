@@ -86,6 +86,9 @@ export function useFilterImpactCount({
 
   // Fetch count function
   const fetchCount = useCallback(async () => {
+    // Skip fetch when offline to avoid wasted requests
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
     // Check cache first
     const cached = getCachedCount(cacheKey);
     if (cached !== undefined) {
@@ -122,7 +125,12 @@ export function useFilterImpactCount({
       }
 
       const data = await response.json();
-      const newCount = data.count as number | null;
+      // Runtime validation: ensure response has expected shape
+      if (typeof data !== "object" || data === null) {
+        throw new Error("Invalid count response: expected object");
+      }
+      const newCount =
+        typeof data.count === "number" ? data.count : null;
 
       // Cache the result
       setCachedCount(cacheKey, newCount);

@@ -126,7 +126,6 @@ export function transformToGeoJSON(
       price: listing.price,
       image: listing.images[0] ?? null,
       availableSlots: listing.availableSlots,
-      ownerId: listing.ownerId,
     } satisfies SearchV2FeatureProperties,
   }));
 
@@ -149,7 +148,6 @@ function adaptToMarkerListing(listing: MapListingData): MapMarkerListing {
     title: listing.title,
     price: listing.price,
     availableSlots: listing.availableSlots,
-    ownerId: listing.ownerId,
     images: listing.images,
     location: listing.location,
   };

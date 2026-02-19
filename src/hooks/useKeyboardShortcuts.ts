@@ -151,9 +151,11 @@ export function formatShortcut(
   const parts: string[] = [];
 
   // Detect platform for proper symbol
+  // Prefer navigator.userAgentData (modern API) with fallback to deprecated navigator.platform
   const isMac =
     typeof navigator !== "undefined" &&
-    /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+    ((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform === "macOS" ||
+      /Mac|iPod|iPhone|iPad/.test(navigator.platform));
 
   if (config.meta) {
     parts.push(isMac ? "⌘" : "Ctrl");

@@ -568,7 +568,9 @@ export default function PersistentMapWrapper({
       clearTimeout(fetchTimeoutRef.current);
     }
 
-    // Abort any in-flight request from previous effect run
+    // M6-MAP: Client AbortController cancels the fetch but cannot cancel the
+    // in-progress DB query on the server. Server-side statement_timeout provides
+    // the safety net for runaway queries.
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }

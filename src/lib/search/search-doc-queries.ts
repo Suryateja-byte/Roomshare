@@ -34,11 +34,62 @@ import {
 } from "@/lib/near-matches";
 import { BOUNDS_EPSILON } from "@/lib/constants";
 import { features } from "@/lib/env";
+import { parseLocalDate } from "@/lib/utils";
 import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
 
 // Statement timeout for search queries (5 seconds)
 const SEARCH_QUERY_TIMEOUT_MS = 5000;
+
+// ============================================
+// Raw Query Result Interfaces (M6 fix)
+// ============================================
+
+/** Raw row shape from map listings query */
+interface MapListingRaw {
+  id: string;
+  title: string;
+  price: number | string;
+  availableSlots: number;
+  primaryImage: string | null;
+  lat: number | string;
+  lng: number | string;
+}
+
+/** Raw row shape from paginated listings query */
+interface ListingRaw {
+  id: string;
+  title: string;
+  description: string;
+  price: number | string;
+  images: string[];
+  availableSlots: number;
+  totalSlots: number;
+  amenities: string[];
+  houseRules: string[];
+  householdLanguages: string[];
+  primaryHomeLanguage?: string;
+  leaseDuration?: string;
+  roomType?: string;
+  moveInDate?: string | Date;
+  createdAt?: string | Date;
+  viewCount: number | string;
+  city: string;
+  state: string;
+  lat: number | string;
+  lng: number | string;
+  avgRating: number | string | null;
+  reviewCount: number | string | null;
+}
+
+/** Raw row shape from keyset paginated query (includes cursor columns) */
+interface ListingWithCursorRaw extends ListingRaw {
+  _cursorRecommendedScore: string | null;
+  _cursorPrice: string | null;
+  _cursorAvgRating: string | null;
+  _cursorReviewCount: string | null;
+  _cursorCreatedAt: string | null;
+}
 
 /**
  * Execute a raw query with a statement timeout to prevent runaway queries.
@@ -163,15 +214,6 @@ function createSearchDocCountCacheKey(params: FilterParams): string {
     // NOTE: No page or limit - intentionally excluded for cross-page caching
   };
   return JSON.stringify(normalized);
-}
-
-// ============================================
-// Helper: Parse date string to Date
-// ============================================
-
-function parseDateOnly(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
 }
 
 // ============================================
@@ -471,7 +513,7 @@ function buildSearchDocWhereConditions(
     conditions.push(
       `(d.move_in_date IS NULL OR d.move_in_date <= $${paramIndex++})`,
     );
-    params.push(parseDateOnly(moveInDate));
+    params.push(parseLocalDate(moveInDate));
   }
 
   // Languages filter (OR logic) - uses lowercase arrays with GIN index
@@ -616,6 +658,8 @@ export async function getSearchDocLimitedCount(
 ): Promise<number | null> {
   const cacheKey = createSearchDocCountCacheKey(params);
 
+  // Note: unstable_cache captures the closure at creation time. The params object
+  // is serialized into the cache key, so reference changes don't affect cache behavior.
   const cachedFn = unstable_cache(
     async () => getSearchDocLimitedCountInternal(params),
     ["searchdoc-limited-count", cacheKey],
@@ -623,6 +667,43 @@ export async function getSearchDocLimitedCount(
   );
 
   return cachedFn();
+}
+
+// ============================================
+// Shared Listing Mapping (L3 fix — DRY extraction)
+// ============================================
+
+/**
+ * Map raw SQL query results to ListingData objects.
+ * Shared by all paginated listing queries to avoid duplication.
+ */
+function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
+  return listings.map((l) => ({
+    id: l.id,
+    title: l.title,
+    description: l.description,
+    price: Number(l.price),
+    images: l.images || [],
+    availableSlots: l.availableSlots,
+    totalSlots: l.totalSlots,
+    amenities: l.amenities || [],
+    houseRules: l.houseRules || [],
+    householdLanguages: l.householdLanguages || [],
+    primaryHomeLanguage: l.primaryHomeLanguage,
+    leaseDuration: l.leaseDuration,
+    roomType: l.roomType,
+    moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+    createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
+    viewCount: Number(l.viewCount) || 0,
+    avgRating: Number(l.avgRating) || 0,
+    reviewCount: Number(l.reviewCount) || 0,
+    location: {
+      city: l.city,
+      state: l.state,
+      lat: Number(l.lat) || 0,
+      lng: Number(l.lng) || 0,
+    },
+  }));
 }
 
 // ============================================
@@ -661,18 +742,18 @@ async function getSearchDocMapListingsInternal(
 
   // Query with minimal fields for map markers
   // Uses precomputed lat/lng from SearchDoc (no ST_X/ST_Y needed)
-  // COUNT(*) OVER() gives us total matching rows before LIMIT is applied
+  // P2 fix: Fetch LIMIT+1 instead of COUNT(*) OVER() to detect truncation
+  // without the per-row window function cost
+  const fetchLimit = MAX_MAP_MARKERS + 1;
   const sqlQuery = `
     SELECT
       d.id,
       d.title,
       d.price,
       d.available_slots as "availableSlots",
-      d.owner_id as "ownerId",
       d.images[1] as "primaryImage",
       d.lat,
-      d.lng,
-      COUNT(*) OVER() as "totalCount"
+      d.lng
     FROM listing_search_docs d
     WHERE ${whereClause}
     ORDER BY d.listing_created_at DESC
@@ -680,21 +761,20 @@ async function getSearchDocMapListingsInternal(
   `;
 
   try {
-    const listings = await queryWithTimeout<any>(
+    const listings = await queryWithTimeout<MapListingRaw>(
       sqlQuery,
-      [...queryParams, MAX_MAP_MARKERS],
+      [...queryParams, fetchLimit],
     );
 
-    // Extract total count from first row (same for all rows due to window function)
-    const totalCount = listings.length > 0 ? Number(listings[0].totalCount) : 0;
-    const truncated = totalCount > MAX_MAP_MARKERS;
+    // Detect truncation via LIMIT+1 pattern (avoids COUNT(*) OVER() cost)
+    const truncated = listings.length > MAX_MAP_MARKERS;
+    const trimmedListings = truncated ? listings.slice(0, MAX_MAP_MARKERS) : listings;
 
-    const mappedListings = listings.map((l) => ({
+    const mappedListings = trimmedListings.map((l) => ({
       id: l.id,
       title: l.title,
       price: Number(l.price),
       availableSlots: l.availableSlots,
-      ownerId: l.ownerId,
       images: l.primaryImage ? [l.primaryImage] : [],
       location: {
         lat: Number(l.lat) || 0,
@@ -705,8 +785,6 @@ async function getSearchDocMapListingsInternal(
     return {
       listings: mappedListings,
       truncated,
-      // Only include totalCandidates when truncated (to avoid confusion)
-      ...(truncated && { totalCandidates: totalCount }),
     };
   } catch (error) {
     const dataError = wrapDatabaseError(error, "getSearchDocMapListings");
@@ -832,38 +910,13 @@ async function getSearchDocListingsPaginatedInternal(
 
     const dataParams = [...queryParams, fetchLimit, offset];
 
-    const listings = await queryWithTimeout<any>(
+    const listings = await queryWithTimeout<ListingRaw>(
       dataQuery,
       dataParams,
     );
 
     // Map results to ListingData
-    const results = listings.map((l) => ({
-      id: l.id,
-      title: l.title,
-      description: l.description,
-      price: Number(l.price),
-      images: l.images || [],
-      availableSlots: l.availableSlots,
-      totalSlots: l.totalSlots,
-      amenities: l.amenities || [],
-      houseRules: l.houseRules || [],
-      householdLanguages: l.householdLanguages || [],
-      primaryHomeLanguage: l.primaryHomeLanguage,
-      leaseDuration: l.leaseDuration,
-      roomType: l.roomType,
-      moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-      viewCount: Number(l.viewCount) || 0,
-      avgRating: Number(l.avgRating) || 0,
-      reviewCount: Number(l.reviewCount) || 0,
-      location: {
-        city: l.city,
-        state: l.state,
-        lat: Number(l.lat) || 0,
-        lng: Number(l.lng) || 0,
-      },
-    }));
+    const results = mapRawListingsToPublic(listings);
 
     // Determine hasNextPage using limit+1 pattern
     // Use effectiveLimit for unbounded browse cap
@@ -876,8 +929,10 @@ async function getSearchDocListingsPaginatedInternal(
     let nearMatchCount = 0;
     let nearMatchExpansion: string | undefined;
 
+    // P5 cost guard: skip near-match expansion if initial query already has enough results
     if (
       nearMatches &&
+      !hasNextPage &&
       items.length < LOW_RESULTS_THRESHOLD &&
       items.length > 0 &&
       safePage === 1
@@ -1084,38 +1139,13 @@ export async function getSearchDocListingsWithKeyset(
 
     const dataParams = [...allParams, fetchLimit];
 
-    const listings = await queryWithTimeout<any>(
+    const listings = await queryWithTimeout<ListingWithCursorRaw>(
       dataQuery,
       dataParams,
     );
 
     // Map results to ListingData
-    const results = listings.map((l) => ({
-      id: l.id,
-      title: l.title,
-      description: l.description,
-      price: Number(l.price),
-      images: l.images || [],
-      availableSlots: l.availableSlots,
-      totalSlots: l.totalSlots,
-      amenities: l.amenities || [],
-      houseRules: l.houseRules || [],
-      householdLanguages: l.householdLanguages || [],
-      primaryHomeLanguage: l.primaryHomeLanguage,
-      leaseDuration: l.leaseDuration,
-      roomType: l.roomType,
-      moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-      viewCount: Number(l.viewCount) || 0,
-      avgRating: Number(l.avgRating) || 0,
-      reviewCount: Number(l.reviewCount) || 0,
-      location: {
-        city: l.city,
-        state: l.state,
-        lat: Number(l.lat) || 0,
-        lng: Number(l.lng) || 0,
-      },
-    }));
+    const results = mapRawListingsToPublic(listings);
 
     // Determine hasNextPage using limit+1 pattern
     const hasNextPage = results.length > limit;
@@ -1130,7 +1160,7 @@ export async function getSearchDocListingsWithKeyset(
       const lastRawItem = listings[limit - 1];
       const cursorRowData: CursorRowData = {
         id: lastRawItem.id,
-        listing_created_at: lastRawItem._cursorCreatedAt,
+        listing_created_at: lastRawItem._cursorCreatedAt ?? new Date().toISOString(),
         recommended_score: lastRawItem._cursorRecommendedScore,
         price: lastRawItem._cursorPrice,
         avg_rating: lastRawItem._cursorAvgRating,
@@ -1268,38 +1298,13 @@ export async function getSearchDocListingsFirstPage(
 
     const dataParams = [...queryParams, fetchLimit];
 
-    const listings = await queryWithTimeout<any>(
+    const listings = await queryWithTimeout<ListingWithCursorRaw>(
       dataQuery,
       dataParams,
     );
 
     // Map results to ListingData
-    const results = listings.map((l) => ({
-      id: l.id,
-      title: l.title,
-      description: l.description,
-      price: Number(l.price),
-      images: l.images || [],
-      availableSlots: l.availableSlots,
-      totalSlots: l.totalSlots,
-      amenities: l.amenities || [],
-      houseRules: l.houseRules || [],
-      householdLanguages: l.householdLanguages || [],
-      primaryHomeLanguage: l.primaryHomeLanguage,
-      leaseDuration: l.leaseDuration,
-      roomType: l.roomType,
-      moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-      viewCount: Number(l.viewCount) || 0,
-      avgRating: Number(l.avgRating) || 0,
-      reviewCount: Number(l.reviewCount) || 0,
-      location: {
-        city: l.city,
-        state: l.state,
-        lat: Number(l.lat) || 0,
-        lng: Number(l.lng) || 0,
-      },
-    }));
+    const results = mapRawListingsToPublic(listings);
 
     // Determine hasNextPage using limit+1 pattern
     const hasNextPage = results.length > limit;
@@ -1308,11 +1313,13 @@ export async function getSearchDocListingsFirstPage(
     let items: ListingData[] = hasNextPage ? results.slice(0, limit) : results;
 
     // Near-match expansion: if enabled and low results on page 1, fetch near matches
+    // P5 cost guard: skip expansion if initial query already has enough results
     let nearMatchCount = 0;
     let nearMatchExpansion: string | undefined;
 
     if (
       nearMatches &&
+      !hasNextPage &&
       items.length < LOW_RESULTS_THRESHOLD &&
       items.length > 0
     ) {
@@ -1366,7 +1373,7 @@ export async function getSearchDocListingsFirstPage(
       const lastRawItem = listings[Math.min(limit - 1, listings.length - 1)];
       const cursorRowData: CursorRowData = {
         id: lastRawItem.id,
-        listing_created_at: lastRawItem._cursorCreatedAt,
+        listing_created_at: lastRawItem._cursorCreatedAt ?? new Date().toISOString(),
         recommended_score: lastRawItem._cursorRecommendedScore,
         price: lastRawItem._cursorPrice,
         avg_rating: lastRawItem._cursorAvgRating,

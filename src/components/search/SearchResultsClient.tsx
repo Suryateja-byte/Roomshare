@@ -83,7 +83,10 @@ export function SearchResultsClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParamsString]);
 
-  const allListings = [...initialListings, ...extraListings];
+  const allListings = useMemo(
+    () => [...initialListings, ...extraListings],
+    [initialListings, extraListings],
+  );
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
 
   // O(1) lookup for saved listing IDs instead of O(n) .includes()
@@ -112,8 +115,7 @@ export function SearchResultsClient({
   // Compute split stay pairs for long durations (6+ months)
   const splitStayPairs = useMemo(
     () => findSplitStays(allListings, estimatedMonths),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allListings.length, estimatedMonths],
+    [allListings, estimatedMonths],
   );
 
   // Parse searchParamsString into raw params for the server action.

@@ -120,7 +120,7 @@ export async function saveSearch(input: SaveSearchInput) {
     } catch (error: unknown) {
         logger.sync.error('Failed to save search', {
             action: 'saveSearch',
-            searchName: input.name,
+            searchNameLength: input.name?.length ?? 0,
             error: error instanceof Error ? error.message : 'Unknown error',
         });
         return { error: 'Failed to save search' };

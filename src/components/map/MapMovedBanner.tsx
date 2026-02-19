@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, X } from "lucide-react";
+import { Loader2, MapPin, X } from "lucide-react";
 
 export interface MapMovedBannerProps {
   variant: "map" | "list";
@@ -10,6 +10,8 @@ export interface MapMovedBannerProps {
   areaCount?: number | null;
   /** Whether area count is currently loading */
   isAreaCountLoading?: boolean;
+  /** L2-MAP: Whether a search is currently in progress (disables the search button) */
+  isSearchLoading?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export function MapMovedBanner({
   onReset,
   areaCount,
   isAreaCountLoading = false,
+  isSearchLoading = false,
 }: MapMovedBannerProps) {
   const label = formatSearchLabel(areaCount, isAreaCountLoading);
 
@@ -45,8 +48,10 @@ export function MapMovedBanner({
       <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-white dark:bg-zinc-800 rounded-full shadow-lg px-2 py-1">
         <button
           onClick={onSearch}
-          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 h-11 px-3 inline-flex items-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          disabled={isSearchLoading}
+          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-3 inline-flex items-center gap-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
+          {isSearchLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
           {label}
         </button>
         <button
@@ -70,8 +75,10 @@ export function MapMovedBanner({
       <div className="flex items-center gap-2">
         <button
           onClick={onSearch}
-          className="text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 h-11 px-2 inline-flex items-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+          disabled={isSearchLoading}
+          className="text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-2 inline-flex items-center gap-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
         >
+          {isSearchLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
           {label}
         </button>
         <button

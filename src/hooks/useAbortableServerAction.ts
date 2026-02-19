@@ -33,6 +33,10 @@ interface UseAbortableServerActionReturn<TParams, TResult> {
 /**
  * Hook for executing server actions with request sequencing to prevent race conditions.
  *
+ * Note: "Abortable" refers to client-side request cancellation only. Server-side execution
+ * cannot be cancelled once started. Server-side statement_timeout provides the safety net
+ * for long-running queries.
+ *
  * Since Next.js server actions don't support AbortSignal, this hook uses a request ID
  * pattern to ignore stale responses. When a new request is made, any responses from
  * previous requests are discarded.

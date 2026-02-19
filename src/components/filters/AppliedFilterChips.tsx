@@ -90,12 +90,6 @@ export function AppliedFilterChips({
         )}
       </div>
 
-      {/* Left fade edge (visible when scrolled) */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-white dark:from-zinc-950 to-transparent pointer-events-none opacity-0 md:hidden"
-        aria-hidden="true"
-      />
-
       {/* Right fade edge (visible when content overflows) */}
       <div
         className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-zinc-950 to-transparent pointer-events-none md:hidden"

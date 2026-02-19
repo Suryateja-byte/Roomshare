@@ -39,6 +39,9 @@ export function FilterChipWithImpact({
   const [autoFetch, setAutoFetch] = useState(false);
 
   // Auto-fetch impact count after a staggered delay
+  // TODO: Each chip fires an individual API call. Consider a batch endpoint
+  // (e.g. POST /api/search/filter-impacts) that accepts all active chips and
+  // returns impact counts in a single request to reduce N+1 network overhead.
   useEffect(() => {
     const timer = setTimeout(() => setAutoFetch(true), 500 + index * 200);
     return () => clearTimeout(timer);

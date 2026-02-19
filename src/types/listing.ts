@@ -24,7 +24,7 @@ export interface PublicListing {
   leaseDuration?: string;
   roomType?: string;
   moveInDate?: Date;
-  /** Listing owner ID - this is public listing metadata, NOT user-specific */
+  /** @deprecated No longer populated in API responses (S3 security fix) */
   ownerId?: string;
   location: {
     address: string;
@@ -45,6 +45,7 @@ export interface PublicMapListing {
   title: string;
   price: number;
   availableSlots: number;
+  /** @deprecated No longer populated in API responses (S3 security fix) */
   ownerId?: string;
   images: string[];
   location: {

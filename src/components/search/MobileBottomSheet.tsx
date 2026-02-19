@@ -126,7 +126,7 @@ export default function MobileBottomSheet({
       }
       return rawOffset;
     },
-    [currentSnap, viewportHeight],
+    [currentSnap],
   );
 
   const displayOffset = isDragging ? getRubberbandOffset(dragOffset) : 0;
@@ -224,7 +224,7 @@ export default function MobileBottomSheet({
 
     setSnapIndex(newIndex);
     setDragOffset(0);
-  }, [dragOffset, findNearestSnap, setSnapIndex, viewportHeight]);
+  }, [dragOffset, findNearestSnap, setSnapIndex]);
 
   // Reset drag state on system interruption (incoming call, notification, gesture conflict)
   const handleTouchCancel = useCallback(() => {
@@ -242,7 +242,8 @@ export default function MobileBottomSheet({
       // P1-5 FIX: Don't intercept touches on interactive elements
       // This prevents buttons, links, and inputs from being blocked by drag gestures
       const target = e.target as HTMLElement;
-      const isInteractive = target.closest('button, a, input, [role="button"], [data-interactive]');
+      // L5-MAP FIX: Include all form controls to prevent drag gestures from blocking interaction
+      const isInteractive = target.closest('button, a, input, select, textarea, [role="button"], [role="listbox"], [role="slider"], [data-interactive]');
       if (isInteractive) return;
 
       const content = contentRef.current;

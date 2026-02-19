@@ -211,7 +211,7 @@ export default function ListingCardCarousel({
           <button
             type="button"
             onClick={goToPrev}
-            className="absolute left-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="absolute left-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
             aria-label="Previous image"
           >
             <span className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md flex items-center justify-center hover:bg-white dark:hover:bg-zinc-700 transition-colors">
@@ -225,7 +225,7 @@ export default function ListingCardCarousel({
           <button
             type="button"
             onClick={goToNext}
-            className="absolute right-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="absolute right-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
             aria-label="Next image"
           >
             <span className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md flex items-center justify-center hover:bg-white dark:hover:bg-zinc-700 transition-colors">

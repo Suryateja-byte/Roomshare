@@ -373,6 +373,8 @@ export default function MapComponent({
     const [mapRemountKey, setMapRemountKey] = useState(0);
     const [currentZoom, setCurrentZoom] = useState(12);
     const [areTilesLoading, setAreTilesLoading] = useState(false);
+    // M3-MAP FIX: Debounce tile loading state to avoid visual flash on brief pans
+    const tileLoadingTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const [viewportInfoMessage, setViewportInfoMessage] = useState<string | null>(null);
     const { hoveredId, activeId, setHovered, setActive, requestScrollTo } = useListingFocus();
@@ -682,14 +684,19 @@ export default function MapComponent({
         return markersSource.map(l => l.id).sort().join(',');
     }, [markersSource]);
 
+    // M4-MAP FIX: Use markersSourceKey directly in deps instead of void trick.
+    // The memo recalculates when the key changes (listing IDs change),
+    // but reads actual data from markersSource via the outer scope.
+    const markersSourceRef = useRef(markersSource);
+    markersSourceRef.current = markersSource;
+
     const markerPositions = useMemo(() => {
-        // Note: markersSourceKey is used for dependency tracking, markersSource for data
-        void markersSourceKey; // Satisfy TypeScript that the variable is read
+        const source = markersSourceRef.current;
         const positions: MarkerPosition[] = [];
         const coordsCounts: Record<string, number> = {};
 
         // First pass: count how many listings share each coordinate
-        markersSource.forEach(listing => {
+        source.forEach(listing => {
             const key = `${listing.location.lat},${listing.location.lng}`;
             coordsCounts[key] = (coordsCounts[key] || 0) + 1;
         });
@@ -697,7 +704,7 @@ export default function MapComponent({
         // Second pass: add offsets for overlapping markers
         const coordsIndices: Record<string, number> = {};
 
-        markersSource.forEach(listing => {
+        source.forEach(listing => {
             const key = `${listing.location.lat},${listing.location.lng}`;
             const count = coordsCounts[key] || 1;
 
@@ -718,7 +725,10 @@ export default function MapComponent({
                 const offsetDistance = 0.0015; // ~150 meters offset
 
                 const latOffset = Math.cos(angle) * offsetDistance;
-                const lngOffset = Math.sin(angle) * offsetDistance;
+                // L4-MAP FIX: Scale longitude offset by latitude to account for
+                // meridian convergence at higher latitudes
+                const lat = listing.location.lat;
+                const lngOffset = Math.sin(angle) * offsetDistance / Math.cos(lat * Math.PI / 180);
 
                 positions.push({
                     listing,
@@ -730,7 +740,6 @@ export default function MapComponent({
 
         return positions;
     // P2-FIX (#150): Depend on stable ID key instead of array reference
-    // This prevents recalculation when listings change but IDs remain the same
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [markersSourceKey]);
 
@@ -953,6 +962,9 @@ export default function MapComponent({
                 ? { longitude: listings[0].location.lng, latitude: listings[0].location.lat, zoom: 12 }
                 : { longitude: -122.4194, latitude: 37.7749, zoom: 12 };
         })(),
+    // M1-MAP: `listings` intentionally excluded — initialViewState must be stable after mount.
+    // The listings fallback (SF default) only applies when there are no URL bounds on mount.
+    // Adding listings to deps would re-center the map on every search result change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [defaultViewState]);
 
@@ -1161,6 +1173,10 @@ export default function MapComponent({
             }
             if (sourcedataDebounceRef.current) {
                 clearTimeout(sourcedataDebounceRef.current);
+            }
+            if (tileLoadingTimerRef.current) {
+                clearTimeout(tileLoadingTimerRef.current);
+                tileLoadingTimerRef.current = null;
             }
             if (webglRecoveryTimeoutRef.current) {
                 clearTimeout(webglRecoveryTimeoutRef.current);
@@ -1441,7 +1457,11 @@ export default function MapComponent({
         if (searchAsMove) {
             // Don't trigger search when zoomed out too far — viewport exceeds server max span
             const latSpan = bounds.maxLat - bounds.minLat;
-            const lngSpan = bounds.maxLng - bounds.minLng;
+            // H2-MAP FIX: Handle antimeridian crossing (west > east when crossing 180/-180)
+            const crossesAntimeridian = bounds.minLng > bounds.maxLng;
+            const lngSpan = crossesAntimeridian
+                ? (180 - bounds.minLng) + (bounds.maxLng + 180)
+                : bounds.maxLng - bounds.minLng;
             if (latSpan > 5 || lngSpan > 5) {
                 setBoundsDirty(true);
                 setViewportInfoMessage('Zoom in further to update results');
@@ -1744,8 +1764,8 @@ export default function MapComponent({
                         }
                     }
 
-                    // E2E testing hook: expose map ref and helpers for programmatic control
-                    if (mapRef.current) {
+                    // L3-MAP FIX: Gate E2E testing hooks behind non-production check
+                    if (process.env.NODE_ENV !== 'production' && mapRef.current) {
                         const win = window as unknown as Record<string, unknown>;
                         win.__e2eMapRef = mapRef.current.getMap();
                         win.__e2eSetProgrammaticMove = setProgrammaticMove;
@@ -1814,8 +1834,18 @@ export default function MapComponent({
                         }
                     }
                 }}
-                onMoveStart={() => setAreTilesLoading(true)}
+                onMoveStart={() => {
+                    // M3-MAP FIX: Defer tile-loading indicator by 200ms so brief pans
+                    // don't flash the loading overlay
+                    if (tileLoadingTimerRef.current) clearTimeout(tileLoadingTimerRef.current);
+                    tileLoadingTimerRef.current = setTimeout(() => setAreTilesLoading(true), 200);
+                }}
                 onIdle={() => {
+                    // M3-MAP FIX: Cancel pending tile-loading timer and clear state
+                    if (tileLoadingTimerRef.current) {
+                        clearTimeout(tileLoadingTimerRef.current);
+                        tileLoadingTimerRef.current = null;
+                    }
                     setAreTilesLoading(false);
                     // CLUSTER FIX: Clear expansion flag AFTER tiles are loaded
                     // This ensures updateUnclusteredListings has valid data
@@ -2225,6 +2255,7 @@ export default function MapComponent({
                     onReset={onReset}
                     areaCount={areaCount}
                     isAreaCountLoading={isAreaCountLoading}
+                    isSearchLoading={isSearching}
                 />
             )}
 
