@@ -457,8 +457,9 @@ describe("search-v2-service", () => {
         }),
       );
 
-      // Response should have warnings about map failure
-      expect(result.response!.meta.warnings).toContain("MAP_QUERY_FAILED");
+      // Response should have warnings about map failure (spread dynamically, not in TS type)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result.response!.meta as any).warnings).toContain("MAP_QUERY_FAILED");
     });
 
     it("handles list query failure gracefully (returns empty)", async () => {
@@ -963,7 +964,7 @@ describe("search-v2-service", () => {
       setupDefaultMocks({ useSearchDoc: true });
       mockIsSearchDocEnabled.mockReturnValue(true);
 
-      const keysetCursor = { price: 1500, id: "abc", score: 0.8 };
+      const keysetCursor = { v: 1 as const, s: "newest" as const, k: ["1500"], id: "abc" };
       mockDecodeCursorAny.mockReturnValue({
         type: "keyset" as const,
         cursor: keysetCursor,
