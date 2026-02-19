@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Search, Clock, X } from "lucide-react";
 import { useRecentSearches } from "@/hooks/useRecentSearches";
+import { FocusTrap } from "@/components/ui/FocusTrap";
 
 interface MobileSearchOverlayProps {
   /** Whether the overlay is open */
@@ -83,7 +84,11 @@ export default function MobileSearchOverlay({
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 400, damping: 35 }}
             className="fixed inset-0 z-[60] bg-white dark:bg-zinc-900 flex flex-col md:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search"
           >
+           <FocusTrap active={isOpen}>
             {/* Header with back button and search input */}
             <div className="flex items-center gap-3 px-4 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800">
               <button
@@ -160,6 +165,7 @@ export default function MobileSearchOverlay({
                 </div>
               )}
             </div>
+           </FocusTrap>
           </m.div>
         )}
       </AnimatePresence>

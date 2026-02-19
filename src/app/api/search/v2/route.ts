@@ -38,9 +38,13 @@ function isV2Enabled(request: NextRequest): boolean {
     return true;
   }
 
-  // URL param override for testing: ?v2=1
-  const v2Param = request.nextUrl.searchParams.get("v2");
-  return v2Param === "1" || v2Param === "true";
+  // URL param override for testing only — disabled in production to prevent feature-flag bypass
+  if (process.env.NODE_ENV !== "production") {
+    const v2Param = request.nextUrl.searchParams.get("v2");
+    return v2Param === "1" || v2Param === "true";
+  }
+
+  return false;
 }
 
 export async function GET(request: NextRequest) {

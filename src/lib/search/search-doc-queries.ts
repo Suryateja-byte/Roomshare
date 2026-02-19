@@ -71,8 +71,6 @@ export const MAX_UNBOUNDED_RESULTS = 48;
 const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english"]);
 
 function assertParameterizedWhereClause(whereClause: string): void {
-  if (process.env.NODE_ENV === "production") return;
-
   const literalPattern = /'([^']*)'/g;
   for (const match of whereClause.matchAll(literalPattern)) {
     const literalValue = match[1];
@@ -113,6 +111,8 @@ function createSearchDocListCacheKey(params: FilterParams): string {
     roomType: params.roomType?.toLowerCase() || "",
     leaseDuration: params.leaseDuration?.toLowerCase() || "",
     moveInDate: params.moveInDate || "",
+    genderPreference: params.genderPreference || "",
+    householdGender: params.householdGender || "",
     bounds: params.bounds
       ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",
@@ -1414,12 +1414,14 @@ export async function getSearchDocListingsFirstPage(
  * In production, this should always be enabled for performance.
  */
 export function isSearchDocEnabled(urlSearchDoc?: string | null): boolean {
-  // URL override for testing (allows ?searchDoc=1 to enable on specific requests)
-  if (urlSearchDoc === "1" || urlSearchDoc === "true") {
-    return true;
-  }
-  if (urlSearchDoc === "0" || urlSearchDoc === "false") {
-    return false;
+  // URL override for testing only — disabled in production to prevent feature-flag bypass
+  if (process.env.NODE_ENV !== "production") {
+    if (urlSearchDoc === "1" || urlSearchDoc === "true") {
+      return true;
+    }
+    if (urlSearchDoc === "0" || urlSearchDoc === "false") {
+      return false;
+    }
   }
 
   // Read directly from process.env to avoid caching issues in tests

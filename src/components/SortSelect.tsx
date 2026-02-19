@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { SortOption } from '@/lib/data';
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { ArrowUpDown, Check } from 'lucide-react';
+import { FocusTrap } from '@/components/ui/FocusTrap';
 import {
     Select,
     SelectContent,
@@ -36,6 +37,16 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Escape key closes mobile sort sheet
+    useEffect(() => {
+        if (!mobileOpen) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setMobileOpen(false);
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [mobileOpen]);
 
     // P2-3: Memoize handler to improve INP by preventing function recreation on each render
     const handleSortChange = useCallback((newSort: string) => {
@@ -102,7 +113,12 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
 
             {/* Mobile sort sheet */}
             {mobileOpen && (
-                <div className="md:hidden fixed inset-0 z-50">
+                <div
+                    className="md:hidden fixed inset-0 z-50"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="sort-sheet-title"
+                >
                     {/* Backdrop */}
                     <div
                         className="absolute inset-0 bg-black/40"
@@ -110,36 +126,38 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
                         aria-hidden="true"
                     />
                     {/* Sheet */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-200">
-                        <div className="flex justify-center py-3">
-                            <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
+                    <FocusTrap active={mobileOpen}>
+                        <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-200">
+                            <div className="flex justify-center py-3">
+                                <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
+                            </div>
+                            <div className="px-4 pb-2">
+                                <h3 id="sort-sheet-title" className="text-lg font-semibold text-zinc-900 dark:text-white">Sort by</h3>
+                            </div>
+                            <div className="px-2 pb-6">
+                                {sortOptions.map((option) => {
+                                    const isActive = option.value === currentSort;
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => handleSortChange(option.value)}
+                                            className={`flex items-center justify-between w-full px-4 py-3.5 min-h-[44px] rounded-xl text-sm font-medium transition-colors ${
+                                                isActive
+                                                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white'
+                                                    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                                            }`}
+                                        >
+                                            <span>{option.label}</span>
+                                            {isActive && <Check className="w-4 h-4 text-zinc-900 dark:text-white" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {/* Safe area spacer for phones with home indicator */}
+                            <div className="h-safe-area-inset-bottom" />
                         </div>
-                        <div className="px-4 pb-2">
-                            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">Sort by</h3>
-                        </div>
-                        <div className="px-2 pb-6">
-                            {sortOptions.map((option) => {
-                                const isActive = option.value === currentSort;
-                                return (
-                                    <button
-                                        key={option.value}
-                                        type="button"
-                                        onClick={() => handleSortChange(option.value)}
-                                        className={`flex items-center justify-between w-full px-4 py-3.5 min-h-[44px] rounded-xl text-sm font-medium transition-colors ${
-                                            isActive
-                                                ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white'
-                                                : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
-                                        }`}
-                                    >
-                                        <span>{option.label}</span>
-                                        {isActive && <Check className="w-4 h-4 text-zinc-900 dark:text-white" />}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        {/* Safe area spacer for phones with home indicator */}
-                        <div className="h-safe-area-inset-bottom" />
-                    </div>
+                    </FocusTrap>
                 </div>
             )}
 

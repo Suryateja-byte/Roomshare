@@ -50,8 +50,6 @@ const MAX_FACET_RESULTS = 100;
 const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english"]);
 
 function assertParameterizedWhereClause(whereClause: string): void {
-  if (process.env.NODE_ENV === "production") return;
-
   const literalPattern = /'([^']*)'/g;
   for (const match of whereClause.matchAll(literalPattern)) {
     const literalValue = match[1];
@@ -70,25 +68,21 @@ function joinWhereClauseWithSecurityInvariant(conditions: string[]): string {
 }
 
 /**
- * Execute facet queries with a local statement timeout.
- * Prevents expensive UNNEST/GROUP BY calls from hanging connections.
+ * Prisma interactive-transaction client used by facet query helpers.
+ * All five facet queries share a single transaction with one
+ * SET LOCAL statement_timeout for the whole batch.
  *
  * SECURITY AUDIT: $queryRawUnsafe used with parameterized queries ($N placeholders).
  * All user-supplied values MUST be in the `params` array. The `query` string must
  * contain ONLY hard-coded SQL with $N parameter placeholders — never interpolate
  * user input directly. The SET LOCAL uses a hard-coded constant (FACET_QUERY_TIMEOUT_MS).
  */
-async function queryWithTimeout<T>(
-  query: string,
-  params: unknown[],
-): Promise<T[]> {
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      `SET LOCAL statement_timeout = ${FACET_QUERY_TIMEOUT_MS}`,
-    );
-    return tx.$queryRawUnsafe<T[]>(query, ...params);
-  });
-}
+type FacetTxClient = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  $executeRawUnsafe(query: string, ...values: any[]): Promise<number>;
+};
 
 /**
  * A single histogram bucket for price distribution
@@ -300,6 +294,7 @@ function buildFacetWhereConditions(
  */
 async function getAmenitiesFacet(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
+  tx: FacetTxClient,
 ): Promise<Record<string, number>> {
   const { conditions, params, paramIndex } = buildFacetWhereConditions(
     filterParams,
@@ -322,10 +317,9 @@ async function getAmenitiesFacet(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await queryWithTimeout<{ amenity: string; count: bigint }>(
-    query,
-    [...params, MAX_FACET_RESULTS],
-  );
+  const results = await tx.$queryRawUnsafe<
+    { amenity: string; count: bigint }[]
+  >(query, ...params, MAX_FACET_RESULTS);
 
   const facets: Record<string, number> = {};
   for (const row of results) {
@@ -339,6 +333,7 @@ async function getAmenitiesFacet(
  */
 async function getHouseRulesFacet(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
+  tx: FacetTxClient,
 ): Promise<Record<string, number>> {
   const { conditions, params, paramIndex } = buildFacetWhereConditions(
     filterParams,
@@ -360,9 +355,10 @@ async function getHouseRulesFacet(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await queryWithTimeout<{ rule: string; count: bigint }>(
+  const results = await tx.$queryRawUnsafe<{ rule: string; count: bigint }[]>(
     query,
-    [...params, MAX_FACET_RESULTS],
+    ...params,
+    MAX_FACET_RESULTS,
   );
 
   const facets: Record<string, number> = {};
@@ -377,6 +373,7 @@ async function getHouseRulesFacet(
  */
 async function getRoomTypesFacet(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
+  tx: FacetTxClient,
 ): Promise<Record<string, number>> {
   const { conditions, params, paramIndex } = buildFacetWhereConditions(
     filterParams,
@@ -398,10 +395,9 @@ async function getRoomTypesFacet(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await queryWithTimeout<{ roomType: string; count: bigint }>(
-    query,
-    [...params, MAX_FACET_RESULTS],
-  );
+  const results = await tx.$queryRawUnsafe<
+    { roomType: string; count: bigint }[]
+  >(query, ...params, MAX_FACET_RESULTS);
 
   const facets: Record<string, number> = {};
   for (const row of results) {
@@ -415,6 +411,7 @@ async function getRoomTypesFacet(
  */
 async function getPriceRanges(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
+  tx: FacetTxClient,
 ): Promise<{ min: number | null; max: number | null; median: number | null }> {
   const { conditions, params } = buildFacetWhereConditions(
     filterParams,
@@ -434,11 +431,9 @@ async function getPriceRanges(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await queryWithTimeout<{
-    min: number | null;
-    max: number | null;
-    median: number | null;
-  }>(query, params);
+  const results = await tx.$queryRawUnsafe<
+    { min: number | null; max: number | null; median: number | null }[]
+  >(query, ...params);
 
   const row = results[0];
   return {
@@ -469,6 +464,7 @@ async function getPriceHistogram(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
   priceMin: number | null,
   priceMax: number | null,
+  tx: FacetTxClient,
 ): Promise<FacetsResponse["priceHistogram"]> {
   if (priceMin === null || priceMax === null || priceMin >= priceMax) {
     return null;
@@ -494,10 +490,9 @@ async function getPriceHistogram(
   `;
 
   // SECURITY INVARIANT: query string is static SQL, dynamic values are passed only via $N placeholders in params.
-  const results = await queryWithTimeout<{ bucket_min: number; count: bigint }>(
-    query,
-    [...params, bucketWidth],
-  );
+  const results = await tx.$queryRawUnsafe<
+    { bucket_min: number; count: bigint }[]
+  >(query, ...params, bucketWidth);
 
   const buckets: PriceHistogramBucket[] = results.map((row) => ({
     min: Number(row.bucket_min),
@@ -537,28 +532,36 @@ function generateFacetsCacheKey(
 async function getFacetsInternal(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
 ): Promise<FacetsResponse> {
-  // Run all facet queries in parallel for efficiency
-  const [amenities, houseRules, roomTypes, priceRanges] = await Promise.all([
-    getAmenitiesFacet(filterParams),
-    getHouseRulesFacet(filterParams),
-    getRoomTypesFacet(filterParams),
-    getPriceRanges(filterParams),
-  ]);
+  // Single transaction for all facet queries — reduces connection pool usage
+  // from 5 separate transactions to 1. Promise.all inside the callback still
+  // runs queries concurrently; a single SET LOCAL timeout covers them all.
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRawUnsafe(
+        `SET LOCAL statement_timeout = ${FACET_QUERY_TIMEOUT_MS}`,
+      );
 
-  // Histogram depends on priceRanges (needs min/max for bucket sizing)
-  const priceHistogram = await getPriceHistogram(
-    filterParams,
-    priceRanges.min,
-    priceRanges.max,
+      // Run amenity/houseRule/roomType/priceRange queries in parallel
+      const [amenities, houseRules, roomTypes, priceRanges] =
+        await Promise.all([
+          getAmenitiesFacet(filterParams, tx),
+          getHouseRulesFacet(filterParams, tx),
+          getRoomTypesFacet(filterParams, tx),
+          getPriceRanges(filterParams, tx),
+        ]);
+
+      // Histogram depends on priceRanges (needs min/max for bucket sizing)
+      const priceHistogram = await getPriceHistogram(
+        filterParams,
+        priceRanges.min,
+        priceRanges.max,
+        tx,
+      );
+
+      return { amenities, houseRules, roomTypes, priceRanges, priceHistogram };
+    },
+    { timeout: FACET_QUERY_TIMEOUT_MS * 2 },
   );
-
-  return {
-    amenities,
-    houseRules,
-    roomTypes,
-    priceRanges,
-    priceHistogram,
-  };
 }
 
 /**
