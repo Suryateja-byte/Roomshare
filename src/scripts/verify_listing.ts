@@ -13,9 +13,10 @@ async function main() {
         return;
     }
 
+    // PII audit 2026-02-19: only log non-sensitive listing fields
     console.log('Listing found:', listing.title);
     console.log('Price:', listing.price);
-    console.log('Owner ID:', listing.ownerId);
+    console.log('Owner ID: [REDACTED]');
 
     if (listing.location) {
         console.log('Location found: [REDACTED]');
