@@ -138,8 +138,8 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                 alertFrequency
             });
 
-            if (result.error) {
-                setError(result.error);
+            if ("error" in result) {
+                setError(result.error ?? 'Failed to save search');
             } else {
                 setIsOpen(false);
                 toast.success('Search saved successfully!');
