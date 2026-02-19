@@ -15,13 +15,9 @@ import { useSearchParams } from "next/navigation";
 import type { BatchedFilterValues } from "./useBatchedFilters";
 import type { FacetsResponse } from "@/app/api/search/facets/route";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
+import { createTTLCache } from "./createTTLCache";
 
-interface CacheEntry {
-  data: FacetsResponse;
-  expiresAt: number;
-}
-
-const facetsCache = new Map<string, CacheEntry>();
+const facetsCache = createTTLCache<FacetsResponse>(100);
 const CACHE_TTL_MS = 30_000;
 const DEBOUNCE_MS = 300;
 
@@ -33,6 +29,7 @@ export interface UseFacetsOptions {
 export interface UseFacetsReturn {
   facets: FacetsResponse | null;
   isLoading: boolean;
+  error: Error | null;
 }
 
 /**
@@ -110,6 +107,7 @@ export function useFacets({
   const searchParams = useSearchParams();
   const [facets, setFacets] = useState<FacetsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,8 +121,8 @@ export function useFacets({
   const fetchFacets = useCallback(async () => {
     // Check cache
     const cached = facetsCache.get(cacheKey);
-    if (cached && Date.now() < cached.expiresAt) {
-      setFacets(cached.data);
+    if (cached !== undefined) {
+      setFacets(cached);
       setIsLoading(false);
       return;
     }
@@ -136,6 +134,7 @@ export function useFacets({
     abortControllerRef.current = abortController;
 
     setIsLoading(true);
+    setError(null);
 
     try {
       const url = buildFacetsUrl(pending, searchParams);
@@ -150,23 +149,21 @@ export function useFacets({
 
       const data: FacetsResponse = await response.json();
 
-      facetsCache.set(cacheKey, {
-        data,
-        expiresAt: Date.now() + CACHE_TTL_MS,
-      });
+      facetsCache.set(cacheKey, data, CACHE_TTL_MS);
 
       if (!abortController.signal.aborted) {
         setFacets(data);
         setIsLoading(false);
       }
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
-      if (error instanceof RateLimitError) {
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      if (err instanceof RateLimitError) {
         if (!abortController.signal.aborted) setIsLoading(false);
         return;
       }
-      console.error("[useFacets] Error:", error);
+      console.error("[useFacets] Error:", err);
       if (!abortController.signal.aborted) {
+        setError(err instanceof Error ? err : new Error("Unknown error"));
         setIsLoading(false);
       }
     }
@@ -184,8 +181,8 @@ export function useFacets({
 
     // Check cache immediately
     const cached = facetsCache.get(cacheKey);
-    if (cached && Date.now() < cached.expiresAt) {
-      setFacets(cached.data);
+    if (cached !== undefined) {
+      setFacets(cached);
       setIsLoading(false);
       return;
     }
@@ -206,5 +203,5 @@ export function useFacets({
     };
   }, [cacheKey, isDrawerOpen, fetchFacets]);
 
-  return { facets, isLoading };
+  return { facets, isLoading, error };
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FocusTrap } from '@/components/ui/FocusTrap';
@@ -126,12 +126,7 @@ export function FilterModal({
   isCountLoading,
   boundsRequired,
 }: FilterModalProps) {
-  useEffect(() => {
-    if (!isOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, [isOpen]);
+  useBodyScrollLock(isOpen);
 
   if (!isOpen || typeof document === 'undefined') {
     return null;

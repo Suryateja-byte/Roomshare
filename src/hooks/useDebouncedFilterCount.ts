@@ -19,16 +19,14 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import type { BatchedFilterValues } from "./useBatchedFilters";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
+import { createTTLCache } from "./createTTLCache";
 
-// Cache entry with expiration
-interface CacheEntry {
+interface CachedCount {
   count: number | null;
   boundsRequired: boolean;
-  expiresAt: number;
 }
 
-// Simple in-memory cache with TTL
-const countCache = new Map<string, CacheEntry>();
+const countCache = createTTLCache<CachedCount>(100);
 const CACHE_TTL_MS = 30_000; // 30 seconds
 
 // Debounce delay
@@ -40,6 +38,9 @@ const DEBOUNCE_MS = 300;
 export function clearCountCache(): void {
   countCache.clear();
 }
+
+// Re-export TTLCache type so tests can verify size if needed
+export type { TTLCache } from "./createTTLCache";
 
 export interface UseDebouncedFilterCountOptions {
   /** Pending filter values (not yet applied) */
@@ -63,6 +64,8 @@ export interface UseDebouncedFilterCountReturn {
   formattedCount: string;
   /** P3b: Whether bounds selection is required before showing count */
   boundsRequired: boolean;
+  /** Last fetch error, or null */
+  error: Error | null;
 }
 
 /**
@@ -149,34 +152,16 @@ function buildCountUrl(
   return `/api/search-count?${params.toString()}`;
 }
 
-/**
- * Get cached entry if valid (returns full entry including boundsRequired)
- */
-function getCachedEntry(cacheKey: string): CacheEntry | undefined {
-  const entry = countCache.get(cacheKey);
-  if (!entry) return undefined;
-
-  if (Date.now() > entry.expiresAt) {
-    countCache.delete(cacheKey);
-    return undefined;
-  }
-
-  return entry;
+function getCachedEntry(cacheKey: string): CachedCount | undefined {
+  return countCache.get(cacheKey);
 }
 
-/**
- * Set cached entry (stores both count and boundsRequired)
- */
 function setCachedEntry(
   cacheKey: string,
   count: number | null,
   boundsRequired: boolean,
 ): void {
-  countCache.set(cacheKey, {
-    count,
-    boundsRequired,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-  });
+  countCache.set(cacheKey, { count, boundsRequired }, CACHE_TTL_MS);
 }
 
 export function useDebouncedFilterCount({
@@ -189,6 +174,7 @@ export function useDebouncedFilterCount({
   const [previousCount, setPreviousCount] = useState<number | null>(null);
   const [baselineCount, setBaselineCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   // P3b: Track when API indicates bounds selection is required
   const [boundsRequired, setBoundsRequired] = useState(false);
 
@@ -226,6 +212,7 @@ export function useDebouncedFilterCount({
     abortControllerRef.current = abortController;
 
     setIsLoading(true);
+    setError(null);
 
     try {
       const url = buildCountUrl(pending, searchParams);
@@ -252,19 +239,20 @@ export function useDebouncedFilterCount({
         setBoundsRequired(newBoundsRequired);
         setIsLoading(false);
       }
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
         return;
       }
       // Silently back off on rate limit — shared state prevents further fetches
-      if (error instanceof RateLimitError) {
+      if (err instanceof RateLimitError) {
         if (!abortController.signal.aborted) setIsLoading(false);
         return;
       }
 
-      console.error("[useDebouncedFilterCount] Error fetching count:", error);
+      console.error("[useDebouncedFilterCount] Error fetching count:", err);
 
       if (!abortController.signal.aborted) {
+        setError(err instanceof Error ? err : new Error("Unknown error"));
         setIsLoading(false);
       }
     }
@@ -365,5 +353,6 @@ export function useDebouncedFilterCount({
     isLoading,
     formattedCount,
     boundsRequired,
+    error,
   };
 }

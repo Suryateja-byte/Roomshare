@@ -14,15 +14,9 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import type { FilterChipData } from "@/components/filters/filter-chip-utils";
 import { removeFilterFromUrl } from "@/components/filters/filter-chip-utils";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
+import { createTTLCache } from "./createTTLCache";
 
-// Cache entry with expiration
-interface CacheEntry {
-  count: number | null;
-  expiresAt: number;
-}
-
-// Simple in-memory cache with TTL
-const impactCache = new Map<string, CacheEntry>();
+const impactCache = createTTLCache<number | null>(100);
 const CACHE_TTL_MS = 60_000; // 60 seconds (longer than filter count cache)
 
 // Debounce delay for hover
@@ -46,6 +40,8 @@ export interface UseFilterImpactCountReturn {
   isLoading: boolean;
   /** Formatted string (e.g., "+22" or "+100") */
   formattedDelta: string | null;
+  /** Last fetch error, or null */
+  error: Error | null;
 }
 
 /**
@@ -60,29 +56,12 @@ function generateCacheKey(
   return `impact:${queryWithoutFilter}`;
 }
 
-/**
- * Get cached count if valid
- */
 function getCachedCount(cacheKey: string): number | null | undefined {
-  const entry = impactCache.get(cacheKey);
-  if (!entry) return undefined;
-
-  if (Date.now() > entry.expiresAt) {
-    impactCache.delete(cacheKey);
-    return undefined;
-  }
-
-  return entry.count;
+  return impactCache.get(cacheKey);
 }
 
-/**
- * Set cached count
- */
 function setCachedCount(cacheKey: string, count: number | null): void {
-  impactCache.set(cacheKey, {
-    count,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-  });
+  impactCache.set(cacheKey, count, CACHE_TTL_MS);
 }
 
 export function useFilterImpactCount({
@@ -95,6 +74,7 @@ export function useFilterImpactCount({
     null,
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   const [hasFetched, setHasFetched] = useState(false);
 
   // Refs for cleanup
@@ -125,6 +105,7 @@ export function useFilterImpactCount({
     abortControllerRef.current = abortController;
 
     setIsLoading(true);
+    setError(null);
 
     try {
       // Build URL with filter removed
@@ -152,11 +133,11 @@ export function useFilterImpactCount({
         setIsLoading(false);
         setHasFetched(true);
       }
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
         return;
       }
-      if (error instanceof RateLimitError) {
+      if (err instanceof RateLimitError) {
         if (!abortController.signal.aborted) {
           setIsLoading(false);
           setHasFetched(true);
@@ -164,9 +145,10 @@ export function useFilterImpactCount({
         return;
       }
 
-      console.error("[useFilterImpactCount] Error fetching count:", error);
+      console.error("[useFilterImpactCount] Error fetching count:", err);
 
       if (!abortController.signal.aborted) {
+        setError(err instanceof Error ? err : new Error("Unknown error"));
         setIsLoading(false);
         setHasFetched(true);
       }
@@ -239,5 +221,6 @@ export function useFilterImpactCount({
     impactDelta,
     isLoading,
     formattedDelta,
+    error,
   };
 }

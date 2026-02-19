@@ -130,6 +130,10 @@ async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
     l.toLowerCase(),
   );
 
+  // Note: search_tsv (tsvector) is auto-populated by a BEFORE INSERT/UPDATE
+  // trigger defined in migration 20260116000000_search_doc_fts. The trigger
+  // builds a weighted tsvector from title (A), city/state (B), description (C).
+  // No need to set it here — the DB handles it on every INSERT and UPDATE.
   await prisma.$executeRaw`
     INSERT INTO listing_search_docs (
       id, owner_id, title, description, price, images,

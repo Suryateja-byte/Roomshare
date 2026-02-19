@@ -430,6 +430,8 @@ export default function MapComponent({
     const isClusterExpandingRef = useRef(false);
     // Debounce timer for updateUnclusteredListings to batch rapid moveEnd events
     const updateUnclusteredDebounceRef = useRef<NodeJS.Timeout | null>(null);
+    // Debounce timer for sourcedata handler to avoid dozens of calls per second during panning
+    const sourcedataDebounceRef = useRef<NodeJS.Timeout | null>(null);
     // Debounce timer for marker hover scroll (300ms delay to prevent jank)
     const hoverScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1157,6 +1159,9 @@ export default function MapComponent({
             if (updateUnclusteredDebounceRef.current) {
                 clearTimeout(updateUnclusteredDebounceRef.current);
             }
+            if (sourcedataDebounceRef.current) {
+                clearTimeout(sourcedataDebounceRef.current);
+            }
             if (webglRecoveryTimeoutRef.current) {
                 clearTimeout(webglRecoveryTimeoutRef.current);
                 webglRecoveryTimeoutRef.current = null;
@@ -1755,7 +1760,7 @@ export default function MapComponent({
                         const handler = (e: MapSourceDataEvent) => {
                             if (e.sourceId !== 'listings') return;
 
-                            // During cluster expansion, accept any sourcedata event
+                            // During cluster expansion, accept any sourcedata event immediately
                             if (isClusterExpandingRef.current) {
                                 updateUnclusteredListings();
                                 return;
@@ -1771,7 +1776,13 @@ export default function MapComponent({
                                 e.isSourceLoaded ||
                                 mapRef.current?.getMap().isSourceLoaded('listings')
                             ) {
-                                updateUnclusteredListings();
+                                // Debounce: sourcedata fires dozens of times/sec during tile loads
+                                if (sourcedataDebounceRef.current) {
+                                    clearTimeout(sourcedataDebounceRef.current);
+                                }
+                                sourcedataDebounceRef.current = setTimeout(() => {
+                                    updateUnclusteredListings();
+                                }, 150);
                             }
                         };
                         sourcedataHandlerRef.current = handler;

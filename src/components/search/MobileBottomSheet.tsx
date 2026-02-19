@@ -10,6 +10,7 @@ import {
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import PullToRefresh from "./PullToRefresh";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 /**
  * Snap points as fractions of viewport height (from bottom).
@@ -269,14 +270,7 @@ export default function MobileBottomSheet({
 
   // Prevent body scroll when sheet is expanded or during drag
   // P2-FIX (#117): Also lock body scroll during drag transitions to prevent background scrolling
-  useEffect(() => {
-    if (snapIndex === 2 || isDragging) {
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = "";
-      };
-    }
-  }, [snapIndex, isDragging]);
+  useBodyScrollLock(snapIndex === 2 || isDragging);
 
   const isExpanded = snapIndex === 2;
   const isCollapsed = snapIndex === 0;

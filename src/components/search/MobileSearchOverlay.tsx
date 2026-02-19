@@ -5,6 +5,7 @@ import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Search, Clock, X } from "lucide-react";
 import { useRecentSearches } from "@/hooks/useRecentSearches";
 import { FocusTrap } from "@/components/ui/FocusTrap";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 interface MobileSearchOverlayProps {
   /** Whether the overlay is open */
@@ -51,14 +52,7 @@ export default function MobileSearchOverlay({
   }, [isOpen, onClose]);
 
   // Prevent body scroll when open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = "";
-      };
-    }
-  }, [isOpen]);
+  useBodyScrollLock(isOpen);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

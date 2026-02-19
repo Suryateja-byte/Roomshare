@@ -66,6 +66,16 @@ export function useAbortableServerAction<TParams, TResult>({
     // Track mounted state to prevent state updates after unmount
     const mountedRef = useRef(true);
 
+    // Store callbacks in refs so `execute` has a stable identity
+    const actionRef = useRef(action);
+    const onSuccessRef = useRef(onSuccess);
+    const onErrorRef = useRef(onError);
+
+    // Sync refs on every render
+    useEffect(() => { actionRef.current = action; }, [action]);
+    useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
+    useEffect(() => { onErrorRef.current = onError; }, [onError]);
+
     // Set mounted flag on mount, clear on unmount
     useEffect(() => {
         mountedRef.current = true;
@@ -81,7 +91,7 @@ export function useAbortableServerAction<TParams, TResult>({
         setError(null);
 
         try {
-            const result = await action(params);
+            const result = await actionRef.current(params);
 
             // Ignore stale responses: check if this is still the current request
             // and component is still mounted
@@ -91,7 +101,7 @@ export function useAbortableServerAction<TParams, TResult>({
 
             setData(result);
             setIsLoading(false);
-            onSuccess?.(result);
+            onSuccessRef.current?.(result);
         } catch (err) {
             // Ignore errors from stale requests
             if (!mountedRef.current || currentRequestId !== requestIdRef.current) {
@@ -101,9 +111,9 @@ export function useAbortableServerAction<TParams, TResult>({
             const error = err instanceof Error ? err : new Error('Unknown error');
             setError(error);
             setIsLoading(false);
-            onError?.(error);
+            onErrorRef.current?.(error);
         }
-    }, [action, onSuccess, onError]);
+    }, []);
 
     const cancel = useCallback(() => {
         // Increment request ID to invalidate any in-flight requests
