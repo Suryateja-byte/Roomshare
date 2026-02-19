@@ -16,7 +16,32 @@ export const test = base.extend<{
   assert: ReturnType<typeof assertionHelpers>;
   data: typeof dataHelpers;
   _mockMapTiles: void;
+  _disableAnimations: void;
 }>({
+  // Disable CSS transitions and framer-motion animations for stable clicks in CI.
+  // prefers-reduced-motion: reduce makes framer-motion skip all animations;
+  // the injected stylesheet forces CSS transitions/animations to 0s as a safety net.
+  _disableAnimations: [async ({ page }, use) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.addInitScript(() => {
+      const style = document.createElement('style');
+      style.textContent = `
+        *, *::before, *::after {
+          animation-duration: 0s !important;
+          animation-delay: 0s !important;
+          transition-duration: 0s !important;
+          transition-delay: 0s !important;
+        }
+      `;
+      if (document.head) {
+        document.head.appendChild(style);
+      } else {
+        document.addEventListener('DOMContentLoaded', () => document.head.appendChild(style));
+      }
+    });
+    await use();
+  }, { auto: true }],
+
   // Auto-mock all external map tile/style/geocoding requests.
   // Runs before every test; only intercepts external domains so
   // non-map tests are unaffected (routes simply never match).
