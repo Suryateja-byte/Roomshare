@@ -16,9 +16,11 @@ jest.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams,
 }));
 
-// Mock fetch
+// Mock fetch — save original and restore in afterAll to prevent cross-file leaks
+const originalFetch = global.fetch;
 const mockFetch = jest.fn();
-global.fetch = mockFetch;
+beforeAll(() => { global.fetch = mockFetch; });
+afterAll(() => { global.fetch = originalFetch; });
 
 describe("useDebouncedFilterCount", () => {
   const defaultPending = {

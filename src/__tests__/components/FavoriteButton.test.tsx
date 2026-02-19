@@ -2,9 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FavoriteButton from '@/components/FavoriteButton'
 
-// Mock fetch
+// Mock fetch — save original and restore in afterAll to prevent cross-file leaks
+const originalFetch = global.fetch
 const mockFetch = jest.fn()
-global.fetch = mockFetch
+beforeAll(() => { global.fetch = mockFetch })
+afterAll(() => { global.fetch = originalFetch })
 
 // Mock useRouter
 const mockPush = jest.fn()

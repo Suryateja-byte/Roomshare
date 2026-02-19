@@ -6,9 +6,11 @@ import {
   RateLimitError,
 } from "@/lib/rate-limit-client";
 
-// Mock global fetch
+// Mock global fetch — save original and restore in afterAll to prevent cross-file leaks
+const originalFetch = global.fetch;
 const mockFetch = jest.fn();
-global.fetch = mockFetch;
+beforeAll(() => { global.fetch = mockFetch; });
+afterAll(() => { global.fetch = originalFetch; });
 
 beforeEach(() => {
   resetThrottle();
