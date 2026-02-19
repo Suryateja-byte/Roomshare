@@ -10,12 +10,19 @@ import { selectors } from '../helpers/test-utils';
 /** Helper: wait for search page to be ready (handles slow compilation) */
 async function waitForSearchReady(page: import('@playwright/test').Page) {
   await page.waitForLoadState('domcontentloaded');
-  // Wait for either listing cards or empty state to appear (search compiled + data loaded)
-  await page.locator(`${selectors.listingCard}, ${selectors.emptyState}, [data-testid="search-results"]`)
-    .or(page.getByText('Please select a location'))
-    .or(page.getByText('Try a new search'))
-    .first()
-    .waitFor({ state: 'attached', timeout: 60000 });
+  const container = searchResultsContainer(page);
+  // Wait for real "settled" outcomes, not just shell attachment.
+  await expect.poll(async () => {
+    const listingCount = await container.locator(selectors.listingCard).count();
+    const emptyStateCount = await page.locator(selectors.emptyState).count();
+    const guidanceCount = await page
+      .getByText(/please select a location|try a new search|no listings found|no matches found/i)
+      .count();
+    return listingCount + emptyStateCount + guidanceCount;
+  }, {
+    timeout: 60000,
+    message: 'Search did not render listings or an empty state in time',
+  }).toBeGreaterThan(0);
 }
 
 /** Helper: login for tests that need fresh auth (clears pre-loaded storage state) */
@@ -63,8 +70,31 @@ test.describe('30 Critical User Journey Simulations', () => {
     await waitForSearchReady(page);
 
     const s1Container = searchResultsContainer(page);
+    const hasListingsOrEmpty = async () => {
+      const listingCount = await s1Container.locator(selectors.listingCard).count();
+      const emptyStateCount = await page.locator(selectors.emptyState).count();
+      const guidanceCount = await page
+        .getByText(/please select a location|try a new search|no listings found|no matches found/i)
+        .count();
+      return listingCount + emptyStateCount + guidanceCount > 0;
+    };
+
+    // If first render is still in-flight, reload once and re-check.
+    if (!(await hasListingsOrEmpty())) {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForSearchReady(page);
+    }
+
+    await expect.poll(hasListingsOrEmpty, {
+      timeout: 30000,
+      message: 'Search page never reached listings or empty state',
+    }).toBe(true);
+
     const hasListings = await s1Container.locator(selectors.listingCard).count() > 0;
-    const hasEmpty = await page.locator(selectors.emptyState).count() > 0;
+    const hasEmpty = await page.locator(selectors.emptyState).count() > 0
+      || await page
+        .getByText(/please select a location|try a new search|no listings found|no matches found/i)
+        .count() > 0;
     expect(hasListings || hasEmpty).toBeTruthy();
 
     if (hasListings) {
