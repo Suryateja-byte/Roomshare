@@ -190,7 +190,7 @@ describe('GET /api/cron/search-alerts', () => {
       expect(response.status).toBe(500)
       const data = await response.json()
       expect(data.success).toBe(false)
-      expect(data.error).toBe('Database connection failed')
+      expect(data.error).toBe('Search alerts processing failed')
     })
 
     it('reports errors to Sentry', async () => {
@@ -212,7 +212,7 @@ describe('GET /api/cron/search-alerts', () => {
 
       expect(response.status).toBe(500)
       const data = await response.json()
-      expect(data.error).toBe('Unknown error')
+      expect(data.error).toBe('Search alerts processing failed')
     })
   })
 })
