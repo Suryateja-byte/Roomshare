@@ -49,7 +49,7 @@ const savedSearchFiltersSchema = z.object({
 }).passthrough();
 
 /** Safely parse filters JSON from DB, falling back to empty object on invalid data. */
-export function parseSavedSearchFilters(raw: unknown): SearchFilters {
+function parseSavedSearchFilters(raw: unknown): SearchFilters {
     const result = savedSearchFiltersSchema.safeParse(raw);
     if (result.success) {
         return result.data as SearchFilters;
