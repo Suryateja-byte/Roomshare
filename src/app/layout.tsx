@@ -70,6 +70,7 @@ export default async function RootLayout({
       <body className={inter.className}>
         <Providers session={session}>
           <SkipLink />
+          <SkipLink href="#search-results">Skip to search results</SkipLink>
           <CustomScrollContainer>
             <div className="flex flex-col min-h-screen">
               <NavbarWrapper>
