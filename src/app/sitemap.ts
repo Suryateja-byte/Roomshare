@@ -16,15 +16,20 @@ const STATIC_PAGES = [
 ];
 
 export async function generateSitemaps() {
-  const [listingCount, userCount] = await Promise.all([
-    prisma.listing.count({ where: { status: 'ACTIVE' } }),
-    prisma.user.count({ where: { isSuspended: false } }),
-  ]);
+  try {
+    const [listingCount, userCount] = await Promise.all([
+      prisma.listing.count({ where: { status: 'ACTIVE' } }),
+      prisma.user.count({ where: { isSuspended: false } }),
+    ]);
 
-  const totalUrls = listingCount + userCount + STATIC_PAGES.length;
-  const sitemapCount = Math.max(1, Math.ceil(totalUrls / URLS_PER_SITEMAP));
+    const totalUrls = listingCount + userCount + STATIC_PAGES.length;
+    const sitemapCount = Math.max(1, Math.ceil(totalUrls / URLS_PER_SITEMAP));
 
-  return Array.from({ length: sitemapCount }, (_, i) => ({ id: i }));
+    return Array.from({ length: sitemapCount }, (_, i) => ({ id: i }));
+  } catch {
+    // DB unreachable at build time (CI) — return single sitemap as safe default
+    return [{ id: 0 }];
+  }
 }
 
 export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
