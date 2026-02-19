@@ -22,6 +22,45 @@ interface SaveSearchInput {
 
 const savedSearchNameSchema = z.string().trim().min(1).max(100);
 
+/**
+ * Zod schema for validating SavedSearch.filters JSON field on read.
+ * Uses .passthrough() to allow future fields without breaking existing data.
+ */
+const savedSearchFiltersSchema = z.object({
+    query: z.string().optional(),
+    minPrice: z.number().optional(),
+    maxPrice: z.number().optional(),
+    roomType: z.string().optional(),
+    amenities: z.array(z.string()).optional(),
+    houseRules: z.array(z.string()).optional(),
+    languages: z.array(z.string()).optional(),
+    moveInDate: z.string().optional(),
+    leaseDuration: z.string().optional(),
+    genderPreference: z.string().optional(),
+    householdGender: z.string().optional(),
+    sort: z.string().optional(),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+    minLat: z.number().optional(),
+    maxLat: z.number().optional(),
+    minLng: z.number().optional(),
+    maxLng: z.number().optional(),
+    city: z.string().optional(),
+}).passthrough();
+
+/** Safely parse filters JSON from DB, falling back to empty object on invalid data. */
+export function parseSavedSearchFilters(raw: unknown): SearchFilters {
+    const result = savedSearchFiltersSchema.safeParse(raw);
+    if (result.success) {
+        return result.data as SearchFilters;
+    }
+    logger.sync.warn('Invalid saved search filters in DB, falling back to empty', {
+        action: 'parseSavedSearchFilters',
+        error: result.error.message,
+    });
+    return {};
+}
+
 async function enforceSavedSearchMutationRateLimit(action: string) {
     const headersList = await headers();
     const rateLimit = await checkServerComponentRateLimit(
@@ -100,7 +139,11 @@ export async function getMySavedSearches() {
             orderBy: { createdAt: 'desc' }
         });
 
-        return searches;
+        // Validate filters JSON on read to prevent malformed data from reaching the client
+        return searches.map(search => ({
+            ...search,
+            filters: parseSavedSearchFilters(search.filters) as Prisma.JsonValue,
+        }));
     } catch (error: unknown) {
         logger.sync.error('Failed to fetch saved searches', {
             action: 'getMySavedSearches',
