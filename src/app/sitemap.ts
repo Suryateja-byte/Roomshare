@@ -1,6 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 const URLS_PER_SITEMAP = 5000;
 
 const STATIC_PAGES = [
