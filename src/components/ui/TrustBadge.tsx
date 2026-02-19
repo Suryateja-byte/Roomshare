@@ -1,5 +1,3 @@
-'use client';
-
 interface TrustBadgeProps {
   avgRating?: number | null;
   reviewCount?: number;

@@ -122,18 +122,18 @@ export default function BlockUserButton({
                         className="absolute inset-0 bg-black/50"
                         onClick={() => setShowConfirm(false)}
                     />
-                    <div role="dialog" aria-modal="true" aria-labelledby="block-user-title" className="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-                        <h3 id="block-user-title" className="text-lg font-semibold text-zinc-900 mb-2">
+                    <div role="dialog" aria-modal="true" aria-labelledby="block-user-title" className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-sm w-full p-6">
+                        <h3 id="block-user-title" className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
                             Block {userName}?
                         </h3>
-                        <p className="text-sm text-zinc-500 mb-6">
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
                             {userName} will not be able to message you or book your listings.
                             They will see that you have blocked them.
                         </p>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setShowConfirm(false)}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900"
                             >
                                 Cancel
                             </button>

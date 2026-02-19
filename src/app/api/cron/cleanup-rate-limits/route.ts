@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
+import { withRetry } from '@/lib/retry';
 
 export async function GET(request: NextRequest) {
     try {
@@ -36,12 +37,15 @@ export async function GET(request: NextRequest) {
 
         const now = new Date();
 
-        // Delete expired rate limit entries
-        const result = await prisma.rateLimitEntry.deleteMany({
-            where: {
-                expiresAt: { lt: now }
-            }
-        });
+        // Delete expired rate limit entries — with retry for transient DB errors
+        const result = await withRetry(
+            () => prisma.rateLimitEntry.deleteMany({
+                where: {
+                    expiresAt: { lt: now }
+                }
+            }),
+            { context: 'cleanup-rate-limits' },
+        );
 
         logger.sync.info(`[Cleanup Cron] Deleted ${result.count} expired rate limit entries`);
 

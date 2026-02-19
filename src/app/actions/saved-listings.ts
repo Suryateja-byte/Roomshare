@@ -27,32 +27,27 @@ export async function toggleSaveListing(listingId: string) {
     }
 
     try {
-        // Atomic toggle using transaction to prevent TOCTOU race
-        const saved = await prisma.$transaction(async (tx) => {
-            const existing = await tx.savedListing.findUnique({
-                where: {
-                    userId_listingId: {
-                        userId: session.user.id,
-                        listingId
-                    }
-                }
-            });
-
-            if (existing) {
-                await tx.savedListing.delete({
-                    where: { id: existing.id }
-                });
-                return false;
-            } else {
-                await tx.savedListing.create({
-                    data: {
-                        userId: session.user.id,
-                        listingId
-                    }
-                });
-                return true;
-            }
+        // P2 fix: atomic toggle — single deleteMany instead of find+delete
+        // deleteMany returns count; if 0 deleted → record didn't exist → create
+        const { count } = await prisma.savedListing.deleteMany({
+            where: {
+                userId: session.user.id,
+                listingId,
+            },
         });
+
+        let saved: boolean;
+        if (count > 0) {
+            saved = false; // was saved, now removed
+        } else {
+            await prisma.savedListing.create({
+                data: {
+                    userId: session.user.id,
+                    listingId,
+                },
+            });
+            saved = true; // newly saved
+        }
 
         revalidatePath(`/listings/${listingId}`);
         revalidatePath('/saved');

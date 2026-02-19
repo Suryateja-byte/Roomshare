@@ -17,6 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 import { parseSearchParams } from "@/lib/search-params";
 import { unstable_cache } from "next/cache";
@@ -71,6 +72,11 @@ function joinWhereClauseWithSecurityInvariant(conditions: string[]): string {
 /**
  * Execute facet queries with a local statement timeout.
  * Prevents expensive UNNEST/GROUP BY calls from hanging connections.
+ *
+ * SECURITY AUDIT: $queryRawUnsafe used with parameterized queries ($N placeholders).
+ * All user-supplied values MUST be in the `params` array. The `query` string must
+ * contain ONLY hard-coded SQL with $N parameter placeholders — never interpolate
+ * user input directly. The SET LOCAL uses a hard-coded constant (FACET_QUERY_TIMEOUT_MS).
  */
 async function queryWithTimeout<T>(
   query: string,
@@ -693,6 +699,7 @@ export async function GET(request: NextRequest) {
         error: error instanceof Error ? error.message : "Unknown",
         requestId,
       });
+      Sentry.captureException(error, { tags: { route: "/api/search/facets", method: "GET" } });
 
       return NextResponse.json(
         { error: "Failed to fetch facets" },

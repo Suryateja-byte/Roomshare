@@ -1,8 +1,10 @@
 import crypto from 'crypto';
 import { NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { checkMetricsRateLimit } from '@/lib/rate-limit-redis';
 import { getClientIP } from '@/lib/rate-limit';
 import { isOriginAllowed, isHostAllowed } from '@/lib/origin-guard';
+import { logger } from '@/lib/logger';
 
 /**
  * Metrics API Route - Privacy-Safe Logging
@@ -250,7 +252,9 @@ export async function POST(request: Request) {
     // await analyticsService.log(safeLog);
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    logger.sync.error('Metrics API error', { error: error instanceof Error ? error.message : 'Unknown error' });
+    Sentry.captureException(error, { tags: { route: '/api/metrics', method: 'POST' } });
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }

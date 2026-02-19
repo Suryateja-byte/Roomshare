@@ -29,7 +29,7 @@ export function buildCspHeader(nonce?: string): string {
     "default-src 'self'",
     `script-src ${scriptSrcTokens.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    "img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com https://images.unsplash.com https://picsum.photos https://i.pravatar.cc https://maps.googleapis.com https://maps.gstatic.com https://tile.openstreetmap.org https://tiles.stadiamaps.com",
     "object-src 'none'",
     "font-src 'self' https://tiles.openfreemap.org",
     `connect-src ${CONNECT_SRC_ORIGINS.join(" ")}`,

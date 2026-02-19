@@ -188,11 +188,12 @@ export async function sendMessage(conversationId: string, content: string) {
             });
 
             // Send email (respecting user preferences)
+            // Truncate email preview to match in-app notification (50 chars)
             if (participant.email) {
                 await sendNotificationEmailWithPreference('newMessage', participant.id, participant.email, {
                     recipientName: participant.name || 'User',
                     senderName,
-                    messagePreview: safeContent,
+                    messagePreview: safeContent.substring(0, 50) + (safeContent.length > 50 ? '...' : ''),
                     conversationId: safeConversationId
                 });
             }

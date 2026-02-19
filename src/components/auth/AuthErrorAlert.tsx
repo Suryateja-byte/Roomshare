@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import { AlertCircle, AlertTriangle, Info, ArrowRight } from 'lucide-react';
 import { getAuthErrorInfo } from '@/lib/auth-errors';

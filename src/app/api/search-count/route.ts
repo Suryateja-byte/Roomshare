@@ -13,6 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import {
   createContextFromHeaders,
@@ -101,6 +102,7 @@ export async function GET(request: NextRequest) {
         requestId,
         error: error instanceof Error ? error.message : "Unknown error",
       });
+      Sentry.captureException(error, { tags: { route: "/api/search-count", method: "GET" } });
 
       return NextResponse.json(
         { error: "Failed to get count" },

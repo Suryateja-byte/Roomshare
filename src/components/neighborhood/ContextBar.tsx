@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * ContextBar - Search context display for Neighborhood Intelligence
  *

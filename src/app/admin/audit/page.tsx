@@ -80,7 +80,6 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
         const parts: string[] = [];
 
         if (d.userName) parts.push(`User: ${d.userName}`);
-        if (d.userEmail) parts.push(`Email: ${d.userEmail}`);
         if (d.listingTitle) parts.push(`Listing: ${d.listingTitle}`);
         if (d.reason) parts.push(`Reason: ${d.reason}`);
         if (d.rejectionReason) parts.push(`Reason: ${d.rejectionReason}`);

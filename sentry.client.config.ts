@@ -43,10 +43,10 @@ if (SENTRY_DSN) {
         if (error.name === 'AbortError' || error.name === 'CancelledError') return null;
         // Skip dynamic import failures (usually transient network issues)
         if (error.message?.includes('ChunkLoadError')) return null;
-        // Skip network errors commonly caused by browser extensions or connectivity
-        if (error.message?.includes('Failed to fetch') || error.message?.includes('Load failed')) return null;
         // Skip ResizeObserver loop errors (benign browser noise)
         if (error.message?.includes('ResizeObserver loop')) return null;
+        // Note: "Failed to fetch" / "Load failed" are NOT filtered here.
+        // They can indicate real API failures and should be reported to Sentry.
       }
 
       return event;

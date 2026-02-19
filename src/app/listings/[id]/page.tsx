@@ -45,7 +45,6 @@ export default async function ListingPage({ params }: PageProps) {
                 select: {
                     id: true,
                     name: true,
-                    email: true,
                     image: true,
                     isVerified: true,
                     bio: true,

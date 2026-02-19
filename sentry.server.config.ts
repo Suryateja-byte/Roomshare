@@ -53,5 +53,13 @@ if (SENTRY_DSN) {
     integrations: [
       Sentry.prismaIntegration(),
     ],
+
+    // Explicit tags for filtering in Sentry dashboard
+    initialScope: {
+      tags: {
+        runtime: 'nodejs',
+        service: 'roomshare',
+      },
+    },
   });
 }

@@ -1,10 +1,19 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { auth } from '@/auth';
 import { logger } from '@/lib/logger';
 import { crossesAntimeridian } from '@/lib/data';
 import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from '@/lib/rate-limit';
 import { headers } from 'next/headers';
+import { z } from 'zod';
+
+const boundsSchema = z.object({
+  ne_lat: z.number().min(-90).max(90),
+  ne_lng: z.number().min(-180).max(180),
+  sw_lat: z.number().min(-90).max(90),
+  sw_lng: z.number().min(-180).max(180),
+});
 
 export interface Bounds {
   ne_lat: number;
@@ -26,7 +35,14 @@ export interface MapListing {
 }
 
 export async function getListingsInBounds(bounds: Bounds): Promise<MapListing[]> {
-  const { ne_lat, ne_lng, sw_lat, sw_lng } = bounds;
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
+  // Input validation
+  const parsed = boundsSchema.safeParse(bounds);
+  if (!parsed.success) return [];
+
+  const { ne_lat, ne_lng, sw_lat, sw_lng } = parsed.data;
 
   // Rate limiting
   const headersList = await headers();

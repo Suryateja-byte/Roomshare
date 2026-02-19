@@ -442,6 +442,8 @@ const MAX_RESULTS_CAP = 500;
 /**
  * @deprecated Use getListingsPaginated() or SearchDoc queries instead.
  * This function has no pagination and may return unbounded results.
+ *
+ * P0 #15 fix: All filters pushed to SQL WHERE clauses instead of JS post-filtering.
  */
 export async function getListings(
   params: FilterParams = {},
@@ -463,8 +465,157 @@ export async function getListings(
   } = params;
 
   try {
-    // Fetch all active listings with location data
-    const listings = await prisma.$queryRaw`
+    // Build dynamic WHERE conditions — all filtering at SQL level
+    const conditions: string[] = [
+      'l."availableSlots" > 0',
+      "l.status = 'ACTIVE'",
+      "ST_X(loc.coords::geometry) IS NOT NULL",
+      "ST_Y(loc.coords::geometry) IS NOT NULL",
+      "NOT (ST_X(loc.coords::geometry) = 0 AND ST_Y(loc.coords::geometry) = 0)",
+      "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
+      "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
+    ];
+    const queryParams: any[] = [];
+    let paramIndex = 1;
+
+    // Geographic bounds filter (SQL level)
+    if (bounds) {
+      conditions.push(`ST_Y(loc.coords::geometry) >= $${paramIndex++}`);
+      queryParams.push(bounds.minLat);
+      conditions.push(`ST_Y(loc.coords::geometry) <= $${paramIndex++}`);
+      queryParams.push(bounds.maxLat);
+      if (crossesAntimeridian(bounds.minLng, bounds.maxLng)) {
+        conditions.push(
+          `(ST_X(loc.coords::geometry) >= $${paramIndex++} OR ST_X(loc.coords::geometry) <= $${paramIndex++})`,
+        );
+        queryParams.push(bounds.minLng);
+        queryParams.push(bounds.maxLng);
+      } else {
+        conditions.push(`ST_X(loc.coords::geometry) >= $${paramIndex++}`);
+        queryParams.push(bounds.minLng);
+        conditions.push(`ST_X(loc.coords::geometry) <= $${paramIndex++}`);
+        queryParams.push(bounds.maxLng);
+      }
+    }
+
+    // Text search filter (SQL level)
+    if (query && isValidQuery(query)) {
+      const sanitizedQuery = sanitizeSearchQuery(query);
+      if (sanitizedQuery) {
+        const searchPattern = `%${sanitizedQuery}%`;
+        conditions.push(`(
+          LOWER(l.title) LIKE LOWER($${paramIndex}) OR
+          LOWER(l.description) LIKE LOWER($${paramIndex}) OR
+          LOWER(loc.city) LIKE LOWER($${paramIndex}) OR
+          LOWER(loc.state) LIKE LOWER($${paramIndex})
+        )`);
+        queryParams.push(searchPattern);
+        paramIndex++;
+      }
+    }
+
+    // Price filters (SQL level)
+    if (minPrice !== undefined && minPrice !== null) {
+      conditions.push(`l.price >= $${paramIndex++}`);
+      queryParams.push(minPrice);
+    }
+    if (maxPrice !== undefined && maxPrice !== null) {
+      conditions.push(`l.price <= $${paramIndex++}`);
+      queryParams.push(maxPrice);
+    }
+
+    // Amenities filter (SQL level, AND logic with partial match)
+    if (amenities?.length) {
+      const normalizedAmenities = amenities.map((a) => a.trim().toLowerCase()).filter(Boolean);
+      if (normalizedAmenities.length > 0) {
+        conditions.push(`NOT EXISTS (
+          SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term
+          WHERE NOT EXISTS (
+            SELECT 1 FROM unnest(l.amenities) AS la
+            WHERE LOWER(la) LIKE '%' || search_term || '%'
+          )
+        )`);
+        queryParams.push(normalizedAmenities);
+      }
+    }
+
+    // Move-in date filter (SQL level)
+    if (moveInDate) {
+      conditions.push(`(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`);
+      queryParams.push(parseDateOnly(moveInDate));
+    }
+
+    // Lease duration filter (SQL level)
+    if (leaseDuration) {
+      conditions.push(`LOWER(l."leaseDuration") = LOWER($${paramIndex++})`);
+      queryParams.push(leaseDuration);
+    }
+
+    // House rules filter (SQL level, AND logic)
+    if (houseRules?.length) {
+      const normalizedRules = houseRules.map((r) => r.trim().toLowerCase()).filter(Boolean);
+      if (normalizedRules.length > 0) {
+        conditions.push(
+          `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`,
+        );
+        queryParams.push(normalizedRules);
+      }
+    }
+
+    // Room type filter (SQL level)
+    if (roomType) {
+      conditions.push(`LOWER(l."roomType") = LOWER($${paramIndex++})`);
+      queryParams.push(roomType);
+    }
+
+    // Languages filter (SQL level, OR logic with GIN index)
+    if (languages?.length) {
+      const normalized = languages.map((l) => l.trim().toLowerCase()).filter(Boolean);
+      if (normalized.length > 0) {
+        conditions.push(`l."household_languages" && $${paramIndex++}::text[]`);
+        queryParams.push(normalized);
+      }
+    }
+
+    // Gender preference filter (SQL level)
+    if (genderPreference) {
+      conditions.push(`LOWER(l."genderPreference") = LOWER($${paramIndex++})`);
+      queryParams.push(genderPreference);
+    }
+
+    // Household gender filter (SQL level)
+    if (householdGender) {
+      conditions.push(`LOWER(l."householdGender") = LOWER($${paramIndex++})`);
+      queryParams.push(householdGender);
+    }
+
+    const whereClause = conditions.join(" AND ");
+
+    // Build ORDER BY clause based on sort option
+    let orderByClause: string;
+    switch (sort) {
+      case "price_asc":
+        orderByClause = 'l.price ASC, l."createdAt" DESC';
+        break;
+      case "price_desc":
+        orderByClause = 'l.price DESC, l."createdAt" DESC';
+        break;
+      case "newest":
+        orderByClause = 'l."createdAt" DESC, l.id ASC';
+        break;
+      case "rating":
+        orderByClause = 'COALESCE(AVG(r.rating), 0) DESC, COUNT(r.id) DESC, l."createdAt" DESC';
+        break;
+      case "recommended":
+      default:
+        orderByClause = '(COALESCE(AVG(r.rating), 0) * 20 + l."viewCount" * 0.1 + COUNT(r.id) * 5) DESC, l."createdAt" DESC';
+        break;
+    }
+
+    // SECURITY AUDIT: $queryRawUnsafe with parameterized $N placeholders.
+    // All user-supplied values in queryParams — no direct interpolation.
+    // whereClause/orderByClause use hard-coded SQL. MAX_RESULTS_CAP is a constant.
+    const sqlQuery = `
       SELECT
           l.id,
           l.title,
@@ -496,19 +647,15 @@ export async function getListings(
       FROM "Listing" l
       JOIN "Location" loc ON l.id = loc."listingId"
       LEFT JOIN "Review" r ON l.id = r."listingId"
-      WHERE l."availableSlots" > 0
-        AND l.status = 'ACTIVE'
-        AND ST_X(loc.coords::geometry) IS NOT NULL
-        AND ST_Y(loc.coords::geometry) IS NOT NULL
-        AND NOT (ST_X(loc.coords::geometry) = 0 AND ST_Y(loc.coords::geometry) = 0)
-        AND ST_Y(loc.coords::geometry) BETWEEN -90 AND 90
-        AND ST_X(loc.coords::geometry) BETWEEN -180 AND 180
+      WHERE ${whereClause}
       GROUP BY l.id, loc.id
-      ORDER BY l."createdAt" DESC
-      LIMIT 1000
-  `;
+      ORDER BY ${orderByClause}
+      LIMIT ${MAX_RESULTS_CAP}
+    `;
 
-    let results = (listings as any[]).map((l) => ({
+    const listings = await prisma.$queryRawUnsafe<any[]>(sqlQuery, ...queryParams);
+
+    return listings.map((l) => ({
       id: l.id,
       title: l.title,
       description: l.description,
@@ -539,173 +686,6 @@ export async function getListings(
         lng: Number(l.lng) || 0,
       },
     }));
-
-    // Apply geographic bounds filter
-    if (bounds) {
-      results = results.filter(
-        (l) =>
-          l.location.lat >= bounds.minLat &&
-          l.location.lat <= bounds.maxLat &&
-          l.location.lng >= bounds.minLng &&
-          l.location.lng <= bounds.maxLng,
-      );
-    }
-
-    // Apply text search filter (with sanitization for special characters)
-    // Only apply if query meets minimum length requirement (2+ chars)
-    if (query && isValidQuery(query)) {
-      const q = sanitizeSearchQuery(query).toLowerCase();
-      if (q) {
-        results = results.filter(
-          (l) =>
-            l.title.toLowerCase().includes(q) ||
-            l.description.toLowerCase().includes(q) ||
-            l.location.city.toLowerCase().includes(q) ||
-            l.location.state.toLowerCase().includes(q),
-        );
-      }
-    }
-
-    // Apply price filters
-    if (minPrice !== undefined && minPrice !== null) {
-      results = results.filter((l) => l.price >= minPrice);
-    }
-
-    if (maxPrice !== undefined && maxPrice !== null) {
-      results = results.filter((l) => l.price <= maxPrice);
-    }
-
-    // Apply amenities filter (must have ALL selected amenities, case-insensitive partial match)
-    // UI sends short names like 'Pool', 'Gym' but DB has 'Pool Access', 'Gym Access'
-    if (amenities && amenities.length > 0) {
-      const amenitiesLower = amenities.map((a) => a.toLowerCase());
-      results = results.filter((l) =>
-        amenitiesLower.every((a) =>
-          l.amenities.some((la: string) => la.toLowerCase().includes(a)),
-        ),
-      );
-    }
-
-    // Apply move-in date filter (listing available by target date)
-    if (moveInDate) {
-      const targetDate = new Date(moveInDate);
-      results = results.filter(
-        (l) => !l.moveInDate || new Date(l.moveInDate) <= targetDate,
-      );
-    }
-
-    // Apply lease duration filter (case-insensitive)
-    if (leaseDuration) {
-      const leaseLower = leaseDuration.toLowerCase();
-      results = results.filter(
-        (l) => l.leaseDuration && l.leaseDuration.toLowerCase() === leaseLower,
-      );
-    }
-
-    // Apply house rules filter (must have ALL selected rules, case-insensitive)
-    if (houseRules && houseRules.length > 0) {
-      const rulesLower = houseRules.map((r) => r.toLowerCase());
-      results = results.filter((l) =>
-        rulesLower.every((r) =>
-          l.houseRules.some((hr: string) => hr.toLowerCase() === r),
-        ),
-      );
-    }
-
-    // Apply room type filter (case-insensitive)
-    if (roomType) {
-      const roomTypeLower = roomType.toLowerCase();
-      results = results.filter(
-        (l) => l.roomType && l.roomType.toLowerCase() === roomTypeLower,
-      );
-    }
-
-    // Apply languages filter (OR logic - show listings where household speaks ANY selected language)
-    if (languages && languages.length > 0) {
-      const languagesLower = languages.map((l) => l.toLowerCase());
-      results = results.filter((listing) =>
-        languagesLower.some((lang) =>
-          listing.householdLanguages.some(
-            (ll: string) => ll.toLowerCase() === lang,
-          ),
-        ),
-      );
-    }
-
-    // Apply gender preference filter (case-insensitive)
-    if (genderPreference) {
-      const prefLower = genderPreference.toLowerCase();
-      results = results.filter(
-        (l) =>
-          l.genderPreference && l.genderPreference.toLowerCase() === prefLower,
-      );
-    }
-
-    // Apply household gender filter (case-insensitive)
-    if (householdGender) {
-      const householdLower = householdGender.toLowerCase();
-      results = results.filter(
-        (l) =>
-          l.householdGender &&
-          l.householdGender.toLowerCase() === householdLower,
-      );
-    }
-
-    // Apply sorting with stable secondary sort by createdAt
-    // This ensures deterministic ordering when primary sort values are equal
-    switch (sort) {
-      case "price_asc":
-        results.sort((a, b) => {
-          const priceDiff = a.price - b.price;
-          if (priceDiff !== 0) return priceDiff;
-          return b.createdAt.getTime() - a.createdAt.getTime(); // newer first as tiebreaker
-        });
-        break;
-      case "price_desc":
-        results.sort((a, b) => {
-          const priceDiff = b.price - a.price;
-          if (priceDiff !== 0) return priceDiff;
-          return b.createdAt.getTime() - a.createdAt.getTime();
-        });
-        break;
-      case "newest":
-        // Already sorted by createdAt, add id as ultimate tiebreaker
-        results.sort((a, b) => {
-          const timeDiff = b.createdAt.getTime() - a.createdAt.getTime();
-          if (timeDiff !== 0) return timeDiff;
-          return a.id.localeCompare(b.id);
-        });
-        break;
-      case "rating":
-        results.sort((a, b) => {
-          const ratingDiff = b.avgRating - a.avgRating;
-          if (ratingDiff !== 0) return ratingDiff;
-          const reviewDiff = b.reviewCount - a.reviewCount;
-          if (reviewDiff !== 0) return reviewDiff;
-          return b.createdAt.getTime() - a.createdAt.getTime();
-        });
-        break;
-      case "recommended":
-      default:
-        // Recommended: combination of recency, rating, and views
-        results.sort((a, b) => {
-          const aScore =
-            a.avgRating * 20 + a.viewCount * 0.1 + a.reviewCount * 5;
-          const bScore =
-            b.avgRating * 20 + b.viewCount * 0.1 + b.reviewCount * 5;
-          const scoreDiff = bScore - aScore;
-          if (scoreDiff !== 0) return scoreDiff;
-          return b.createdAt.getTime() - a.createdAt.getTime();
-        });
-        break;
-    }
-
-    // Apply maximum results cap for performance (prevents memory issues on wide map bounds)
-    if (results.length > MAX_RESULTS_CAP) {
-      results = results.slice(0, MAX_RESULTS_CAP);
-    }
-
-    return results;
   } catch (error) {
     const dataError = wrapDatabaseError(error, "getListings");
     dataError.log({
@@ -911,7 +891,10 @@ export async function getMapListings(
 
   const whereClause = conditions.join(" AND ");
 
-  // Query with minimal fields for map markers
+  // SECURITY AUDIT: $queryRawUnsafe used with parameterized queries ($N placeholders).
+  // All user-supplied values are in queryParams array — no direct string interpolation
+  // of user input into the SQL template. whereClause is built from hard-coded column
+  // names with $N parameter placeholders. MAX_MAP_MARKERS is a constant.
   const sqlQuery = `
         SELECT
             l.id,
@@ -1179,7 +1162,14 @@ export async function getListingsPaginated(
         break;
     }
 
-    // Execute count query for pagination (without LIMIT/OFFSET)
+    // SECURITY AUDIT: $queryRawUnsafe used with parameterized queries ($N placeholders).
+    // All user-supplied values are in queryParams — no direct string interpolation of
+    // user input. whereClause/orderByClause built from hard-coded SQL with $N params.
+
+    // P2 fix: Run COUNT and data queries in parallel instead of sequentially.
+    // Use unclamped page for offset — if page exceeds total, data query returns empty (safe).
+    const uncheckedOffset = (effectivePage - 1) * effectiveLimit;
+
     const countQuery = `
         SELECT COUNT(DISTINCT l.id) as total
         FROM "Listing" l
@@ -1187,22 +1177,9 @@ export async function getListingsPaginated(
         WHERE ${whereClause}
     `;
 
-    const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
-      countQuery,
-      ...queryParams,
-    );
-    const rawTotal = Number(countResult[0]?.total || 0);
+    // Save paramIndex before mutating for data query
+    const limitParamIdx = paramIndex;
 
-    // P1 Fix: Cap total for unbounded browse to prevent deep pagination
-    const total = isUnboundedBrowse
-      ? Math.min(rawTotal, MAX_UNBOUNDED_RESULTS)
-      : rawTotal;
-    const totalPages = Math.ceil(total / effectiveLimit);
-    const safePage =
-      totalPages > 0 ? Math.max(1, Math.min(effectivePage, totalPages)) : 1;
-    const offset = (safePage - 1) * effectiveLimit;
-
-    // Execute main query with LIMIT/OFFSET
     const dataQuery = `
         SELECT
             l.id,
@@ -1235,16 +1212,27 @@ export async function getListingsPaginated(
         WHERE ${whereClause}
         GROUP BY l.id, loc.id
         ORDER BY ${orderByClause}
-        LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+        LIMIT $${limitParamIdx} OFFSET $${limitParamIdx + 1}
     `;
+    paramIndex = limitParamIdx + 2;
 
-    // Add limit and offset to params (using effective values for browse mode cap)
-    const dataParams = [...queryParams, effectiveLimit, offset];
+    const dataParams = [...queryParams, effectiveLimit, uncheckedOffset];
 
-    const listings = await prisma.$queryRawUnsafe<any[]>(
-      dataQuery,
-      ...dataParams,
-    );
+    // Execute both queries concurrently
+    const [countResult, listings] = await Promise.all([
+      prisma.$queryRawUnsafe<{ total: bigint }[]>(countQuery, ...queryParams),
+      prisma.$queryRawUnsafe<any[]>(dataQuery, ...dataParams),
+    ]);
+
+    const rawTotal = Number(countResult[0]?.total || 0);
+
+    // P1 Fix: Cap total for unbounded browse to prevent deep pagination
+    const total = isUnboundedBrowse
+      ? Math.min(rawTotal, MAX_UNBOUNDED_RESULTS)
+      : rawTotal;
+    const totalPages = Math.ceil(total / effectiveLimit);
+    const safePage =
+      totalPages > 0 ? Math.max(1, Math.min(effectivePage, totalPages)) : 1;
 
     // Map results and apply JS-level filters for amenities/house rules/languages
     const results = listings.map((l) => ({
@@ -1464,7 +1452,8 @@ async function getListingsCountEfficient(
 
   const whereClause = conditions.join(" AND ");
 
-  // Execute lightweight COUNT query only
+  // SECURITY AUDIT: $queryRawUnsafe with parameterized $N placeholders.
+  // All user-supplied values in queryParams — no direct string interpolation.
   const countQuery = `
         SELECT COUNT(DISTINCT l.id) as total
         FROM "Listing" l

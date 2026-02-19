@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * RadarAttribution Component
  *
@@ -17,7 +15,6 @@
  * @see https://stadiamaps.com/attribution/
  */
 
-import React from 'react';
 import type { TileSource } from './NearbyPlacesMap';
 
 interface RadarAttributionProps {

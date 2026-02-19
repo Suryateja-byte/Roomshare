@@ -18,6 +18,14 @@ if (SENTRY_DSN) {
     // Performance monitoring - sample rate for edge functions
     tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
 
+    // Explicit tags for filtering in Sentry dashboard
+    initialScope: {
+      tags: {
+        runtime: 'edge',
+        service: 'roomshare',
+      },
+    },
+
     // Filter out non-actionable errors
     beforeSend(event, hint) {
       const error = hint.originalException;

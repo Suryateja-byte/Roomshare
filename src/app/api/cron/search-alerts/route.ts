@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { processSearchAlerts } from '@/lib/search-alerts';
 import { logger } from '@/lib/logger';
+import { withRetry } from '@/lib/retry';
 
 // Vercel Cron or external cron service endpoint
 // Secured with CRON_SECRET in all environments
@@ -39,7 +40,10 @@ export async function GET(request: NextRequest) {
         logger.sync.info('Starting search alerts processing...');
         const startTime = Date.now();
 
-        const result = await processSearchAlerts();
+        const result = await withRetry(
+            () => processSearchAlerts(),
+            { context: 'processSearchAlerts' },
+        );
 
         const duration = Date.now() - startTime;
         logger.sync.info(`Search alerts completed in ${duration}ms`, { ...result, duration });
@@ -56,10 +60,7 @@ export async function GET(request: NextRequest) {
         });
         Sentry.captureException(error, { tags: { cron: 'search-alerts' } });
         return NextResponse.json(
-            {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error'
-            },
+            { success: false, error: 'Search alerts processing failed' },
             { status: 500 }
         );
     }
