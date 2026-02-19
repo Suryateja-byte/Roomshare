@@ -20,12 +20,14 @@ jest.mock("next/cache", () => ({
 // Mock prisma before imports — $transaction delegates to the same $queryRawUnsafe mock
 jest.mock("@/lib/prisma", () => {
   const qru = jest.fn();
+  const eru = jest.fn();
   return {
     prisma: {
       $queryRawUnsafe: qru,
+      $executeRawUnsafe: eru,
       $transaction: jest.fn((fn: any) =>
         fn({
-          $executeRawUnsafe: jest.fn(),
+          $executeRawUnsafe: eru,
           $queryRawUnsafe: qru,
         })
       ),
@@ -35,6 +37,8 @@ jest.mock("@/lib/prisma", () => {
 
 import { prisma } from "@/lib/prisma";
 import { getSearchDocLimitedCount } from "@/lib/search/search-doc-queries";
+
+const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as jest.Mock;
 
 // Note: HYBRID_COUNT_THRESHOLD = 100 in source (see file header for details)
 
@@ -64,6 +68,10 @@ describe("hybrid-count-threshold", () => {
       // Assert: Should return the exact count
       expect(result).toBe(50);
       expect(prisma.$queryRawUnsafe).toHaveBeenCalled();
+      expect(mockExecuteRawUnsafe).toHaveBeenCalled();
+      const timeoutSql = mockExecuteRawUnsafe.mock.calls[0][0];
+      expect(timeoutSql).toBe("SET LOCAL statement_timeout = 5000");
+      expect(timeoutSql).not.toContain("$1");
     });
 
     it("returns null when count > 100", async () => {

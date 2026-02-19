@@ -5,9 +5,21 @@
  * skeleton loading, pagination progress, heart animation, date pills.
  */
 
+import type { Page } from "@playwright/test";
 import { test, expect, SF_BOUNDS, searchResultsContainer } from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
+
+async function waitForVisibleListingCards(page: Page) {
+  const cards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
+  await expect
+    .poll(async () => cards.count(), {
+      timeout: 30_000,
+      message: "Expected listing cards in the visible search results container",
+    })
+    .toBeGreaterThan(0);
+  return cards;
+}
 
 test.beforeEach(async () => {
   test.slow();
@@ -19,7 +31,7 @@ test.beforeEach(async () => {
 test.describe("2.1: Image carousel enhancements", () => {
   test("carousel dots are capped at 5 max", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     // Scope to visible search results container (dual-container layout)
     const container = searchResultsContainer(page);
@@ -43,7 +55,7 @@ test.describe("2.1: Image carousel enhancements", () => {
 
   test("carousel arrow buttons exist and are accessible", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     // Scope to visible search results container (dual-container layout)
     const container = searchResultsContainer(page);
@@ -71,7 +83,7 @@ test.describe("2.1: Image carousel enhancements", () => {
 test.describe("2.2: Trust badges", () => {
   test("Guest Favorite badge renders when present", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     // Scope to visible search results container (dual-container layout)
     const container = searchResultsContainer(page);
@@ -98,7 +110,7 @@ test.describe("2.2: Trust badges", () => {
 test.describe("2.3: Total price toggle", () => {
   test("toggle switch is present and functional", async ({ page, browserName }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     // Find the toggle
     const toggle = page.locator('[role="switch"][aria-checked]');
@@ -128,7 +140,7 @@ test.describe("2.3: Total price toggle", () => {
 
   test("toggle label text is visible", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     const label = page.getByText("Show total price");
     const labelCount = await label.count();
@@ -177,7 +189,7 @@ test.describe("2.4: Skeleton loading states", () => {
 test.describe("2.5: Pagination progress indicator", () => {
   test("result count header is displayed", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     // Look for "X places" or "100+ places" text
     const resultCount = page.locator("text=/\\d+\\+?\\s+places?/i");
@@ -186,7 +198,7 @@ test.describe("2.5: Pagination progress indicator", () => {
 
   test("contextual footer shows stay count", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     // Look for "X+ stays" footer text — scroll to bottom to trigger render
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -199,7 +211,7 @@ test.describe("2.5: Pagination progress indicator", () => {
 
   test("load more button shows progress text", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     // Look for "Show more places" button
     const loadMore = page.getByRole("button", { name: /show more/i });
@@ -222,7 +234,7 @@ test.describe("2.5: Pagination progress indicator", () => {
 test.describe("2.6: Wishlist heart button", () => {
   test("favorite buttons have correct ARIA attributes", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     // Scope to visible search results container (dual-container layout)
     const container = searchResultsContainer(page);
@@ -247,7 +259,7 @@ test.describe("2.6: Wishlist heart button", () => {
 
   test("heart save button can be toggled via hover and click", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     const container = searchResultsContainer(page);
     const card = container.locator('[data-testid="listing-card"]').first();
@@ -271,10 +283,7 @@ test.describe("2.6: Wishlist heart button", () => {
 test.describe("General: Listing cards integrity", () => {
   test("all cards have prices and titles", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
-
-    const container = searchResultsContainer(page);
-    const cards = container.locator('[data-testid="listing-card"]');
+    const cards = await waitForVisibleListingCards(page);
     const cardCount = await cards.count();
     expect(cardCount).toBeGreaterThanOrEqual(1);
 
@@ -298,7 +307,7 @@ test.describe("General: Listing cards integrity", () => {
 
   test("listing cards have article role with aria-label", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     const container = searchResultsContainer(page);
     const articles = container.locator('[data-testid="listing-card"][role="article"]');
@@ -323,7 +332,7 @@ test.describe("General: Listing cards integrity", () => {
     });
 
     await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="listing-card"]', { timeout: 30_000, state: 'attached' });
+    await waitForVisibleListingCards(page);
 
     const realErrors = errors.filter(
       (e) =>

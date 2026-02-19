@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import crypto from "crypto";
 import { logger } from "@/lib/logger";
 
 /**
@@ -252,6 +251,20 @@ function getFirstForwardedIp(forwardedFor: string | null): string | null {
   return first || null;
 }
 
+/**
+ * Edge-safe deterministic hash for anonymous fingerprinting.
+ * Not cryptographic; only used to avoid collapsing all unknown clients
+ * into the same rate-limit bucket.
+ */
+function fnv1aHex(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
 function getAnonymousFingerprint(headers: Headers): string {
   const fingerprintSource = [
     headers.get("user-agent") || "",
@@ -259,7 +272,8 @@ function getAnonymousFingerprint(headers: Headers): string {
     headers.get("sec-ch-ua") || "",
   ].join("|");
 
-  return `anon-${crypto.createHash("sha256").update(fingerprintSource).digest("hex").slice(0, 16)}`;
+  const hash = `${fnv1aHex(`a:${fingerprintSource}`)}${fnv1aHex(`b:${fingerprintSource.length}:${fingerprintSource}`)}`;
+  return `anon-${hash.slice(0, 16)}`;
 }
 
 /**

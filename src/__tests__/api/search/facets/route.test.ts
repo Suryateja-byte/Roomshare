@@ -136,6 +136,17 @@ describe("/api/search/facets", () => {
   });
 
   describe("response structure", () => {
+    it("should set a literal statement timeout before facet queries", async () => {
+      const request = createRequest();
+
+      await GET(request);
+
+      expect(mockExecuteRawUnsafe).toHaveBeenCalled();
+      const timeoutSql = mockExecuteRawUnsafe.mock.calls[0][0];
+      expect(timeoutSql).toBe("SET LOCAL statement_timeout = 5000");
+      expect(timeoutSql).not.toContain("$1");
+    });
+
     it("should return facets with correct structure", async () => {
       const request = createRequest();
       const response = await GET(request);

@@ -51,8 +51,7 @@ const SEARCH_QUERY_TIMEOUT_MS = 5000;
 async function queryWithTimeout<T>(query: string, params: unknown[]): Promise<T[]> {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(
-      'SET LOCAL statement_timeout = $1',
-      `${SEARCH_QUERY_TIMEOUT_MS}`
+      `SET LOCAL statement_timeout = ${SEARCH_QUERY_TIMEOUT_MS}`,
     );
     return tx.$queryRawUnsafe<T[]>(query, ...params);
   });
