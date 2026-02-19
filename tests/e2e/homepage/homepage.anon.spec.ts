@@ -100,9 +100,10 @@ test.describe('Homepage — Anonymous User', () => {
 
   test('HP-06: Search CTA navigates to /search', async ({ page }) => {
     // The bottom CTA section has "Browse Listings" link pointing to /search
-    const searchCta = page.getByRole('link', { name: /browse listings/i })
-      .or(page.getByRole('link', { name: /view all listings/i }))
-      .or(page.getByRole('link', { name: /search|find|explore/i }))
+    const main = page.locator('main');
+    const searchCta = main.getByRole('link', { name: /browse listings/i })
+      .or(main.getByRole('link', { name: /view all listings/i }))
+      .or(main.getByRole('link', { name: /search|find|explore/i }))
       .first();
 
     await expect(searchCta).toBeVisible({ timeout: 10000 });

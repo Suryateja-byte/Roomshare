@@ -296,7 +296,7 @@ test.describe('Edge Case Journeys', () => {
       await network.goOffline();
 
       // Try to navigate
-      const navLink = page.getByRole('link', { name: /search|listing/i }).first();
+      const navLink = page.locator('main').getByRole('link', { name: /search|listing/i }).first();
       if (await navLink.isVisible().catch(() => false)) {
         await navLink.click({ force: true });
         await page.waitForLoadState('domcontentloaded').catch(() => {});

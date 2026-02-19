@@ -50,12 +50,13 @@ test.describe("J1: Home Page Load & Hero CTA", () => {
     await expect(page.locator(selectors.navbar).first()).toBeVisible({ timeout: 10000 });
 
     // Should have a CTA or search entry point
-    const searchEntry = page
+    const main = page.locator('main');
+    const searchEntry = main
       .getByRole("link", { name: /search|find|browse|explore/i })
-      .or(page.getByRole("button", { name: /search|find|browse|explore/i }))
-      .or(page.locator('a[href*="/search"]'))
-      .or(page.locator('[data-testid="search-input"]'))
-      .or(page.getByPlaceholder(/location|city|where/i));
+      .or(main.getByRole("button", { name: /search|find|browse|explore/i }))
+      .or(main.locator('a[href*="/search"]'))
+      .or(main.locator('[data-testid="search-input"]'))
+      .or(main.getByPlaceholder(/location|city|where/i));
 
     // On mobile viewports, the hero CTA may be hidden or different — skip if not visible
     const viewport = page.viewportSize();

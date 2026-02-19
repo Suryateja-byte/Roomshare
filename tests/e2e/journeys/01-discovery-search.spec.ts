@@ -51,9 +51,10 @@ test.describe("Discovery & Search Journeys", () => {
 
       // Step 7: Click search CTA
       await page.waitForLoadState("load");
-      const searchButton = page
+      const main = page.locator('main');
+      const searchButton = main
         .getByRole("link", { name: /search|find|browse/i })
-        .or(page.getByRole("button", { name: /search|find/i }));
+        .or(main.getByRole("button", { name: /search|find/i }));
 
       if (await searchButton.first().isVisible({ timeout: 5000 }).catch(() => false)) {
         await searchButton.first().click();
