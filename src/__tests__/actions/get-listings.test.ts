@@ -8,6 +8,26 @@ jest.mock('@/lib/prisma', () => ({
   },
 }))
 
+jest.mock('@/auth', () => ({
+  auth: jest.fn().mockResolvedValue({ user: { id: 'user-1' } }),
+}))
+
+jest.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({ success: true, remaining: 10, resetAt: new Date() }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue('127.0.0.1'),
+  RATE_LIMITS: {
+    getListingsInBounds: { limit: 60, windowMs: 60000 },
+  },
+}))
+
+jest.mock('next/headers', () => ({
+  headers: jest.fn().mockResolvedValue(new Headers()),
+}))
+
+jest.mock('@/lib/logger', () => ({
+  logger: { sync: { error: jest.fn(), info: jest.fn(), warn: jest.fn() } },
+}))
+
 import { getListingsInBounds, type Bounds } from '@/app/actions/get-listings'
 import { prisma } from '@/lib/prisma'
 
