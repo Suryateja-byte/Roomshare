@@ -5,10 +5,10 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx --cache --cache-location .next/cache/eslint",
+    "typecheck": "rm -rf .next/dev/types && next typegen && tsc --noEmit",
     "verify": "node verify.js",
     "test": "jest",
     "test:watch": "jest --watch",

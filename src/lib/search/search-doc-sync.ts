@@ -13,6 +13,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { computeRecommendedScore } from "@/lib/search/recommended-score";
 
 interface ListingSearchData {
   id: string;
@@ -43,37 +44,6 @@ interface ListingSearchData {
   // Review aggregation
   avgRating: number;
   reviewCount: number;
-}
-
-/**
- * Compute recommended score with time decay, log scaling, and freshness boost
- * Same formula used in cron job for consistency
- */
-function computeRecommendedScore(
-  avgRating: number,
-  viewCount: number,
-  reviewCount: number,
-  createdAt: Date
-): number {
-  // Base scores
-  const ratingScore = avgRating * 20;
-  const reviewScore = reviewCount * 5;
-
-  // Time decay on views (30-day half-life)
-  const daysSinceCreation = Math.floor(
-    (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  const decayFactor = Math.max(0.1, 1 - (daysSinceCreation / 30) * 0.5);
-
-  // Logarithmic scaling on views
-  const viewScore = Math.log(1 + viewCount) * 10 * decayFactor;
-
-  // Freshness boost for new listings (first 7 days)
-  const freshnessBoost = daysSinceCreation <= 7
-    ? 15 * (1 - daysSinceCreation / 7)
-    : 0;
-
-  return ratingScore + viewScore + reviewScore + freshnessBoost;
 }
 
 /**

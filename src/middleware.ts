@@ -3,30 +3,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { checkSuspension } from "@/lib/auth-helpers";
 import { applySecurityHeaders } from "@/lib/csp-middleware";
-import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
 
 export default auth(async function middleware(request: NextRequest) {
   // P0-01 FIX: Check suspension status for protected routes
   const suspensionResponse = await checkSuspension(request);
   if (suspensionResponse) return suspensionResponse;
-
-  // Rate limit /search at middleware level so clients receive HTTP 429 (not SSR 200 fallback content)
-  if (request.nextUrl.pathname === "/search") {
-    const rateLimitResult = await checkServerComponentRateLimit(
-      request.headers,
-      "search",
-      "/search",
-    );
-    if (!rateLimitResult.allowed) {
-      return new NextResponse("Too Many Requests", {
-        status: 429,
-        headers: {
-          "Retry-After": String(rateLimitResult.retryAfter ?? 60),
-          "Content-Type": "text/plain",
-        },
-      });
-    }
-  }
 
   const { requestHeaders, responseHeaders } = applySecurityHeaders(request);
 

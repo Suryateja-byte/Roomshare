@@ -24,9 +24,15 @@ const nextConfig: NextConfig = {
   // Optimize barrel file imports for better tree-shaking
   // Significantly reduces bundle size for icon libraries and UI component packages
   experimental: {
+    // Build worker has been unstable in this project (silent worker exits during type-checking).
+    // Use the single-process path for deterministic CI/production builds.
+    webpackBuildWorker: false,
     optimizePackageImports: [
       'lucide-react',
       'framer-motion',
+      '@radix-ui/react-icons',
+      'date-fns',
+      '@heroicons/react',
     ],
   },
 

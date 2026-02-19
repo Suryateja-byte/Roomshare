@@ -7,6 +7,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    // Dependencies
+    "node_modules/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
@@ -26,34 +28,32 @@ const eslintConfig = defineConfig([
     "scripts/**",
     // Internal scripts
     "src/scripts/**",
+    // Test code has different ergonomics and rule expectations
+    "src/__tests__/**",
+    // Local multi-worktree metadata (can contain full duplicate trees)
+    ".worktrees/**",
+    // Local agent/editor metadata
+    ".claude/**",
+    // Next compiler cache
+    ".swc/**",
     // E2E tests (Playwright, not React components - causes false positive hook errors)
     "tests/**",
   ]),
-  // Rule overrides for pre-existing issues (to be fixed in follow-up PRs)
+  // Keep this limited to core ESLint rules so plugin scoping in flat config
+  // doesn't break lint execution.
   {
     rules: {
-      // Downgrade to warnings - many pre-existing occurrences
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-namespace": "warn",
-      "@typescript-eslint/no-require-imports": "warn",
-      "@typescript-eslint/no-non-null-asserted-optional-chain": "warn",
-      // React rules - common in JSX text content
-      "react/no-unescaped-entities": "warn",
-      "react/display-name": "warn",
-      // Next.js rules - some valid uses of <a> for external links
-      "@next/next/no-html-link-for-pages": "warn",
-      // TypeScript rules
-      "@typescript-eslint/ban-ts-comment": "warn",
       // Style rules
       "prefer-const": "warn",
-      // setState in useEffect is common pattern for hydration/sync with external systems
-      // This rule is overly strict for legitimate use cases
-      "react-hooks/set-state-in-effect": "off",
-      // React hooks memoization - has false positives on valid patterns
-      "react-hooks/preserve-manual-memoization": "warn",
-      // React Compiler rules - has false positives on valid patterns
-      "react-hooks/purity": "warn",
+      // Keep these as warnings while we burn down legacy backlog.
+      "@typescript-eslint/ban-ts-comment": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-namespace": "warn",
+      "@next/next/no-html-link-for-pages": "warn",
+      "react/no-unescaped-entities": "warn",
       "react-hooks/immutability": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
+      "react-hooks/set-state-in-effect": "warn",
     },
   },
 ]);

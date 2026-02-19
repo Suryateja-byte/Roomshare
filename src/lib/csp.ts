@@ -11,7 +11,6 @@ const CONNECT_SRC_ORIGINS = [
   "https://api.radar.io",
   "https://tiles.stadiamaps.com",
   "https://api.stadiamaps.com",
-  "https://challenges.cloudflare.com",
 ];
 
 export function buildCspHeader(nonce?: string): string {
@@ -23,19 +22,19 @@ export function buildCspHeader(nonce?: string): string {
   } else if (nonce) {
     scriptSrcTokens.push(`'nonce-${nonce}'`, "'strict-dynamic'");
   }
-  scriptSrcTokens.push("https://maps.googleapis.com", "https://challenges.cloudflare.com");
+  scriptSrcTokens.push("https://maps.googleapis.com");
 
   const directives: string[] = [
     "default-src 'self'",
     `script-src ${scriptSrcTokens.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com https://images.unsplash.com https://picsum.photos https://i.pravatar.cc https://maps.googleapis.com https://maps.gstatic.com https://tile.openstreetmap.org https://tiles.stadiamaps.com",
+    "img-src 'self' data: blob: https:",
     "object-src 'none'",
     "font-src 'self' https://tiles.openfreemap.org",
     `connect-src ${CONNECT_SRC_ORIGINS.join(" ")}`,
     "worker-src 'self' blob:",
     "child-src blob:",
-    "frame-src 'self' https://accounts.google.com https://challenges.cloudflare.com",
+    "frame-src 'self' https://accounts.google.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

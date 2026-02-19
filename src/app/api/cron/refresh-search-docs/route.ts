@@ -14,10 +14,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
-import { logger } from "@/lib/logger";
-import { withRetry } from "@/lib/retry";
+import { computeRecommendedScore } from "@/lib/search/recommended-score";
 
 // Number of dirty listings to process per cron run
 const BATCH_SIZE = parseInt(process.env.SEARCH_DOC_BATCH_SIZE || "100", 10);
@@ -51,49 +49,6 @@ interface ListingWithData {
   // Review aggregation
   avgRating: number;
   reviewCount: number;
-}
-
-/**
- * Compute recommended score formula with time decay, freshness boost, and log scaling
- *
- * Components:
- * - Rating score: avgRating * 20 (unchanged)
- * - Review score: reviewCount * 5 (unchanged)
- * - View score: log(1 + views) * 10 * decayFactor (prevents gaming, decays over time)
- * - Freshness boost: +15 points for new listings, decays linearly over 7 days
- *
- * Time decay: Views from older listings contribute less (30-day half-life)
- * Log scaling: Prevents view count gaming (1000 views ≈ 69 points, not 100)
- */
-export function computeRecommendedScore(
-  avgRating: number,
-  viewCount: number,
-  reviewCount: number,
-  createdAt: Date,
-): number {
-  // Base scores (unchanged weights for rating and reviews)
-  const ratingScore = avgRating * 20;
-  const reviewScore = reviewCount * 5;
-
-  // Calculate days since listing was created
-  const daysSinceCreation = Math.floor(
-    (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24),
-  );
-
-  // Time decay on views (30-day half-life)
-  // Views older than 30 days contribute less (minimum 10% contribution)
-  const decayFactor = Math.max(0.1, 1 - (daysSinceCreation / 30) * 0.5);
-
-  // Logarithmic scaling on views (prevents gaming via page refreshes)
-  // log(1 + views) grows slowly: 100 views ≈ 4.6, 1000 views ≈ 6.9
-  const viewScore = Math.log(1 + viewCount) * 10 * decayFactor;
-
-  // Freshness boost for new listings (first 7 days)
-  // Day 0: +15 points, Day 7: +0 points (linear decay)
-  const freshnessBoost =
-    daysSinceCreation <= 7 ? 15 * (1 - daysSinceCreation / 7) : 0;
-
-  return ratingScore + viewScore + reviewScore + freshnessBoost;
 }
 
 /**
@@ -158,6 +113,81 @@ async function fetchListingsWithData(
 }
 
 /**
+ * Upsert a single search doc
+ */
+async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
+  const recommendedScore = computeRecommendedScore(
+    listing.avgRating,
+    listing.viewCount,
+    listing.reviewCount,
+    listing.createdAt,
+  );
+
+  // Compute lowercase arrays for case-insensitive filtering
+  const amenitiesLower = listing.amenities.map((a) => a.toLowerCase());
+  const houseRulesLower = listing.houseRules.map((r) => r.toLowerCase());
+  const householdLanguagesLower = listing.householdLanguages.map((l) =>
+    l.toLowerCase(),
+  );
+
+  await prisma.$executeRaw`
+    INSERT INTO listing_search_docs (
+      id, owner_id, title, description, price, images,
+      amenities, house_rules, household_languages, primary_home_language,
+      lease_duration, room_type, move_in_date, total_slots, available_slots,
+      view_count, status, listing_created_at,
+      address, city, state, zip, location_geog, lat, lng,
+      avg_rating, review_count, recommended_score,
+      amenities_lower, house_rules_lower, household_languages_lower,
+      doc_created_at, doc_updated_at
+    ) VALUES (
+      ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
+      ${listing.amenities}, ${listing.houseRules}, ${listing.householdLanguages}, ${listing.primaryHomeLanguage},
+      ${listing.leaseDuration}, ${listing.roomType}, ${listing.moveInDate}, ${listing.totalSlots}, ${listing.availableSlots},
+      ${listing.viewCount}, ${listing.status}, ${listing.createdAt},
+      ${listing.address}, ${listing.city}, ${listing.state}, ${listing.zip},
+      ST_SetSRID(ST_MakePoint(${listing.lng}, ${listing.lat}), 4326)::geography,
+      ${listing.lat}, ${listing.lng},
+      ${listing.avgRating}, ${listing.reviewCount}, ${recommendedScore},
+      ${amenitiesLower}, ${houseRulesLower}, ${householdLanguagesLower},
+      NOW(), NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      owner_id = EXCLUDED.owner_id,
+      title = EXCLUDED.title,
+      description = EXCLUDED.description,
+      price = EXCLUDED.price,
+      images = EXCLUDED.images,
+      amenities = EXCLUDED.amenities,
+      house_rules = EXCLUDED.house_rules,
+      household_languages = EXCLUDED.household_languages,
+      primary_home_language = EXCLUDED.primary_home_language,
+      lease_duration = EXCLUDED.lease_duration,
+      room_type = EXCLUDED.room_type,
+      move_in_date = EXCLUDED.move_in_date,
+      total_slots = EXCLUDED.total_slots,
+      available_slots = EXCLUDED.available_slots,
+      view_count = EXCLUDED.view_count,
+      status = EXCLUDED.status,
+      listing_created_at = EXCLUDED.listing_created_at,
+      address = EXCLUDED.address,
+      city = EXCLUDED.city,
+      state = EXCLUDED.state,
+      zip = EXCLUDED.zip,
+      location_geog = EXCLUDED.location_geog,
+      lat = EXCLUDED.lat,
+      lng = EXCLUDED.lng,
+      avg_rating = EXCLUDED.avg_rating,
+      review_count = EXCLUDED.review_count,
+      recommended_score = EXCLUDED.recommended_score,
+      amenities_lower = EXCLUDED.amenities_lower,
+      house_rules_lower = EXCLUDED.house_rules_lower,
+      household_languages_lower = EXCLUDED.household_languages_lower,
+      doc_updated_at = NOW()
+  `;
+}
+
+/**
  * Delete dirty flags for processed listings
  */
 async function clearDirtyFlags(listingIds: string[]): Promise<number> {
@@ -205,9 +235,8 @@ export async function GET(request: NextRequest) {
 
     // Defense in depth: validate secret configuration
     if (!cronSecret || cronSecret.length < 32) {
-      logger.sync.error(
+      console.error(
         "[SearchDoc Cron] CRON_SECRET not configured or too short (min 32 chars)",
-        { route: "/api/cron/refresh-search-docs" },
       );
       return NextResponse.json(
         { error: "Server configuration error" },
@@ -221,9 +250,7 @@ export async function GET(request: NextRequest) {
       cronSecret.startsWith("your-") ||
       cronSecret.startsWith("generate-")
     ) {
-      logger.sync.error("[SearchDoc Cron] CRON_SECRET contains placeholder value", {
-        route: "/api/cron/refresh-search-docs",
-      });
+      console.error("[SearchDoc Cron] CRON_SECRET contains placeholder value");
       return NextResponse.json(
         { error: "Server configuration error" },
         { status: 500 },
@@ -236,11 +263,8 @@ export async function GET(request: NextRequest) {
 
     const startTime = Date.now();
 
-    // 1. Fetch dirty listing IDs (oldest first) — with retry for transient DB errors
-    const dirtyIds = await withRetry(
-      () => fetchDirtyListingIds(BATCH_SIZE),
-      { context: 'fetchDirtyListingIds' },
-    );
+    // 1. Fetch dirty listing IDs (oldest first)
+    const dirtyIds = await fetchDirtyListingIds(BATCH_SIZE);
 
     if (dirtyIds.length === 0) {
       return NextResponse.json({
@@ -252,124 +276,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2. Fetch full listing data for dirty listings — with retry
-    const listings = await withRetry(
-      () => fetchListingsWithData(dirtyIds),
-      { context: 'fetchListingsWithData' },
-    );
+    // 2. Fetch full listing data for dirty listings
+    const listings = await fetchListingsWithData(dirtyIds);
     const foundIds = new Set(listings.map((l) => l.id));
 
-    // 3. Batch upsert search docs with single SQL INSERT (1 DB round-trip)
-    // P0 #16 fix: replaced N individual $executeRaw calls with single batch INSERT
+    // 3. Upsert search docs for each listing
     let upsertedCount = 0;
     const errors: string[] = [];
 
-    if (listings.length > 0) {
+    for (const listing of listings) {
       try {
-        // Pre-compute scores and lowercase arrays
-        const prepared = listings.map((listing) => ({
-          ...listing,
-          recommendedScore: computeRecommendedScore(
-            listing.avgRating,
-            listing.viewCount,
-            listing.reviewCount,
-            listing.createdAt,
-          ),
-          amenitiesLower: listing.amenities.map((a) => a.toLowerCase()),
-          houseRulesLower: listing.houseRules.map((r) => r.toLowerCase()),
-          householdLanguagesLower: listing.householdLanguages.map((l) => l.toLowerCase()),
-        }));
-
-        // Build single batch INSERT with multiple VALUES rows
-        const valuePlaceholders: string[] = [];
-        const params: any[] = [];
-        let paramIdx = 1;
-
-        for (const l of prepared) {
-          valuePlaceholders.push(`(
-            $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++},
-            $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++},
-            $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++},
-            $${paramIdx++}, $${paramIdx++}, $${paramIdx++},
-            $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++},
-            ST_SetSRID(ST_MakePoint($${paramIdx++}, $${paramIdx++}), 4326)::geography,
-            $${paramIdx++}, $${paramIdx++},
-            $${paramIdx++}, $${paramIdx++}, $${paramIdx++},
-            $${paramIdx++}, $${paramIdx++}, $${paramIdx++},
-            NOW(), NOW()
-          )`);
-          params.push(
-            l.id, l.ownerId, l.title, l.description, l.price, l.images,
-            l.amenities, l.houseRules, l.householdLanguages, l.primaryHomeLanguage,
-            l.leaseDuration, l.roomType, l.moveInDate, l.totalSlots, l.availableSlots,
-            l.viewCount, l.status, l.createdAt,
-            l.address, l.city, l.state, l.zip,
-            l.lng, l.lat,
-            l.lat, l.lng,
-            l.avgRating, l.reviewCount, l.recommendedScore,
-            l.amenitiesLower, l.houseRulesLower, l.householdLanguagesLower,
-          );
-        }
-
-        const batchSql = `
-          INSERT INTO listing_search_docs (
-            id, owner_id, title, description, price, images,
-            amenities, house_rules, household_languages, primary_home_language,
-            lease_duration, room_type, move_in_date, total_slots, available_slots,
-            view_count, status, listing_created_at,
-            address, city, state, zip, location_geog, lat, lng,
-            avg_rating, review_count, recommended_score,
-            amenities_lower, house_rules_lower, household_languages_lower,
-            doc_created_at, doc_updated_at
-          ) VALUES ${valuePlaceholders.join(", ")}
-          ON CONFLICT (id) DO UPDATE SET
-            owner_id = EXCLUDED.owner_id,
-            title = EXCLUDED.title,
-            description = EXCLUDED.description,
-            price = EXCLUDED.price,
-            images = EXCLUDED.images,
-            amenities = EXCLUDED.amenities,
-            house_rules = EXCLUDED.house_rules,
-            household_languages = EXCLUDED.household_languages,
-            primary_home_language = EXCLUDED.primary_home_language,
-            lease_duration = EXCLUDED.lease_duration,
-            room_type = EXCLUDED.room_type,
-            move_in_date = EXCLUDED.move_in_date,
-            total_slots = EXCLUDED.total_slots,
-            available_slots = EXCLUDED.available_slots,
-            view_count = EXCLUDED.view_count,
-            status = EXCLUDED.status,
-            listing_created_at = EXCLUDED.listing_created_at,
-            address = EXCLUDED.address,
-            city = EXCLUDED.city,
-            state = EXCLUDED.state,
-            zip = EXCLUDED.zip,
-            location_geog = EXCLUDED.location_geog,
-            lat = EXCLUDED.lat,
-            lng = EXCLUDED.lng,
-            avg_rating = EXCLUDED.avg_rating,
-            review_count = EXCLUDED.review_count,
-            recommended_score = EXCLUDED.recommended_score,
-            amenities_lower = EXCLUDED.amenities_lower,
-            house_rules_lower = EXCLUDED.house_rules_lower,
-            household_languages_lower = EXCLUDED.household_languages_lower,
-            doc_updated_at = NOW()
-        `;
-
-        await prisma.$executeRawUnsafe(batchSql, ...params);
-        upsertedCount = listings.length;
+        await upsertSearchDoc(listing);
+        upsertedCount++;
       } catch (error) {
-        // If batch fails, log error for all listings in the batch
-        const batchError = error instanceof Error ? error.message : "Unknown error";
-        logger.sync.error("[SearchDoc Cron] Batch upsert failed", {
-          error: batchError,
-          batchSize: listings.length,
-          route: "/api/cron/refresh-search-docs",
-        });
-        Sentry.captureException(error, { tags: { cron: 'refresh-search-docs', phase: 'batch-upsert' } });
-        for (const listing of listings) {
-          errors.push(`Listing ${listing.id}: ${batchError}`);
-        }
+        // Log error without PII (only listing ID)
+        errors.push(
+          `Listing ${listing.id}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
       }
     }
 
@@ -384,14 +307,19 @@ export async function GET(request: NextRequest) {
 
     const durationMs = Date.now() - startTime;
 
-    logger.sync.info("[SearchDoc Cron] Complete", {
+    console.log(JSON.stringify({
       event: "search_doc_cron_complete",
       processed: upsertedCount,
       orphans: orphanCount,
       errors: errors.length,
       totalDirty: dirtyIds.length,
       durationMs,
-    });
+    }));
+
+    console.log(
+      `[SearchDoc Cron] Processed: ${upsertedCount}, Orphans: ${orphanCount}, ` +
+        `Errors: ${errors.length}, Duration: ${durationMs}ms`,
+    );
 
     return NextResponse.json({
       success: errors.length === 0,
@@ -402,11 +330,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.sync.error("[SearchDoc Cron] Error", {
-      error: error instanceof Error ? error.message : String(error),
-      route: "/api/cron/refresh-search-docs",
-    });
-    Sentry.captureException(error, { tags: { cron: 'refresh-search-docs' } });
+    console.error("[SearchDoc Cron] Error:", error);
     return NextResponse.json(
       { error: "SearchDoc refresh failed" },
       { status: 500 },

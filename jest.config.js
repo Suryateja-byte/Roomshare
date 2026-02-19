@@ -23,6 +23,12 @@ const customJestConfig = {
     "<rootDir>/src/__tests__/fixtures/",
     "<rootDir>/tests/e2e/",
   ],
+  modulePathIgnorePatterns: [
+    "<rootDir>/.worktrees/",
+  ],
+  watchPathIgnorePatterns: [
+    "<rootDir>/.worktrees/",
+  ],
   collectCoverageFrom: [
     "src/**/*.{js,jsx,ts,tsx}",
     "!src/**/*.d.ts",

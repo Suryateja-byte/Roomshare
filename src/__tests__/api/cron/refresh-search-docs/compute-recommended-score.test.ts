@@ -7,7 +7,7 @@
  * - Logarithmic scaling on views (prevents gaming)
  */
 
-import { computeRecommendedScore } from "@/app/api/cron/refresh-search-docs/route";
+import { computeRecommendedScore } from "@/lib/search/recommended-score";
 
 describe("computeRecommendedScore", () => {
   // Helper to create a date N days ago

@@ -75,7 +75,7 @@ describe("fetchMoreListings", () => {
     expect(mockWithTimeout).toHaveBeenCalledWith(
       expect.any(Promise),
       DEFAULT_TIMEOUTS.DATABASE,
-      "fetchMore-V2"
+      "fetchMoreListings-executeSearchV2"
     );
 
     // Result passes through from V2
@@ -89,7 +89,7 @@ describe("fetchMoreListings", () => {
   it("falls back gracefully when V2 times out", async () => {
     // withTimeout rejects with TimeoutError
     mockWithTimeout.mockRejectedValue(
-      new TimeoutError("fetchMore-V2", DEFAULT_TIMEOUTS.DATABASE)
+      new TimeoutError("fetchMoreListings-executeSearchV2", DEFAULT_TIMEOUTS.DATABASE)
     );
 
     const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
