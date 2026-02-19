@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/refresh-search-docs",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-typing-status",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
