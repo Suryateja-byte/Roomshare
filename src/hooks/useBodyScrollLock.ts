@@ -2,17 +2,18 @@ import { useEffect, useRef } from "react";
 
 /**
  * Module-level reference counter for body scroll locks.
- *
- * Multiple components can request a lock simultaneously (e.g. bottom sheet +
- * filter modal). The counter ensures `overflow: hidden` is applied when the
- * first consumer locks and only removed when the *last* consumer unlocks,
- * preventing the race where one component restores scroll while another still
- * needs it locked.
+ * Uses position:fixed + scroll restoration to prevent iOS Safari rubber-banding.
  */
 let lockCount = 0;
+let savedScrollY = 0;
 
 function lock() {
   if (lockCount === 0) {
+    savedScrollY = window.scrollY;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${savedScrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
     document.body.style.overflow = "hidden";
   }
   lockCount++;
@@ -21,16 +22,19 @@ function lock() {
 function unlock() {
   lockCount = Math.max(0, lockCount - 1);
   if (lockCount === 0) {
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
     document.body.style.overflow = "";
+    window.scrollTo(0, savedScrollY);
   }
 }
 
 /**
  * Lock body scroll while `isLocked` is true.
- *
- * Uses a shared reference counter so multiple concurrent consumers
- * (bottom sheet, filter modal, search overlay) never race on
- * `document.body.style.overflow`.
+ * Uses position:fixed + scroll restoration to prevent iOS Safari rubber-banding.
+ * Shared reference counter ensures multiple concurrent consumers never race.
  */
 export function useBodyScrollLock(isLocked: boolean): void {
   const wasLocked = useRef(false);
@@ -51,4 +55,15 @@ export function useBodyScrollLock(isLocked: boolean): void {
       }
     };
   }, [isLocked]);
+}
+
+/** @internal Test-only reset. Not part of public API. */
+export function _resetLockStateForTesting(): void {
+  lockCount = 0;
+  savedScrollY = 0;
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.overflow = "";
 }
