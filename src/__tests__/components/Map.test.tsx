@@ -984,6 +984,11 @@ describe('Map Component', () => {
         }
       });
 
+      // Advance past the 150ms sourcedata debounce so the handler fires
+      await act(async () => {
+        jest.advanceTimersByTime(200);
+      });
+
       // Should have called querySourceFeatures via updateUnclusteredListings
       expect(mockMapInstance.querySourceFeatures).toHaveBeenCalled();
     });
