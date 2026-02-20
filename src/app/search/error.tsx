@@ -13,8 +13,9 @@ export default function SearchError({
     reset: () => void;
 }) {
     useEffect(() => {
-        // Log the error to an error reporting service
-        console.error('Search page error:', error);
+        if (process.env.NODE_ENV === 'development') {
+            console.error('Search page error:', error);
+        }
     }, [error]);
 
     return (
