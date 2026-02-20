@@ -104,31 +104,39 @@ test.describe('Map — Visual Regression', () => {
     await page.goto(searchUrl);
     await page.waitForLoadState('domcontentloaded');
 
-    // Turn OFF "search as I move" so panning triggers the banner
-    const toggle = page.locator('button[role="switch"]').filter({ hasText: /search as i move/i });
-    const toggleVisible = await toggle.isVisible({ timeout: 5000 }).catch(() => false);
-    if (toggleVisible) {
-      const isChecked = await toggle.getAttribute('aria-checked');
-      if (isChecked === 'true') {
-        await toggle.click();
-      }
-    }
-
-    // Pan the map programmatically to trigger "Search this area" banner
+    // Wait for map to be interactive
     await page.waitForFunction(
       () => !!(window as any).__e2eMapRef,
       null,
-      { timeout: 10_000 },
-    ).catch(() => {});
+      { timeout: 15_000 },
+    );
+    // Let initial auto-fly settle
+    await page.waitForTimeout(2000);
 
+    // Turn OFF "search as I move" so panning triggers the banner
+    const toggle = page.getByRole('switch', { name: /search as i move/i });
+    await toggle.waitFor({ state: 'visible', timeout: 5000 });
+    const isChecked = await toggle.getAttribute('aria-checked');
+    if (isChecked === 'true') {
+      await toggle.click();
+      // Wait for toggle state to propagate
+      await expect(toggle).toHaveAttribute('aria-checked', 'false', { timeout: 3000 });
+    }
+
+    // Use the dedicated E2E helper that clears the initial-move guard
+    // so the moveend is treated as a user interaction
     await page.evaluate(() => {
-      const map = (window as any).__e2eMapRef;
-      if (map) map.panBy([150, 0], { duration: 0 });
+      const fn = (window as any).__e2eSimulateUserPan;
+      if (fn) fn(200, 0);
     });
+    // Wait for moveend + React state update
+    await page.waitForTimeout(2000);
 
-    // Wait for the banner to appear
-    const banner = page.getByText('Search this area').first();
-    await banner.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+    // Scope to the map region — the list panel also has a "Search this area"
+    // banner (list variant) that comes first in DOM order but is hidden on desktop
+    const mapRegion = page.locator('[role="region"][aria-label*="Interactive map"]');
+    const banner = mapRegion.getByText('Search this area').first();
+    await banner.waitFor({ state: 'visible', timeout: 10_000 });
     await disableAnimations(page);
 
     const bannerContainer = banner.locator('..').locator('..');
