@@ -5,6 +5,7 @@ import { Map, MapPinOff } from 'lucide-react';
 import MobileBottomSheet from './search/MobileBottomSheet';
 import FloatingMapButton from './search/FloatingMapButton';
 import { useListingFocus } from '@/contexts/ListingFocusContext';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface SearchViewToggleProps {
   children: React.ReactNode;
@@ -19,25 +20,6 @@ interface SearchViewToggleProps {
   resultHeaderText?: string;
 }
 
-/**
- * Hook to detect desktop viewport (md breakpoint = 768px).
- * Returns undefined during SSR/hydration to avoid mismatch,
- * then resolves to true/false on the client.
- */
-function useIsDesktop(): boolean | undefined {
-  const [isDesktop, setIsDesktop] = useState<boolean | undefined>(undefined);
-
-  useEffect(() => {
-    const mql = window.matchMedia('(min-width: 768px)');
-    setIsDesktop(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, []);
-
-  return isDesktop;
-}
-
 export default function SearchViewToggle({
   children,
   mapComponent,
@@ -47,7 +29,7 @@ export default function SearchViewToggle({
   resultHeaderText,
 }: SearchViewToggleProps) {
   const mobileListRef = useRef<HTMLDivElement>(null);
-  const isDesktop = useIsDesktop();
+  const isDesktop = useMediaQuery('(min-width: 768px)');
   const [mobileSnap, setMobileSnap] = useState(1); // 0=collapsed, 1=half, 2=expanded
   const { activeId } = useListingFocus();
 
@@ -70,6 +52,10 @@ export default function SearchViewToggle({
   const renderMapInMobile = isDesktop === false;
   const renderMapInDesktop = isDesktop !== false && shouldShowMap;
 
+  // Prevent dual children mount: render children in exactly one container.
+  const showChildrenInMobile = isDesktop === false;
+  const showChildrenInDesktop = isDesktop !== false;
+
   return (
     <>
       {/* Mobile: Map always visible with bottom sheet overlay */}
@@ -87,12 +73,14 @@ export default function SearchViewToggle({
           snapIndex={mobileSnap}
           onSnapChange={setMobileSnap}
         >
-          <div
-            ref={mobileListRef}
-            data-testid="mobile-search-results-container"
-          >
-            {children}
-          </div>
+          {showChildrenInMobile && (
+            <div
+              ref={mobileListRef}
+              data-testid="mobile-search-results-container"
+            >
+              {children}
+            </div>
+          )}
         </MobileBottomSheet>
 
         {/* Floating toggle pill */}
@@ -111,7 +99,7 @@ export default function SearchViewToggle({
             shouldShowMap ? 'w-[55%]' : 'w-full'
           }`}
         >
-          {children}
+          {showChildrenInDesktop && children}
         </div>
 
         {/* Right Panel: Map View (45%) */}
