@@ -302,11 +302,11 @@ export default function MobileBottomSheet({
         animate={
           isDragging
             ? { height: displayHeightPx }
-            : { height: `${displayHeightVh}vh` }
+            : { height: `${displayHeightVh}dvh` }
         }
         transition={isDragging ? { duration: 0 } : { type: "spring", ...SPRING_CONFIG }}
         style={{
-          willChange: "height, transform",
+          willChange: isDragging ? "height" : "auto",
           // P0-FIX (#82, #73): Allow map touches to pass through when collapsed.
           // Only capture pointer events on the visible handle/content areas.
           // touchAction moved to drag handle only to allow map pan gestures.
@@ -318,14 +318,15 @@ export default function MobileBottomSheet({
           // Prevent flickering during animations on iOS
           WebkitBackfaceVisibility: "hidden",
           backfaceVisibility: "hidden",
+          overscrollBehavior: "contain",
           // P2-FIX (#128): CSS custom properties for snap points.
           // Exposed as CSS variables so child components or global styles can use them.
           // Example usage: .listing-card { scroll-snap-align: start; }
-          "--snap-collapsed": `${SNAP_COLLAPSED * 100}vh`,
-          "--snap-half": `${SNAP_HALF * 100}vh`,
-          "--snap-expanded": `${SNAP_EXPANDED * 100}vh`,
+          "--snap-collapsed": `${SNAP_COLLAPSED * 100}dvh`,
+          "--snap-half": `${SNAP_HALF * 100}dvh`,
+          "--snap-expanded": `${SNAP_EXPANDED * 100}dvh`,
           "--snap-current-index": snapIndex,
-          "--snap-current-height": `${SNAP_POINTS[snapIndex] * 100}vh`,
+          "--snap-current-height": `${SNAP_POINTS[snapIndex] * 100}dvh`,
         } as React.CSSProperties}
       >
         {/* Drag handle area */}
@@ -376,7 +377,7 @@ export default function MobileBottomSheet({
                 setSnapIndex(2);
               }
             }}
-            className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600 mx-auto mb-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="w-12 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 mx-auto mb-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           />
 
           {/* Header content */}
@@ -436,7 +437,7 @@ export default function MobileBottomSheet({
             // When fully collapsed, map interaction is more important than content.
             pointerEvents: isCollapsed ? "none" : "auto",
             // P2-FIX (#105): GPU acceleration hints for smooth scrolling
-            willChange: "scroll-position",
+            willChange: isDragging ? "scroll-position" : "auto",
             // Force GPU layer for scroll performance
             transform: "translateZ(0)",
             // P2-FIX (#128): CSS scroll-snap for native-like content scrolling

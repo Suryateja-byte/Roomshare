@@ -44,7 +44,7 @@ export default function FloatingMapButton({
             // P2-FIX (#134): Add safe-area-inset-bottom for notched devices.
             isListMode
               ? "bottom-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
-              : "bottom-[calc(15vh+1rem)] pb-[env(safe-area-inset-bottom,0px)]"
+              : "bottom-[calc(15dvh+1rem)] pb-[env(safe-area-inset-bottom,0px)]"
           }`}
           aria-label={isListMode ? "Show map" : "Show list"}
         >

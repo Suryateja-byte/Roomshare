@@ -179,9 +179,9 @@ test.describe("Mobile Bottom Sheet - Snap Points (7.1)", () => {
       };
     });
 
-    expect(cssVars.collapsed).toBe("15vh");
-    expect(cssVars.half).toBe("50vh");
-    expect(cssVars.expanded).toBe("85vh");
+    expect(cssVars.collapsed).toBe("15dvh");
+    expect(cssVars.half).toBe("50dvh");
+    expect(cssVars.expanded).toBe("85dvh");
   });
 });
 
