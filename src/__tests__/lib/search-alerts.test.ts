@@ -21,9 +21,21 @@ jest.mock('@/lib/email', () => ({
   sendNotificationEmail: jest.fn(),
 }))
 
+jest.mock('@/lib/logger', () => ({
+  logger: {
+    sync: {
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    },
+  },
+}))
+
 import { processSearchAlerts, triggerInstantAlerts } from '@/lib/search-alerts'
 import { prisma } from '@/lib/prisma'
 import { sendNotificationEmail } from '@/lib/email'
+import { logger } from '@/lib/logger'
 
 describe('search-alerts', () => {
   const mockUser = {
@@ -494,6 +506,26 @@ describe('search-alerts', () => {
 
         expect(result.errors).toBe(1)
         expect(result.sent).toBe(0)
+      })
+    })
+
+    describe('PII compliance', () => {
+      it('does not log userId in any logger call', async () => {
+        ;(prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([instantSearch])
+        ;(prisma.notification.create as jest.Mock).mockResolvedValue({})
+        ;(prisma.savedSearch.update as jest.Mock).mockResolvedValue({})
+
+        await triggerInstantAlerts(newListing)
+
+        const mockLogger = logger.sync as unknown as Record<string, jest.Mock>
+        for (const method of ['debug', 'info', 'warn', 'error']) {
+          for (const call of mockLogger[method].mock.calls) {
+            const metadata = call[1]
+            if (metadata && typeof metadata === 'object') {
+              expect(metadata).not.toHaveProperty('userId')
+            }
+          }
+        }
       })
     })
   })
