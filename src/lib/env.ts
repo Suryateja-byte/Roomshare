@@ -257,10 +257,19 @@ export const clientEnv: ClientEnv = new Proxy({} as ClientEnv, {
   get: (_, prop) => getClientEnv()[prop as keyof ClientEnv],
 });
 
-export const CURSOR_SECRET = process.env.CURSOR_SECRET ?? "";
-if (!CURSOR_SECRET && process.env.NODE_ENV === "production") {
-  throw new Error("[SECURITY] CURSOR_SECRET is required in production — cursor tokens cannot be verified without it");
+// Lazy getter — avoids throwing at import time during `next build` static generation
+let _cursorSecretChecked = false;
+export function getCursorSecret(): string {
+  const secret = process.env.CURSOR_SECRET ?? "";
+  if (!secret && process.env.NODE_ENV === "production" && !_cursorSecretChecked) {
+    _cursorSecretChecked = true;
+    throw new Error("[SECURITY] CURSOR_SECRET is required in production — cursor tokens cannot be verified without it");
+  }
+  _cursorSecretChecked = true;
+  return secret;
 }
+// Backward-compatible export — defers check to first access
+export const CURSOR_SECRET = process.env.CURSOR_SECRET ?? "";
 
 // Helper to check if a feature is available
 // Uses getters to defer env access to runtime (prevents import-time validation noise)
