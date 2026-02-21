@@ -102,7 +102,8 @@ export async function getUsers(options?: {
         logger.sync.error('Failed to fetch users (admin)', {
             action: 'getUsers',
             adminId: adminCheck.userId,
-            options,
+            hasSearch: !!options?.search,
+            filters: { isVerified: options?.isVerified, isAdmin: options?.isAdmin, isSuspended: options?.isSuspended },
             error: error instanceof Error ? error.message : 'Unknown error',
         });
         return { error: 'Failed to fetch users', users: [], total: 0 };
