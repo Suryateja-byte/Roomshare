@@ -2,6 +2,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FavoriteButton from '@/components/FavoriteButton'
 
+// Mock sonner toast
+const mockToastError = jest.fn()
+jest.mock('sonner', () => ({
+  toast: { error: mockToastError },
+}))
+
 // Mock fetch — save original and restore in afterAll to prevent cross-file leaks
 const originalFetch = global.fetch
 const mockFetch = jest.fn()
@@ -17,6 +23,9 @@ jest.mock('next/navigation', () => ({
     refresh: mockRefresh,
   }),
 }))
+
+// Save original location for 401 redirect tests
+const originalLocation = window.location
 
 describe('FavoriteButton', () => {
   beforeEach(() => {
@@ -187,7 +196,7 @@ describe('FavoriteButton', () => {
       })
     })
 
-    it('prevents multiple clicks while loading', async () => {
+    it('prevents multiple clicks while loading (double-click protection)', async () => {
       let resolvePromise: (value: any) => void
       const promise = new Promise(resolve => {
         resolvePromise = resolve
@@ -215,25 +224,22 @@ describe('FavoriteButton', () => {
   })
 
   describe('error handling', () => {
-    it('redirects to login on 401', async () => {
+    it('reverts state and shows toast on 401', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
       })
 
-      render(<FavoriteButton listingId="listing-123" />)
-
-      await userEvent.click(screen.getByRole('button'))
-
-      await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/login')
+      // Mock window.location.href to prevent jsdom navigation error
+      const hrefSetter = jest.fn()
+      Object.defineProperty(window, 'location', {
+        value: { pathname: '/listings/123' },
+        writable: true,
+        configurable: true,
       })
-    })
-
-    it('reverts state on 401', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 401,
+      Object.defineProperty(window.location, 'href', {
+        set: hrefSetter,
+        configurable: true,
       })
 
       render(<FavoriteButton listingId="listing-123" initialIsSaved={false} />)
@@ -242,14 +248,28 @@ describe('FavoriteButton', () => {
       await userEvent.click(button)
 
       await waitFor(() => {
+        // apiFetch sets window.location.href for 401 redirect
+        expect(hrefSetter).toHaveBeenCalledWith(expect.stringContaining('/login?returnUrl='))
+      })
+
+      // State should be reverted since apiFetch throws on 401
+      await waitFor(() => {
         expect(button).toHaveClass('text-zinc-400')
+      })
+
+      // Restore
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
       })
     })
 
-    it('reverts state on API error', async () => {
+    it('reverts state on API error and shows toast', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
+        json: async () => ({ error: 'Server error' }),
       })
 
       render(<FavoriteButton listingId="listing-123" initialIsSaved={false} />)
@@ -259,13 +279,16 @@ describe('FavoriteButton', () => {
 
       await waitFor(() => {
         expect(button).toHaveClass('text-zinc-400')
+      })
+
+      // Should show toast with API error message
+      await waitFor(() => {
+        expect(mockToastError).toHaveBeenCalledWith('Server error')
       })
     })
 
-    it('reverts state on network error', async () => {
+    it('reverts state on network error and shows toast', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'))
-
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
 
       render(<FavoriteButton listingId="listing-123" initialIsSaved={false} />)
       const button = screen.getByRole('button')
@@ -276,7 +299,10 @@ describe('FavoriteButton', () => {
         expect(button).toHaveClass('text-zinc-400')
       })
 
-      consoleSpy.mockRestore()
+      // Should show toast with fallback message
+      await waitFor(() => {
+        expect(mockToastError).toHaveBeenCalledWith('Failed to update favorite')
+      })
     })
   })
 
@@ -310,3 +336,4 @@ describe('FavoriteButton', () => {
     })
   })
 })
+

@@ -10,6 +10,7 @@ import { DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/nextjs';
 import { isOriginAllowed, isHostAllowed } from '@/lib/origin-guard';
+import { validateCoordinates } from '@/lib/validation';
 
 /**
  * Neighborhood Chat API Route
@@ -34,24 +35,6 @@ import { isOriginAllowed, isHostAllowed } from '@/lib/origin-guard';
 
 // CRITICAL: Force Node.js runtime for crypto compatibility
 export const runtime = 'nodejs';
-
-// ============ COORDINATE VALIDATION ============
-
-function validateCoordinates(
-  lat: unknown,
-  lng: unknown
-): { valid: boolean; lat?: number; lng?: number } {
-  if (typeof lat !== 'number' || typeof lng !== 'number') {
-    return { valid: false };
-  }
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return { valid: false };
-  }
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-    return { valid: false };
-  }
-  return { valid: true, lat, lng };
-}
 
 // ============ STRICT CHAT PAYLOAD VALIDATION ============
 

@@ -1,8 +1,8 @@
 /**
- * Bounds Validation Utility
+ * Validation Utilities
  *
- * Validates and parses map bounding box parameters to prevent:
- * - NaN/Infinity attacks
+ * Shared coordinate parsing and bounds validation to prevent:
+ * - NaN/Infinity propagation from user input
  * - World-query full-table scans
  * - Out-of-range coordinates
  */
@@ -19,6 +19,70 @@ import {
 
 // Re-export for backward compatibility
 export { MAX_LAT_SPAN, MAX_LNG_SPAN };
+
+// ============ COORDINATE PARSING & VALIDATION ============
+
+/**
+ * Safely parses a string or number into a finite number.
+ * Returns null for NaN, Infinity, empty strings, and non-numeric input.
+ */
+export function parseCoordinate(val: unknown): number | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'number') {
+    return Number.isFinite(val) ? val : null;
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed === '') return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/** Checks whether a latitude value is within [-90, 90]. */
+export function validateLatitude(lat: number): boolean {
+  return Number.isFinite(lat) && lat >= -90 && lat <= 90;
+}
+
+/** Checks whether a longitude value is within [-180, 180]. */
+export function validateLongitude(lng: number): boolean {
+  return Number.isFinite(lng) && lng >= -180 && lng <= 180;
+}
+
+/**
+ * Validates a bounding box object for geographic correctness.
+ * Checks that all values are finite, within range, and minLat < maxLat.
+ */
+export function validateBounds(bounds: {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}): boolean {
+  return (
+    validateLatitude(bounds.minLat) &&
+    validateLatitude(bounds.maxLat) &&
+    validateLongitude(bounds.minLng) &&
+    validateLongitude(bounds.maxLng) &&
+    bounds.minLat < bounds.maxLat
+  );
+}
+
+/**
+ * Validates coordinate pair (lat, lng) — accepts number or unknown input.
+ * Returns validated numbers if valid, or { valid: false } otherwise.
+ */
+export function validateCoordinates(
+  lat: unknown,
+  lng: unknown,
+): { valid: true; lat: number; lng: number } | { valid: false } {
+  const parsedLat = typeof lat === 'number' ? lat : parseCoordinate(lat);
+  const parsedLng = typeof lng === 'number' ? lng : parseCoordinate(lng);
+  if (parsedLat === null || parsedLng === null) return { valid: false };
+  if (!validateLatitude(parsedLat) || !validateLongitude(parsedLng)) return { valid: false };
+  return { valid: true, lat: parsedLat, lng: parsedLng };
+}
 
 export interface MapBounds {
   minLng: number;

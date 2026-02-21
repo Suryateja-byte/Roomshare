@@ -486,7 +486,6 @@ describe('admin actions', () => {
       const result = await deleteListing('listing-123')
 
       expect(result.error).toBe('Cannot delete listing with active bookings')
-      expect(result.activeBookings).toBe(2)
     })
 
     it('deletes listing and notifies pending tenants', async () => {
@@ -495,7 +494,6 @@ describe('admin actions', () => {
       ;(prisma.booking.findMany as jest.Mock).mockResolvedValue([
         { id: 'booking-1', tenantId: 'tenant-1' },
       ])
-      ;(prisma.$transaction as jest.Mock).mockResolvedValue([])
       ;(logAdminAction as jest.Mock).mockResolvedValue({})
 
       const result = await deleteListing('listing-123')
@@ -508,7 +506,6 @@ describe('admin actions', () => {
       ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
       ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
       ;(prisma.booking.findMany as jest.Mock).mockResolvedValue([])
-      ;(prisma.$transaction as jest.Mock).mockResolvedValue([])
       ;(logAdminAction as jest.Mock).mockResolvedValue({})
 
       await deleteListing('listing-123')

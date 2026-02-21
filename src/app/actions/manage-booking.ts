@@ -231,6 +231,7 @@ export async function updateBookingStatus(
         if (status === 'CANCELLED') {
             if (booking.status === 'ACCEPTED') {
                 // P0-04 FIX: Atomically update booking with optimistic lock and increment slots
+                // BIZ-07 FIX: Use bounded SQL increment to enforce availableSlots <= totalSlots
                 try {
                     await prisma.$transaction(async (tx) => {
                         const updateResult = await tx.booking.updateMany({
@@ -248,10 +249,25 @@ export async function updateBookingStatus(
                             throw new Error('CONCURRENT_MODIFICATION');
                         }
 
-                        await tx.listing.update({
-                            where: { id: booking.listing.id },
-                            data: { availableSlots: { increment: 1 } }
-                        });
+                        // BIZ-07: Conditionally increment availableSlots with guard
+                        // The WHERE clause prevents availableSlots from exceeding totalSlots
+                        const slotResult = await tx.$queryRaw<Array<{ availableSlots: number }>>`
+                            UPDATE "Listing"
+                            SET "availableSlots" = "availableSlots" + 1
+                            WHERE "id" = ${booking.listing.id}
+                            AND "availableSlots" < "totalSlots"
+                            RETURNING "availableSlots"
+                        `;
+
+                        if (slotResult.length === 0) {
+                            // availableSlots already at totalSlots — no increment needed
+                            // This can happen if slots were manually corrected; log but don't rollback
+                            logger.sync.warn('Slot increment skipped: availableSlots already at totalSlots', {
+                                action: 'updateBookingStatus',
+                                bookingId,
+                                listingId: booking.listing.id,
+                            });
+                        }
                     });
                 } catch (error) {
                     if (error instanceof Error && error.message === 'CONCURRENT_MODIFICATION') {
@@ -348,7 +364,7 @@ export async function getMyBookings() {
                     }
                 },
                 tenant: {
-                    select: { id: true, name: true, image: true, email: true }
+                    select: { id: true, name: true, image: true }
                 }
             },
             orderBy: { createdAt: 'desc' }

@@ -46,9 +46,25 @@ const RATE_LIMIT_CONFIGS: Record<
 };
 
 /**
- * Wrapper function to add Redis-backed rate limiting to API route handlers.
+ * Rate-limit guard for **high-traffic API route handlers** using Redis (Upstash).
  *
- * Uses fallback-limited behavior when Redis is unavailable.
+ * Provides lower-latency rate limiting than the DB-backed `withRateLimit` by using
+ * Upstash Redis sliding-window counters. Falls back to an in-memory limiter when
+ * Redis is unavailable.
+ *
+ * **When to use**: API route handlers for high-traffic endpoints where DB-backed
+ * rate limiting would add too much latency (map, search, chat, metrics).
+ * For lower-traffic endpoints, prefer `withRateLimit` from `@/lib/with-rate-limit`.
+ *
+ * **Interface contract**: Same as `withRateLimit` — returns `NextResponse | null`.
+ * - `null` → request is within limits, proceed with handler logic.
+ * - `NextResponse` → 429 response with rate-limit headers. Return it immediately.
+ *
+ * **Supported types**: 'chat', 'map', 'metrics', 'search-count', 'search-v2', 'listings-read'
+ *
+ * @param request - The incoming HTTP request (provides IP for identification)
+ * @param options - Rate limit configuration (type key, optional custom identifier)
+ * @returns `null` if allowed, or a 429 `NextResponse` if rate-limited
  *
  * @example
  * export async function GET(request: Request) {

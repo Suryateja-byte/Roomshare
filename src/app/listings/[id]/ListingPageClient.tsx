@@ -34,6 +34,7 @@ import ContactHostButton from '@/components/ContactHostButton';
 import DeleteListingButton from '@/components/DeleteListingButton';
 import ReportButton from '@/components/ReportButton';
 import ShareListingButton from '@/components/ShareListingButton';
+import { ErrorBoundary } from '@/components/error/ErrorBoundary';
 import SaveListingButton from '@/components/SaveListingButton';
 import ListingStatusToggle from '@/components/ListingStatusToggle';
 import ListingFreshnessCheck from '@/components/ListingFreshnessCheck';
@@ -254,7 +255,11 @@ export default function ListingPageClient({
                             {!isOwner && isLoggedIn && (
                                 <SaveListingButton listingId={listing.id} />
                             )}
-                            {!isOwner && <ReportButton listingId={listing.id} />}
+                            {!isOwner && (
+                                <ErrorBoundary fallback={<span className="text-xs text-zinc-400">Report unavailable</span>}>
+                                    <ReportButton listingId={listing.id} />
+                                </ErrorBoundary>
+                            )}
                         </div>
                     </div>
 
@@ -458,13 +463,19 @@ export default function ListingPageClient({
                                 </div>
 
                                 {!isOwner && (
-                                    <ReviewForm
-                                        listingId={listing.id}
-                                        isLoggedIn={isLoggedIn}
-                                        hasExistingReview={!!userExistingReview}
-                                        hasBookingHistory={userHasBooking}
-                                        existingReview={userExistingReview || undefined}
-                                    />
+                                    <ErrorBoundary fallback={
+                                        <div role="alert" className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">
+                                            Something went wrong loading the review form. Please refresh the page.
+                                        </div>
+                                    }>
+                                        <ReviewForm
+                                            listingId={listing.id}
+                                            isLoggedIn={isLoggedIn}
+                                            hasExistingReview={!!userExistingReview}
+                                            hasBookingHistory={userHasBooking}
+                                            existingReview={userExistingReview || undefined}
+                                        />
+                                    </ErrorBoundary>
                                 )}
                             </div>
                         </div>
@@ -543,15 +554,22 @@ export default function ListingPageClient({
 
                                 {/* Guest Booking Card */}
                                 {!isOwner && (
-                                    <BookingForm
-                                        listingId={listing.id}
-                                        price={listing.price}
-                                        ownerId={listing.ownerId}
-                                        isOwner={isOwner}
-                                        isLoggedIn={isLoggedIn}
-                                        status={listing.status as 'ACTIVE' | 'PAUSED' | 'RENTED'}
-                                        bookedDates={bookedDates}
-                                    />
+                                    <ErrorBoundary fallback={
+                                        <div role="alert" className="rounded-3xl border border-red-200 dark:border-red-800 bg-white dark:bg-zinc-900 p-6 text-center">
+                                            <p className="text-red-600 dark:text-red-400 font-medium mb-2">Something went wrong with the booking form.</p>
+                                            <p className="text-sm text-zinc-500 dark:text-zinc-400">Please refresh the page to try again.</p>
+                                        </div>
+                                    }>
+                                        <BookingForm
+                                            listingId={listing.id}
+                                            price={listing.price}
+                                            ownerId={listing.ownerId}
+                                            isOwner={isOwner}
+                                            isLoggedIn={isLoggedIn}
+                                            status={listing.status as 'ACTIVE' | 'PAUSED' | 'RENTED'}
+                                            bookedDates={bookedDates}
+                                        />
+                                    </ErrorBoundary>
                                 )}
                             </div>
                         </div>

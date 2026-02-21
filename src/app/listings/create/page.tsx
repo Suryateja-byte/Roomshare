@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 import ProfileWarningBanner from './ProfileWarningBanner';
+import { ErrorBoundary } from '@/components/error/ErrorBoundary';
 
 export default async function CreateListingPage() {
     const session = await auth();
@@ -65,7 +66,14 @@ export default async function CreateListingPage() {
                 )}
 
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 md:p-12 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800">
-                    <CreateListingForm />
+                    <ErrorBoundary fallback={
+                        <div role="alert" className="p-6 text-center">
+                            <p className="text-red-600 dark:text-red-400 font-medium mb-2">Something went wrong with the listing form.</p>
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400">Please refresh the page to try again.</p>
+                        </div>
+                    }>
+                        <CreateListingForm />
+                    </ErrorBoundary>
                 </div>
             </div>
         </div>

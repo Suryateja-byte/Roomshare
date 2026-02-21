@@ -10,6 +10,7 @@ import { executeSearchV2 } from '@/lib/search/search-v2-service';
 import { V2MapDataSetter } from '@/components/search/V2MapDataSetter';
 import { V1PathResetSetter } from '@/components/search/V1PathResetSetter';
 import { SearchResultsLoadingWrapper } from '@/components/search/SearchResultsLoadingWrapper';
+import { ErrorBoundary } from '@/components/error/ErrorBoundary';
 import { AppliedFilterChips } from '@/components/filters/AppliedFilterChips';
 import { CategoryBar } from '@/components/search/CategoryBar';
 import { RecommendedFilters } from '@/components/search/RecommendedFilters';
@@ -358,19 +359,26 @@ export default async function SearchPage({
                 </div>
             </div>
 
-            <SearchResultsClient
-                key={searchParamsString}
-                initialListings={listings}
-                initialNextCursor={initialNextCursor}
-                initialTotal={total}
-                savedListingIds={savedListingIds}
-                searchParamsString={searchParamsString}
-                query={q ?? ""}
-                browseMode={browseMode}
-                hasConfirmedZeroResults={hasConfirmedZeroResults}
-                filterSuggestions={filterSuggestions}
-                sortOption={sortOption}
-            />
+            <ErrorBoundary fallback={
+                <div role="alert" className="p-8 text-center">
+                    <p className="text-red-600 dark:text-red-400 font-medium mb-2">Something went wrong loading search results.</p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Please refresh the page to try again.</p>
+                </div>
+            }>
+                <SearchResultsClient
+                    key={searchParamsString}
+                    initialListings={listings}
+                    initialNextCursor={initialNextCursor}
+                    initialTotal={total}
+                    savedListingIds={savedListingIds}
+                    searchParamsString={searchParamsString}
+                    query={q ?? ""}
+                    browseMode={browseMode}
+                    hasConfirmedZeroResults={hasConfirmedZeroResults}
+                    filterSuggestions={filterSuggestions}
+                    sortOption={sortOption}
+                />
+            </ErrorBoundary>
             </div>
         </div>
     );

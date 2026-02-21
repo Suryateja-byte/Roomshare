@@ -325,6 +325,7 @@ describe('Chat Actions', () => {
           conversationId: 'conv-123',
           senderId: { not: 'user-123' },
           read: false,
+          deletedAt: null,
         },
         data: { read: true },
       })

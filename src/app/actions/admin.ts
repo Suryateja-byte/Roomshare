@@ -372,55 +372,65 @@ export async function deleteListing(listingId: string) {
             return { error: 'Listing not found' };
         }
 
-        // Check for active ACCEPTED bookings - block deletion if any exist
-        const activeAcceptedBookings = await prisma.booking.count({
-            where: {
-                listingId,
-                status: 'ACCEPTED',
-                endDate: { gte: new Date() }
-            }
-        });
-
-        if (activeAcceptedBookings > 0) {
-            return {
-                error: 'Cannot delete listing with active bookings',
-                message: `This listing has ${activeAcceptedBookings} active booking(s). The owner must cancel them first.`,
-                activeBookings: activeAcceptedBookings
-            };
-        }
-
-        // Get all pending bookings to notify tenants before deletion
-        const pendingBookings = await prisma.booking.findMany({
-            where: {
-                listingId,
-                status: 'PENDING'
-            },
-            select: {
-                id: true,
-                tenantId: true
-            }
-        });
-
-        // Create notifications for tenants with pending bookings
-        const notificationPromises = pendingBookings.map(booking =>
-            prisma.notification.create({
-                data: {
-                    userId: booking.tenantId,
-                    type: 'BOOKING_CANCELLED',
-                    title: 'Booking Request Cancelled',
-                    message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
-                    link: '/bookings'
+        // Interactive transaction: prevents TOCTOU race where a booking could be
+        // accepted between the active-bookings check and the listing deletion
+        const pendingBookings = await prisma.$transaction(async (tx) => {
+            // Re-check active ACCEPTED bookings INSIDE transaction
+            const activeAcceptedBookings = await tx.booking.count({
+                where: {
+                    listingId,
+                    status: 'ACCEPTED',
+                    endDate: { gte: new Date() }
                 }
-            })
-        );
+            });
 
-        // Delete listing and send notifications in transaction
-        await prisma.$transaction([
-            ...notificationPromises,
-            prisma.listing.delete({
+            if (activeAcceptedBookings > 0) {
+                throw new Error('ACTIVE_BOOKINGS');
+            }
+
+            // Get all pending bookings to notify tenants before deletion
+            const pending = await tx.booking.findMany({
+                where: {
+                    listingId,
+                    status: 'PENDING'
+                },
+                select: {
+                    id: true,
+                    tenantId: true
+                }
+            });
+
+            // Cancel pending bookings before deletion
+            if (pending.length > 0) {
+                await tx.booking.updateMany({
+                    where: {
+                        listingId,
+                        status: 'PENDING'
+                    },
+                    data: { status: 'CANCELLED' }
+                });
+            }
+
+            // Create notifications for tenants with pending bookings
+            for (const booking of pending) {
+                await tx.notification.create({
+                    data: {
+                        userId: booking.tenantId,
+                        type: 'BOOKING_CANCELLED',
+                        title: 'Booking Request Cancelled',
+                        message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
+                        link: '/bookings'
+                    }
+                });
+            }
+
+            // Delete listing (cascades related records)
+            await tx.listing.delete({
                 where: { id: listingId }
-            })
-        ]);
+            });
+
+            return pending;
+        });
 
         // Audit log
         await logAdminAction({
@@ -439,6 +449,14 @@ export async function deleteListing(listingId: string) {
         revalidatePath('/admin/listings');
         return { success: true, notifiedTenants: pendingBookings.length };
     } catch (error) {
+        // Handle active bookings error thrown from inside transaction
+        if (error instanceof Error && error.message === 'ACTIVE_BOOKINGS') {
+            return {
+                error: 'Cannot delete listing with active bookings',
+                message: 'This listing has active booking(s). The owner must cancel them first.',
+            };
+        }
+
         logger.sync.error('Failed to delete listing (admin)', {
             action: 'deleteListing',
             adminId: adminCheck.userId,

@@ -35,11 +35,15 @@ import {
   KEYWORD_CATEGORY_MAP,
   shouldIncludePlace,
 } from "@/lib/nearby-categories";
+import {
+  validateLatitude,
+  validateLongitude,
+} from "@/lib/validation";
 
 // Validation schema for request body
 const requestSchema = z.object({
-  listingLat: z.number().min(-90).max(90),
-  listingLng: z.number().min(-180).max(180),
+  listingLat: z.number().refine(validateLatitude, { message: "Latitude must be between -90 and 90" }),
+  listingLng: z.number().refine(validateLongitude, { message: "Longitude must be between -180 and 180" }),
   query: z.string().max(100).optional(),
   categories: z.array(z.string()).optional(),
   radiusMeters: z.union([
@@ -389,9 +393,9 @@ export async function POST(request: Request) {
     const places: NearbyPlace[] = (radarData.places || [])
       .map((place): NearbyPlace | null => {
         // Null safety: skip null/undefined entries and places with missing coordinates
-        if (!place || !place.location?.coordinates?.length) {
+        if (!place || !place.location?.coordinates || place.location.coordinates.length < 2) {
           if (place) {
-            logger.sync.warn("Place missing coordinates", { placeId: place._id });
+            logger.sync.warn("Place missing or malformed coordinates", { placeId: place._id });
           }
           return null;
         }
@@ -399,6 +403,11 @@ export async function POST(request: Request) {
         // Radar returns [lng, lat] in coordinates
         const placeLat = place.location.coordinates[1];
         const placeLng = place.location.coordinates[0];
+
+        if (!validateLatitude(placeLat) || !validateLongitude(placeLng)) {
+          logger.sync.warn("Place has invalid coordinates", { placeId: place._id });
+          return null;
+        }
 
         const nearbyPlace: NearbyPlace = {
           id:

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, Plus, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useImageUpload } from '@/hooks/useImageUpload';
 
 interface ImageObject {
     file?: File;
@@ -36,6 +37,11 @@ export default function ImageUploader({
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const { uploadImage, validateFile } = useImageUpload({
+        uploadType: 'listing',
+        maxFiles: maxImages,
+    });
+
     // Handle standard file input
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
@@ -62,30 +68,13 @@ export default function ImageUploader({
         processFiles(files);
     };
 
-    // Upload a single file to the server
-    const uploadFile = async (file: File): Promise<string> => {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('type', 'listing');
-
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!response.ok) {
-            const data = await response.json();
-            throw new Error(data.error || 'Upload failed');
-        }
-
-        const data = await response.json();
-        return data.url;
-    };
-
     // Process files: Create preview URLs and optionally upload
     const processFiles = async (newFiles: File[]) => {
-        // Filter for images only
-        const validImageFiles = newFiles.filter(file => file.type.startsWith('image/'));
+        // Filter for valid images using the hook's validation
+        const validImageFiles = newFiles.filter(file => {
+            const error = validateFile(file);
+            return error === null;
+        });
 
         // Check max limit
         const remainingSlots = maxImages - images.length;
@@ -105,11 +94,11 @@ export default function ImageUploader({
         const updatedImages = [...images, ...newImageObjects];
         setImages(updatedImages);
 
-        // If uploading to cloud, process uploads
+        // If uploading to cloud, process uploads using the shared hook
         if (uploadToCloud) {
             for (const imgObj of newImageObjects) {
                 try {
-                    const url = await uploadFile(imgObj.file!);
+                    const url = await uploadImage(imgObj.file!);
                     setImages(prev => prev.map(img =>
                         img.id === imgObj.id
                             ? { ...img, uploadedUrl: url, isUploading: false }
@@ -142,7 +131,7 @@ export default function ImageUploader({
         setImages(updatedImages);
     };
 
-    // Retry a failed upload
+    // Retry a failed upload using the shared hook
     const retryUpload = async (imageId: string) => {
         const img = images.find(i => i.id === imageId);
         if (!img?.file) return;
@@ -155,7 +144,7 @@ export default function ImageUploader({
         ));
 
         try {
-            const url = await uploadFile(img.file);
+            const url = await uploadImage(img.file);
             setImages(prev => prev.map(i =>
                 i.id === imageId
                     ? { ...i, uploadedUrl: url, isUploading: false, error: undefined }

@@ -14,7 +14,22 @@ interface RateLimitOptions {
 }
 
 /**
- * Wrapper function to add rate limiting to API route handlers
+ * Rate-limit guard for **API route handlers** (route.ts files).
+ *
+ * Uses the DB-backed (PostgreSQL) sliding-window rate limiter. For high-traffic
+ * endpoints (map, search, chat), prefer `withRateLimitRedis` from
+ * `@/lib/with-rate-limit-redis` which uses Upstash Redis for lower latency.
+ *
+ * **When to use**: Any Next.js API route handler that has a `Request` object.
+ * For Server Components / Server Actions, use `checkServerComponentRateLimit` instead.
+ *
+ * **Interface contract**: Returns `NextResponse | null`.
+ * - `null` → request is within limits, proceed with handler logic.
+ * - `NextResponse` → 429 response with rate-limit headers. Return it immediately.
+ *
+ * @param request - The incoming HTTP request (provides IP for identification)
+ * @param options - Rate limit configuration (type key, optional custom identifier/endpoint)
+ * @returns `null` if allowed, or a 429 `NextResponse` if rate-limited
  *
  * @example
  * export async function POST(request: Request) {
@@ -93,10 +108,44 @@ export interface ServerComponentRateLimitResult {
 }
 
 /**
- * Check rate limit for Server Components (which can't access Request object)
- * Uses Headers object from next/headers instead.
+ * Rate-limit guard for **Server Components and Server Actions**.
+ *
+ * Server Components and Server Actions don't have access to the `Request` object,
+ * so this variant accepts a `Headers` object from `next/headers` instead.
+ *
+ * Uses the same DB-backed (PostgreSQL) sliding-window rate limiter as `withRateLimit`.
+ *
+ * **When to use**: Any Server Component (page.tsx) or Server Action (actions/*.ts)
+ * that needs rate limiting. For API route handlers, use `withRateLimit` instead.
+ *
+ * **Interface contract**: Returns `{ allowed: boolean, remaining: number, retryAfter?: number }`.
+ * - `allowed: true` → request is within limits, proceed.
+ * - `allowed: false` → rate-limited. Use `retryAfter` to inform the user.
+ *
+ * **Test/E2E bypass**: Automatically bypasses rate limiting when `NODE_ENV === 'test'`
+ * or `E2E_DISABLE_RATE_LIMIT === 'true'` to avoid flaky CI runs.
+ *
+ * @param headersList - Headers object from `await headers()` (next/headers)
+ * @param type - Rate limit configuration key from RATE_LIMITS
+ * @param endpoint - Endpoint identifier for the rate limit bucket
+ * @returns Rate limit check result with allowed status and remaining count
  *
  * @example
+ * // In a Server Action
+ * import { headers } from 'next/headers';
+ * import { checkServerComponentRateLimit } from '@/lib/with-rate-limit';
+ *
+ * export async function createListing(formData: FormData) {
+ *   const headersList = await headers();
+ *   const rateLimit = await checkServerComponentRateLimit(headersList, 'createListing', '/actions/create-listing');
+ *   if (!rateLimit.allowed) {
+ *     return { error: 'Too many requests', retryAfter: rateLimit.retryAfter };
+ *   }
+ *   // Action logic...
+ * }
+ *
+ * @example
+ * // In a Server Component
  * import { headers } from 'next/headers';
  *
  * export default async function SearchPage() {
@@ -105,7 +154,7 @@ export interface ServerComponentRateLimitResult {
  *   if (!rateLimit.allowed) {
  *     return <RateLimitError retryAfter={rateLimit.retryAfter} />;
  *   }
- *   // Your page logic...
+ *   // Page logic...
  * }
  */
 export async function checkServerComponentRateLimit(

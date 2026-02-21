@@ -20,10 +20,12 @@ import {
     ChevronDown,
     Bell
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import UserAvatar from '@/components/UserAvatar';
 import NotificationCenter from '@/components/NotificationCenter';
 import ThemeToggle from '@/components/ThemeToggle';
+import { apiFetch } from '@/lib/api-client';
 
 // --- Helper Components ---
 
@@ -129,6 +131,7 @@ interface NavbarClientProps {
 const BASE_POLL_INTERVAL = 30000; // 30 seconds
 const MAX_BACKOFF_INTERVAL = 300000; // 5 minutes max
 const BACKOFF_MULTIPLIER = 2;
+const TOAST_FAILURE_THRESHOLD = 5;
 
 export default function NavbarClient({ user: initialUser, unreadCount = 0 }: NavbarClientProps) {
     const { data: session, status } = useSession();
@@ -147,6 +150,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     const failureCountRef = useRef(0);
     const currentIntervalRef = useRef(BASE_POLL_INTERVAL);
     const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
+    const toastShownRef = useRef(false);
 
     // Schedule next poll with dynamic interval
     const scheduleNextPoll = useCallback((interval: number, fetchFn: () => Promise<void>) => {
@@ -164,20 +168,18 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     const fetchUnreadCount = useCallback(async () => {
         if (!user) return;
         try {
-            const response = await fetch('/api/messages/unread');
-            if (response.ok) {
-                const data = await response.json();
-                setCurrentUnreadCount(data.count);
+            const data = await apiFetch<{ count: number }>('/api/messages/unread');
+            setCurrentUnreadCount(data.count);
 
-                // Reset backoff on successful response
-                if (failureCountRef.current > 0) {
-                    failureCountRef.current = 0;
-                    currentIntervalRef.current = BASE_POLL_INTERVAL;
-                    scheduleNextPoll(BASE_POLL_INTERVAL, fetchUnreadCount);
-                }
+            // Reset backoff on successful response
+            if (failureCountRef.current > 0) {
+                failureCountRef.current = 0;
+                currentIntervalRef.current = BASE_POLL_INTERVAL;
+                toastShownRef.current = false;
+                scheduleNextPoll(BASE_POLL_INTERVAL, fetchUnreadCount);
             }
         } catch {
-            // Network error - implement exponential backoff
+            // Network or API error - implement exponential backoff
             failureCountRef.current += 1;
             const newInterval = Math.min(
                 BASE_POLL_INTERVAL * Math.pow(BACKOFF_MULTIPLIER, failureCountRef.current),
@@ -187,6 +189,12 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
             if (newInterval !== currentIntervalRef.current) {
                 currentIntervalRef.current = newInterval;
                 scheduleNextPoll(newInterval, fetchUnreadCount);
+            }
+
+            // Show one toast after sustained failures (not on every poll)
+            if (failureCountRef.current >= TOAST_FAILURE_THRESHOLD && !toastShownRef.current) {
+                toastShownRef.current = true;
+                toast.error('Unable to check for new messages');
             }
 
             // Only log in development to reduce console noise (first 3 failures only)
@@ -231,6 +239,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
         // Reset backoff state
         failureCountRef.current = 0;
         currentIntervalRef.current = BASE_POLL_INTERVAL;
+        toastShownRef.current = false;
 
         // Fetch immediately on mount
         fetchUnreadCount();

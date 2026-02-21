@@ -497,7 +497,7 @@ describe("manage-booking actions", () => {
         (auth as jest.Mock).mockResolvedValue(mockTenantSession);
       });
 
-      it("increments slots when cancelling accepted booking", async () => {
+      it("increments slots when cancelling accepted booking (bounded SQL)", async () => {
         const acceptedBooking = { ...mockBooking, status: "ACCEPTED" };
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
           acceptedBooking,
@@ -509,7 +509,9 @@ describe("manage-booking actions", () => {
               .fn()
               .mockResolvedValue({ count: 1 }),
           },
-          listing: { update: jest.fn() },
+          // BIZ-07: Cancellation now uses $queryRaw with bounded increment
+          // (WHERE availableSlots < totalSlots) instead of listing.update
+          $queryRaw: jest.fn().mockResolvedValue([{ availableSlots: 3 }]),
         };
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => callback(mockTx),
@@ -517,10 +519,33 @@ describe("manage-booking actions", () => {
 
         await updateBookingStatus("booking-123", "CANCELLED");
 
-        expect(mockTx.listing.update).toHaveBeenCalledWith({
-          where: { id: "listing-123" },
-          data: { availableSlots: { increment: 1 } },
-        });
+        // Verify $queryRaw was called (bounded UPDATE...WHERE availableSlots < totalSlots)
+        expect(mockTx.$queryRaw).toHaveBeenCalled();
+      });
+
+      it("logs warning when slot increment is skipped (already at max)", async () => {
+        const acceptedBooking = { ...mockBooking, status: "ACCEPTED" };
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+          acceptedBooking,
+        );
+
+        const mockTx = {
+          booking: {
+            updateMany: jest
+              .fn()
+              .mockResolvedValue({ count: 1 }),
+          },
+          // BIZ-07: Empty result = availableSlots already at totalSlots
+          $queryRaw: jest.fn().mockResolvedValue([]),
+        };
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => callback(mockTx),
+        );
+
+        const result = await updateBookingStatus("booking-123", "CANCELLED");
+
+        // Should still succeed — skipped increment is not a failure
+        expect(result.success).toBe(true);
       });
 
       it("does not increment slots when cancelling pending booking", async () => {
@@ -568,7 +593,7 @@ describe("manage-booking actions", () => {
                   .fn()
                   .mockResolvedValue({ count: 1 }),
               },
-              listing: { update: jest.fn() },
+              $queryRaw: jest.fn().mockResolvedValue([{ availableSlots: 3 }]),
             };
             return callback(tx);
           },

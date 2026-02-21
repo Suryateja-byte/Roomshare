@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Star, LogIn, CheckCircle2, Edit3, Trash2, Loader2, Calendar, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { apiFetch, handleFetchError } from '@/lib/api-client';
 import Link from 'next/link';
 import CharacterCounter from '@/components/CharacterCounter';
 import {
@@ -57,6 +58,7 @@ export default function ReviewForm({
     const [isDeleting, setIsDeleting] = useState(false);
     const [wasDeleted, setWasDeleted] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const isSubmittingRef = useRef(false);
     const router = useRouter();
 
     // Handle editing an existing review
@@ -69,16 +71,15 @@ export default function ReviewForm({
             setError('Please write a comment');
             return;
         }
+        if (isSubmittingRef.current) return;
 
+        isSubmittingRef.current = true;
         setIsSubmitting(true);
         setError('');
 
         try {
-            const response = await fetch('/api/reviews', {
+            await apiFetch('/api/reviews', {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({
                     reviewId: existingReview?.id,
                     rating,
@@ -86,45 +87,39 @@ export default function ReviewForm({
                 }),
             });
 
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to update review');
-            }
-
             toast.success('Review updated successfully!');
             setIsEditing(false);
             router.refresh();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update review');
-            toast.error('Failed to update review');
+            handleFetchError(err, 'Failed to update review');
         } finally {
             setIsSubmitting(false);
+            isSubmittingRef.current = false;
         }
     };
 
     // Handle deleting a review
     const handleDelete = async () => {
         if (!existingReview?.id) return;
+        if (isSubmittingRef.current) return;
 
+        isSubmittingRef.current = true;
         setIsDeleting(true);
 
         try {
-            const response = await fetch(`/api/reviews?reviewId=${existingReview.id}`, {
+            await apiFetch(`/api/reviews?reviewId=${existingReview.id}`, {
                 method: 'DELETE',
             });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to delete review');
-            }
 
             toast.success('Review deleted successfully');
             setWasDeleted(true);
             router.refresh();
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to delete review');
+            handleFetchError(err, 'Failed to delete review');
         } finally {
             setIsDeleting(false);
+            isSubmittingRef.current = false;
         }
     };
 
@@ -145,16 +140,15 @@ export default function ReviewForm({
             setError('Please write a comment');
             return;
         }
+        if (isSubmittingRef.current) return;
 
+        isSubmittingRef.current = true;
         setIsSubmitting(true);
         setError('');
 
         try {
-            const response = await fetch('/api/reviews', {
+            await apiFetch('/api/reviews', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({
                     listingId,
                     targetUserId,
@@ -162,11 +156,6 @@ export default function ReviewForm({
                     comment
                 }),
             });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to submit review');
-            }
 
             // Success! Show feedback
             setIsSubmitted(true);
@@ -182,13 +171,13 @@ export default function ReviewForm({
 
             // Reset submitted state after animation
             setTimeout(() => setIsSubmitted(false), 3000);
-        } catch (err: any) {
-            setError(err.message);
-            toast.error('Failed to submit review', {
-                description: err.message,
-            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to submit review';
+            setError(message);
+            handleFetchError(err, 'Failed to submit review');
         } finally {
             setIsSubmitting(false);
+            isSubmittingRef.current = false;
         }
     };
 

@@ -95,8 +95,7 @@ export async function getBlockedUsers() {
                     select: {
                         id: true,
                         name: true,
-                        image: true,
-                        email: true
+                        image: true
                     }
                 }
             },

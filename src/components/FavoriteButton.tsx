@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Heart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { apiFetch, handleFetchError } from '@/lib/api-client';
 
 interface FavoriteButtonProps {
     listingId: string;
@@ -15,6 +16,7 @@ export default function FavoriteButton({ listingId, initialIsSaved = false, clas
     const [isSaved, setIsSaved] = useState(initialIsSaved);
     const [isLoading, setIsLoading] = useState(false);
     const [animating, setAnimating] = useState(false);
+    const isSubmittingRef = useRef(false);
     const router = useRouter();
 
     // P2-3: Memoize handler to improve INP by preventing function recreation on each render
@@ -22,8 +24,9 @@ export default function FavoriteButton({ listingId, initialIsSaved = false, clas
         e.preventDefault();
         e.stopPropagation();
 
-        if (isLoading) return;
+        if (isLoading || isSubmittingRef.current) return;
 
+        isSubmittingRef.current = true;
         setIsLoading(true);
         // Optimistic update with bounce animation on save
         const previousState = isSaved;
@@ -35,33 +38,19 @@ export default function FavoriteButton({ listingId, initialIsSaved = false, clas
         }
 
         try {
-            const response = await fetch('/api/favorites', {
+            const data = await apiFetch<{ saved: boolean }>('/api/favorites', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({ listingId }),
             });
 
-            if (response.status === 401) {
-                // Redirect to login if unauthorized
-                router.push('/login');
-                setIsSaved(previousState); // Revert
-                return;
-            }
-
-            if (!response.ok) {
-                throw new Error('Failed to toggle favorite');
-            }
-
-            const data = await response.json();
             setIsSaved(data.saved);
             router.refresh(); // Refresh server components to update lists if needed
         } catch (error) {
-            console.error('Error toggling favorite:', error);
             setIsSaved(previousState); // Revert on error
+            handleFetchError(error, 'Failed to update favorite');
         } finally {
             setIsLoading(false);
+            isSubmittingRef.current = false;
         }
     }, [isLoading, isSaved, listingId, router]);
 

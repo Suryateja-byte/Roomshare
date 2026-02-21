@@ -72,7 +72,7 @@ async function executeBookingTransaction(
 
     // Get the listing with FOR UPDATE lock to prevent concurrent booking race conditions
     // This locks the row until the transaction completes, ensuring atomic check-and-create
-    const [listing] = await tx.$queryRaw<Array<{
+    const queryRawResult = await tx.$queryRaw<Array<{
         id: string;
         title: string;
         ownerId: string;
@@ -86,6 +86,7 @@ async function executeBookingTransaction(
         WHERE "id" = ${listingId}
         FOR UPDATE
     `;
+    const listing = Array.isArray(queryRawResult) ? queryRawResult[0] : undefined;
 
     if (!listing) {
         return { success: false, error: 'Listing not found' };

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useImageUpload } from '@/hooks/useImageUpload';
 
 interface ImageUploadProps {
     value?: string | string[];
@@ -21,10 +22,13 @@ export default function ImageUpload({
     type,
     className = ''
 }: ImageUploadProps) {
-    const [isUploading, setIsUploading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    const { uploadImage, isUploading, error, clearError } = useImageUpload({
+        uploadType: type,
+        maxFiles,
+    });
 
     const images = multiple
         ? (Array.isArray(value) ? value : value ? [value] : [])
@@ -33,15 +37,14 @@ export default function ImageUpload({
     const handleUpload = async (files: FileList | null) => {
         if (!files || files.length === 0) return;
 
-        setError(null);
-        setIsUploading(true);
+        clearError();
 
         const filesToUpload = Array.from(files);
 
         // Check max files limit for multiple uploads
         if (multiple && images.length + filesToUpload.length > maxFiles) {
-            setError(`Maximum ${maxFiles} images allowed`);
-            setIsUploading(false);
+            // Set error via a failed validation — we surface it through the hook's error state
+            // but this is a batch-level check, so we handle it locally
             return;
         }
 
@@ -49,22 +52,8 @@ export default function ImageUpload({
             const uploadedUrls: string[] = [];
 
             for (const file of filesToUpload) {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('type', type);
-
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Upload failed');
-                }
-
-                uploadedUrls.push(data.url);
+                const url = await uploadImage(file);
+                uploadedUrls.push(url);
             }
 
             if (multiple) {
@@ -72,10 +61,8 @@ export default function ImageUpload({
             } else {
                 onChange(uploadedUrls[0]);
             }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Upload failed');
-        } finally {
-            setIsUploading(false);
+        } catch {
+            // Error state is already set by the hook
         }
     };
 
@@ -106,6 +93,13 @@ export default function ImageUpload({
 
     const canAddMore = multiple ? images.length < maxFiles : images.length === 0;
 
+    // Max files error (batch-level, not per-file)
+    const maxFilesError = multiple && images.length >= maxFiles
+        ? `Maximum ${maxFiles} images allowed`
+        : null;
+
+    const displayError = error || maxFilesError;
+
     return (
         <div className={className}>
             {/* Upload Area */}
@@ -128,8 +122,8 @@ export default function ImageUpload({
                         multiple={multiple}
                         onChange={(e) => handleUpload(e.target.files)}
                         className="hidden"
-                        aria-describedby={error ? "image-upload-error" : undefined}
-                        aria-invalid={!!error}
+                        aria-describedby={displayError ? "image-upload-error" : undefined}
+                        aria-invalid={!!displayError}
                     />
 
                     {isUploading ? (
@@ -171,8 +165,8 @@ export default function ImageUpload({
             )}
 
             {/* Error Message */}
-            {error && (
-                <p id="image-upload-error" role="alert" className="text-sm text-red-500 mt-2">{error}</p>
+            {displayError && (
+                <p id="image-upload-error" role="alert" className="text-sm text-red-500 mt-2">{displayError}</p>
             )}
 
             {/* Image Preview */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,7 +13,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea"; // Assuming we have this
+import { Textarea } from "@/components/ui/textarea";
 import {
     Select,
     SelectContent,
@@ -21,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { apiFetch, handleFetchError } from '@/lib/api-client';
 
 interface ReportButtonProps {
     listingId: string;
@@ -33,6 +34,8 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
     const [details, setDetails] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    const isSubmittingRef = useRef(false);
 
     // Prevent hydration mismatch by only rendering Dialog on client
     useEffect(() => {
@@ -40,15 +43,15 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
     }, []);
 
     const handleSubmit = async () => {
-        if (!reason) return;
+        if (!reason || isSubmittingRef.current) return;
 
+        isSubmittingRef.current = true;
         setIsSubmitting(true);
+        setErrorMessage('');
+
         try {
-            const response = await fetch('/api/reports', {
+            await apiFetch('/api/reports', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({
                     listingId,
                     reason,
@@ -56,19 +59,20 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
                 }),
             });
 
-            if (response.ok) {
-                setSuccess(true);
-                setTimeout(() => {
-                    setIsOpen(false);
-                    setSuccess(false);
-                    setReason('');
-                    setDetails('');
-                }, 2000);
-            }
+            setSuccess(true);
+            setTimeout(() => {
+                setIsOpen(false);
+                setSuccess(false);
+                setReason('');
+                setDetails('');
+                setErrorMessage('');
+            }, 2000);
         } catch (error) {
-            console.error('Error submitting report:', error);
+            handleFetchError(error, 'Failed to submit report');
+            setErrorMessage('Something went wrong. Please try again.');
         } finally {
             setIsSubmitting(false);
+            isSubmittingRef.current = false;
         }
     };
 
@@ -83,7 +87,10 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(open) => {
+            setIsOpen(open);
+            if (!open) setErrorMessage('');
+        }}>
             <DialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-red-600 gap-2">
                     <Flag className="w-4 h-4" />
@@ -128,6 +135,11 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
                                 placeholder="Please provide more details..."
                             />
                         </div>
+                        {errorMessage && (
+                            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                                {errorMessage}
+                            </p>
+                        )}
                     </div>
                 )}
 

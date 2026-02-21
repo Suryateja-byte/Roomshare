@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { toast } from 'sonner';
+import { apiFetch, handleFetchError } from '@/lib/api-client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -23,17 +24,23 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
     const [isBlocked, setIsBlocked] = useState(false);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [hasPassword, setHasPassword] = useState(false);
+    const isSubmittingRef = useRef(false);
     const router = useRouter();
 
     const handleDeleteClick = async () => {
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
         setIsChecking(true);
         setDeletionInfo(null);
         setIsBlocked(false);
 
         try {
-            // Check if listing can be deleted
-            const checkRes = await fetch(`/api/listings/${listingId}/can-delete`);
-            const { canDelete, activeBookings, pendingBookings, activeConversations } = await checkRes.json();
+            const { canDelete, activeBookings, pendingBookings, activeConversations } = await apiFetch<{
+                canDelete: boolean;
+                activeBookings: number;
+                pendingBookings: number;
+                activeConversations: number;
+            }>(`/api/listings/${listingId}/can-delete`);
 
             const info: DeletionInfo = { activeBookings, pendingBookings, activeConversations };
             setDeletionInfo(info);
@@ -43,13 +50,12 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
                 return;
             }
 
-            // Safe to show confirmation (but may have warnings)
             setShowConfirm(true);
         } catch (error) {
-            console.error('Error checking deletability:', error);
-            toast.error('Failed to check listing status');
+            handleFetchError(error, 'Failed to check listing status');
         } finally {
             setIsChecking(false);
+            isSubmittingRef.current = false;
         }
     };
 
@@ -68,27 +74,21 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
     };
 
     const handleDelete = async () => {
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
         setIsDeleting(true);
         try {
-            const response = await fetch(`/api/listings/${listingId}`, {
+            await apiFetch(`/api/listings/${listingId}`, {
                 method: 'DELETE',
             });
 
-            if (response.ok) {
-                toast.success('Listing deleted successfully');
-                router.push('/search');
-                router.refresh();
-            } else {
-                const data = await response.json();
-                toast.error(data.message || data.error || 'Failed to delete listing');
-                setIsDeleting(false);
-                setShowConfirm(false);
-                setShowPasswordModal(false);
-            }
+            toast.success('Listing deleted successfully');
+            router.push('/search');
+            router.refresh();
         } catch (error) {
-            console.error('Error deleting listing:', error);
-            toast.error('Failed to delete listing');
+            handleFetchError(error, 'Failed to delete listing');
             setIsDeleting(false);
+            isSubmittingRef.current = false;
             setShowConfirm(false);
             setShowPasswordModal(false);
         }

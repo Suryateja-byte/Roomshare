@@ -48,7 +48,7 @@ export async function updateProfile(data: UpdateProfileInput) {
         return { success: true };
     } catch (error) {
         if (error instanceof z.ZodError) {
-            return { error: error.issues[0].message };
+            return { error: error.issues[0]?.message || 'Validation failed' };
         }
         logger.sync.error('Failed to update profile', {
             action: 'updateProfile',

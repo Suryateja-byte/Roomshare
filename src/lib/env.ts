@@ -87,6 +87,12 @@ const serverEnvSchema = z.object({
   // CRITICAL: Should be enabled in production for performance
   ENABLE_SEARCH_DOC: z.enum(["true", "false"]).optional(),
 
+  // Security: Cursor HMAC signing (optional - disables cursor signing if absent)
+  CURSOR_SECRET: z
+    .string()
+    .min(32, "CURSOR_SECRET must be at least 32 characters")
+    .optional(),
+
   // Cloudflare Turnstile (bot protection - required in production)
   TURNSTILE_SECRET_KEY: z.string().optional(),
   TURNSTILE_ENABLED: z.enum(["true", "false"]).optional(),
@@ -257,6 +263,8 @@ export const clientEnv: ClientEnv = new Proxy({} as ClientEnv, {
   get: (_, prop) => getClientEnv()[prop as keyof ClientEnv],
 });
 
+// CURSOR_SECRET: read from validated schema, fallback to empty string when absent.
+// The Zod schema enforces min 32 chars when provided.
 export const CURSOR_SECRET = process.env.CURSOR_SECRET ?? "";
 if (!CURSOR_SECRET && process.env.NODE_ENV === "production") {
   console.error("[SECURITY] CURSOR_SECRET is not set — cursor HMAC disabled");

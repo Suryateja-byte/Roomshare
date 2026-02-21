@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         }
 
         // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 12);
 
         // Create user (emailVerified is null by default for soft verification)
         const user = await prisma.user.create({

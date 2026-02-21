@@ -32,6 +32,7 @@ import { BoundaryLayer } from './map/BoundaryLayer';
 import { UserMarker, useUserPin } from './map/UserMarker';
 import { POILayer } from './map/POILayer';
 import { PROGRAMMATIC_MOVE_TIMEOUT_MS } from '@/lib/constants';
+import { parseCoordinate, validateLatitude, validateLongitude } from '@/lib/validation';
 import { cn } from '@/lib/utils';
 
 interface Listing {
@@ -932,16 +933,16 @@ export default function MapComponent({
             const maxLng = searchParams.get('maxLng');
 
             if (minLat && maxLat && minLng && maxLng) {
-                const parsedMinLat = parseFloat(minLat);
-                const parsedMaxLat = parseFloat(maxLat);
-                const parsedMinLng = parseFloat(minLng);
-                const parsedMaxLng = parseFloat(maxLng);
+                const parsedMinLat = parseCoordinate(minLat);
+                const parsedMaxLat = parseCoordinate(maxLat);
+                const parsedMinLng = parseCoordinate(minLng);
+                const parsedMaxLng = parseCoordinate(maxLng);
 
                 if (
-                    Number.isFinite(parsedMinLat) &&
-                    Number.isFinite(parsedMaxLat) &&
-                    Number.isFinite(parsedMinLng) &&
-                    Number.isFinite(parsedMaxLng)
+                    parsedMinLat !== null && parsedMaxLat !== null &&
+                    parsedMinLng !== null && parsedMaxLng !== null &&
+                    validateLatitude(parsedMinLat) && validateLatitude(parsedMaxLat) &&
+                    validateLongitude(parsedMinLng) && validateLongitude(parsedMaxLng)
                 ) {
                     const centerLat = (parsedMinLat + parsedMaxLat) / 2;
                     let centerLng: number;
@@ -1215,28 +1216,34 @@ export default function MapComponent({
 
     // Sync URL bounds to context and track for reset functionality
     useEffect(() => {
-        const minLat = searchParams.get('minLat');
-        const maxLat = searchParams.get('maxLat');
-        const minLng = searchParams.get('minLng');
-        const maxLng = searchParams.get('maxLng');
+        const parsedMinLat = parseCoordinate(searchParams.get('minLat'));
+        const parsedMaxLat = parseCoordinate(searchParams.get('maxLat'));
+        const parsedMinLng = parseCoordinate(searchParams.get('minLng'));
+        const parsedMaxLng = parseCoordinate(searchParams.get('maxLng'));
 
-        if (minLat && maxLat && minLng && maxLng) {
-            const bounds = {
-                minLat: parseFloat(minLat),
-                maxLat: parseFloat(maxLat),
-                minLng: parseFloat(minLng),
-                maxLng: parseFloat(maxLng),
+        if (
+            parsedMinLat !== null && parsedMaxLat !== null &&
+            parsedMinLng !== null && parsedMaxLng !== null &&
+            validateLatitude(parsedMinLat) && validateLatitude(parsedMaxLat) &&
+            validateLongitude(parsedMinLng) && validateLongitude(parsedMaxLng) &&
+            parsedMinLat < parsedMaxLat
+        ) {
+            urlBoundsRef.current = {
+                minLat: parsedMinLat,
+                maxLat: parsedMaxLat,
+                minLng: parsedMinLng,
+                maxLng: parsedMaxLng,
             };
-            urlBoundsRef.current = bounds;
         }
 
         // Extract search location from URL for location conflict detection
         const q = searchParams.get('q');
-        const lat = searchParams.get('lat');
-        const lng = searchParams.get('lng');
+        const parsedLat = parseCoordinate(searchParams.get('lat'));
+        const parsedLng = parseCoordinate(searchParams.get('lng'));
 
-        if (q && lat && lng) {
-            setSearchLocation(q, { lat: parseFloat(lat), lng: parseFloat(lng) });
+        if (q && parsedLat !== null && parsedLng !== null &&
+            validateLatitude(parsedLat) && validateLongitude(parsedLng)) {
+            setSearchLocation(q, { lat: parsedLat, lng: parsedLng });
         } else if (q) {
             setSearchLocation(q, null);
         } else {
@@ -1820,17 +1827,30 @@ export default function MapComponent({
                         const minLng = sp.get('minLng');
                         const maxLng = sp.get('maxLng');
                         if (minLat && maxLat && minLng && maxLng) {
-                            const bounds: [[number, number], [number, number]] = [
-                                [parseFloat(minLng), parseFloat(minLat)],
-                                [parseFloat(maxLng), parseFloat(maxLat)],
-                            ];
-                            setProgrammaticMove(true);
-                            // Safety: clear programmatic flag if moveEnd doesn't fire
-                            if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
-                            programmaticClearTimeoutRef.current = setTimeout(() => {
-                                if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
-                            }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-                            mapRef.current.fitBounds(bounds, { duration: 0, padding: 0 });
+                            const pMinLat = parseCoordinate(minLat);
+                            const pMaxLat = parseCoordinate(maxLat);
+                            const pMinLng = parseCoordinate(minLng);
+                            const pMaxLng = parseCoordinate(maxLng);
+                            if (
+                                pMinLat === null || pMaxLat === null ||
+                                pMinLng === null || pMaxLng === null ||
+                                !validateLatitude(pMinLat) || !validateLatitude(pMaxLat) ||
+                                !validateLongitude(pMinLng) || !validateLongitude(pMaxLng)
+                            ) {
+                                // Skip fitBounds — invalid coordinates from URL
+                            } else {
+                                const bounds: [[number, number], [number, number]] = [
+                                    [pMinLng, pMinLat],
+                                    [pMaxLng, pMaxLat],
+                                ];
+                                setProgrammaticMove(true);
+                                // Safety: clear programmatic flag if moveEnd doesn't fire
+                                if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+                                programmaticClearTimeoutRef.current = setTimeout(() => {
+                                    if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+                                }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+                                mapRef.current.fitBounds(bounds, { duration: 0, padding: 0 });
+                            }
                         }
                     }
                 }}

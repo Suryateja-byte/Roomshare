@@ -21,12 +21,12 @@ import type {
   ListingData,
   MapListingData,
   PaginatedResultHybrid,
-} from "@/lib/data";
+} from "@/lib/search-types";
 import {
   sanitizeSearchQuery,
   isValidQuery,
   crossesAntimeridian,
-} from "@/lib/data";
+} from "@/lib/filter-utils";
 import {
   LOW_RESULTS_THRESHOLD,
   expandFiltersForNearMatches,

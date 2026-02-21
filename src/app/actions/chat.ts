@@ -279,12 +279,13 @@ export async function getMessages(conversationId: string) {
         return { error: 'Unauthorized', messages: [] };
     }
 
-    // Mark unread messages as read
+    // Mark unread messages as read (exclude soft-deleted messages)
     const updateResult = await prisma.message.updateMany({
         where: {
             conversationId,
             senderId: { not: userId },
             read: false,
+            deletedAt: null,
         },
         data: { read: true },
     });
@@ -652,13 +653,14 @@ export async function pollMessages(conversationId: string, lastMessageId?: strin
             }
         });
 
-        // Mark messages from others as read
+        // Mark messages from others as read (exclude soft-deleted messages)
         if (messages.length > 0) {
             await prisma.message.updateMany({
                 where: {
                     conversationId,
                     senderId: { not: session.user.id },
-                    read: false
+                    read: false,
+                    deletedAt: null,
                 },
                 data: { read: true }
             });
