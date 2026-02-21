@@ -618,7 +618,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
                 <div className={`w-full md:flex-1 flex flex-col relative ${isCompact ? 'px-4 py-2' : 'px-5 sm:px-6 py-3 md:py-2'}`}>
                     {!isCompact && (
-                        <label htmlFor="search-location" className="text-2xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-1">
+                        <label htmlFor="search-location" className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-1">
                             Where
                         </label>
                     )}
@@ -711,7 +711,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 {/* Price Range Input - Airbnb-style stacked layout */}
                 <div className={`w-full md:flex-1 flex flex-col ${isCompact ? 'px-4 py-2' : 'px-5 sm:px-6 py-3 md:py-2'}`}>
                     {!isCompact && (
-                        <label className="text-2xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-1">
+                        <label className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-1">
                             Budget
                         </label>
                     )}
