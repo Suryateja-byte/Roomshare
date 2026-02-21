@@ -203,7 +203,7 @@ export function CategoryBar() {
       {/* Scrollable container */}
       <div
         ref={scrollRef}
-        className="flex items-center gap-1 px-4 py-3 overflow-x-auto scrollbar-hide scroll-smooth"
+        className="flex items-center gap-2 px-4 py-3 overflow-x-auto scrollbar-hide scroll-smooth"
         style={{ cursor: 'grab' }}
       >
         {CATEGORIES.map((cat) => {
@@ -216,11 +216,11 @@ export function CategoryBar() {
               onClick={() => handleSelect(cat.params)}
               disabled={isPending}
               className={`
-                flex flex-col items-center gap-1 px-3 py-2 min-w-[72px] rounded-xl text-xs font-medium
+                flex flex-col items-center gap-1 px-3 py-2.5 min-w-[84px] min-h-[44px] rounded-xl text-xs font-medium
                 transition-all duration-150 flex-shrink-0
                 ${active
-                  ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-sm'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
+                  ? 'bg-indigo-500 text-white shadow-sm'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-indigo-50 dark:hover:bg-indigo-950 hover:text-zinc-900 dark:hover:text-white'
                 }
                 disabled:opacity-60 disabled:cursor-not-allowed
               `}

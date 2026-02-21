@@ -168,7 +168,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                         e.stopPropagation();
                         setActive(listing.id);
                     }}
-                    className="p-1.5 rounded-full bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-700 transition-colors"
+                    className="relative p-1.5 rounded-full bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-700 transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
                     aria-label="Show on map"
                     title="Show on map"
                 >

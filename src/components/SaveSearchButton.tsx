@@ -182,7 +182,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                         >
                             <button
                                 onClick={() => setIsOpen(false)}
-                                className="absolute top-4 right-4 p-1 text-zinc-500 hover:text-zinc-600"
+                                className="absolute top-4 right-4 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                                 aria-label="Close save search dialog"
                             >
                                 <X className="w-5 h-5" />
