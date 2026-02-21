@@ -221,8 +221,8 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                     </div>
                 </div>
 
-                {/* Content Area - min-h-[156px] prevents CLS from conditional languages section */}
-                <div className="flex flex-col flex-1 p-3 sm:p-4 min-h-[156px]">
+                {/* Content Area */}
+                <div className="flex flex-col flex-1 p-3 sm:p-4">
                     {/* Title Row with Rating */}
                     <div className="flex justify-between items-start gap-3 mb-0.5">
                         <h3 className="font-semibold text-sm text-zinc-900 dark:text-white line-clamp-1 leading-snug" title={displayTitle}>
@@ -238,10 +238,26 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                         )}
                     </div>
 
-                    {/* Location - Tight spacing with title */}
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+                    {/* Location */}
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                         {formatLocation(listing.location.city, listing.location.state)}
                     </p>
+
+                    {/* Price — surfaced right below location */}
+                    <div className="flex items-baseline mb-3">
+                        {showTotalPrice && estimatedMonths > 1 ? (
+                            <>
+                                <span data-testid="listing-price" className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price * estimatedMonths)}</span>
+                                <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">total</span>
+                                <span className="text-zinc-500 dark:text-zinc-500 text-xs ml-1.5">({formatPrice(listing.price)}/mo × {estimatedMonths})</span>
+                            </>
+                        ) : (
+                            <>
+                                <span data-testid="listing-price" className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
+                                {listing.price > 0 && <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
+                            </>
+                        )}
+                    </div>
 
                     {/* Amenities */}
                     <div className="flex flex-wrap gap-1.5 mb-2">
@@ -254,10 +270,10 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
 
                     {/* Languages spoken */}
                     {listing.householdLanguages && listing.householdLanguages.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 mb-4">
-                            <Globe className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                        <div className="flex flex-wrap items-center gap-1.5 mt-auto">
+                            <Globe className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
                             {listing.householdLanguages.slice(0, 2).map((code) => (
-                                <span key={code} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded font-medium">
+                                <span key={code} className="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded font-medium">
                                     {getLanguageName(code)}
                                 </span>
                             ))}
@@ -266,24 +282,6 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                             )}
                         </div>
                     )}
-
-                    {/* Price Row */}
-                    <div className="mt-auto">
-                        <div className="flex items-baseline">
-                            {showTotalPrice && estimatedMonths > 1 ? (
-                                <>
-                                    <span data-testid="listing-price" className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price * estimatedMonths)}</span>
-                                    <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">total</span>
-                                    <span className="text-zinc-500 dark:text-zinc-500 text-xs ml-1.5">({formatPrice(listing.price)}/mo × {estimatedMonths})</span>
-                                </>
-                            ) : (
-                                <>
-                                    <span data-testid="listing-price" className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
-                                    {listing.price > 0 && <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
-                                </>
-                            )}
-                        </div>
-                    </div>
                 </div>
                 </div>
             </Link>
