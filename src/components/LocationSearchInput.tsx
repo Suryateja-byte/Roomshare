@@ -335,7 +335,7 @@ export default function LocationSearchInput({
     if (placeTypes.includes('locality')) return 'text-blue-500';
     if (placeTypes.includes('place')) return 'text-green-500';
     if (placeTypes.includes('region')) return 'text-purple-500';
-    return 'text-zinc-400';
+    return 'text-zinc-500';
   };
 
   // Show "type more" hint when user has typed but not enough characters
@@ -385,7 +385,7 @@ export default function LocationSearchInput({
         {/* Loading/Clear indicator */}
         <div className="absolute right-0 top-1/2 -translate-y-1/2">
           {isLoading ? (
-            <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" aria-hidden="true" />
+            <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" aria-hidden="true" />
           ) : value ? (
             <button
               type="button"
@@ -393,7 +393,7 @@ export default function LocationSearchInput({
               className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-full transition-colors"
               aria-label="Clear search"
             >
-              <X className="w-3 h-3 text-zinc-400" />
+              <X className="w-3 h-3 text-zinc-500" />
             </button>
           ) : null}
         </div>

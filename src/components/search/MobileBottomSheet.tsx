@@ -386,7 +386,7 @@ export default function MobileBottomSheet({
               {headerText || "Search results"}
             </span>
             {isCollapsed && (
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+              <span className="text-xs text-zinc-500 dark:text-zinc-500">
                 Pull up for listings
               </span>
             )}
@@ -406,7 +406,7 @@ export default function MobileBottomSheet({
                 {/* P2-FIX (#123): Visible close button to dismiss sheet */}
                 <button
                   onClick={() => setSnapIndex(0)}
-                  className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   aria-label="Minimize results panel"
                 >
                   <X className="w-4 h-4" />

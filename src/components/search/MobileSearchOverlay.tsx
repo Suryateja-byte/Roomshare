@@ -95,13 +95,13 @@ export default function MobileSearchOverlay({
 
               <form onSubmit={handleSubmit} className="flex-1">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                   <input
                     ref={inputRef}
                     type="text"
                     defaultValue={currentQuery}
                     placeholder="Search by city, neighborhood..."
-                    className="w-full h-10 pl-9 pr-4 bg-zinc-100 dark:bg-zinc-800 rounded-full text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-white/20"
+                    className="w-full h-10 pl-9 pr-4 bg-zinc-100 dark:bg-zinc-800 rounded-full text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-white/20"
                     enterKeyHint="search"
                   />
                 </div>
@@ -124,7 +124,7 @@ export default function MobileSearchOverlay({
                             onClick={() => handleRecentClick(search.location)}
                             className="flex-1 flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors text-left"
                           >
-                            <Clock className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                            <Clock className="w-4 h-4 text-zinc-500 flex-shrink-0" />
                             <div className="min-w-0">
                               <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
                                 {search.location}
@@ -144,7 +144,7 @@ export default function MobileSearchOverlay({
                             className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                             aria-label={`Remove ${search.location} from recent searches`}
                           >
-                            <X className="w-3.5 h-3.5 text-zinc-400" />
+                            <X className="w-3.5 h-3.5 text-zinc-500" />
                           </button>
                         </li>
                       );
@@ -154,7 +154,7 @@ export default function MobileSearchOverlay({
               )}
 
               {recentSearches.length === 0 && (
-                <div className="text-center text-sm text-zinc-400 dark:text-zinc-500 mt-8">
+                <div className="text-center text-sm text-zinc-500 dark:text-zinc-500 mt-8">
                   No recent searches
                 </div>
               )}

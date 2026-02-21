@@ -182,7 +182,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                         >
                             <button
                                 onClick={() => setIsOpen(false)}
-                                className="absolute top-4 right-4 p-1 text-zinc-400 hover:text-zinc-600"
+                                className="absolute top-4 right-4 p-1 text-zinc-500 hover:text-zinc-600"
                                 aria-label="Close save search dialog"
                             >
                                 <X className="w-5 h-5" />
@@ -214,7 +214,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                                             {alertEnabled ? (
                                                 <Bell className="w-5 h-5 text-zinc-600" />
                                             ) : (
-                                                <BellOff className="w-5 h-5 text-zinc-400" />
+                                                <BellOff className="w-5 h-5 text-zinc-500" />
                                             )}
                                             <div>
                                                 <p className="font-medium text-zinc-900">Email Alerts</p>

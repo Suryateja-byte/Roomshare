@@ -273,13 +273,13 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                             {showTotalPrice && estimatedMonths > 1 ? (
                                 <>
                                     <span data-testid="listing-price" className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price * estimatedMonths)}</span>
-                                    <span className="text-zinc-400 dark:text-zinc-500 text-sm ml-0.5">total</span>
-                                    <span className="text-zinc-400 dark:text-zinc-500 text-xs ml-1.5">({formatPrice(listing.price)}/mo × {estimatedMonths})</span>
+                                    <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">total</span>
+                                    <span className="text-zinc-500 dark:text-zinc-500 text-xs ml-1.5">({formatPrice(listing.price)}/mo × {estimatedMonths})</span>
                                 </>
                             ) : (
                                 <>
                                     <span data-testid="listing-price" className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
-                                    {listing.price > 0 && <span className="text-zinc-400 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
+                                    {listing.price > 0 && <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
                                 </>
                             )}
                         </div>

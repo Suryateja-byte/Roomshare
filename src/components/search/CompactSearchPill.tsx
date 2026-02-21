@@ -59,7 +59,7 @@ export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPill
         className="flex-1 flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         aria-label="Expand search form"
       >
-        <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+        <Search className="w-4 h-4 text-zinc-500 flex-shrink-0" />
         <div className="flex items-center gap-2 min-w-0 text-sm">
           {segments.map((seg, i) => (
             <span key={i} className="flex items-center gap-2">

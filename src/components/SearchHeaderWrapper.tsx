@@ -93,7 +93,7 @@ export default function SearchHeaderWrapper() {
 
               {/* Keyboard shortcut hint — desktop only */}
               <kbd
-                className="hidden md:inline-flex absolute right-3 top-1/2 -translate-y-1/2 items-center px-1.5 py-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded pointer-events-none"
+                className="hidden md:inline-flex absolute right-3 top-1/2 -translate-y-1/2 items-center px-1.5 py-0.5 text-xs font-medium text-zinc-500 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded pointer-events-none"
                 aria-hidden="true"
               >
                 {formatShortcut({ key: "k", meta: true })}

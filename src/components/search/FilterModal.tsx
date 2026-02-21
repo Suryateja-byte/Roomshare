@@ -243,7 +243,7 @@ export function FilterModal({
                       >
                         {type}
                         {count !== undefined && (
-                          <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">({count})</span>
+                          <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">({count})</span>
                         )}
                       </SelectItem>
                     );
@@ -276,7 +276,7 @@ export function FilterModal({
                     >
                       {amenity}
                       {count !== undefined && !isActive && (
-                        <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">({count})</span>
+                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">({count})</span>
                       )}
                       {isActive && (
                         <X className="w-3.5 h-3.5 ml-1.5" />
@@ -311,7 +311,7 @@ export function FilterModal({
                     >
                       {rule}
                       {count !== undefined && !isActive && (
-                        <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">({count})</span>
+                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">({count})</span>
                       )}
                       {isActive && (
                         <X className="w-3.5 h-3.5 ml-1.5" />

@@ -182,7 +182,7 @@ export function SearchResultsClient({
       {hasConfirmedZeroResults ? (
         <div data-testid="empty-state" className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm mb-4">
-            <Search className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-400" />
+            <Search className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-500" />
           </div>
           <h2 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-white mb-2">
             No matches found
@@ -259,7 +259,7 @@ export function SearchResultsClient({
           {/* Load more section with progress indicator */}
           {nextCursor && !reachedCap && (
             <div className="flex flex-col items-center mt-8 mb-4 gap-2">
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+              <p className="text-xs text-zinc-500 dark:text-zinc-500">
                 Showing {allListings.length} of {total !== null ? `~${total}` : '100+'} listings
               </p>
               <button
@@ -306,14 +306,14 @@ export function SearchResultsClient({
 
           {/* End of results indicator */}
           {!nextCursor && allListings.length > 0 && extraListings.length > 0 && (
-            <p className="text-center text-sm text-zinc-400 dark:text-zinc-500 mt-8">
+            <p className="text-center text-sm text-zinc-500 dark:text-zinc-500 mt-8">
               You&apos;ve seen all {allListings.length} results
             </p>
           )}
 
           {/* Contextual footer */}
           {allListings.length > 0 && (
-            <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-6 pb-4">
+            <p className="text-center text-xs text-zinc-500 dark:text-zinc-500 mt-6 pb-4">
               {total === null ? '100+' : total} stays{query ? ` in ${query}` : ''}
             </p>
           )}
