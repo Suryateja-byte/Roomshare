@@ -75,7 +75,7 @@ export function FilterChip({
           className={cn(
             "inline-flex items-center justify-center",
             "min-w-[1.25rem] px-1 py-0.5",
-            "text-2xs font-semibold",
+            "text-xs font-semibold",
             "rounded-full",
             "bg-emerald-100 dark:bg-emerald-900/50",
             "text-emerald-700 dark:text-emerald-300",

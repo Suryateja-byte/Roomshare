@@ -53,7 +53,7 @@ function SplitStayHalf({ listing, label }: { listing: SplitStayPair['first']; la
 
   return (
     <Link href={`/listings/${listing.id}`} className="block p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-      <p className="text-2xs text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wide mb-1.5">
+      <p className="text-xs text-zinc-500 dark:text-zinc-500 font-medium uppercase tracking-wide mb-1.5">
         {label}
       </p>
       {image && (
