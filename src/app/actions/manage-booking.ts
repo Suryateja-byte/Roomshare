@@ -248,10 +248,12 @@ export async function updateBookingStatus(
                             throw new Error('CONCURRENT_MODIFICATION');
                         }
 
-                        await tx.listing.update({
-                            where: { id: booking.listing.id },
-                            data: { availableSlots: { increment: 1 } }
-                        });
+                        // BIZ-07: Clamp availableSlots so it never exceeds totalSlots
+                    await tx.$executeRaw`
+                            UPDATE "Listing"
+                            SET "availableSlots" = LEAST("availableSlots" + 1, "totalSlots")
+                            WHERE "id" = ${booking.listing.id}
+                        `;
                     });
                 } catch (error) {
                     if (error instanceof Error && error.message === 'CONCURRENT_MODIFICATION') {
@@ -348,7 +350,7 @@ export async function getMyBookings() {
                     }
                 },
                 tenant: {
-                    select: { id: true, name: true, image: true, email: true }
+                    select: { id: true, name: true, image: true }
                 }
             },
             orderBy: { createdAt: 'desc' }

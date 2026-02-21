@@ -46,7 +46,7 @@ const serverEnvSchema = z.object({
     .min(32, "CRON_SECRET must be at least 32 characters")
     .optional()
     .refine(
-      (val) => !val || !val.includes("change-in-production"),
+      (val) => !val || !/change-in-production|placeholder|dummy|example|test-secret|YOUR_/i.test(val),
       "CRON_SECRET must not contain placeholder values",
     )
     .refine(
@@ -259,7 +259,7 @@ export const clientEnv: ClientEnv = new Proxy({} as ClientEnv, {
 
 export const CURSOR_SECRET = process.env.CURSOR_SECRET ?? "";
 if (!CURSOR_SECRET && process.env.NODE_ENV === "production") {
-  console.error("[SECURITY] CURSOR_SECRET is not set — cursor HMAC disabled");
+  throw new Error("[SECURITY] CURSOR_SECRET is required in production — cursor tokens cannot be verified without it");
 }
 
 // Helper to check if a feature is available

@@ -79,10 +79,9 @@ async function fixListingCoordinates() {
 
         if (coords) {
             // Update the database with new coordinates
-            const point = `POINT(${coords.lng} ${coords.lat})`;
             await prisma.$executeRaw`
         UPDATE "Location"
-        SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
+        SET coords = ST_SetSRID(ST_MakePoint(${coords.lng}::float8, ${coords.lat}::float8), 4326)
         WHERE id = ${listing.location_id}
       `;
             console.log(`  💾 Updated in database`);

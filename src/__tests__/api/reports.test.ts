@@ -8,6 +8,9 @@ jest.mock('@/lib/prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
     },
+    listing: {
+      findUnique: jest.fn(),
+    },
   },
 }))
 
@@ -44,6 +47,8 @@ describe('Reports API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(auth as jest.Mock).mockResolvedValue(mockSession)
+    // Default: listing exists and is owned by someone else
+    ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue({ ownerId: 'other-owner' })
   })
 
   describe('POST', () => {
@@ -77,6 +82,34 @@ describe('Reports API', () => {
       const response = await POST(request)
 
       expect(response.status).toBe(400)
+    })
+
+    it('returns 404 when listing does not exist', async () => {
+      ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(null)
+
+      const request = new Request('http://localhost/api/reports', {
+        method: 'POST',
+        body: JSON.stringify({ listingId: 'nonexistent', reason: 'Spam' }),
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(404)
+      const data = await response.json()
+      expect(data.error).toBe('Listing not found')
+    })
+
+    it('returns 400 when reporting own listing (BIZ-05)', async () => {
+      ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue({ ownerId: 'user-123' })
+
+      const request = new Request('http://localhost/api/reports', {
+        method: 'POST',
+        body: JSON.stringify({ listingId: 'my-listing', reason: 'Spam' }),
+      })
+      const response = await POST(request)
+
+      expect(response.status).toBe(400)
+      const data = await response.json()
+      expect(data.error).toBe('You cannot report your own listing')
     })
 
     it('creates report successfully', async () => {

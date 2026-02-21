@@ -17,19 +17,27 @@ export async function createNotification(input: CreateNotificationInput) {
         return { success: false, error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
-    // Only admins or users creating notifications for themselves can use this public server action.
-    // Internal business flows should call createInternalNotification() directly.
-    if (!session.user.isAdmin && session.user.id !== input.userId) {
-        logger.sync.warn('Blocked unauthorized notification creation attempt', {
-            action: 'createNotification',
-            actorUserId: session.user.id,
-            targetUserId: input.userId,
-            type: input.type,
-        });
-        return { success: false, error: 'Forbidden' };
-    }
+    try {
+        // Only admins or users creating notifications for themselves can use this public server action.
+        // Internal business flows should call createInternalNotification() directly.
+        if (!session.user.isAdmin && session.user.id !== input.userId) {
+            logger.sync.warn('Blocked unauthorized notification creation attempt', {
+                action: 'createNotification',
+                actorUserId: session.user.id,
+                targetUserId: input.userId,
+                type: input.type,
+            });
+            return { success: false, error: 'Forbidden' };
+        }
 
-    return createInternalNotification(input);
+        return createInternalNotification(input);
+    } catch (error: unknown) {
+        logger.sync.error('Failed to create notification', {
+            action: 'createNotification',
+            errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
+        });
+        return { success: false, error: 'Failed to create notification' };
+    }
 }
 
 export async function getNotifications(limit = 20) {

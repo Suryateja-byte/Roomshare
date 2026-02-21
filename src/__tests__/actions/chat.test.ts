@@ -27,11 +27,15 @@ jest.mock('@/lib/prisma', () => {
       deleteMany: jest.fn(),
     },
     message: {
+      findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       updateMany: jest.fn(),
       count: jest.fn(),
       groupBy: jest.fn(),
+    },
+    typingStatus: {
+      findMany: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -66,6 +70,8 @@ import {
   getConversations,
   getMessages,
   getUnreadMessageCount,
+  pollMessages,
+  markConversationMessagesAsRead,
 } from '@/app/actions/chat'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
@@ -369,6 +375,92 @@ describe('Chat Actions', () => {
           },
         })
       )
+    })
+  })
+
+  describe('pollMessages (BIZ-08)', () => {
+    const mockConversation = {
+      id: 'conv-123',
+      deletedAt: null,
+      participants: [{ id: 'user-123' }, { id: 'other-456' }],
+      deletions: [],
+    }
+
+    beforeEach(() => {
+      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
+      ;(prisma.typingStatus.findMany as jest.Mock).mockResolvedValue([])
+      ;(prisma.message.findMany as jest.Mock).mockResolvedValue([])
+    })
+
+    it('does NOT mark messages as read during polling', async () => {
+      const newMessages = [
+        { id: 'msg-new', content: 'Hello', sender: { id: 'other-456', name: 'Other' } },
+      ]
+      ;(prisma.message.findMany as jest.Mock).mockResolvedValue(newMessages)
+
+      await pollMessages('conv-123')
+
+      // BIZ-08: pollMessages should NOT call updateMany to mark as read
+      expect(prisma.message.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('returns new messages without side effects', async () => {
+      const newMessages = [
+        { id: 'msg-1', content: 'Hi', sender: { id: 'other-456', name: 'Other' } },
+      ]
+      ;(prisma.message.findMany as jest.Mock).mockResolvedValue(newMessages)
+
+      const result = await pollMessages('conv-123')
+
+      expect(result.messages).toEqual(newMessages)
+      expect(result.hasNewMessages).toBe(true)
+    })
+  })
+
+  describe('markConversationMessagesAsRead (BIZ-08)', () => {
+    const mockConversation = {
+      id: 'conv-123',
+      deletedAt: null,
+      participants: [{ id: 'user-123' }, { id: 'other-456' }],
+      deletions: [],
+    }
+
+    beforeEach(() => {
+      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
+      ;(prisma.message.updateMany as jest.Mock).mockResolvedValue({ count: 2 })
+    })
+
+    it('returns error when not authenticated', async () => {
+      ;(auth as jest.Mock).mockResolvedValue(null)
+
+      const result = await markConversationMessagesAsRead('conv-123')
+
+      expect(result).toEqual({ error: 'Unauthorized', code: 'SESSION_EXPIRED' })
+    })
+
+    it('returns error when user is not a participant', async () => {
+      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        ...mockConversation,
+        participants: [{ id: 'other-1' }, { id: 'other-2' }],
+      })
+
+      const result = await markConversationMessagesAsRead('conv-123')
+
+      expect(result).toEqual({ error: 'Unauthorized' })
+    })
+
+    it('marks unread messages as read for participant', async () => {
+      const result = await markConversationMessagesAsRead('conv-123')
+
+      expect(result).toEqual({ success: true, count: 2 })
+      expect(prisma.message.updateMany).toHaveBeenCalledWith({
+        where: {
+          conversationId: 'conv-123',
+          senderId: { not: 'user-123' },
+          read: false,
+        },
+        data: { read: true },
+      })
     })
   })
 })

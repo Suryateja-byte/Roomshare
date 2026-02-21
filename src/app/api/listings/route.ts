@@ -253,11 +253,10 @@ export async function POST(request: Request) {
                 },
             });
 
-            // Update with PostGIS geometry
-            const point = `POINT(${coords.lng} ${coords.lat})`;
+            // Update with PostGIS geometry (use ST_MakePoint to avoid string interpolation)
             await tx.$executeRaw`
                 UPDATE "Location"
-                SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
+                SET coords = ST_SetSRID(ST_MakePoint(${coords.lng}::float8, ${coords.lat}::float8), 4326)
                 WHERE id = ${location.id}
             `;
 

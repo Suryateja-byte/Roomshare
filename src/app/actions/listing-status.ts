@@ -100,17 +100,24 @@ export async function incrementViewCount(listingId: string) {
 }
 
 export async function trackListingView(listingId: string) {
-    const session = await auth();
+    try {
+        const session = await auth();
 
-    // Increment view count regardless of authentication
-    await incrementViewCount(listingId);
+        // Increment view count regardless of authentication
+        await incrementViewCount(listingId);
 
-    // Track recently viewed for authenticated users
-    if (session?.user?.id) {
-        await trackRecentlyViewed(listingId);
+        // Track recently viewed for authenticated users
+        if (session?.user?.id) {
+            await trackRecentlyViewed(listingId);
+        }
+
+        return { success: true };
+    } catch (error) {
+        logger.sync.warn('trackListingView failed silently', {
+            error: error instanceof Error ? error.name : 'Unknown',
+        });
+        return { success: false };
     }
-
-    return { success: true };
 }
 
 export async function trackRecentlyViewed(listingId: string) {

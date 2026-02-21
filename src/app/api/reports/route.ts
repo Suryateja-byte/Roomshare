@@ -37,6 +37,20 @@ export async function POST(request: Request) {
 
         const { listingId, reason, details } = parsed.data;
 
+        // BIZ-05: Block self-reporting — look up listing owner
+        const listing = await prisma.listing.findUnique({
+            where: { id: listingId },
+            select: { ownerId: true },
+        });
+
+        if (!listing) {
+            return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+        }
+
+        if (listing.ownerId === session.user.id) {
+            return NextResponse.json({ error: 'You cannot report your own listing' }, { status: 400 });
+        }
+
         // Check for existing active report (duplicate prevention)
         // Allow re-report only if previous report was DISMISSED
         const existingReport = await prisma.report.findFirst({

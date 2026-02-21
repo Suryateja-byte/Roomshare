@@ -19,69 +19,77 @@ export async function startConversation(listingId: string) {
     const session = await auth();
     if (!session?.user?.id) return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
 
-    // Rate limiting
-    const headersList = await headers();
-    const ip = getClientIPFromHeaders(headersList);
-    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'startConversation', RATE_LIMITS.chatStartConversation);
-    if (!rl.success) return { error: 'Too many attempts. Please wait.' };
+    try {
+        // Rate limiting
+        const headersList = await headers();
+        const ip = getClientIPFromHeaders(headersList);
+        const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'startConversation', RATE_LIMITS.chatStartConversation);
+        if (!rl.success) return { error: 'Too many attempts. Please wait.' };
 
-    const suspension = await checkSuspension();
-    if (suspension.suspended) {
-        return { error: suspension.error || 'Account suspended' };
-    }
+        const suspension = await checkSuspension();
+        if (suspension.suspended) {
+            return { error: suspension.error || 'Account suspended' };
+        }
 
-    const emailCheck = await checkEmailVerified();
-    if (!emailCheck.verified) {
-        return { error: emailCheck.error || 'Please verify your email to start a conversation' };
-    }
+        const emailCheck = await checkEmailVerified();
+        if (!emailCheck.verified) {
+            return { error: emailCheck.error || 'Please verify your email to start a conversation' };
+        }
 
-    const userId = session.user.id;
+        const userId = session.user.id;
 
-    const listing = await prisma.listing.findUnique({
-        where: { id: listingId },
-        select: { ownerId: true },
-    });
-
-    if (!listing) return { error: 'Listing not found' };
-    if (listing.ownerId === userId) return { error: 'Cannot chat with yourself' };
-
-    // Check if either user has blocked the other
-    const { checkBlockBeforeAction } = await import('./block');
-    const blockCheck = await checkBlockBeforeAction(listing.ownerId);
-    if (!blockCheck.allowed) {
-        return { error: blockCheck.message };
-    }
-
-    // Check existing conversation (exclude admin-deleted, but include per-user deleted for resurrection)
-    const existing = await prisma.conversation.findFirst({
-        where: {
-            listingId,
-            deletedAt: null, // Only exclude admin-deleted
-            AND: [
-                { participants: { some: { id: userId } } },
-                { participants: { some: { id: listing.ownerId } } },
-            ],
-        },
-    });
-
-    if (existing) {
-        // Resurrect: clear per-user deletion record if it exists
-        await prisma.conversationDeletion.deleteMany({
-            where: { conversationId: existing.id, userId },
+        const listing = await prisma.listing.findUnique({
+            where: { id: listingId },
+            select: { ownerId: true },
         });
-        return { conversationId: existing.id };
-    }
 
-    const conversation = await prisma.conversation.create({
-        data: {
-            listingId,
-            participants: {
-                connect: [{ id: userId }, { id: listing.ownerId }],
+        if (!listing) return { error: 'Listing not found' };
+        if (listing.ownerId === userId) return { error: 'Cannot chat with yourself' };
+
+        // Check if either user has blocked the other
+        const { checkBlockBeforeAction } = await import('./block');
+        const blockCheck = await checkBlockBeforeAction(listing.ownerId);
+        if (!blockCheck.allowed) {
+            return { error: blockCheck.message };
+        }
+
+        // Check existing conversation (exclude admin-deleted, but include per-user deleted for resurrection)
+        const existing = await prisma.conversation.findFirst({
+            where: {
+                listingId,
+                deletedAt: null, // Only exclude admin-deleted
+                AND: [
+                    { participants: { some: { id: userId } } },
+                    { participants: { some: { id: listing.ownerId } } },
+                ],
             },
-        },
-    });
+        });
 
-    return { conversationId: conversation.id };
+        if (existing) {
+            // Resurrect: clear per-user deletion record if it exists
+            await prisma.conversationDeletion.deleteMany({
+                where: { conversationId: existing.id, userId },
+            });
+            return { conversationId: existing.id };
+        }
+
+        const conversation = await prisma.conversation.create({
+            data: {
+                listingId,
+                participants: {
+                    connect: [{ id: userId }, { id: listing.ownerId }],
+                },
+            },
+        });
+
+        return { conversationId: conversation.id };
+    } catch (error: unknown) {
+        logger.sync.error('Failed to start conversation', {
+            action: 'startConversation',
+            errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
+        });
+        return { error: 'Failed to start conversation' };
+    }
 }
 
 export async function sendMessage(conversationId: string, content: string) {
@@ -90,172 +98,188 @@ export async function sendMessage(conversationId: string, content: string) {
         return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
 
-    // Rate limiting
-    const headersList = await headers();
-    const ip = getClientIPFromHeaders(headersList);
-    const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'sendMessage', RATE_LIMITS.chatSendMessage);
-    if (!rl.success) return { error: 'Too many messages. Please wait.' };
+    try {
+        // Rate limiting
+        const headersList = await headers();
+        const ip = getClientIPFromHeaders(headersList);
+        const rl = await checkRateLimit(`${ip}:${session.user.id}`, 'sendMessage', RATE_LIMITS.chatSendMessage);
+        if (!rl.success) return { error: 'Too many messages. Please wait.' };
 
-    const suspension = await checkSuspension();
-    if (suspension.suspended) {
-        return { error: suspension.error || 'Account suspended' };
-    }
-
-    const parsed = sendMessageSchema.safeParse({ conversationId, content });
-    if (!parsed.success) {
-        return { error: 'Invalid message payload' };
-    }
-    const { conversationId: safeConversationId, content: safeContent } = parsed.data;
-
-    // Check if email is verified (soft enforcement - only block unverified users)
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { emailVerified: true }
-    });
-
-    if (!user?.emailVerified) {
-        return { error: 'Please verify your email to send messages' };
-    }
-
-    // Get conversation with participants for notification
-    const conversation = await prisma.conversation.findUnique({
-        where: { id: safeConversationId },
-        include: {
-            participants: {
-                select: { id: true, name: true, email: true }
-            }
+        const suspension = await checkSuspension();
+        if (suspension.suspended) {
+            return { error: suspension.error || 'Account suspended' };
         }
-    });
 
-    if (!conversation || conversation.deletedAt) {
-        return { error: 'Conversation not found' };
-    }
-
-    // P1-17 FIX: Verify user is a participant in the conversation (IDOR protection)
-    const isParticipant = conversation.participants.some(p => p.id === session.user.id);
-    if (!isParticipant) {
-        return { error: 'Unauthorized' };
-    }
-
-    // Check for blocks between participants
-    const { checkBlockBeforeAction } = await import('./block');
-    const otherParticipant = conversation.participants.find(p => p.id !== session.user.id);
-    if (otherParticipant) {
-        const blockCheck = await checkBlockBeforeAction(otherParticipant.id);
-        if (!blockCheck.allowed) {
-            return { error: blockCheck.message };
+        const parsed = sendMessageSchema.safeParse({ conversationId, content });
+        if (!parsed.success) {
+            return { error: 'Invalid message payload' };
         }
-    }
+        const { conversationId: safeConversationId, content: safeContent } = parsed.data;
 
-    // Wrap dependent writes in a transaction to prevent partial failures
-    const message = await prisma.$transaction(async (tx) => {
-        const msg = await tx.message.create({
-            data: {
-                content: safeContent,
-                conversationId: safeConversationId,
-                senderId: session.user.id,
-            },
+        // Check if email is verified (soft enforcement - only block unverified users)
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { emailVerified: true }
         });
-        await Promise.all([
-            tx.conversation.update({
-                where: { id: safeConversationId },
-                data: { updatedAt: new Date() },
-            }),
-            // New message resurrects conversation for everyone
-            tx.conversationDeletion.deleteMany({
-                where: { conversationId: safeConversationId },
-            }),
-        ]);
-        return msg;
-    });
 
-    // Use session.user.name (already available) instead of an extra DB query
-    const senderName = session.user.name || 'Someone';
+        if (!user?.emailVerified) {
+            return { error: 'Please verify your email to send messages' };
+        }
 
-    // Send notifications to other participants in parallel
-    const otherParticipants = conversation.participants.filter(
-        (p) => p.id !== session.user.id,
-    );
-    await Promise.all(
-        otherParticipants.map(async (participant) => {
-            // Create in-app notification
-            await createInternalNotification({
-                userId: participant.id,
-                type: 'NEW_MESSAGE',
-                title: 'New Message',
-                message: `${senderName}: ${safeContent.substring(0, 50)}${safeContent.length > 50 ? '...' : ''}`,
-                link: `/messages/${safeConversationId}`
-            });
-
-            // Send email (respecting user preferences)
-            // Truncate email preview to match in-app notification (50 chars)
-            if (participant.email) {
-                await sendNotificationEmailWithPreference('newMessage', participant.id, participant.email, {
-                    recipientName: participant.name || 'User',
-                    senderName,
-                    messagePreview: safeContent.substring(0, 50) + (safeContent.length > 50 ? '...' : ''),
-                    conversationId: safeConversationId
-                });
+        // Get conversation with participants for notification
+        const conversation = await prisma.conversation.findUnique({
+            where: { id: safeConversationId },
+            include: {
+                participants: {
+                    select: { id: true, name: true, email: true }
+                }
             }
-        }),
-    );
+        });
 
-    return message;
+        if (!conversation || conversation.deletedAt) {
+            return { error: 'Conversation not found' };
+        }
+
+        // P1-17 FIX: Verify user is a participant in the conversation (IDOR protection)
+        const isParticipant = conversation.participants.some(p => p.id === session.user.id);
+        if (!isParticipant) {
+            return { error: 'Unauthorized' };
+        }
+
+        // Check for blocks between participants
+        const { checkBlockBeforeAction } = await import('./block');
+        const otherParticipant = conversation.participants.find(p => p.id !== session.user.id);
+        if (otherParticipant) {
+            const blockCheck = await checkBlockBeforeAction(otherParticipant.id);
+            if (!blockCheck.allowed) {
+                return { error: blockCheck.message };
+            }
+        }
+
+        // Wrap dependent writes in a transaction to prevent partial failures
+        const message = await prisma.$transaction(async (tx) => {
+            const msg = await tx.message.create({
+                data: {
+                    content: safeContent,
+                    conversationId: safeConversationId,
+                    senderId: session.user.id,
+                },
+            });
+            await Promise.all([
+                tx.conversation.update({
+                    where: { id: safeConversationId },
+                    data: { updatedAt: new Date() },
+                }),
+                // New message resurrects conversation for everyone
+                tx.conversationDeletion.deleteMany({
+                    where: { conversationId: safeConversationId },
+                }),
+            ]);
+            return msg;
+        });
+
+        // Use session.user.name (already available) instead of an extra DB query
+        const senderName = session.user.name || 'Someone';
+
+        // Send notifications to other participants in parallel
+        const otherParticipants = conversation.participants.filter(
+            (p) => p.id !== session.user.id,
+        );
+        await Promise.all(
+            otherParticipants.map(async (participant) => {
+                // Create in-app notification
+                await createInternalNotification({
+                    userId: participant.id,
+                    type: 'NEW_MESSAGE',
+                    title: 'New Message',
+                    message: `${senderName}: ${safeContent.substring(0, 50)}${safeContent.length > 50 ? '...' : ''}`,
+                    link: `/messages/${safeConversationId}`
+                });
+
+                // Send email (respecting user preferences)
+                // Truncate email preview to match in-app notification (50 chars)
+                if (participant.email) {
+                    await sendNotificationEmailWithPreference('newMessage', participant.id, participant.email, {
+                        recipientName: participant.name || 'User',
+                        senderName,
+                        messagePreview: safeContent.substring(0, 50) + (safeContent.length > 50 ? '...' : ''),
+                        conversationId: safeConversationId
+                    });
+                }
+            }),
+        );
+
+        return message;
+    } catch (error: unknown) {
+        logger.sync.error('Failed to send message', {
+            action: 'sendMessage',
+            errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
+        });
+        return { error: 'Failed to send message' };
+    }
 }
 
 export async function getConversations() {
     const session = await auth();
     if (!session?.user?.id) return [];
 
-    const conversations = await prisma.conversation.findMany({
-        where: {
-            participants: {
-                some: { id: session.user.id },
-            },
-            deletedAt: null, // Exclude admin-deleted conversations
-            deletions: { none: { userId: session.user.id } }, // Exclude per-user deleted
-        },
-        include: {
-            participants: {
-                select: { id: true, name: true, image: true },
-            },
-            messages: {
-                where: { deletedAt: null }, // Exclude soft-deleted messages
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-            },
-            listing: {
-                select: { title: true },
-            },
-        },
-        orderBy: { updatedAt: 'desc' },
-    });
-
-    // P2-07 FIX: Get unread counts in single query using groupBy (2 queries instead of N+1)
-    const conversationIds = conversations.map(c => c.id);
-    const unreadCounts = conversationIds.length > 0
-        ? await prisma.message.groupBy({
-            by: ['conversationId'],
+    try {
+        const conversations = await prisma.conversation.findMany({
             where: {
-                conversationId: { in: conversationIds },
-                senderId: { not: session.user.id },
-                read: false,
-                deletedAt: null,
+                participants: {
+                    some: { id: session.user.id },
+                },
+                deletedAt: null, // Exclude admin-deleted conversations
+                deletions: { none: { userId: session.user.id } }, // Exclude per-user deleted
             },
-            _count: true,
-        })
-        : [];
+            include: {
+                participants: {
+                    select: { id: true, name: true, image: true },
+                },
+                messages: {
+                    where: { deletedAt: null }, // Exclude soft-deleted messages
+                    orderBy: { createdAt: 'desc' },
+                    take: 1,
+                },
+                listing: {
+                    select: { title: true },
+                },
+            },
+            orderBy: { updatedAt: 'desc' },
+        });
 
-    // Create lookup map for O(1) access
-    const unreadMap = new Map(unreadCounts.map(c => [c.conversationId, c._count]));
+        // P2-07 FIX: Get unread counts in single query using groupBy (2 queries instead of N+1)
+        const conversationIds = conversations.map(c => c.id);
+        const unreadCounts = conversationIds.length > 0
+            ? await prisma.message.groupBy({
+                by: ['conversationId'],
+                where: {
+                    conversationId: { in: conversationIds },
+                    senderId: { not: session.user.id },
+                    read: false,
+                    deletedAt: null,
+                },
+                _count: true,
+            })
+            : [];
 
-    // Map conversations with unread counts
-    const conversationsWithUnread = conversations.map((conv) => ({
-        ...conv,
-        unreadCount: unreadMap.get(conv.id) || 0,
-    }));
+        // Create lookup map for O(1) access
+        const unreadMap = new Map(unreadCounts.map(c => [c.conversationId, c._count]));
 
-    return conversationsWithUnread;
+        // Map conversations with unread counts
+        const conversationsWithUnread = conversations.map((conv) => ({
+            ...conv,
+            unreadCount: unreadMap.get(conv.id) || 0,
+        }));
+
+        return conversationsWithUnread;
+    } catch (error: unknown) {
+        logger.sync.error('Failed to get conversations', {
+            action: 'getConversations',
+            errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
+        });
+        return [];
+    }
 }
 
 export async function getMessages(conversationId: string) {
@@ -264,71 +288,87 @@ export async function getMessages(conversationId: string) {
         return { error: 'Unauthorized', code: 'SESSION_EXPIRED', messages: [] };
     }
 
-    const userId = session.user.id;
+    try {
+        const userId = session.user.id;
 
-    // Verify participant and check both admin-delete and per-user delete
-    const conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
-        include: {
-            participants: { select: { id: true } },
-            deletions: { where: { userId }, select: { id: true } },
-        },
-    });
-
-    if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === userId)) {
-        return { error: 'Unauthorized', messages: [] };
-    }
-
-    // Mark unread messages as read
-    const updateResult = await prisma.message.updateMany({
-        where: {
-            conversationId,
-            senderId: { not: userId },
-            read: false,
-        },
-        data: { read: true },
-    });
-
-    await logger.debug('Messages marked as read', {
-        action: 'getMessages',
-        conversationId: conversationId.slice(0, 8) + '...',
-        markedCount: updateResult.count,
-    });
-
-    return await prisma.message.findMany({
-        where: {
-            conversationId,
-            deletedAt: null // Exclude soft-deleted messages
-        },
-        orderBy: { createdAt: 'asc' },
-        include: {
-            sender: {
-                select: { id: true, name: true, image: true },
+        // Verify participant and check both admin-delete and per-user delete
+        const conversation = await prisma.conversation.findUnique({
+            where: { id: conversationId },
+            include: {
+                participants: { select: { id: true } },
+                deletions: { where: { userId }, select: { id: true } },
             },
-        },
-    });
+        });
+
+        if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === userId)) {
+            return { error: 'Unauthorized', messages: [] };
+        }
+
+        // Mark unread messages as read
+        const updateResult = await prisma.message.updateMany({
+            where: {
+                conversationId,
+                senderId: { not: userId },
+                read: false,
+            },
+            data: { read: true },
+        });
+
+        await logger.debug('Messages marked as read', {
+            action: 'getMessages',
+            conversationId: conversationId.slice(0, 8) + '...',
+            markedCount: updateResult.count,
+        });
+
+        return await prisma.message.findMany({
+            where: {
+                conversationId,
+                deletedAt: null // Exclude soft-deleted messages
+            },
+            orderBy: { createdAt: 'asc' },
+            include: {
+                sender: {
+                    select: { id: true, name: true, image: true },
+                },
+            },
+        });
+    } catch (error: unknown) {
+        logger.sync.error('Failed to get messages', {
+            action: 'getMessages',
+            errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
+        });
+        return { error: 'Failed to load messages', messages: [] };
+    }
 }
 
 export async function getUnreadMessageCount() {
     const session = await auth();
     if (!session?.user?.id) return 0;
 
-    const unreadCount = await prisma.message.count({
-        where: {
-            conversation: {
-                participants: {
-                    some: { id: session.user.id },
+    try {
+        const unreadCount = await prisma.message.count({
+            where: {
+                conversation: {
+                    participants: {
+                        some: { id: session.user.id },
+                    },
+                    deletedAt: null, // Exclude admin-deleted conversations
+                    deletions: { none: { userId: session.user.id } }, // Exclude per-user deleted
                 },
-                deletedAt: null, // Exclude admin-deleted conversations
-                deletions: { none: { userId: session.user.id } }, // Exclude per-user deleted
+                senderId: { not: session.user.id },
+                read: false,
+                deletedAt: null, // Exclude soft-deleted messages
             },
-            senderId: { not: session.user.id },
-            read: false,
-            deletedAt: null, // Exclude soft-deleted messages
-        },
-    });
+        });
 
-    return unreadCount;
+        return unreadCount;
+    } catch (error: unknown) {
+        logger.sync.error('Failed to get unread message count', {
+            action: 'getUnreadMessageCount',
+            errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
+        });
+        return 0;
+    }
 }
 
 /**
@@ -652,17 +692,9 @@ export async function pollMessages(conversationId: string, lastMessageId?: strin
             }
         });
 
-        // Mark messages from others as read
-        if (messages.length > 0) {
-            await prisma.message.updateMany({
-                where: {
-                    conversationId,
-                    senderId: { not: session.user.id },
-                    read: false
-                },
-                data: { read: true }
-            });
-        }
+        // BIZ-08: Do NOT mark messages as read during background polling.
+        // Marking as read is handled by getMessages (initial load) or
+        // markConversationMessagesAsRead (explicit user action).
 
         return {
             messages,
@@ -675,5 +707,50 @@ export async function pollMessages(conversationId: string, lastMessageId?: strin
             error: error instanceof Error ? error.message : 'Unknown error',
         });
         return { messages: [], typingUsers: [], hasNewMessages: false };
+    }
+}
+
+/**
+ * BIZ-08: Explicitly mark messages in a conversation as read.
+ * Called when the user actively views the conversation, NOT during background polling.
+ */
+export async function markConversationMessagesAsRead(conversationId: string) {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
+    }
+
+    try {
+        const userId = session.user.id;
+
+        // Verify user is a participant in a non-deleted conversation
+        const conversation = await prisma.conversation.findUnique({
+            where: { id: conversationId },
+            include: {
+                participants: { select: { id: true } },
+                deletions: { where: { userId }, select: { id: true } },
+            },
+        });
+
+        if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === userId)) {
+            return { error: 'Unauthorized' };
+        }
+
+        const result = await prisma.message.updateMany({
+            where: {
+                conversationId,
+                senderId: { not: userId },
+                read: false,
+            },
+            data: { read: true },
+        });
+
+        return { success: true, count: result.count };
+    } catch (error: unknown) {
+        logger.sync.error('Failed to mark conversation messages as read', {
+            action: 'markConversationMessagesAsRead',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return { error: 'Failed to mark messages as read' };
     }
 }

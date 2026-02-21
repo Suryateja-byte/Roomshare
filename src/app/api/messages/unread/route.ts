@@ -27,7 +27,10 @@ export async function GET(request: Request) {
             });
         }
 
-        return NextResponse.json({ count });
+        const response = NextResponse.json({ count });
+        // PERF-01: Short cache — unread badge doesn't need real-time accuracy
+        response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=20');
+        return response;
     } catch (error) {
         return captureApiError(error, { route: '/api/messages/unread', method: 'GET' });
     }

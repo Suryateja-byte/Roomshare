@@ -52,14 +52,19 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "*.supabase.co",
       },
-      {
-        protocol: "https",
-        hostname: "picsum.photos",
-      },
-      {
-        protocol: "https",
-        hostname: "i.pravatar.cc",
-      },
+      // Placeholder image services — only allowed in development
+      ...(process.env.NODE_ENV !== "production"
+        ? [
+            {
+              protocol: "https" as const,
+              hostname: "picsum.photos",
+            },
+            {
+              protocol: "https" as const,
+              hostname: "i.pravatar.cc",
+            },
+          ]
+        : []),
       {
         protocol: "https",
         hostname: "lh3.googleusercontent.com",

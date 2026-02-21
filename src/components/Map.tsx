@@ -34,6 +34,15 @@ import { POILayer } from './map/POILayer';
 import { PROGRAMMATIC_MOVE_TIMEOUT_MS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
+/** Parse a string to float and validate it's a finite number within an optional range. */
+function safeParseFloat(value: string, min?: number, max?: number): number | undefined {
+    const parsed = parseFloat(value);
+    if (!Number.isFinite(parsed)) return undefined;
+    if (min !== undefined && parsed < min) return undefined;
+    if (max !== undefined && parsed > max) return undefined;
+    return parsed;
+}
+
 interface Listing {
     id: string;
     title: string;
@@ -1221,13 +1230,13 @@ export default function MapComponent({
         const maxLng = searchParams.get('maxLng');
 
         if (minLat && maxLat && minLng && maxLng) {
-            const bounds = {
-                minLat: parseFloat(minLat),
-                maxLat: parseFloat(maxLat),
-                minLng: parseFloat(minLng),
-                maxLng: parseFloat(maxLng),
-            };
-            urlBoundsRef.current = bounds;
+            const pMinLat = safeParseFloat(minLat, -90, 90);
+            const pMaxLat = safeParseFloat(maxLat, -90, 90);
+            const pMinLng = safeParseFloat(minLng, -180, 180);
+            const pMaxLng = safeParseFloat(maxLng, -180, 180);
+            if (pMinLat !== undefined && pMaxLat !== undefined && pMinLng !== undefined && pMaxLng !== undefined) {
+                urlBoundsRef.current = { minLat: pMinLat, maxLat: pMaxLat, minLng: pMinLng, maxLng: pMaxLng };
+            }
         }
 
         // Extract search location from URL for location conflict detection
@@ -1236,7 +1245,9 @@ export default function MapComponent({
         const lng = searchParams.get('lng');
 
         if (q && lat && lng) {
-            setSearchLocation(q, { lat: parseFloat(lat), lng: parseFloat(lng) });
+            const pLat = safeParseFloat(lat, -90, 90);
+            const pLng = safeParseFloat(lng, -180, 180);
+            setSearchLocation(q, pLat !== undefined && pLng !== undefined ? { lat: pLat, lng: pLng } : null);
         } else if (q) {
             setSearchLocation(q, null);
         } else {
@@ -1820,9 +1831,16 @@ export default function MapComponent({
                         const minLng = sp.get('minLng');
                         const maxLng = sp.get('maxLng');
                         if (minLat && maxLat && minLng && maxLng) {
+                            const pMinLat = safeParseFloat(minLat, -90, 90);
+                            const pMaxLat = safeParseFloat(maxLat, -90, 90);
+                            const pMinLng = safeParseFloat(minLng, -180, 180);
+                            const pMaxLng = safeParseFloat(maxLng, -180, 180);
+                            if (pMinLat === undefined || pMaxLat === undefined || pMinLng === undefined || pMaxLng === undefined) {
+                                return; // Invalid URL coordinates — skip fitBounds
+                            }
                             const bounds: [[number, number], [number, number]] = [
-                                [parseFloat(minLng), parseFloat(minLat)],
-                                [parseFloat(maxLng), parseFloat(maxLat)],
+                                [pMinLng, pMinLat],
+                                [pMaxLng, pMaxLat],
                             ];
                             setProgrammaticMove(true);
                             // Safety: clear programmatic flag if moveEnd doesn't fire

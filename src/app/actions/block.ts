@@ -95,8 +95,7 @@ export async function getBlockedUsers() {
                     select: {
                         id: true,
                         name: true,
-                        image: true,
-                        email: true
+                        image: true
                     }
                 }
             },
@@ -195,15 +194,20 @@ export async function checkBlockBeforeAction(userId: string): Promise<{ allowed:
         return { allowed: false, message: 'Unauthorized' };
     }
 
-    const status = await getBlockStatus(userId);
+    try {
+        const status = await getBlockStatus(userId);
 
-    if (status === 'blocked') {
-        return { allowed: false, message: 'This user has blocked you' };
+        if (status === 'blocked') {
+            return { allowed: false, message: 'This user has blocked you' };
+        }
+
+        if (status === 'blocker') {
+            return { allowed: false, message: 'You have blocked this user. Unblock them to interact.' };
+        }
+
+        return { allowed: true };
+    } catch {
+        // Fail closed: if we can't check block status, deny the action
+        return { allowed: false, message: 'Unable to verify block status' };
     }
-
-    if (status === 'blocker') {
-        return { allowed: false, message: 'You have blocked this user. Unblock them to interact.' };
-    }
-
-    return { allowed: true };
 }
