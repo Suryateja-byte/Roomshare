@@ -1,6 +1,7 @@
 import { getMessages } from '@/app/actions/chat';
 import { auth } from '@/auth';
 import ChatWindow from './ChatWindow';
+import { ErrorBoundary, ErrorFallback } from '@/components/error/ErrorBoundary';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 
@@ -42,14 +43,24 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
     const messages = Array.isArray(result) ? result : (result.messages || []);
 
     return (
-        <ChatWindow
-            initialMessages={messages}
-            conversationId={id}
-            currentUserId={userId}
-            currentUserName={currentParticipant?.name || session.user.name || 'User'}
-            otherUserId={otherParticipant?.id || ''}
-            otherUserName={otherParticipant?.name || 'User'}
-            otherUserImage={otherParticipant?.image}
-        />
+        <ErrorBoundary
+            fallback={
+                <ErrorFallback
+                    error={null}
+                    title="Something went wrong loading this conversation"
+                    description="An unexpected error occurred. Please try refreshing the page."
+                />
+            }
+        >
+            <ChatWindow
+                initialMessages={messages}
+                conversationId={id}
+                currentUserId={userId}
+                currentUserName={currentParticipant?.name || session.user.name || 'User'}
+                otherUserId={otherParticipant?.id || ''}
+                otherUserName={otherParticipant?.name || 'User'}
+                otherUserImage={otherParticipant?.image}
+            />
+        </ErrorBoundary>
     );
 }

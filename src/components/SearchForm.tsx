@@ -112,6 +112,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(parseCoords);
     const [geoLoading, setGeoLoading] = useState(false);
+    const isMountedRef = useRef(true);
 
     const [hasMounted, setHasMounted] = useState(false);
 
@@ -222,6 +223,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         setGeoLoading(true);
         navigator.geolocation.getCurrentPosition(
             (position) => {
+                if (!isMountedRef.current) return;
                 const { latitude: lat, longitude: lng } = position.coords;
                 flushSync(() => {
                     setLocation('');
@@ -235,6 +237,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 formRef.current?.requestSubmit();
             },
             (error) => {
+                if (!isMountedRef.current) return;
                 setGeoLoading(false);
                 switch (error.code) {
                     case error.PERMISSION_DENIED:
@@ -429,9 +432,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }, SEARCH_DEBOUNCE_MS);
     }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching, saveRecentSearch, searchParams]);
 
-    // Cleanup timeout and abort controller on unmount
+    // Cleanup timeout, abort controller, and mount ref on unmount
     useEffect(() => {
+        isMountedRef.current = true;
         return () => {
+            isMountedRef.current = false;
             if (searchTimeoutRef.current) {
                 clearTimeout(searchTimeoutRef.current);
             }

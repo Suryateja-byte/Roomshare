@@ -70,7 +70,6 @@ export default function ChatWindow({
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [isSending, setIsSending] = useState(false);
-    const [isPolling, setIsPolling] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [otherUserTyping, setOtherUserTyping] = useState(false);
     const [isOnline, setIsOnline] = useState(false);
@@ -82,10 +81,18 @@ export default function ChatWindow({
     const inputRef = useRef<HTMLInputElement>(null);
     const channelRef = useRef<RealtimeChannel | null>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const isMountedRef = useRef(true);
+    const isPollingRef = useRef(false);
     const router = useRouter();
     const lastMessageIdRef = useRef<string | null>(
         initialMessages.length > 0 ? initialMessages[initialMessages.length - 1].id : null
     );
+
+    // Track mount state for async callback guards
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => { isMountedRef.current = false; };
+    }, []);
 
     // Block status tracking
     const { blockStatus, isBlocked, refetch: refetchBlockStatus } = useBlockStatus(otherUserId, currentUserId);
@@ -206,40 +213,28 @@ export default function ChatWindow({
 
     // Poll for new messages as fallback (or primary if Supabase not configured)
     const pollForMessages = useCallback(async () => {
-        if (isPolling) return;
-        setIsPolling(true);
-
+        if (isPollingRef.current || !isMountedRef.current) return;
+        isPollingRef.current = true;
         try {
             const result = await getMessages(conversationId);
+            if (!isMountedRef.current) return;
             if (result && Array.isArray(result)) {
-                // Check if there are new messages
-                const newMessages = result.filter(
-                    (msg: Message) => !messages.some(m => m.id === msg.id)
-                );
-
-                if (newMessages.length > 0) {
-                    setMessages(prev => {
-                        const combined = [...prev, ...newMessages];
-                        // Sort by createdAt and remove duplicates
-                        const unique = combined.reduce((acc: Message[], curr) => {
-                            if (!acc.some(m => m.id === curr.id)) {
-                                acc.push(curr);
-                            }
-                            return acc;
-                        }, []);
-                        return unique.sort((a, b) =>
-                            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-                        );
-                    });
-                    lastMessageIdRef.current = result[result.length - 1]?.id || null;
-                }
+                setMessages(prev => {
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const newMsgs = result.filter(m => !existingIds.has(m.id));
+                    if (newMsgs.length === 0) return prev; // no re-render
+                    return [...prev, ...newMsgs].sort((a, b) =>
+                        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                    );
+                });
+                lastMessageIdRef.current = result[result.length - 1]?.id || null;
             }
         } catch (error) {
             console.error('Polling error:', error);
         } finally {
-            setIsPolling(false);
+            isPollingRef.current = false;
         }
-    }, [conversationId, messages, isPolling]);
+    }, [conversationId]);
 
     // Set up real-time subscription with presence and typing
     useEffect(() => {
@@ -260,6 +255,7 @@ export default function ChatWindow({
                         table: 'Message',
                         filter: `conversationId=eq.${conversationId}`
                     }, (payload) => {
+                        if (!isMountedRef.current) return;
                         const newMessage = payload.new as any;
                         newMessage.createdAt = new Date(newMessage.createdAt);
 

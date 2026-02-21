@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { updateListingStatus, deleteListing } from '@/app/actions/admin';
 import {
@@ -62,10 +62,13 @@ export default function ListingList({ initialListings, totalListings }: ListingL
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | ListingStatus>('all');
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const isProcessingRef = useRef(false);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     const handleStatusChange = async (listingId: string, newStatus: ListingStatus) => {
+        if (isProcessingRef.current) return;
+        isProcessingRef.current = true;
         setProcessingId(listingId);
         try {
             const result = await updateListingStatus(listingId, newStatus);
@@ -81,12 +84,15 @@ export default function ListingList({ initialListings, totalListings }: ListingL
         } catch (error) {
             console.error('Error updating status:', error);
         } finally {
+            isProcessingRef.current = false;
             setProcessingId(null);
             setOpenMenuId(null);
         }
     };
 
     const handleDelete = async (listingId: string) => {
+        if (isProcessingRef.current) return;
+        isProcessingRef.current = true;
         setProcessingId(listingId);
         try {
             const result = await deleteListing(listingId);
@@ -98,6 +104,7 @@ export default function ListingList({ initialListings, totalListings }: ListingL
         } catch (error) {
             console.error('Error deleting listing:', error);
         } finally {
+            isProcessingRef.current = false;
             setProcessingId(null);
             setDeleteConfirmId(null);
         }
