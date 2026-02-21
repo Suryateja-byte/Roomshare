@@ -20,6 +20,7 @@ jest.mock('@/lib/prisma', () => ({
     booking: {
       count: jest.fn(),
       findMany: jest.fn(),
+      updateMany: jest.fn(),
     },
     report: {
       findUnique: jest.fn(),
@@ -466,13 +467,38 @@ describe('admin actions', () => {
 
   describe('deleteListing', () => {
     const mockListing = {
+      id: 'listing-123',
       title: 'Test Listing',
       ownerId: 'owner-123',
       status: 'ACTIVE',
     }
 
+    // Helper to set up interactive transaction mock
+    function mockInteractiveTx(overrides: Record<string, unknown> = {}) {
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+          booking: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
+          notification: { create: jest.fn().mockResolvedValue({}) },
+          listing: { delete: jest.fn().mockResolvedValue({}) },
+          report: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            update: jest.fn().mockResolvedValue({}),
+          },
+          ...overrides,
+        }
+        return fn(tx)
+      })
+    }
+
     it('returns error when listing not found', async () => {
-      ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(null)
+      mockInteractiveTx({
+        $queryRaw: jest.fn().mockResolvedValue([]),
+      })
 
       const result = await deleteListing('nonexistent')
 
@@ -480,35 +506,52 @@ describe('admin actions', () => {
     })
 
     it('blocks deletion with active bookings', async () => {
-      ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(2)
+      mockInteractiveTx({
+        booking: {
+          count: jest.fn().mockResolvedValue(2),
+          findMany: jest.fn().mockResolvedValue([]),
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+      })
 
       const result = await deleteListing('listing-123')
 
       expect(result.error).toBe('Cannot delete listing with active bookings')
-      expect(result.activeBookings).toBe(2)
+    })
+
+    it('uses interactive transaction with FOR UPDATE lock', async () => {
+      mockInteractiveTx()
+      ;(logAdminAction as jest.Mock).mockResolvedValue({})
+
+      await deleteListing('listing-123')
+
+      // Verify interactive transaction was used (function, not array)
+      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function))
     })
 
     it('deletes listing and notifies pending tenants', async () => {
-      ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-      ;(prisma.booking.findMany as jest.Mock).mockResolvedValue([
-        { id: 'booking-1', tenantId: 'tenant-1' },
-      ])
-      ;(prisma.$transaction as jest.Mock).mockResolvedValue([])
+      const mockNotifCreate = jest.fn().mockResolvedValue({})
+      mockInteractiveTx({
+        booking: {
+          count: jest.fn().mockResolvedValue(0),
+          findMany: jest.fn().mockResolvedValue([
+            { id: 'booking-1', tenantId: 'tenant-1' },
+          ]),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        notification: { create: mockNotifCreate },
+      })
       ;(logAdminAction as jest.Mock).mockResolvedValue({})
 
       const result = await deleteListing('listing-123')
 
       expect(result.success).toBe(true)
       expect(result.notifiedTenants).toBe(1)
+      expect(mockNotifCreate).toHaveBeenCalledTimes(1)
     })
 
     it('logs deletion action', async () => {
-      ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-      ;(prisma.booking.findMany as jest.Mock).mockResolvedValue([])
-      ;(prisma.$transaction as jest.Mock).mockResolvedValue([])
+      mockInteractiveTx()
       ;(logAdminAction as jest.Mock).mockResolvedValue({})
 
       await deleteListing('listing-123')
