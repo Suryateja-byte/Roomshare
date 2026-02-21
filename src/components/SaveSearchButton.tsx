@@ -175,7 +175,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
 
                         {/* Modal Content */}
                         <div
-                            className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
+                            className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6"
                             role="dialog"
                             aria-modal="true"
                             aria-labelledby="save-search-dialog-title"
@@ -188,12 +188,12 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                                 <X className="w-5 h-5" />
                             </button>
 
-                            <h2 id="save-search-dialog-title" className="text-xl font-bold text-zinc-900 mb-4">Save This Search</h2>
+                            <h2 id="save-search-dialog-title" className="text-xl font-bold text-zinc-900 dark:text-white mb-4">Save This Search</h2>
 
                             <div className="space-y-4">
                                 {/* Search Name */}
                                 <div>
-                                    <label className="block text-sm font-medium text-zinc-700 mb-1">
+                                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                                         Search Name
                                     </label>
                                     <input
@@ -201,7 +201,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                         placeholder="e.g., Downtown apartments under $1500"
-                                        className="w-full px-4 py-2.5 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                                        className="w-full px-4 py-2.5 border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:text-white"
                                         aria-describedby={error ? "save-search-error" : undefined}
                                         aria-invalid={!!error}
                                     />
@@ -243,7 +243,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                                     {/* Alert Frequency */}
                                     {alertEnabled && (
                                         <div className="pt-3 border-t border-zinc-200">
-                                            <label className="block text-sm font-medium text-zinc-700 mb-2">
+                                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                                                 Alert Frequency
                                             </label>
                                             <div className="flex gap-2">
@@ -255,7 +255,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                                                         className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                                             alertFrequency === freq
                                                                 ? 'bg-zinc-900 text-white'
-                                                                : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                                                                : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
                                                         }`}
                                                     >
                                                         {freq === 'INSTANT' ? 'Instant' : freq === 'DAILY' ? 'Daily' : 'Weekly'}
@@ -273,7 +273,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
 
                                 {/* Error */}
                                 {error && (
-                                    <p id="save-search-error" role="alert" className="text-sm text-red-600">{error}</p>
+                                    <p id="save-search-error" role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>
                                 )}
 
                                 {/* Actions */}

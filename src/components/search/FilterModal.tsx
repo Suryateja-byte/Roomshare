@@ -157,7 +157,7 @@ export function FilterModal({
             <h2 id="filter-drawer-title" className="text-lg font-semibold text-zinc-900 dark:text-white">
               Filters
               {activeFilterCount > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">
+                <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-indigo-500 text-white">
                   {activeFilterCount}
                 </span>
               )}
@@ -445,7 +445,7 @@ export function FilterModal({
               type="button"
               onClick={onApply}
               disabled={boundsRequired}
-              className="flex-1 rounded-xl h-12 bg-zinc-900 text-white hover:bg-zinc-800 shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 rounded-xl h-12 bg-indigo-500 text-white hover:bg-indigo-600 shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
               data-testid="filter-modal-apply"
             >
               {isCountLoading ? (
