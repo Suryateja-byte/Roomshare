@@ -98,7 +98,7 @@ export function RecommendedFilters() {
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-2">
-      <Sparkles className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" aria-hidden="true" />
+      <Sparkles className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" aria-hidden="true" />
       <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0">Try:</span>
       {available.map((s) => (
         <button

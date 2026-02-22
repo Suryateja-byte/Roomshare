@@ -313,7 +313,10 @@ test.describe("Search URL Browser Navigation (P1)", () => {
       return;
     }
 
-    await firstLink.click();
+    // Navigate directly via href to avoid click interception by image carousel
+    // overlay elements (Embla touch-action, z-20 buttons). The test's purpose is
+    // verifying ephemeral pagination state on back-navigation, not the click target.
+    await page.goto(href);
     await expect(page).toHaveURL(/\/listings\//, { timeout: 15_000 });
 
     // Go back

@@ -49,7 +49,7 @@ export function MapMovedBanner({
         <button
           onClick={onSearch}
           disabled={isSearchLoading}
-          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-3 inline-flex items-center gap-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-3 inline-flex items-center gap-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
           {isSearchLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
           {label}
@@ -57,7 +57,7 @@ export function MapMovedBanner({
         <button
           onClick={onReset}
           aria-label="Reset map view"
-          className="p-1 w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          className="p-1 w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
           <X className="h-4 w-4" />
         </button>

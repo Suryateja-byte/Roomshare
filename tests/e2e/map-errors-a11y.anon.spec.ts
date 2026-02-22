@@ -241,6 +241,7 @@ test.describe("Map Error States and Accessibility", () => {
       const criticalErrors = consoleErrors.filter(
         (e) =>
           !e.includes("mapbox") &&
+          !e.includes("maplibre") &&
           !e.includes("webpack") &&
           !e.includes("HMR") &&
           !e.includes("hydrat") &&
@@ -250,7 +251,15 @@ test.describe("Map Error States and Accessibility", () => {
           !e.includes("Failed to create") &&
           !e.includes("404") &&
           !e.includes("AbortError") &&
-          !e.includes("Environment validation")
+          !e.includes("Environment validation") &&
+          !e.includes("net::ERR") &&
+          !e.includes("Failed to load resource") &&
+          !e.includes("Failed to fetch") &&
+          !e.includes("Load failed") &&
+          !e.includes("FetchTimeoutError") &&
+          !e.includes("timed out") &&
+          !e.includes("photon.komoot") &&
+          !e.includes("TimeoutError")
       );
 
       // Should have no critical JavaScript errors

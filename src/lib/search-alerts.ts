@@ -434,7 +434,6 @@ export async function triggerInstantAlerts(newListing: NewListingForAlert): Prom
                 logger.sync.debug('Instant alert matched listing to saved search', {
                     action: 'triggerInstantAlerts',
                     savedSearchId: savedSearch.id,
-                    userId: savedSearch.user.id,
                     listingId: newListing.id,
                 });
 

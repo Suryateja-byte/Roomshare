@@ -155,8 +155,8 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
             onBlur={() => setHovered(null)}
             className={cn(
                 "relative rounded-xl transition-shadow",
-                isActive && "ring-2 ring-blue-500 ring-offset-2",
-                isHovered && !isActive && "shadow-md ring-1 ring-blue-200 dark:ring-blue-800",
+                isActive && "ring-2 ring-indigo-500 ring-offset-2",
+                isHovered && !isActive && "shadow-md ring-1 ring-indigo-200 dark:ring-indigo-800",
                 className
             )}
         >
@@ -168,7 +168,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                         e.stopPropagation();
                         setActive(listing.id);
                     }}
-                    className="p-1.5 rounded-full bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-700 transition-colors"
+                    className="relative p-1.5 rounded-full bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-700 transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
                     aria-label="Show on map"
                     title="Show on map"
                 >
@@ -180,11 +180,11 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                 href={`/listings/${listing.id}`}
                 onClick={isDragging ? (e) => e.preventDefault() : undefined}
                 className={cn(
-                    "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 rounded-none sm:rounded-xl",
+                    "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 rounded-none sm:rounded-xl",
                     isDragging && "pointer-events-none"
                 )}
             >
-                <div className="relative bg-white dark:bg-zinc-900 flex flex-col rounded-none sm:rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden transition-all duration-normal hover:-translate-y-0.5 hover:shadow-lg hover:border-zinc-300 dark:hover:border-zinc-700">
+                <div className="relative bg-white dark:bg-zinc-900 flex flex-col rounded-none sm:rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden transition-all duration-normal hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-800">
                 {/* Image Area */}
                 <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
                     {/* Image Carousel or single image */}
@@ -210,7 +210,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                     {/* Badges — top-left stack */}
                     <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5">
                         <span className={cn(
-                            "inline-flex items-center px-2.5 py-1 rounded-md text-2xs font-bold uppercase tracking-wide shadow-sm",
+                            "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide shadow-sm",
                             isAvailable
                                 ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-black/5'
                                 : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
@@ -221,8 +221,8 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                     </div>
                 </div>
 
-                {/* Content Area - min-h-[156px] prevents CLS from conditional languages section */}
-                <div className="flex flex-col flex-1 p-3 sm:p-4 min-h-[156px]">
+                {/* Content Area */}
+                <div className="flex flex-col flex-1 p-3 sm:p-4">
                     {/* Title Row with Rating */}
                     <div className="flex justify-between items-start gap-3 mb-0.5">
                         <h3 className="font-semibold text-sm text-zinc-900 dark:text-white line-clamp-1 leading-snug" title={displayTitle}>
@@ -234,19 +234,35 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                                 <span className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">{avgRating!.toFixed(1)}</span>
                             </div>
                         ) : (
-                            <span className="text-2xs uppercase font-bold text-zinc-400 dark:text-zinc-500 flex-shrink-0 tracking-wide">New</span>
+                            <span className="text-xs uppercase font-bold text-zinc-500 dark:text-zinc-500 flex-shrink-0 tracking-wide">New</span>
                         )}
                     </div>
 
-                    {/* Location - Tight spacing with title */}
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+                    {/* Location */}
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                         {formatLocation(listing.location.city, listing.location.state)}
                     </p>
+
+                    {/* Price — surfaced right below location */}
+                    <div className="flex items-baseline mb-3">
+                        {showTotalPrice && estimatedMonths > 1 ? (
+                            <>
+                                <span data-testid="listing-price" className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price * estimatedMonths)}</span>
+                                <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">total</span>
+                                <span className="text-zinc-500 dark:text-zinc-500 text-xs ml-1.5">({formatPrice(listing.price)}/mo × {estimatedMonths})</span>
+                            </>
+                        ) : (
+                            <>
+                                <span data-testid="listing-price" className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
+                                {listing.price > 0 && <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
+                            </>
+                        )}
+                    </div>
 
                     {/* Amenities */}
                     <div className="flex flex-wrap gap-1.5 mb-2">
                         {listing.amenities.slice(0, 3).map((amenity) => (
-                            <span key={amenity} className="text-2xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded font-medium border border-zinc-200 dark:border-zinc-700">
+                            <span key={amenity} className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-1 rounded font-medium border border-zinc-200 dark:border-zinc-700">
                                 {amenity}
                             </span>
                         ))}
@@ -254,36 +270,18 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
 
                     {/* Languages spoken */}
                     {listing.householdLanguages && listing.householdLanguages.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 mb-4">
-                            <Globe className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                        <div className="flex flex-wrap items-center gap-1.5 mt-auto">
+                            <Globe className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
                             {listing.householdLanguages.slice(0, 2).map((code) => (
-                                <span key={code} className="text-2xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded font-medium">
+                                <span key={code} className="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded font-medium">
                                     {getLanguageName(code)}
                                 </span>
                             ))}
                             {listing.householdLanguages.length > 2 && (
-                                <span className="text-2xs text-zinc-400 dark:text-zinc-500">+{listing.householdLanguages.length - 2}</span>
+                                <span className="text-xs text-zinc-500 dark:text-zinc-500">+{listing.householdLanguages.length - 2}</span>
                             )}
                         </div>
                     )}
-
-                    {/* Price Row */}
-                    <div className="mt-auto">
-                        <div className="flex items-baseline">
-                            {showTotalPrice && estimatedMonths > 1 ? (
-                                <>
-                                    <span data-testid="listing-price" className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price * estimatedMonths)}</span>
-                                    <span className="text-zinc-400 dark:text-zinc-500 text-sm ml-0.5">total</span>
-                                    <span className="text-zinc-400 dark:text-zinc-500 text-xs ml-1.5">({formatPrice(listing.price)}/mo × {estimatedMonths})</span>
-                                </>
-                            ) : (
-                                <>
-                                    <span data-testid="listing-price" className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
-                                    {listing.price > 0 && <span className="text-zinc-400 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
-                                </>
-                            )}
-                        </div>
-                    </div>
                 </div>
                 </div>
             </Link>

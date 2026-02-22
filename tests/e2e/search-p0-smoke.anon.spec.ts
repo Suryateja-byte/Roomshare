@@ -32,6 +32,7 @@ const SEARCH_URL = `/search?${boundsQS}`;
  */
 const BENIGN_ERROR_PATTERNS = [
   "mapbox",
+  "maplibre",
   "webpack",
   "HMR",
   "hydrat",
@@ -52,6 +53,11 @@ const BENIGN_ERROR_PATTERNS = [
   "NEXT_",
   "next-",
   "Clerk",
+  // External API timeouts (Photon geocoding, Unsplash images, etc.)
+  "FetchTimeoutError",
+  "timed out",
+  "photon.komoot",
+  "TimeoutError",
 ];
 
 function filterBenignErrors(errors: string[]): string[] {

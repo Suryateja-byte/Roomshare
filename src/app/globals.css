@@ -25,10 +25,11 @@
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
 
-    /* Accent - Indigo (for highlights) */
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --accent-indigo: 239 84% 67%;
+    /* Accent - Indigo (brand accent) */
+    --accent: 239 84% 67%;
+    --accent-foreground: 0 0% 100%;
+    --accent-subtle: 239 84% 97%;
+    --accent-muted: 239 84% 92%;
 
     --destructive: 0 84.2% 60.2%;
     --ring: 240 5% 64.9%;
@@ -67,7 +68,16 @@
     --z-popover: 1300;
     --z-tooltip: 1400;
 
+    /* Design System - Header Height (mobile default) */
+    --header-height: 80px;
+
     color-scheme: light;
+  }
+
+  @media (min-width: 640px) {
+    :root {
+      --header-height: 96px;
+    }
   }
 
   .dark {
@@ -92,9 +102,10 @@
     --muted-foreground: 240 5% 64.9%;
 
     /* Accent */
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --accent-indigo: 239 84% 67%;
+    --accent: 239 84% 67%;
+    --accent-foreground: 0 0% 100%;
+    --accent-subtle: 239 50% 15%;
+    --accent-muted: 239 50% 20%;
 
     --destructive: 0 62.8% 30.6%;
     --ring: 240 4.9% 83.9%;
@@ -521,6 +532,7 @@ input:autofill {
 }
 
 /* Custom Typography Scale */
+/* DEPRECATED: Below WCAG 12px minimum. Use text-xs instead. */
 .text-2xs {
   font-size: 0.625rem;
   /* 10px */
