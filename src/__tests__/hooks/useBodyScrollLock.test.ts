@@ -3,6 +3,14 @@ import { useBodyScrollLock, _resetLockStateForTesting } from '@/hooks/useBodyScr
 
 beforeEach(() => {
   _resetLockStateForTesting()
+  jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+    cb(0)
+    return 0
+  })
+})
+
+afterEach(() => {
+  jest.restoreAllMocks()
 })
 
 describe('useBodyScrollLock', () => {

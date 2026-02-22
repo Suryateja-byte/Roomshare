@@ -27,7 +27,9 @@ function unlock() {
     document.body.style.left = "";
     document.body.style.right = "";
     document.body.style.overflow = "";
-    window.scrollTo(0, savedScrollY);
+    requestAnimationFrame(() => {
+      window.scrollTo(0, savedScrollY);
+    });
   }
 }
 

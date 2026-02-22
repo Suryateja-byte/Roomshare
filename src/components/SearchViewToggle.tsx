@@ -30,8 +30,11 @@ export default function SearchViewToggle({
 }: SearchViewToggleProps) {
   const mobileListRef = useRef<HTMLDivElement>(null);
   const isDesktop = useMediaQuery('(min-width: 768px)');
+  const [hasMounted, setHasMounted] = useState(false);
   const [mobileSnap, setMobileSnap] = useState(1); // 0=collapsed, 1=half, 2=expanded
   const { activeId } = useListingFocus();
+
+  useEffect(() => { setHasMounted(true); }, []);
 
   // When a map pin is tapped (activeId changes) on mobile, snap sheet to half
   useEffect(() => {
@@ -53,8 +56,10 @@ export default function SearchViewToggle({
   const renderMapInDesktop = isDesktop !== false && shouldShowMap;
 
   // Prevent dual children mount: render children in exactly one container.
-  const showChildrenInMobile = isDesktop === false;
-  const showChildrenInDesktop = isDesktop !== false;
+  // Before mount: render in desktop container only (CSS `hidden md:flex` hides on mobile)
+  // After mount: render in exactly one container based on actual viewport
+  const showChildrenInMobile = hasMounted && isDesktop === false;
+  const showChildrenInDesktop = !hasMounted || isDesktop !== false;
 
   return (
     <>
