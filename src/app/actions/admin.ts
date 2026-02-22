@@ -102,7 +102,8 @@ export async function getUsers(options?: {
         logger.sync.error('Failed to fetch users (admin)', {
             action: 'getUsers',
             adminId: adminCheck.userId,
-            options,
+            hasSearch: !!options?.search,
+            filters: { isVerified: options?.isVerified, isAdmin: options?.isAdmin, isSuspended: options?.isSuspended },
             error: error instanceof Error ? error.message : 'Unknown error',
         });
         return { error: 'Failed to fetch users', users: [], total: 0 };
@@ -362,83 +363,83 @@ export async function deleteListing(listingId: string) {
     }
 
     try {
-        // Get listing info before deletion for audit
-        const listing = await prisma.listing.findUnique({
-            where: { id: listingId },
-            select: { title: true, ownerId: true, status: true }
-        });
+        const result = await prisma.$transaction(async (tx) => {
+            // Lock listing row to prevent concurrent modifications (TOCTOU fix)
+            const [listing] = await tx.$queryRaw<
+                { id: string; title: string; ownerId: string; status: string }[]
+            >`SELECT "id", "title", "ownerId", "status" FROM "Listing" WHERE "id" = ${listingId} FOR UPDATE`;
 
-        if (!listing) {
-            return { error: 'Listing not found' };
-        }
+            if (!listing) throw new Error('NOT_FOUND');
 
-        // Check for active ACCEPTED bookings - block deletion if any exist
-        const activeAcceptedBookings = await prisma.booking.count({
-            where: {
-                listingId,
-                status: 'ACCEPTED',
-                endDate: { gte: new Date() }
+            // Check for active ACCEPTED bookings INSIDE the transaction
+            const activeAcceptedBookings = await tx.booking.count({
+                where: {
+                    listingId,
+                    status: 'ACCEPTED',
+                    endDate: { gte: new Date() },
+                },
+            });
+
+            if (activeAcceptedBookings > 0) {
+                throw new Error('ACTIVE_BOOKINGS');
             }
-        });
 
-        if (activeAcceptedBookings > 0) {
-            return {
-                error: 'Cannot delete listing with active bookings',
-                message: `This listing has ${activeAcceptedBookings} active booking(s). The owner must cancel them first.`,
-                activeBookings: activeAcceptedBookings
-            };
-        }
+            // Get pending bookings for notifications
+            const pendingBookings = await tx.booking.findMany({
+                where: { listingId, status: 'PENDING' },
+                select: { id: true, tenantId: true },
+            });
 
-        // Get all pending bookings to notify tenants before deletion
-        const pendingBookings = await prisma.booking.findMany({
-            where: {
-                listingId,
-                status: 'PENDING'
-            },
-            select: {
-                id: true,
-                tenantId: true
+            // Cancel pending bookings explicitly
+            await tx.booking.updateMany({
+                where: { listingId, status: 'PENDING' },
+                data: { status: 'CANCELLED' },
+            });
+
+            // Create notifications for affected tenants
+            for (const booking of pendingBookings) {
+                await tx.notification.create({
+                    data: {
+                        userId: booking.tenantId,
+                        type: 'BOOKING_CANCELLED',
+                        title: 'Booking Request Cancelled',
+                        message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
+                        link: '/bookings',
+                    },
+                });
             }
+
+            // Delete the listing
+            await tx.listing.delete({ where: { id: listingId } });
+
+            return { listing, pendingBookingsCount: pendingBookings.length };
         });
 
-        // Create notifications for tenants with pending bookings
-        const notificationPromises = pendingBookings.map(booking =>
-            prisma.notification.create({
-                data: {
-                    userId: booking.tenantId,
-                    type: 'BOOKING_CANCELLED',
-                    title: 'Booking Request Cancelled',
-                    message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
-                    link: '/bookings'
-                }
-            })
-        );
-
-        // Delete listing and send notifications in transaction
-        await prisma.$transaction([
-            ...notificationPromises,
-            prisma.listing.delete({
-                where: { id: listingId }
-            })
-        ]);
-
-        // Audit log
+        // Audit log AFTER successful transaction
         await logAdminAction({
             adminId: adminCheck.userId!,
             action: 'LISTING_DELETED',
             targetType: 'Listing',
             targetId: listingId,
             details: {
-                listingTitle: listing.title,
-                ownerId: listing.ownerId,
-                previousStatus: listing.status,
-                pendingBookingsNotified: pendingBookings.length
-            }
+                listingTitle: result.listing.title,
+                ownerId: result.listing.ownerId,
+                previousStatus: result.listing.status,
+                pendingBookingsNotified: result.pendingBookingsCount,
+            },
         });
 
         revalidatePath('/admin/listings');
-        return { success: true, notifiedTenants: pendingBookings.length };
+        return { success: true, notifiedTenants: result.pendingBookingsCount };
     } catch (error) {
+        if (error instanceof Error) {
+            if (error.message === 'NOT_FOUND') return { error: 'Listing not found' };
+            if (error.message === 'ACTIVE_BOOKINGS') {
+                // Intentionally simplified response: the UI uses /api/listings/[id]/can-delete
+                // for detailed activeBookings info, not this action's error shape.
+                return { error: 'Cannot delete listing with active bookings' };
+            }
+        }
         logger.sync.error('Failed to delete listing (admin)', {
             action: 'deleteListing',
             adminId: adminCheck.userId,
@@ -591,87 +592,104 @@ export async function resolveReportAndRemoveListing(reportId: string, notes?: st
     }
 
     try {
-        const report = await prisma.report.findUnique({
-            where: { id: reportId },
-            select: {
-                listingId: true,
-                reason: true,
-                reporterId: true,
-                status: true
+        const result = await prisma.$transaction(async (tx) => {
+            // Fetch and validate report
+            const report = await tx.report.findUnique({
+                where: { id: reportId },
+                select: {
+                    listingId: true,
+                    reason: true,
+                    reporterId: true,
+                    status: true,
+                },
+            });
+
+            if (!report) throw new Error('REPORT_NOT_FOUND');
+
+            // Lock listing row to prevent concurrent modifications (TOCTOU fix)
+            const [listing] = await tx.$queryRaw<
+                { id: string; title: string; ownerId: string }[]
+            >`SELECT "id", "title", "ownerId" FROM "Listing" WHERE "id" = ${report.listingId} FOR UPDATE`;
+
+            if (!listing) throw new Error('LISTING_NOT_FOUND');
+
+            // BIZ-01: Check for active ACCEPTED bookings before deletion
+            const activeAcceptedBookings = await tx.booking.count({
+                where: {
+                    listingId: report.listingId,
+                    status: 'ACCEPTED',
+                    endDate: { gte: new Date() },
+                },
+            });
+
+            if (activeAcceptedBookings > 0) {
+                throw new Error('ACTIVE_BOOKINGS');
             }
-        });
 
-        if (!report) {
-            return { error: 'Report not found' };
-        }
+            // Get affected bookings (PENDING) for notifications
+            const affectedBookings = await tx.booking.findMany({
+                where: {
+                    listingId: report.listingId,
+                    status: 'PENDING',
+                },
+                select: { id: true, tenantId: true },
+            });
 
-        // Get listing info before deletion
-        const listing = await prisma.listing.findUnique({
-            where: { id: report.listingId },
-            select: { title: true, ownerId: true }
-        });
+            // Cancel affected bookings explicitly
+            await tx.booking.updateMany({
+                where: {
+                    listingId: report.listingId,
+                    status: 'PENDING',
+                },
+                data: { status: 'CANCELLED' },
+            });
 
-        // Get affected bookings to notify tenants BEFORE deletion
-        const affectedBookings = await prisma.booking.findMany({
-            where: {
-                listingId: report.listingId,
-                status: { in: ['PENDING', 'ACCEPTED'] },
-                endDate: { gte: new Date() }
-            },
-            select: {
-                id: true,
-                tenantId: true,
-                status: true
+            // Create notifications for affected tenants
+            for (const booking of affectedBookings) {
+                await tx.notification.create({
+                    data: {
+                        userId: booking.tenantId,
+                        type: 'BOOKING_CANCELLED',
+                        title: 'Booking Cancelled - Listing Removed',
+                        message: `Your booking for "${listing.title}" has been cancelled because the listing was removed due to a policy violation.`,
+                        link: '/bookings',
+                    },
+                });
             }
-        });
 
-        // Create notifications for affected tenants
-        const notificationPromises = affectedBookings.map(booking =>
-            prisma.notification.create({
-                data: {
-                    userId: booking.tenantId,
-                    type: 'BOOKING_CANCELLED',
-                    title: 'Booking Cancelled - Listing Removed',
-                    message: `Your booking for "${listing?.title || 'a listing'}" has been cancelled because the listing was removed due to a policy violation.`,
-                    link: '/bookings'
-                }
-            })
-        );
-
-        // Update report, delete listing, and create notifications in transaction
-        await prisma.$transaction([
-            prisma.report.update({
+            // Update report status
+            await tx.report.update({
                 where: { id: reportId },
                 data: {
                     status: 'RESOLVED',
                     adminNotes: notes || 'Listing removed due to policy violation',
                     reviewedBy: adminCheck.userId,
-                    resolvedAt: new Date()
-                }
-            }),
-            prisma.listing.delete({
-                where: { id: report.listingId }
-            }),
-            ...notificationPromises
-        ]);
+                    resolvedAt: new Date(),
+                },
+            });
 
+            // Delete the listing
+            await tx.listing.delete({ where: { id: report.listingId } });
 
-        // Audit log for report resolution
+            return { report, listing, affectedBookingsCount: affectedBookings.length };
+        });
+
+        // Audit log for report resolution (AFTER successful transaction)
         await logAdminAction({
             adminId: adminCheck.userId!,
             action: 'REPORT_RESOLVED',
             targetType: 'Report',
             targetId: reportId,
             details: {
-                previousStatus: report.status,
+                previousStatus: result.report.status,
                 newStatus: 'RESOLVED',
-                reason: report.reason,
-                listingId: report.listingId,
-                reporterId: report.reporterId,
+                reason: result.report.reason,
+                listingId: result.report.listingId,
+                reporterId: result.report.reporterId,
                 adminNotes: notes || 'Listing removed due to policy violation',
                 listingRemoved: true,
-                affectedBookings: affectedBookings.length
-            }
+                affectedBookings: result.affectedBookingsCount,
+            },
         });
 
         // Audit log for listing deletion
@@ -679,20 +697,27 @@ export async function resolveReportAndRemoveListing(reportId: string, notes?: st
             adminId: adminCheck.userId!,
             action: 'LISTING_DELETED',
             targetType: 'Listing',
-            targetId: report.listingId,
+            targetId: result.report.listingId,
             details: {
-                listingTitle: listing?.title,
-                ownerId: listing?.ownerId,
+                listingTitle: result.listing.title,
+                ownerId: result.listing.ownerId,
                 deletedDueToReport: reportId,
                 adminNotes: notes || 'Listing removed due to policy violation',
-                affectedBookings: affectedBookings.length
-            }
+                affectedBookings: result.affectedBookingsCount,
+            },
         });
 
         revalidatePath('/admin/reports');
         revalidatePath('/admin/listings');
-        return { success: true, affectedBookings: affectedBookings.length };
+        return { success: true, affectedBookings: result.affectedBookingsCount };
     } catch (error) {
+        if (error instanceof Error) {
+            if (error.message === 'REPORT_NOT_FOUND') return { error: 'Report not found' };
+            if (error.message === 'LISTING_NOT_FOUND') return { error: 'Listing not found' };
+            if (error.message === 'ACTIVE_BOOKINGS') {
+                return { error: 'Cannot remove listing with active bookings' };
+            }
+        }
         logger.sync.error('Failed to resolve report with listing removal', {
             action: 'resolveReportAndRemoveListing',
             adminId: adminCheck.userId,

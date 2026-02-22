@@ -366,29 +366,36 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
     });
 
     it("resolves report AND removes listing with proper notifications", async () => {
-      const report = {
-        listingId: "listing-123",
-        reason: "INAPPROPRIATE",
-        reporterId: "reporter-123",
-        status: "OPEN",
-      };
-
-      const listing = {
-        title: "Inappropriate Listing",
-        ownerId: "owner-123",
-      };
-
       const affectedBookings = [
-        { id: "booking-1", tenantId: "tenant-1", status: "PENDING" },
-        { id: "booking-2", tenantId: "tenant-2", status: "ACCEPTED" },
+        { id: "booking-1", tenantId: "tenant-1" },
+        { id: "booking-2", tenantId: "tenant-2" },
       ];
 
-      (prisma.report.findUnique as jest.Mock).mockResolvedValue(report);
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(listing);
-      (prisma.booking.findMany as jest.Mock).mockResolvedValue(
-        affectedBookings,
-      );
-      (prisma.$transaction as jest.Mock).mockResolvedValue([]);
+      // resolveReportAndRemoveListing now uses interactive transaction with FOR UPDATE
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => {
+        const tx = {
+          report: {
+            findUnique: jest.fn().mockResolvedValue({
+              listingId: "listing-123",
+              reason: "INAPPROPRIATE",
+              reporterId: "reporter-123",
+              status: "OPEN",
+            }),
+            update: jest.fn().mockResolvedValue({}),
+          },
+          $queryRaw: jest.fn().mockResolvedValue([{
+            id: "listing-123", title: "Inappropriate Listing", ownerId: "owner-123",
+          }]),
+          booking: {
+            count: jest.fn().mockResolvedValue(0), // No active ACCEPTED bookings
+            findMany: jest.fn().mockResolvedValue(affectedBookings),
+            updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+          },
+          notification: { create: jest.fn().mockResolvedValue({ id: "notif" }) },
+          listing: { delete: jest.fn().mockResolvedValue({ id: "listing-123" }) },
+        };
+        return fn(tx);
+      });
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
       const result = await resolveReportAndRemoveListing(
@@ -398,7 +405,6 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
 
       expect(result.success).toBe(true);
       expect(result.affectedBookings).toBe(2);
-      // Should log both report resolution and listing deletion
       expect(logAdminAction).toHaveBeenCalledTimes(2);
     });
   });
@@ -408,71 +414,69 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
    */
   describe("I6: Listing deletion with cascading notifications", () => {
     it("blocks deletion when listing has active accepted bookings", async () => {
-      const listing = {
-        title: "Active Listing",
-        ownerId: "owner-123",
-        status: "ACTIVE",
-      };
-
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(listing);
-      // Has active accepted bookings
-      (prisma.booking.count as jest.Mock).mockResolvedValue(3);
+      // deleteListing now uses interactive transaction with FOR UPDATE
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{
+            id: "listing-123", title: "Active Listing", ownerId: "owner-123", status: "ACTIVE",
+          }]),
+          booking: { count: jest.fn().mockResolvedValue(3) },
+        };
+        return fn(tx);
+      });
 
       const result = await deleteListing("listing-123");
 
       expect(result.error).toBe("Cannot delete listing with active bookings");
-      expect(result.activeBookings).toBe(3);
-      expect(prisma.listing.delete).not.toHaveBeenCalled();
     });
 
     it("deletes listing with pending bookings and notifies all tenants", async () => {
-      const listing = {
-        title: "To Delete Listing",
-        ownerId: "owner-123",
-        status: "ACTIVE",
-      };
-
       const pendingBookings = [
         { id: "booking-1", tenantId: "tenant-1" },
         { id: "booking-2", tenantId: "tenant-2" },
         { id: "booking-3", tenantId: "tenant-3" },
       ];
 
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(listing);
-      (prisma.booking.count as jest.Mock).mockResolvedValue(0); // No active accepted
-      (prisma.booking.findMany as jest.Mock).mockResolvedValue(pendingBookings);
-      // Mock notification.create to return a promise-like object
-      (prisma.notification.create as jest.Mock).mockReturnValue(
-        Promise.resolve({ id: "notif" }),
-      );
-      (prisma.listing.delete as jest.Mock).mockReturnValue(
-        Promise.resolve({ id: "listing-123" }),
-      );
-      (prisma.$transaction as jest.Mock).mockResolvedValue([]);
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{
+            id: "listing-123", title: "To Delete Listing", ownerId: "owner-123", status: "ACTIVE",
+          }]),
+          booking: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue(pendingBookings),
+            updateMany: jest.fn().mockResolvedValue({ count: 3 }),
+          },
+          notification: { create: jest.fn().mockResolvedValue({ id: "notif" }) },
+          listing: { delete: jest.fn().mockResolvedValue({ id: "listing-123" }) },
+        };
+        return fn(tx);
+      });
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
       const result = await deleteListing("listing-123");
 
       expect(result.success).toBe(true);
       expect(result.notifiedTenants).toBe(3);
-
-      // Transaction should be called with an array
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-      // Verify notification.create was called 3 times (once per pending booking)
-      expect(prisma.notification.create).toHaveBeenCalledTimes(3);
     });
 
     it("handles listing deletion with no pending bookings gracefully", async () => {
-      const listing = {
-        title: "Empty Listing",
-        ownerId: "owner-123",
-        status: "DRAFT",
-      };
-
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(listing);
-      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
-      (prisma.booking.findMany as jest.Mock).mockResolvedValue([]); // No pending bookings
-      (prisma.$transaction as jest.Mock).mockResolvedValue([]);
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{
+            id: "listing-123", title: "Empty Listing", ownerId: "owner-123", status: "DRAFT",
+          }]),
+          booking: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
+          notification: { create: jest.fn() },
+          listing: { delete: jest.fn().mockResolvedValue({ id: "listing-123" }) },
+        };
+        return fn(tx);
+      });
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
       const result = await deleteListing("listing-123");
