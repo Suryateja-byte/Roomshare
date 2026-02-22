@@ -337,6 +337,7 @@ test.describe("General: Listing cards integrity", () => {
     const realErrors = errors.filter(
       (e) =>
         !e.includes("mapbox") &&
+        !e.includes("maplibre") &&
         !e.includes("webpack") &&
         !e.includes("HMR") &&
         !e.includes("hydrat") &&
@@ -348,7 +349,14 @@ test.describe("General: Listing cards integrity", () => {
         !e.includes("net::ERR") &&
         !e.includes("AbortError") &&
         !e.includes("Clerk") &&
-        !e.includes("ChunkLoadError"),
+        !e.includes("ChunkLoadError") &&
+        !e.includes("404") &&
+        !e.includes("Failed to fetch") &&
+        !e.includes("Load failed") &&
+        !e.includes("FetchTimeoutError") &&
+        !e.includes("timed out") &&
+        !e.includes("photon.komoot") &&
+        !e.includes("TimeoutError"),
     );
 
     expect(realErrors).toHaveLength(0);

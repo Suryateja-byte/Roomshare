@@ -16,7 +16,7 @@ test.describe("Search V2 UI Integration", () => {
     // Use desktop viewport for consistent behavior
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    await page.goto("/search?searchV2=1");
+    await page.goto("/search?v2=1");
     // Don't use domcontentloaded - page has continuous polling that prevents it from settling
     await page.waitForLoadState("domcontentloaded");
 
@@ -61,7 +61,7 @@ test.describe("Search V2 UI Integration", () => {
 
     // Include bounds to skip throttle delay and ensure we're in the seed data area
     await page.goto(
-      `/search?searchV2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?v2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
     );
     // Don't use domcontentloaded - page has continuous polling
     await page.waitForLoadState("domcontentloaded");
@@ -123,7 +123,7 @@ test.describe("Search V2 UI Integration", () => {
     });
 
     await page.goto(
-      `/search?searchV2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?v2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
     );
     // Don't use domcontentloaded - page has continuous polling
     await page.waitForLoadState("domcontentloaded");

@@ -81,7 +81,12 @@ test.describe("Map smoke test", () => {
         !e.includes("ChunkLoadError") &&
         !e.includes("Loading chunk") &&
         !e.includes("Environment validation") &&
-        !e.includes("Failed to load resource"),
+        !e.includes("Failed to load resource") &&
+        // External API timeouts (Photon geocoding, etc.) are flaky in CI
+        !e.includes("FetchTimeoutError") &&
+        !e.includes("timed out") &&
+        !e.includes("photon.komoot") &&
+        !e.includes("TimeoutError"),
     );
     expect(realErrors).toHaveLength(0);
   });
@@ -171,7 +176,12 @@ test.describe("1.5: Boundary polygons", () => {
         !e.includes("ChunkLoadError") &&
         !e.includes("Loading chunk") &&
         !e.includes("Environment validation") &&
-        !e.includes("Failed to load resource"),
+        !e.includes("Failed to load resource") &&
+        // External API timeouts (Photon geocoding, etc.) are flaky in CI
+        !e.includes("FetchTimeoutError") &&
+        !e.includes("timed out") &&
+        !e.includes("photon.komoot") &&
+        !e.includes("TimeoutError"),
     );
     expect(realErrors).toHaveLength(0);
   });

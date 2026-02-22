@@ -709,8 +709,11 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
     await page.keyboard.press("Home");
     await waitForSheetAnimation(page);
 
-    // Should collapse to index 0
-    expect(await getSnapIndex(page)).toBe(0);
+    // Should collapse to index 0 — use polling for CI reliability
+    // (animation from expanded→collapsed is the longest transition)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 5_000, intervals: [200, 500, 1000] });
   });
 
   test("end key expands sheet to maximum", async ({ page }) => {

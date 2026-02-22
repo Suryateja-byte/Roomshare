@@ -1099,10 +1099,12 @@ test.describe("Group 7: Sort Accessibility", () => {
     const triggerText = await trigger.textContent();
     expect(triggerText).toContain("Newest First");
 
-    // Mobile button (hidden at desktop but in DOM) has descriptive aria-label
-    // Scope to mobile container to avoid strict-mode violation
+    // Mobile button (rendered inside desktop container at desktop viewport,
+    // hidden via md:hidden CSS but still in DOM) has descriptive aria-label.
+    // At desktop viewport, children render only in the desktop container,
+    // so scope to DESKTOP (not MOBILE which has no children at this viewport).
     const mobileBtn = page
-      .locator(MOBILE)
+      .locator(DESKTOP)
       .locator('button[aria-label^="Sort:"]');
     const ariaLabel = await mobileBtn.getAttribute("aria-label");
     expect(ariaLabel).toBe("Sort: Newest First");

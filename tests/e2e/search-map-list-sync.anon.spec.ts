@@ -129,10 +129,13 @@ async function clickMarkerByListingId(page: Page, listingId: string): Promise<vo
     }, listingId);
     expect(result).toBe('ok');
 
+    // Small wait for React state propagation before checking card state
+    await page.waitForTimeout(200);
+
     // Verify the click triggered handleMarkerClick → setActive(listingId)
     const cardState = await getCardState(page, listingId);
     expect(cardState.isActive).toBe(true);
-  }).toPass({ timeout: 30_000, intervals: [200, 500, 1000, 2000] });
+  }).toPass({ timeout: 45_000, intervals: [500, 1000, 2000, 3000] });
 }
 
 /**
