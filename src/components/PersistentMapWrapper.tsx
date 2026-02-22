@@ -265,7 +265,13 @@ function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
   return v2MapData.geojson.features
     .filter((feature) => {
       const coordinates = feature.geometry?.coordinates;
-      return Array.isArray(coordinates) && coordinates.length >= 2;
+      if (!Array.isArray(coordinates) || coordinates.length < 2) return false;
+      const [lng, lat] = coordinates;
+      return (
+        Number.isFinite(lng) && Number.isFinite(lat) &&
+        lat >= -90 && lat <= 90 &&
+        lng >= -180 && lng <= 180
+      );
     })
     .map((feature) => {
       const [lng, lat] = feature.geometry.coordinates;
