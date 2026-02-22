@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import * as Sentry from '@sentry/nextjs';
 import { processSearchAlerts } from '@/lib/search-alerts';
 import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { withRetry } from '@/lib/retry';
+
+function verifyCronSecret(authHeader: string | null, cronSecret: string): boolean {
+    if (!authHeader) return false;
+    const expected = `Bearer ${cronSecret}`;
+    const providedBuf = Buffer.from(authHeader);
+    const expectedBuf = Buffer.from(expected);
+    if (providedBuf.length !== expectedBuf.length) return false;
+    return timingSafeEqual(providedBuf, expectedBuf);
+}
 
 // Vercel Cron or external cron service endpoint
 // Secured with CRON_SECRET in all environments
@@ -29,7 +39,7 @@ export async function GET(request: NextRequest) {
         );
     }
 
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    if (!verifyCronSecret(authHeader, cronSecret)) {
         return NextResponse.json(
             { error: 'Unauthorized' },
             { status: 401 }
