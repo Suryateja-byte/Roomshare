@@ -20,6 +20,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
+    $executeRaw: jest.fn(),
   },
 }));
 
@@ -497,7 +498,7 @@ describe("manage-booking actions", () => {
         (auth as jest.Mock).mockResolvedValue(mockTenantSession);
       });
 
-      it("increments slots when cancelling accepted booking", async () => {
+      it("increments slots (clamped to totalSlots) when cancelling accepted booking", async () => {
         const acceptedBooking = { ...mockBooking, status: "ACCEPTED" };
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
           acceptedBooking,
@@ -509,7 +510,7 @@ describe("manage-booking actions", () => {
               .fn()
               .mockResolvedValue({ count: 1 }),
           },
-          listing: { update: jest.fn() },
+          $executeRaw: jest.fn().mockResolvedValue(1),
         };
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => callback(mockTx),
@@ -517,10 +518,8 @@ describe("manage-booking actions", () => {
 
         await updateBookingStatus("booking-123", "CANCELLED");
 
-        expect(mockTx.listing.update).toHaveBeenCalledWith({
-          where: { id: "listing-123" },
-          data: { availableSlots: { increment: 1 } },
-        });
+        // BIZ-07: Uses raw SQL with LEAST to clamp availableSlots <= totalSlots
+        expect(mockTx.$executeRaw).toHaveBeenCalled();
       });
 
       it("does not increment slots when cancelling pending booking", async () => {
@@ -568,7 +567,7 @@ describe("manage-booking actions", () => {
                   .fn()
                   .mockResolvedValue({ count: 1 }),
               },
-              listing: { update: jest.fn() },
+              $executeRaw: jest.fn().mockResolvedValue(1),
             };
             return callback(tx);
           },

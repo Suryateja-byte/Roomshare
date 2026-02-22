@@ -1,8 +1,11 @@
-// @ts-nocheck - Uses neighborhoodCache Prisma model not yet in schema
 /**
  * Neighborhood Intelligence cache functions.
  * Caches POI search results in the database with a maximum 30-day TTL
  * to comply with Google Places ToS.
+ *
+ * NOTE: Uses prisma.neighborhoodCache model not yet in schema.
+ * Targeted @ts-expect-error comments suppress only those lines.
+ * Remove them once the NeighborhoodCache model is added to schema.prisma.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -28,6 +31,7 @@ export async function getCachedSearch(
   key: NeighborhoodCacheKey,
 ): Promise<CachedNeighborhoodResult | null> {
   try {
+    // @ts-expect-error — NeighborhoodCache model not yet in schema
     const cached = await prisma.neighborhoodCache.findUnique({
       where: {
         listingId_normalizedQuery_radiusMeters_searchMode: {
@@ -46,6 +50,7 @@ export async function getCachedSearch(
     // Check if expired
     if (new Date() > cached.expiresAt) {
       // Delete expired cache entry
+      // @ts-expect-error — NeighborhoodCache model not yet in schema
       await prisma.neighborhoodCache
         .delete({
           where: { id: cached.id },
@@ -120,6 +125,7 @@ export async function cacheSearch(
       })),
     );
 
+    // @ts-expect-error — NeighborhoodCache model not yet in schema
     await prisma.neighborhoodCache.upsert({
       where: {
         listingId_normalizedQuery_radiusMeters_searchMode: {
@@ -163,6 +169,7 @@ export async function cacheSearch(
  */
 export async function cleanupExpiredCache(): Promise<number> {
   try {
+    // @ts-expect-error — NeighborhoodCache model not yet in schema
     const result = await prisma.neighborhoodCache.deleteMany({
       where: {
         expiresAt: {
@@ -188,6 +195,7 @@ export async function getCacheStats(listingId: string): Promise<{
   newestEntry: Date | null;
 }> {
   try {
+    // @ts-expect-error — NeighborhoodCache model not yet in schema
     const entries = await prisma.neighborhoodCache.findMany({
       where: { listingId },
       select: { createdAt: true },
@@ -231,6 +239,7 @@ export async function invalidateListingCache(
   listingId: string,
 ): Promise<number> {
   try {
+    // @ts-expect-error — NeighborhoodCache model not yet in schema
     const result = await prisma.neighborhoodCache.deleteMany({
       where: { listingId },
     });

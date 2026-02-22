@@ -9,16 +9,21 @@ export async function checkSuspension(): Promise<{ suspended: boolean; error?: s
         return { suspended: false }; // Let auth checks handle this
     }
 
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { isSuspended: true }
-    });
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { isSuspended: true }
+        });
 
-    if (user?.isSuspended) {
-        return { suspended: true, error: 'Account suspended' };
+        if (user?.isSuspended) {
+            return { suspended: true, error: 'Account suspended' };
+        }
+
+        return { suspended: false };
+    } catch {
+        // Fail closed: if we can't verify suspension status, block the action
+        return { suspended: true, error: 'Unable to verify account status' };
     }
-
-    return { suspended: false };
 }
 
 export async function checkEmailVerified(): Promise<{ verified: boolean; error?: string }> {
@@ -27,14 +32,19 @@ export async function checkEmailVerified(): Promise<{ verified: boolean; error?:
         return { verified: false }; // Let auth checks handle this
     }
 
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { emailVerified: true }
-    });
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { emailVerified: true }
+        });
 
-    if (!user?.emailVerified) {
-        return { verified: false, error: 'Please verify your email to continue' };
+        if (!user?.emailVerified) {
+            return { verified: false, error: 'Please verify your email to continue' };
+        }
+
+        return { verified: true };
+    } catch {
+        // Fail closed: if we can't verify email status, block the action
+        return { verified: false, error: 'Unable to verify email status' };
     }
-
-    return { verified: true };
 }

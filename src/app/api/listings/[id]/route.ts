@@ -349,10 +349,9 @@ export async function PATCH(
                         }
                     });
 
-                    const point = `POINT(${coords.lng} ${coords.lat})`;
                     await tx.$executeRaw`
                         UPDATE "Location"
-                        SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
+                        SET coords = ST_SetSRID(ST_MakePoint(${coords.lng}::float8, ${coords.lat}::float8), 4326)
                         WHERE id = ${listing.location.id}
                     `;
                 }

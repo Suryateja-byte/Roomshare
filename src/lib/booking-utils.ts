@@ -12,7 +12,7 @@ export async function getActiveBookingsForListing(listingId: string) {
       endDate: { gte: new Date() }
     },
     include: {
-      tenant: { select: { id: true, email: true, name: true } }
+      tenant: { select: { id: true, name: true } }
     }
   });
 }

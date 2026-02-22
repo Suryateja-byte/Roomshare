@@ -138,8 +138,7 @@ export async function POST(request: NextRequest) {
 
         if (uploadError) {
             logger.sync.error('Supabase upload error', {
-                message: uploadError.message,
-                name: uploadError.name,
+                errorType: uploadError.name,
                 bucket,
                 path
             });
@@ -236,7 +235,7 @@ export async function DELETE(request: NextRequest) {
             .remove([path]);
 
         if (deleteError) {
-            logger.sync.error('Supabase delete error', { error: deleteError.message });
+            logger.sync.error('Supabase delete error', { errorType: deleteError.name });
             return NextResponse.json(
                 { error: 'Failed to delete file' },
                 { status: 500 }

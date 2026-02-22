@@ -208,8 +208,10 @@ const mockPrismaClient = {
 // Interactive transactions receive the full mock client as `tx` param,
 // so code like `prisma.$transaction(async (tx) => { tx.user.findUnique(...) })` works.
 // Array transactions (e.g. prisma.$transaction([p1, p2])) resolve with Promise.all.
-mockPrismaClient.$transaction = jest.fn((fn) =>
-  typeof fn === 'function' ? fn(mockPrismaClient) : Promise.all(fn)
+// TEST-05: Captures isolation options so tests can assert transaction config:
+//   expect(prisma.$transaction.mock.calls[0][1]).toEqual({ isolationLevel: 'Serializable' })
+mockPrismaClient.$transaction = jest.fn((fnOrArray, _options) =>
+  typeof fnOrArray === 'function' ? fnOrArray(mockPrismaClient) : Promise.all(fnOrArray)
 )
 
 jest.mock('@/lib/prisma', () => ({

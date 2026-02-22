@@ -88,7 +88,7 @@ describe('booking-utils', () => {
       expect(prisma.booking.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           include: {
-            tenant: { select: { id: true, email: true, name: true } },
+            tenant: { select: { id: true, name: true } },
           },
         })
       )

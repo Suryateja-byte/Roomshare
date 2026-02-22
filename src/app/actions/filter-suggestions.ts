@@ -6,6 +6,7 @@ import {
   type FilterSuggestion,
 } from "@/lib/data";
 import { auth } from "@/auth";
+import { logger } from "@/lib/logger";
 import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from "@/lib/rate-limit";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -45,17 +46,24 @@ export async function getFilterSuggestions(
     return [];
   }
 
-  // Rate limiting
-  const headersList = await headers();
-  const ip = getClientIPFromHeaders(headersList);
-  const rl = await checkRateLimit(ip, 'filterSuggestions', RATE_LIMITS.filterSuggestions);
-  if (!rl.success) return [];
+  try {
+    // Rate limiting
+    const headersList = await headers();
+    const ip = getClientIPFromHeaders(headersList);
+    const rl = await checkRateLimit(ip, 'filterSuggestions', RATE_LIMITS.filterSuggestions);
+    if (!rl.success) return [];
 
-  // Zod validation
-  const parsed = filterParamsSchema.safeParse(params);
-  if (!parsed.success) {
+    // Zod validation
+    const parsed = filterParamsSchema.safeParse(params);
+    if (!parsed.success) {
+      return [];
+    }
+
+    return analyzeFilterImpact(parsed.data as FilterParams);
+  } catch (error) {
+    logger.sync.warn('getFilterSuggestions failed silently', {
+      error: error instanceof Error ? error.name : 'Unknown',
+    });
     return [];
   }
-
-  return analyzeFilterImpact(parsed.data as FilterParams);
 }

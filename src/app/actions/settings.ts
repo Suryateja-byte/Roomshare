@@ -33,19 +33,26 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
         return DEFAULT_PREFERENCES;
     }
 
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { notificationPreferences: true }
-    });
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { notificationPreferences: true }
+        });
 
-    if (!user?.notificationPreferences) {
+        if (!user?.notificationPreferences) {
+            return DEFAULT_PREFERENCES;
+        }
+
+        return {
+            ...DEFAULT_PREFERENCES,
+            ...(user.notificationPreferences as Partial<NotificationPreferences>)
+        };
+    } catch (error) {
+        logger.sync.warn('getNotificationPreferences failed silently', {
+            error: error instanceof Error ? error.name : 'Unknown',
+        });
         return DEFAULT_PREFERENCES;
     }
-
-    return {
-        ...DEFAULT_PREFERENCES,
-        ...(user.notificationPreferences as Partial<NotificationPreferences>)
-    };
 }
 
 const notificationPreferencesSchema = z.object({
@@ -122,7 +129,7 @@ export async function changePassword(
             return { success: false, error: 'Current password is incorrect' };
         }
 
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
         await prisma.user.update({
             where: { id: session.user.id },
             data: { password: hashedPassword }
@@ -192,12 +199,19 @@ export async function hasPasswordSet(): Promise<boolean> {
         return false;
     }
 
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { password: true }
-    });
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { password: true }
+        });
 
-    return !!user?.password;
+        return !!user?.password;
+    } catch (error) {
+        logger.sync.warn('hasPasswordSet failed silently', {
+            error: error instanceof Error ? error.name : 'Unknown',
+        });
+        return false;
+    }
 }
 
 export async function deleteAccount(
@@ -253,26 +267,33 @@ export async function getUserSettings() {
         return null;
     }
 
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            password: true, // To check if password login is available
-            notificationPreferences: true,
-        }
-    });
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                password: true, // To check if password login is available
+                notificationPreferences: true,
+            }
+        });
 
-    if (!user) return null;
+        if (!user) return null;
 
-    return {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        hasPassword: !!user.password,
-        notificationPreferences: user.notificationPreferences
-            ? { ...DEFAULT_PREFERENCES, ...(user.notificationPreferences as Partial<NotificationPreferences>) }
-            : DEFAULT_PREFERENCES
-    };
+        return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            hasPassword: !!user.password,
+            notificationPreferences: user.notificationPreferences
+                ? { ...DEFAULT_PREFERENCES, ...(user.notificationPreferences as Partial<NotificationPreferences>) }
+                : DEFAULT_PREFERENCES
+        };
+    } catch (error) {
+        logger.sync.warn('getUserSettings failed silently', {
+            error: error instanceof Error ? error.name : 'Unknown',
+        });
+        return null;
+    }
 }

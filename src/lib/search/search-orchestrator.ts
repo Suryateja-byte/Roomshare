@@ -99,5 +99,6 @@ export async function orchestrateSearch(
     }
   }
 
-  return { paginatedResult, v2MapData, fetchError, usedV1Fallback };
+  // Control flow guarantees paginatedResult is non-null: set by v2, v1, or the catch fallback
+  return { paginatedResult: paginatedResult!, v2MapData, fetchError, usedV1Fallback };
 }

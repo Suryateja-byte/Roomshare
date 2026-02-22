@@ -245,7 +245,7 @@ describe("settings actions", () => {
 
       await changePassword("correctpass", "newpass123!!");
 
-      expect(bcrypt.hash).toHaveBeenCalledWith("newpass123!!", 10);
+      expect(bcrypt.hash).toHaveBeenCalledWith("newpass123!!", 12);
     });
 
     it("updates user password in database", async () => {

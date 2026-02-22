@@ -141,7 +141,7 @@ describe("Register API", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(201);
-      expect(bcrypt.hash).toHaveBeenCalledWith("password12345", 10);
+      expect(bcrypt.hash).toHaveBeenCalledWith("password12345", 12);
       expect(prisma.user.create).toHaveBeenCalledWith({
         data: {
           name: "Test User",

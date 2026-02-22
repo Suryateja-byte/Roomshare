@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL('/?verified=true', request.url));
     } catch (error) {
         logger.sync.error('Email verification error', {
-            error: error instanceof Error ? error.message : String(error),
+            errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
             route: '/api/auth/verify-email',
         });
         Sentry.captureException(error);

@@ -5,7 +5,7 @@ import { Search, Send, ArrowLeft, MoreVertical, Paperclip, AlertCircle, Ban, Shi
 import CharacterCounter from '@/components/CharacterCounter';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { toast } from 'sonner';
-import { getMessages, sendMessage, pollMessages, setTypingStatus, markAllMessagesAsRead, deleteConversation } from '@/app/actions/chat';
+import { getMessages, sendMessage, pollMessages, setTypingStatus, markAllMessagesAsRead, markConversationMessagesAsRead, deleteConversation } from '@/app/actions/chat';
 import { blockUser, unblockUser } from '@/app/actions/block';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -256,6 +256,9 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                         const newMessages = result.messages.filter((m: Message) => !existingIds.has(m.id));
                         return [...prev, ...newMessages];
                     });
+
+                    // BIZ-08: Explicitly mark as read since user is actively viewing
+                    await markConversationMessagesAsRead(activeId);
 
                     // Notify navbar to refresh unread count
                     window.dispatchEvent(new Event('messagesRead'));

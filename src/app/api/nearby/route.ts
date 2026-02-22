@@ -156,7 +156,7 @@ export async function POST(request: Request) {
           );
         }
         if (isTimeoutError(error)) {
-          logger.sync.error("Radar API timeout", { error: error.message });
+          logger.sync.error("Radar API timeout", { route: '/api/nearby' });
           return NextResponse.json(
             {
               error: "Nearby search timed out",
@@ -172,7 +172,7 @@ export async function POST(request: Request) {
         const errorText = await radarResponse.text();
         logger.sync.error("Radar Autocomplete API error", {
           status: radarResponse.status,
-          errorText,
+          errorLength: errorText.length,
         });
 
         let userMessage = "Failed to search for places";
@@ -325,7 +325,7 @@ export async function POST(request: Request) {
         );
       }
       if (isTimeoutError(error)) {
-        logger.sync.error("Radar API timeout", { error: error.message, route: '/api/nearby' });
+        logger.sync.error("Radar API timeout", { route: '/api/nearby' });
         return NextResponse.json(
           {
             error: "Nearby search timed out",
@@ -339,7 +339,7 @@ export async function POST(request: Request) {
 
     if (!radarResponse.ok) {
       const errorText = await radarResponse.text();
-      logger.sync.error("Radar API error", { status: radarResponse.status, errorText });
+      logger.sync.error("Radar API error", { status: radarResponse.status, errorLength: errorText.length });
 
       // Parse error for user-friendly message
       let userMessage = "Failed to fetch nearby places";
