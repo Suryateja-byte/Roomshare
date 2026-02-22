@@ -104,11 +104,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     };
     const [location, setLocation] = useState(searchParams.get('q') || '');
     // Batched filter state — single hook manages pending vs committed
-    const { pending, isDirty: filtersDirty, setPending, commit: commitFilters } = useBatchedFilters();
+    const [showFilters, setShowFilters] = useState(false);
+
+    const { pending, isDirty: filtersDirty, setPending, commit: commitFilters } = useBatchedFilters({ isDrawerOpen: showFilters });
     // Destructure for convenient access (read-only aliases)
     const { minPrice, maxPrice, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender } = pending;
-
-    const [showFilters, setShowFilters] = useState(false);
 
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(parseCoords);
     const [geoLoading, setGeoLoading] = useState(false);
