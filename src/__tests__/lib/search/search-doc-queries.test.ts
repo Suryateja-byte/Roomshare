@@ -4,7 +4,50 @@
  * Tests the feature flag logic and SearchDoc query structure.
  */
 
-import { isSearchDocEnabled } from "@/lib/search/search-doc-queries";
+import { isSearchDocEnabled, buildOrderByClause } from "@/lib/search/search-doc-queries";
+
+describe("buildOrderByClause", () => {
+  it("includes ts_rank_cd for offset pagination with FTS", () => {
+    const result = buildOrderByClause("recommended", 3, false);
+    expect(result).toContain("ts_rank_cd");
+    expect(result).toContain("$3");
+  });
+
+  it("skips ts_rank_cd for keyset pagination with FTS", () => {
+    const result = buildOrderByClause("recommended", 3, true);
+    expect(result).not.toContain("ts_rank_cd");
+    // Must still have the sort columns the cursor captures
+    expect(result).toContain("d.recommended_score DESC");
+    expect(result).toContain("d.listing_created_at DESC");
+    expect(result).toContain("d.id ASC");
+  });
+
+  it("skips ts_rank_cd when no FTS regardless of keyset flag", () => {
+    const offset = buildOrderByClause("recommended", null, false);
+    const keyset = buildOrderByClause("recommended", null, true);
+    expect(offset).not.toContain("ts_rank_cd");
+    expect(keyset).not.toContain("ts_rank_cd");
+    // Both should produce identical ORDER BY when no FTS
+    expect(offset).toBe(keyset);
+  });
+
+  it("defaults useKeysetPagination to false", () => {
+    const explicit = buildOrderByClause("price_asc", 5, false);
+    const defaulted = buildOrderByClause("price_asc", 5);
+    expect(explicit).toBe(defaulted);
+    expect(explicit).toContain("ts_rank_cd");
+  });
+
+  it("works correctly for all sort options with keyset", () => {
+    const sorts = ["recommended", "newest", "price_asc", "price_desc", "rating"] as const;
+    for (const sort of sorts) {
+      const result = buildOrderByClause(sort, 2, true);
+      expect(result).not.toContain("ts_rank_cd");
+      // All must end with id ASC for stable ordering
+      expect(result).toContain("d.id ASC");
+    }
+  });
+});
 
 describe("search-doc-queries", () => {
   describe("isSearchDocEnabled", () => {
