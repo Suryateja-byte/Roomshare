@@ -471,6 +471,26 @@ describe('admin actions', () => {
       status: 'ACTIVE',
     }
 
+    // deleteListing uses prisma.$transaction(callback) — the callback receives
+    // a tx client that mirrors prisma's API. We create a tx mock and wire
+    // $transaction to invoke the callback with it.
+    const txMock = {
+      booking: { count: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
+      notification: { create: jest.fn() },
+      listing: { delete: jest.fn() },
+    }
+
+    beforeEach(() => {
+      ;(prisma.$transaction as jest.Mock).mockImplementation(
+        async (cb: (tx: typeof txMock) => Promise<unknown>) => cb(txMock)
+      )
+      jest.clearAllMocks()
+      // Re-apply $transaction mock after clearAllMocks
+      ;(prisma.$transaction as jest.Mock).mockImplementation(
+        async (cb: (tx: typeof txMock) => Promise<unknown>) => cb(txMock)
+      )
+    })
+
     it('returns error when listing not found', async () => {
       ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(null)
 
@@ -481,7 +501,7 @@ describe('admin actions', () => {
 
     it('blocks deletion with active bookings', async () => {
       ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(2)
+      txMock.booking.count.mockResolvedValue(2)
 
       const result = await deleteListing('listing-123')
 
@@ -490,8 +510,8 @@ describe('admin actions', () => {
 
     it('deletes listing and notifies pending tenants', async () => {
       ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-      ;(prisma.booking.findMany as jest.Mock).mockResolvedValue([
+      txMock.booking.count.mockResolvedValue(0)
+      txMock.booking.findMany.mockResolvedValue([
         { id: 'booking-1', tenantId: 'tenant-1' },
       ])
       ;(logAdminAction as jest.Mock).mockResolvedValue({})
@@ -504,8 +524,8 @@ describe('admin actions', () => {
 
     it('logs deletion action', async () => {
       ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-      ;(prisma.booking.findMany as jest.Mock).mockResolvedValue([])
+      txMock.booking.count.mockResolvedValue(0)
+      txMock.booking.findMany.mockResolvedValue([])
       ;(logAdminAction as jest.Mock).mockResolvedValue({})
 
       await deleteListing('listing-123')
