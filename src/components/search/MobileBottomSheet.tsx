@@ -126,7 +126,7 @@ export default function MobileBottomSheet({
       }
       return rawOffset;
     },
-    [currentSnap],
+    [currentSnap, viewportHeight],
   );
 
   const displayOffset = isDragging ? getRubberbandOffset(dragOffset) : 0;
