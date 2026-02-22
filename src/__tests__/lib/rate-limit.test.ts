@@ -303,11 +303,18 @@ describe("rate-limit", () => {
 
   describe("getClientIP", () => {
     const originalNodeEnv = process.env.NODE_ENV;
+    const originalTrustCdn = process.env.TRUST_CDN_HEADERS;
 
     afterEach(() => {
       // Restore original NODE_ENV using delete + assign pattern
       delete (process.env as { NODE_ENV?: string }).NODE_ENV;
       (process.env as { NODE_ENV?: string }).NODE_ENV = originalNodeEnv;
+      // Restore TRUST_CDN_HEADERS
+      if (originalTrustCdn === undefined) {
+        delete process.env.TRUST_CDN_HEADERS;
+      } else {
+        process.env.TRUST_CDN_HEADERS = originalTrustCdn;
+      }
     });
 
     it("extracts IP from x-forwarded-for header in development mode", () => {
@@ -362,6 +369,41 @@ describe("rate-limit", () => {
       const ip = getClientIP(request);
 
       expect(ip).toBe("192.168.1.1");
+    });
+
+    it("ignores cf-connecting-ip when TRUST_CDN_HEADERS is not set", () => {
+      delete process.env.TRUST_CDN_HEADERS;
+      const request = new Request("http://localhost", {
+        headers: { "cf-connecting-ip": "1.2.3.4" },
+      });
+
+      const ip = getClientIP(request);
+
+      // Should NOT return the Cloudflare header — falls through to anon fingerprint
+      expect(ip).not.toBe("1.2.3.4");
+      expect(ip).toMatch(/^anon-[a-f0-9]{16}$/);
+    });
+
+    it("trusts cf-connecting-ip when TRUST_CDN_HEADERS=true", () => {
+      process.env.TRUST_CDN_HEADERS = "true";
+      const request = new Request("http://localhost", {
+        headers: { "cf-connecting-ip": "1.2.3.4" },
+      });
+
+      const ip = getClientIP(request);
+
+      expect(ip).toBe("1.2.3.4");
+    });
+
+    it("ignores true-client-ip when TRUST_CDN_HEADERS is not set", () => {
+      delete process.env.TRUST_CDN_HEADERS;
+      const request = new Request("http://localhost", {
+        headers: { "true-client-ip": "5.6.7.8" },
+      });
+
+      const ip = getClientIP(request);
+
+      expect(ip).not.toBe("5.6.7.8");
     });
   });
 });
