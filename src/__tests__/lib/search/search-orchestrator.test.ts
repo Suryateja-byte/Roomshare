@@ -242,12 +242,39 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
     expect(mockExecuteSearchV2).toHaveBeenCalledTimes(1);
     expect(mockGetListingsPaginated).toHaveBeenCalledTimes(1);
 
-    // Assert: result is empty fallback with v1 error message
+    // Assert: result is empty fallback with GENERIC error message (no raw leak)
     expect(result.paginatedResult.items).toHaveLength(0);
     expect(result.paginatedResult.total).toBe(0);
-    expect(result.fetchError).toBe("Database connection failed");
+    expect(result.fetchError).toBe("Unable to load listings. Please try again.");
     expect(result.usedV1Fallback).toBe(true);
     expect(result.v2MapData).toBeNull();
+  });
+
+  it("never leaks raw error details in fetchError (security)", async () => {
+    // Arrange: v1 throws error with sensitive DB connection string
+    mockExecuteSearchV2.mockResolvedValue({
+      response: null,
+      paginatedResult: null,
+      error: "V2 failed",
+    });
+    mockGetListingsPaginated.mockRejectedValue(
+      new Error("connection to server at 192.168.1.5:5432 failed: FATAL password authentication failed"),
+    );
+
+    // Act
+    const result = await orchestrateSearch(
+      baseParams,
+      filterParams,
+      1,
+      12,
+      true,
+    );
+
+    // Assert: fetchError must be generic, never contain raw details
+    expect(result.fetchError).toBe("Unable to load listings. Please try again.");
+    expect(result.fetchError).not.toContain("192.168");
+    expect(result.fetchError).not.toContain("5432");
+    expect(result.fetchError).not.toContain("password");
   });
 
   it("preserves v1 error message when v1 throws non-Error", async () => {

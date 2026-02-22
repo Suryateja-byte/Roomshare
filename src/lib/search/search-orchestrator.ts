@@ -81,11 +81,9 @@ export async function orchestrateSearch(
         action: "getListingsPaginated",
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      // M4 fix: error details already sanitized in logger above; fetchError
-      // is internal (not in API response body), so preserve message for page UI
-      fetchError = err instanceof Error
-        ? err.message
-        : "Unable to load listings. Please try again.";
+      // Security: Always use generic message for user-facing fetchError.
+      // Raw err.message may contain DB connection strings or internal IPs.
+      fetchError = "Unable to load listings. Please try again.";
       // Provide empty fallback to render gracefully
       paginatedResult = {
         items: [],

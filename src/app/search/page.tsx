@@ -18,6 +18,7 @@ import { features } from '@/lib/env';
 import { preload } from 'react-dom';
 import { withTimeout, DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
+import { sanitizeErrorMessage } from '@/lib/logger';
 import type { Metadata } from 'next';
 
 type SearchPageSearchParams = {
@@ -252,12 +253,12 @@ export default async function SearchPage({
                 };
             } else if (v2Result.error) {
                 // V2 returned error without throwing - log it before falling through to V1
-                console.warn('[search/page] V2 returned error:', v2Result.error);
+                console.warn('[search/page] V2 returned error:', sanitizeErrorMessage(v2Result.error));
             }
         } catch (err) {
             // V2 failed - will fall back to v1 below
             console.warn('[search/page] V2 orchestration failed, falling back to v1:', {
-                error: err instanceof Error ? err.message : 'Unknown error',
+                error: sanitizeErrorMessage(err),
             });
         }
     }
