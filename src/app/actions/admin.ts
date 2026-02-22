@@ -435,6 +435,8 @@ export async function deleteListing(listingId: string) {
         if (error instanceof Error) {
             if (error.message === 'NOT_FOUND') return { error: 'Listing not found' };
             if (error.message === 'ACTIVE_BOOKINGS') {
+                // Intentionally simplified response: the UI uses /api/listings/[id]/can-delete
+                // for detailed activeBookings info, not this action's error shape.
                 return { error: 'Cannot delete listing with active bookings' };
             }
         }
