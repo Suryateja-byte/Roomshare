@@ -48,7 +48,6 @@ interface Listing {
     title: string;
     price: number;
     availableSlots: number;
-    ownerId?: string;
     images?: string[];
     location: {
         lat: number;
@@ -69,7 +68,6 @@ interface ClusterFeatureProperties {
     title: string;
     price: number;
     availableSlots: number;
-    ownerId?: string;
     images?: string;
     lat: number;
     lng: number;
@@ -523,7 +521,6 @@ export default function MapComponent({
                 title: listing.title,
                 price: listing.price,
                 availableSlots: listing.availableSlots,
-                ownerId: listing.ownerId || '',
                 images: JSON.stringify(listing.images || []),
                 lat: listing.location.lat,
                 lng: listing.location.lng,
@@ -614,7 +611,6 @@ export default function MapComponent({
                     title: properties.title ?? '',
                     price: Number(properties.price) || 0,
                     availableSlots: Number(properties.availableSlots) || 0,
-                    ownerId: properties.ownerId,
                     images,
                     location: {
                         lat: Number(properties.lat) || 0,
@@ -2184,20 +2180,18 @@ export default function MapComponent({
                                             View Details
                                         </Button>
                                     </Link>
-                                    {selectedListing.ownerId && (
-                                        <Link href={`/messages?userId=${selectedListing.ownerId}`} className="flex-1">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className={`w-full h-9 text-xs-plus font-medium rounded-lg ${isDarkMode
-                                                    ? 'border-zinc-700 text-white hover:bg-zinc-800'
-                                                    : 'border-zinc-300 text-zinc-900 hover:bg-zinc-100'
-                                                    }`}
-                                            >
-                                                Message
-                                            </Button>
-                                        </Link>
-                                    )}
+                                    <Link href={`/listings/${selectedListing.id}`} className="flex-1">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className={`w-full h-9 text-xs-plus font-medium rounded-lg ${isDarkMode
+                                                ? 'border-zinc-700 text-white hover:bg-zinc-800'
+                                                : 'border-zinc-300 text-zinc-900 hover:bg-zinc-100'
+                                                }`}
+                                        >
+                                            View Listing
+                                        </Button>
+                                    </Link>
                                 </div>
                             </div>
                         </div>

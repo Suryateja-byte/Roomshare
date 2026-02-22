@@ -272,7 +272,7 @@ function makeMapListingData(
     title: "Map Listing",
     price: 1500,
     availableSlots: 1,
-    ownerId: "owner-1",
+
     images: ["img1.jpg"],
     location: { lat: 37.77, lng: -122.42 },
     ...overrides,

@@ -741,7 +741,6 @@ export async function getMapListings(
             l.title,
             l.price,
             l."availableSlots",
-            l."ownerId",
             l.images,
             ST_X(loc.coords::geometry) as lng,
             ST_Y(loc.coords::geometry) as lat
