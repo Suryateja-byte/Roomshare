@@ -25,7 +25,7 @@ import {
 } from "@/lib/request-context";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
 
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
         /cannot exceed|invalid|must be|required|bounds/i.test(error.message);
 
       logger.sync.error("Search v2 API error", {
-        error: error instanceof Error ? error.message : String(error),
+        error: sanitizeErrorMessage(error),
         route: "/api/search/v2",
         requestId,
       });

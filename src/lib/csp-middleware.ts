@@ -25,6 +25,11 @@ export function applySecurityHeaders(request: { headers: Headers }) {
   responseHeaders.set("X-DNS-Prefetch-Control", "on");
   responseHeaders.set("X-Content-Type-Options", "nosniff");
   responseHeaders.set("Referrer-Policy", "origin-when-cross-origin");
+  // Cross-origin isolation (Phase 2 security hardening)
+  // COEP omitted — require-corp breaks third-party resources
+  // (Google Maps tiles, Supabase images, Google OAuth avatars)
+  responseHeaders.set("Cross-Origin-Resource-Policy", "same-origin");
+  responseHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
 
   return { requestHeaders, responseHeaders, nonce };
 }

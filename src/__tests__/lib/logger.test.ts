@@ -8,7 +8,7 @@
  * - Sensitive field names are redacted
  */
 
-import { redactSensitive } from '@/lib/logger';
+import { redactSensitive, sanitizeErrorMessage } from '@/lib/logger';
 
 describe('Logger PII Redaction', () => {
   describe('redactSensitive', () => {
@@ -208,6 +208,61 @@ describe('Logger PII Redaction', () => {
         expect(result.status).toBe('active');
         expect(result.count).toBe(42);
       });
+    });
+  });
+
+  describe('sanitizeErrorMessage', () => {
+    it('handles null and undefined', () => {
+      expect(sanitizeErrorMessage(null)).toBe('Unknown error');
+      expect(sanitizeErrorMessage(undefined)).toBe('Unknown error');
+    });
+
+    it('handles non-Error objects', () => {
+      expect(sanitizeErrorMessage(42)).toBe('Unknown error');
+      expect(sanitizeErrorMessage({ foo: 'bar' })).toBe('Unknown error');
+    });
+
+    it('extracts Error subclass name', () => {
+      const result = sanitizeErrorMessage(new TypeError('bad type'));
+      expect(result).toBe('TypeError: bad type');
+    });
+
+    it('handles plain string errors', () => {
+      expect(sanitizeErrorMessage('something broke')).toBe('something broke');
+    });
+
+    it('truncates messages over 200 characters', () => {
+      const longMsg = 'x'.repeat(250);
+      const result = sanitizeErrorMessage(new Error(longMsg));
+      expect(result).toContain('...[truncated]');
+      expect(result.length).toBeLessThan(250);
+    });
+
+    it('strips connection strings', () => {
+      const err = new Error('Failed to connect to postgres://user:pass@host:5432/db');
+      const result = sanitizeErrorMessage(err);
+      expect(result).toContain('[REDACTED_URL]');
+      expect(result).not.toContain('user:pass');
+    });
+
+    it('strips file system paths', () => {
+      const err = new Error('Error in /home/user/app/src/index.ts');
+      const result = sanitizeErrorMessage(err);
+      expect(result).toContain('[REDACTED_PATH]');
+      expect(result).not.toContain('/home/user');
+    });
+
+    it('strips SQL fragments', () => {
+      const err = new Error('Failed: SELECT * FROM users WHERE id = 1');
+      const result = sanitizeErrorMessage(err);
+      expect(result).toContain('[SQL]');
+      expect(result).not.toContain('SELECT * FROM');
+    });
+
+    it('redacts email addresses in error messages', () => {
+      const err = new Error('User john@example.com not found');
+      const result = sanitizeErrorMessage(err);
+      expect(result).not.toContain('john@example.com');
     });
   });
 });

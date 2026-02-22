@@ -99,6 +99,8 @@ describe("applySecurityHeaders", () => {
       expect(responseHeaders.get("Referrer-Policy")).toBe(
         "origin-when-cross-origin",
       );
+      expect(responseHeaders.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
+      expect(responseHeaders.get("Cross-Origin-Opener-Policy")).toBe("same-origin");
     });
   });
 

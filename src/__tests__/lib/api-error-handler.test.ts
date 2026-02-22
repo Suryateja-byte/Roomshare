@@ -23,13 +23,17 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }))
 
-jest.mock('@/lib/logger', () => ({
-  logger: {
-    sync: {
-      error: jest.fn(),
+jest.mock('@/lib/logger', () => {
+  const actual = jest.requireActual('@/lib/logger')
+  return {
+    logger: {
+      sync: {
+        error: jest.fn(),
+      },
     },
-  },
-}))
+    sanitizeErrorMessage: actual.sanitizeErrorMessage,
+  }
+})
 
 jest.mock('@/lib/request-context', () => ({
   getRequestId: jest.fn().mockReturnValue('test-req-id-123'),
@@ -118,14 +122,14 @@ describe('api-error-handler', () => {
       )
     })
 
-    it('handles string errors (non-Error thrown) as Unknown error', () => {
+    it('handles string errors (non-Error thrown) by preserving string value', () => {
       const context = { route: '/api/test', method: 'GET' }
 
       captureApiError('string error message', context)
 
       expect(logger.sync.error).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ error: 'Unknown error' })
+        expect.objectContaining({ error: 'string error message' })
       )
     })
 

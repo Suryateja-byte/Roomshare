@@ -5,7 +5,7 @@ import { sendNotificationEmail } from '@/lib/email';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { normalizeEmail } from '@/lib/normalize-email';
 import { createTokenPair } from '@/lib/token-security';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import * as Sentry from '@sentry/nextjs';
 
 export async function POST(request: NextRequest) {
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         });
     } catch (error) {
         logger.sync.error('Resend verification error', {
-            error: error instanceof Error ? error.message : String(error),
+            error: sanitizeErrorMessage(error),
             route: '/api/auth/resend-verification',
         });
         Sentry.captureException(error);

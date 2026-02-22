@@ -7,7 +7,7 @@ import { checkChatRateLimit } from '@/lib/rate-limit-redis';
 import { getClientIP } from '@/lib/rate-limit';
 import { checkFairHousingPolicy, POLICY_REFUSAL_MESSAGE } from '@/lib/fair-housing-policy';
 import { DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import * as Sentry from '@sentry/nextjs';
 import { isOriginAllowed, isHostAllowed } from '@/lib/origin-guard';
 
@@ -443,7 +443,7 @@ Be friendly and concise. Focus on being helpful without making up specific infor
   } catch (error) {
     // Log error without user content - sanitize for privacy
     logger.sync.error('[Chat] API error', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: sanitizeErrorMessage(error),
       route: '/api/chat',
     });
     Sentry.captureException(error);

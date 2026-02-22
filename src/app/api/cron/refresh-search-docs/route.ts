@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sanitizeErrorMessage } from "@/lib/logger";
 import { computeRecommendedScore } from "@/lib/search/recommended-score";
 
 // Number of dirty listings to process per cron run
@@ -295,7 +296,7 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         // Log error without PII (only listing ID)
         errors.push(
-          `Listing ${listing.id}: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Listing ${listing.id}: ${sanitizeErrorMessage(error)}`,
         );
       }
     }
