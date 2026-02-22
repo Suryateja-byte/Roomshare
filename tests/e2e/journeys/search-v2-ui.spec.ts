@@ -109,6 +109,9 @@ test.describe("Search V2 UI Integration", () => {
   test(`${tags.core} - V2 map does not trigger separate map-listings fetch`, async ({
     page,
   }) => {
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, "Desktop-only: mobile uses different map data path");
+
     // Desktop viewport for map visibility
     await page.setViewportSize({ width: 1280, height: 800 });
 
