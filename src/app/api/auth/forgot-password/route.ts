@@ -5,7 +5,7 @@ import { withRateLimit } from '@/lib/with-rate-limit';
 import { normalizeEmail } from '@/lib/normalize-email';
 import { createTokenPair } from '@/lib/token-security';
 import { verifyTurnstileToken } from '@/lib/turnstile';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import * as Sentry from '@sentry/nextjs';
 
 export async function POST(request: NextRequest) {
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         });
         if (!emailResult.success) {
             logger.sync.error('Failed to send password reset email', {
-                error: String(emailResult.error),
+                error: sanitizeErrorMessage(emailResult.error),
                 route: '/api/auth/forgot-password',
             });
         }
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         });
     } catch (error) {
         logger.sync.error('Forgot password error', {
-            error: error instanceof Error ? error.message : String(error),
+            error: sanitizeErrorMessage(error),
             route: '/api/auth/forgot-password',
         });
         Sentry.captureException(error);

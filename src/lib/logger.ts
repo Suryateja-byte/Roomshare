@@ -335,6 +335,56 @@ export const logger = {
 };
 
 /**
+ * Sanitize error messages before logging or returning to clients.
+ * Strips connection strings, file paths, SQL fragments, and PII.
+ */
+export function sanitizeErrorMessage(error: unknown): string {
+  if (error === null || error === undefined) return 'Unknown error';
+
+  let errorName = 'Error';
+  let rawMessage = 'Unknown error';
+
+  if (error instanceof Error) {
+    errorName = error.constructor.name || 'Error';
+    rawMessage = error.message || 'Unknown error';
+  } else if (typeof error === 'string') {
+    rawMessage = error;
+  } else {
+    return 'Unknown error';
+  }
+
+  // Truncate to 200 chars
+  let sanitized = rawMessage.length > 200
+    ? rawMessage.slice(0, 200) + '...[truncated]'
+    : rawMessage;
+
+  // Strip connection strings
+  sanitized = sanitized.replace(
+    /(?:postgres|postgresql|mysql|mongodb|redis|amqp|https?):\/\/[^\s,;)}\]]+/gi,
+    '[REDACTED_URL]'
+  );
+
+  // Strip file system paths
+  sanitized = sanitized.replace(
+    /(?:\/(?:usr|home|var|tmp|etc|app|src|node_modules)\/[^\s,;)}\]]+)|(?:[A-Z]:\\[^\s,;)}\]]+)/gi,
+    '[REDACTED_PATH]'
+  );
+
+  // Strip SQL statements — redact from DML/DDL keyword to end of statement
+  sanitized = sanitized.replace(
+    /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE)\b[^]*?(?=;|\s*$)/gi,
+    '[SQL_REDACTED]'
+  );
+
+  // Run through existing REDACT_PATTERNS for PII
+  for (const { pattern, replacement } of REDACT_PATTERNS) {
+    sanitized = sanitized.replace(pattern, replacement);
+  }
+
+  return errorName !== 'Error' ? `${errorName}: ${sanitized}` : sanitized;
+}
+
+/**
  * Export redaction utility for use in other modules
  */
 export { redactSensitive };

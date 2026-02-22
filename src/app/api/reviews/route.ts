@@ -5,7 +5,7 @@ import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from '@/app/actions/suspension';
 import { withRateLimit } from '@/lib/with-rate-limit';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { captureApiError } from '@/lib/api-error-handler';
 import { z } from 'zod';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
@@ -169,7 +169,7 @@ export async function POST(request: Request) {
             markListingDirty(listingId, 'review_changed').catch((err) => {
                 logger.sync.warn("[API] Failed to mark listing dirty", {
                     listingId: listingId,
-                    error: err instanceof Error ? err.message : String(err)
+                    error: sanitizeErrorMessage(err)
                 });
             });
         }
@@ -214,7 +214,7 @@ export async function POST(request: Request) {
                     // Log but don't fail - review was already created successfully
                     logger.sync.error('Failed to send review notification', {
                         action: 'reviewNotification',
-                        error: notificationError instanceof Error ? notificationError.message : 'Unknown error',
+                        error: sanitizeErrorMessage(notificationError),
                     });
                 }
             })();
@@ -362,7 +362,7 @@ export async function PUT(request: Request) {
             markListingDirty(existingReview.listingId, 'review_changed').catch((err) => {
                 logger.sync.warn("[API] Failed to mark listing dirty", {
                     listingId: existingReview.listingId,
-                    error: err instanceof Error ? err.message : String(err)
+                    error: sanitizeErrorMessage(err)
                 });
             });
         }
@@ -423,7 +423,7 @@ export async function DELETE(request: Request) {
             markListingDirty(existingReview.listingId, 'review_changed').catch((err) => {
                 logger.sync.warn("[API] Failed to mark listing dirty", {
                     listingId: existingReview.listingId,
-                    error: err instanceof Error ? err.message : String(err)
+                    error: sanitizeErrorMessage(err)
                 });
             });
         }

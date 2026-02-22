@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 import { getRequestId } from '@/lib/request-context';
 
@@ -11,7 +11,7 @@ export function captureApiError(
   error: unknown,
   context: { route: string; method: string; userId?: string }
 ): NextResponse {
-  const message = error instanceof Error ? error.message : 'Unknown error';
+  const message = sanitizeErrorMessage(error);
 
   logger.sync.error(`API error in ${context.route}`, {
     error: message,

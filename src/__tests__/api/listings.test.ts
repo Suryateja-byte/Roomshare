@@ -65,6 +65,9 @@ jest.mock('@/lib/logger', () => ({
       warn: jest.fn(),
     },
   },
+  sanitizeErrorMessage: jest.fn((e: unknown) =>
+    e instanceof Error ? e.message : typeof e === 'string' ? e : 'Unknown error'
+  ),
 }))
 
 jest.mock('@/app/actions/suspension', () => ({

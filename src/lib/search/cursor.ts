@@ -14,7 +14,7 @@
 
 import { z } from "zod";
 import { createHmac, timingSafeEqual } from "crypto";
-import { CURSOR_SECRET } from "@/lib/env";
+import { getCursorSecret } from "@/lib/env";
 
 // ============================================================================
 // Browser-compatible Base64url Encoding
@@ -127,11 +127,12 @@ const EXPECTED_KEY_COUNTS: Record<SortOption, number> = {
  */
 export function encodeKeysetCursor(cursor: KeysetCursor): string {
   const payload = JSON.stringify(cursor);
-  if (!CURSOR_SECRET) {
+  const cursorSecret = getCursorSecret();
+  if (!cursorSecret) {
     return toBase64Url(payload);
   }
 
-  const signature = createHmac("sha256", CURSOR_SECRET)
+  const signature = createHmac("sha256", cursorSecret)
     .update(payload)
     .digest("base64url");
   const envelope = JSON.stringify({ p: payload, s: signature });
@@ -160,7 +161,8 @@ export function decodeKeysetCursor(
     const decoded = fromBase64Url(cursorStr);
     let payload = decoded;
 
-    if (CURSOR_SECRET) {
+    const cursorSecret = getCursorSecret();
+    if (cursorSecret) {
       const parsedEnvelope = JSON.parse(decoded) as unknown;
       if (
         parsedEnvelope === null ||
@@ -173,7 +175,7 @@ export function decodeKeysetCursor(
         return null;
       }
 
-      const expectedSignature = createHmac("sha256", CURSOR_SECRET)
+      const expectedSignature = createHmac("sha256", cursorSecret)
         .update(parsedEnvelope.p)
         .digest("base64url");
 
