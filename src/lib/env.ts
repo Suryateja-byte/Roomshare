@@ -264,14 +264,18 @@ export const clientEnv: ClientEnv = new Proxy({} as ClientEnv, {
 });
 
 // Lazy getter — avoids throwing at import time during `next build` static generation
-let _cursorSecretChecked = false;
+let _cursorSecretDevWarned = false;
 export function getCursorSecret(): string {
   const secret = process.env.CURSOR_SECRET ?? "";
-  if (!secret && process.env.NODE_ENV === "production" && !_cursorSecretChecked) {
-    _cursorSecretChecked = true;
-    throw new Error("[SECURITY] CURSOR_SECRET is required in production — cursor tokens cannot be verified without it");
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("[SECURITY] CURSOR_SECRET is required in production — cursor tokens cannot be verified without it");
+    }
+    if (!_cursorSecretDevWarned) {
+      _cursorSecretDevWarned = true;
+      console.warn("[DEV] CURSOR_SECRET not set — cursors will not be HMAC-verified");
+    }
   }
-  _cursorSecretChecked = true;
   return secret;
 }
 // Backward-compatible export — defers check to first access
