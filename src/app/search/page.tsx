@@ -49,28 +49,6 @@ interface SearchPageProps {
     searchParams: Promise<SearchPageSearchParams>;
 }
 
-// P2-FIX (#141): Helper for retry with exponential backoff for transient V2 search failures
-// Single retry is sufficient - multiple retries would delay SSR too much
-async function withRetry<T>(
-    fn: () => Promise<T>,
-    retries: number = 1,
-    baseDelayMs: number = 200
-): Promise<T> {
-    let lastError: unknown;
-    for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-            return await fn();
-        } catch (err) {
-            lastError = err;
-            // Don't retry on last attempt
-            if (attempt < retries) {
-                // Exponential backoff: 200ms, 400ms, etc.
-                await new Promise(r => setTimeout(r, baseDelayMs * Math.pow(2, attempt)));
-            }
-        }
-    }
-    throw lastError;
-}
 
 // P2-2: Server-side preload hints for LCP optimization
 // Must match ListingCard.tsx PLACEHOLDER_IMAGES for consistent fallback behavior
@@ -223,18 +201,14 @@ export default async function SearchPage({
             ));
 
             // P0 FIX: Add timeout protection to prevent SSR hangs
-            // P2-FIX (#141): Add single retry for transient V2 failures before falling back to V1
-            const v2Result = await withRetry(
-                () => withTimeout(
-                    executeSearchV2({
-                        rawParams: rawParamsForV2,
-                        limit: DEFAULT_PAGE_SIZE,
-                    }),
-                    DEFAULT_TIMEOUTS.DATABASE,
-                    'SSR-executeSearchV2'
-                ),
-                1, // Single retry
-                200 // 200ms initial delay
+            // V1 fallback (catch block below) IS the retry mechanism — no withRetry needed
+            const v2Result = await withTimeout(
+                executeSearchV2({
+                    rawParams: rawParamsForV2,
+                    limit: DEFAULT_PAGE_SIZE,
+                }),
+                DEFAULT_TIMEOUTS.DATABASE,
+                'SSR-executeSearchV2'
             );
 
             // V2 returned valid data - use it
