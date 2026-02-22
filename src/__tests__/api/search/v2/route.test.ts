@@ -56,6 +56,7 @@ jest.mock("@/lib/env", () => {
     features: mockFeatures,
     serverEnv: {},
     clientEnv: {},
+    getCursorSecret: jest.fn().mockReturnValue(""),
   };
 });
 
