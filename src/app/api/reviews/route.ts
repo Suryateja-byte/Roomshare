@@ -79,6 +79,7 @@ export async function POST(request: Request) {
                     where: {
                         listingId,
                         tenantId: session.user.id,
+                        status: 'ACCEPTED',
                     },
                 })
             ]);
@@ -99,8 +100,37 @@ export async function POST(request: Request) {
             }
         }
 
-        // Check for existing user review (duplicate prevention)
+        // Check for user review guards
         if (targetUserId) {
+            // BIZ-04: Prevent self-reviews
+            if (targetUserId === session.user.id) {
+                return NextResponse.json(
+                    { error: 'You cannot review yourself' },
+                    { status: 403 }
+                );
+            }
+
+            // BIZ-03: Require at least one ACCEPTED booking between parties
+            const hasInteraction = await prisma.booking.findFirst({
+                where: {
+                    status: 'ACCEPTED',
+                    OR: [
+                        // Reviewer was tenant, target was host
+                        { tenantId: session.user.id, listing: { ownerId: targetUserId } },
+                        // Reviewer was host, target was tenant
+                        { tenantId: targetUserId, listing: { ownerId: session.user.id } },
+                    ],
+                },
+            });
+
+            if (!hasInteraction) {
+                return NextResponse.json(
+                    { error: 'You can only review users you have a completed booking with' },
+                    { status: 403 }
+                );
+            }
+
+            // Check for existing user review (duplicate prevention)
             const existingUserReview = await prisma.review.findFirst({
                 where: {
                     authorId: session.user.id,

@@ -120,6 +120,7 @@ describe('Reports API', () => {
         reason: 'Spam',
         details: 'This is spam content',
       }
+      ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue({ ownerId: 'other-user' })
       ;(prisma.report.findFirst as jest.Mock).mockResolvedValue(null)
       ;(prisma.report.create as jest.Mock).mockResolvedValue(mockReport)
 
@@ -145,6 +146,7 @@ describe('Reports API', () => {
     })
 
     it('handles database errors', async () => {
+      ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue({ ownerId: 'other-user' })
       ;(prisma.report.findFirst as jest.Mock).mockResolvedValue(null)
       ;(prisma.report.create as jest.Mock).mockRejectedValue(new Error('DB Error'))
 

@@ -79,7 +79,7 @@ const nextConfig: NextConfig = {
   },
 
   // Security headers fallback for paths excluded from middleware matcher
-  // CSP is now set per-request by src/middleware.ts with nonce injection
+  // CSP is now set per-request by src/proxy.ts with nonce injection
   async headers() {
     return [
       {

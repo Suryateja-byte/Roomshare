@@ -316,6 +316,99 @@ describe('/api/reviews', () => {
       })
     })
 
+    describe('Business rule guards (BIZ-02/03/04)', () => {
+      it('BIZ-02: rejects review when no ACCEPTED booking exists', async () => {
+        ;(prisma.review.findFirst as jest.Mock).mockResolvedValue(null) // no existing review
+        ;(prisma.booking.findFirst as jest.Mock).mockResolvedValue(null) // no booking
+
+        const response = await POST(createRequest({
+          listingId: 'listing-123',
+          rating: 5,
+          comment: 'Great place!',
+        }))
+        const data = await response.json()
+
+        expect(response.status).toBe(403)
+        expect(data.error).toBe('You must have a booking to review this listing')
+      })
+
+      it('BIZ-04: blocks self-review', async () => {
+        const response = await POST(createRequest({
+          targetUserId: 'user-123', // same as session.user.id
+          rating: 5,
+          comment: 'I am great!',
+        }))
+        const data = await response.json()
+
+        expect(response.status).toBe(403)
+        expect(data.error).toBe('You cannot review yourself')
+      })
+
+      it('BIZ-04 happy: allows review of different user', async () => {
+        ;(prisma.booking.findFirst as jest.Mock).mockResolvedValue({ id: 'booking-456' }) // interaction exists
+        ;(prisma.review.findFirst as jest.Mock).mockResolvedValue(null) // no existing review
+        ;(prisma.review.create as jest.Mock).mockResolvedValue({
+          id: 'review-new',
+          authorId: 'user-123',
+          targetUserId: 'target-456',
+          rating: 4,
+          comment: 'Nice person!',
+          author: { name: 'Test User', image: '/avatar.jpg' },
+        })
+
+        const response = await POST(createRequest({
+          targetUserId: 'target-456',
+          rating: 4,
+          comment: 'Nice person!',
+        }))
+
+        expect(response.status).toBe(201)
+      })
+
+      it('BIZ-03: rejects when no interaction exists between users', async () => {
+        // First call is the interaction check (booking.findFirst) — return null
+        ;(prisma.booking.findFirst as jest.Mock).mockResolvedValue(null)
+
+        const response = await POST(createRequest({
+          targetUserId: 'target-456',
+          rating: 4,
+          comment: 'Nice person!',
+        }))
+        const data = await response.json()
+
+        expect(response.status).toBe(403)
+        expect(data.error).toBe('You can only review users you have a completed booking with')
+      })
+
+      it('BIZ-03 happy: allows review when interaction exists', async () => {
+        ;(prisma.booking.findFirst as jest.Mock).mockResolvedValue({ id: 'booking-interaction' }) // interaction exists
+        ;(prisma.review.findFirst as jest.Mock).mockResolvedValue(null) // no existing review
+        ;(prisma.review.create as jest.Mock).mockResolvedValue({
+          id: 'review-interaction',
+          authorId: 'user-123',
+          targetUserId: 'target-789',
+          rating: 5,
+          comment: 'Great host!',
+          author: { name: 'Test User', image: '/avatar.jpg' },
+        })
+
+        const response = await POST(createRequest({
+          targetUserId: 'target-789',
+          rating: 5,
+          comment: 'Great host!',
+        }))
+
+        expect(response.status).toBe(201)
+        expect(prisma.review.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            authorId: 'user-123',
+            targetUserId: 'target-789',
+          }),
+          include: expect.any(Object),
+        })
+      })
+    })
+
     describe('error handling', () => {
       it('returns 500 on database error', async () => {
         ;(prisma.review.create as jest.Mock).mockRejectedValue(new Error('DB Error'))
