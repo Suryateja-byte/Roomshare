@@ -20,7 +20,7 @@ import {
   parseSearchParams,
 } from "@/lib/search-params";
 import { LAT_OFFSET_DEGREES } from "@/lib/constants";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
 
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       );
     } catch (error) {
       logger.sync.error("Map listings API error", {
-        error: error instanceof Error ? error.message : String(error),
+        error: sanitizeErrorMessage(error),
         route: "/api/map-listings",
         requestId,
       });

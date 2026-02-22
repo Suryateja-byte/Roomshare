@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { auth } from '@/auth';
 import { withRateLimit } from '@/lib/with-rate-limit';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { isOriginAllowed, isHostAllowed } from '@/lib/origin-guard';
 
 interface AgentRequest {
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      logger.sync.error('Agent webhook fetch error', { error: fetchError instanceof Error ? fetchError.message : 'Unknown error' });
+      logger.sync.error('Agent webhook fetch error', { error: sanitizeErrorMessage(fetchError) });
       Sentry.captureException(fetchError, { tags: { route: '/api/agent', method: 'POST', phase: 'webhook-fetch' } });
       return NextResponse.json({
         answer: "I'm temporarily unable to process your question. Please try again shortly, or browse the available listing information on this page.",
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    logger.sync.error('Agent API error', { error: error instanceof Error ? error.message : String(error) });
+    logger.sync.error('Agent API error', { error: sanitizeErrorMessage(error) });
     Sentry.captureException(error, { tags: { route: '/api/agent', method: 'POST' } });
     return NextResponse.json(
       { error: 'Internal server error' },

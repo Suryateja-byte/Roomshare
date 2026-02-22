@@ -189,13 +189,11 @@ export async function POST(request: Request) {
           details = "Too many requests, please try again later";
         } else if (radarResponse.status === 400) {
           userMessage = "Invalid search parameters";
-          try {
-            const errorData = JSON.parse(errorText);
-            details =
-              errorData.meta?.message || errorData.message || errorData.error;
-          } catch {
-            details = errorText;
-          }
+          logger.sync.error("Radar 400 details", {
+            errorLength: errorText.length,
+            route: '/api/nearby',
+          });
+          details = "The search parameters were rejected by the service";
         }
 
         return NextResponse.json(
@@ -356,13 +354,11 @@ export async function POST(request: Request) {
         details = "Too many requests, please try again later";
       } else if (radarResponse.status === 400) {
         userMessage = "Invalid search parameters";
-        try {
-          const errorData = JSON.parse(errorText);
-          details =
-            errorData.meta?.message || errorData.message || errorData.error;
-        } catch {
-          details = errorText;
-        }
+        logger.sync.error("Radar 400 details", {
+          errorLength: errorText.length,
+          route: '/api/nearby',
+        });
+        details = "The search parameters were rejected by the service";
       }
 
       return NextResponse.json(

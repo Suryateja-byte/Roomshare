@@ -37,7 +37,7 @@ import {
   MAX_LAT_SPAN,
   MAX_LNG_SPAN,
 } from "@/lib/validation";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { parseLocalDate } from "@/lib/utils";
 
@@ -714,7 +714,7 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       const requestId = getRequestId();
       logger.sync.error("[search/facets] Error fetching facets", {
-        error: error instanceof Error ? error.message : "Unknown",
+        error: sanitizeErrorMessage(error),
         requestId,
       });
       Sentry.captureException(error, { tags: { route: "/api/search/facets", method: "GET" } });

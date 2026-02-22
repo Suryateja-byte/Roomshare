@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withRateLimit } from '@/lib/with-rate-limit';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import * as Sentry from '@sentry/nextjs';
 
 // Public endpoint - no auth required
@@ -40,7 +40,7 @@ export async function GET(
         });
     } catch (error) {
         logger.sync.error('Error checking listing status', {
-            error: error instanceof Error ? error.message : String(error),
+            error: sanitizeErrorMessage(error),
             route: '/api/listings/[id]/status',
         });
         Sentry.captureException(error);

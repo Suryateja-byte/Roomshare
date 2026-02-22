@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import * as Sentry from '@sentry/nextjs';
 
 export async function GET(
@@ -62,7 +62,7 @@ export async function GET(
         });
     } catch (error) {
         logger.sync.error('Error checking deletability', {
-            error: error instanceof Error ? error.message : String(error),
+            error: sanitizeErrorMessage(error),
             route: '/api/listings/[id]/can-delete',
         });
         Sentry.captureException(error);

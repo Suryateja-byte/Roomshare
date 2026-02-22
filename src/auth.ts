@@ -5,7 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
-import { logger } from "@/lib/logger"
+import { logger, sanitizeErrorMessage } from "@/lib/logger"
 import { isGoogleEmailVerified, AUTH_ROUTES, normalizeEmail } from "@/lib/auth-helpers"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 
@@ -16,7 +16,7 @@ async function getUser(email: string) {
         })
         return user
     } catch (error) {
-        logger.sync.error("Failed to fetch user", { error: error instanceof Error ? error.message : String(error) })
+        logger.sync.error("Failed to fetch user", { error: sanitizeErrorMessage(error) })
         throw new Error("Failed to fetch user.")
     }
 }
@@ -61,7 +61,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 logger.sync.warn("Failed to clear OAuth tokens after link", {
                     userId: user.id,
                     provider: account.provider,
-                    error: error instanceof Error ? error.message : String(error),
+                    error: sanitizeErrorMessage(error),
                 });
             }
         },
@@ -109,7 +109,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         token.name = dbUser.name
                     }
                 } catch (error) {
-                    logger.sync.error("JWT callback DB error", { error: error instanceof Error ? error.message : String(error) })
+                    logger.sync.error("JWT callback DB error", { error: sanitizeErrorMessage(error) })
                     // Don't invalidate session on DB errors - keep existing token values
                 }
             }

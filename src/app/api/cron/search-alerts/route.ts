@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { processSearchAlerts } from '@/lib/search-alerts';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { withRetry } from '@/lib/retry';
 
 // Vercel Cron or external cron service endpoint
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
         logger.sync.error('Search alerts cron error', {
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: sanitizeErrorMessage(error),
         });
         Sentry.captureException(error, { tags: { cron: 'search-alerts' } });
         return NextResponse.json(

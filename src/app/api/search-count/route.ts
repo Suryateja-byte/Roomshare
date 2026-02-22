@@ -25,7 +25,7 @@ import {
   buildRawParamsFromSearchParams,
 } from "@/lib/search-params";
 import { getLimitedCount } from "@/lib/data";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 
 // Disable static caching - counts must be fresh
 export const dynamic = "force-dynamic";
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       logger.error("Search count error", {
         requestId,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: sanitizeErrorMessage(error),
       });
       Sentry.captureException(error, { tags: { route: "/api/search-count", method: "GET" } });
 

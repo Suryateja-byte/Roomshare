@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { withRetry } from '@/lib/retry';
 
 export async function GET(request: NextRequest) {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         });
     } catch (error) {
         logger.sync.error('Rate limit cleanup error', {
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: sanitizeErrorMessage(error),
         });
         Sentry.captureException(error, { tags: { cron: 'cleanup-rate-limits' } });
         return NextResponse.json(

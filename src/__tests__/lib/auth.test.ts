@@ -20,6 +20,9 @@ jest.mock('@/lib/logger', () => ({
   logger: {
     sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
   },
+  sanitizeErrorMessage: jest.fn((e: unknown) =>
+    e instanceof Error ? e.message : typeof e === 'string' ? e : 'Unknown error'
+  ),
 }));
 
 jest.mock('@/lib/turnstile', () => ({
