@@ -83,6 +83,12 @@ const serverEnvSchema = z.object({
   // Radar API (server-side, for nearby places search)
   RADAR_SECRET_KEY: z.string().optional(),
 
+  // Security: Cursor pagination HMAC (required in production for tamper-proof cursors)
+  CURSOR_SECRET: z
+    .string()
+    .min(32, "CURSOR_SECRET must be at least 32 characters")
+    .optional(),
+
   // Search optimization (optional - defaults to slow LIKE queries if not enabled)
   // CRITICAL: Should be enabled in production for performance
   ENABLE_SEARCH_DOC: z.enum(["true", "false"]).optional(),
