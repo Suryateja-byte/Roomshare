@@ -370,10 +370,10 @@ export function sanitizeErrorMessage(error: unknown): string {
     '[REDACTED_PATH]'
   );
 
-  // Strip SQL fragments
+  // Strip SQL statements — redact from DML/DDL keyword to end of statement
   sanitized = sanitized.replace(
-    /(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|FROM|WHERE|JOIN|INTO)\s+[^\s]*\s/gi,
-    '[SQL] '
+    /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE)\b[^]*?(?=;|\s*$)/gi,
+    '[SQL_REDACTED]'
   );
 
   // Run through existing REDACT_PATTERNS for PII

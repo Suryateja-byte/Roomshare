@@ -268,8 +268,6 @@ export function getCursorSecret(): string {
   _cursorSecretChecked = true;
   return secret;
 }
-// Backward-compatible export — defers check to first access
-export const CURSOR_SECRET = process.env.CURSOR_SECRET ?? "";
 
 // Helper to check if a feature is available
 // Uses getters to defer env access to runtime (prevents import-time validation noise)

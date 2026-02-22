@@ -6,7 +6,7 @@
 
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { BOUNDS_EPSILON } from "./types";
-import { CURSOR_SECRET } from "@/lib/env";
+import { getCursorSecret } from "@/lib/env";
 
 // ============================================================================
 // Keyset Cursor Re-exports
@@ -112,11 +112,12 @@ export function generateQueryHash(params: HashableFilterParams): string {
  */
 export function encodeCursor(page: number): string {
   const payload = JSON.stringify({ p: page });
-  if (!CURSOR_SECRET) {
+  const cursorSecret = getCursorSecret();
+  if (!cursorSecret) {
     return Buffer.from(payload).toString("base64url");
   }
 
-  const signature = createHmac("sha256", CURSOR_SECRET)
+  const signature = createHmac("sha256", cursorSecret)
     .update(payload)
     .digest("base64url");
   const envelope = JSON.stringify({ p: payload, s: signature });
@@ -132,7 +133,8 @@ export function decodeCursor(cursor: string): number | null {
     const decoded = Buffer.from(cursor, "base64url").toString("utf-8");
     let payload = decoded;
 
-    if (CURSOR_SECRET) {
+    const cursorSecret = getCursorSecret();
+    if (cursorSecret) {
       const parsedEnvelope = JSON.parse(decoded) as unknown;
       if (
         parsedEnvelope === null ||
@@ -145,7 +147,7 @@ export function decodeCursor(cursor: string): number | null {
         return null;
       }
 
-      const expectedSignature = createHmac("sha256", CURSOR_SECRET)
+      const expectedSignature = createHmac("sha256", cursorSecret)
         .update(parsedEnvelope.p)
         .digest("base64url");
 

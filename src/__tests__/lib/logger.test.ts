@@ -252,11 +252,48 @@ describe('Logger PII Redaction', () => {
       expect(result).not.toContain('/home/user');
     });
 
-    it('strips SQL fragments', () => {
+    it('strips SQL fragments completely', () => {
       const err = new Error('Failed: SELECT * FROM users WHERE id = 1');
       const result = sanitizeErrorMessage(err);
-      expect(result).toContain('[SQL]');
-      expect(result).not.toContain('SELECT * FROM');
+      expect(result).toContain('[SQL_REDACTED]');
+      expect(result).not.toContain('SELECT');
+      expect(result).not.toContain('users');
+      expect(result).not.toContain('WHERE');
+      expect(result).not.toContain('id = 1');
+    });
+
+    it('strips complete SQL statements without leaking column names', () => {
+      const err = new Error('Failed: SELECT user_data, email FROM users WHERE id = 1');
+      const result = sanitizeErrorMessage(err);
+      expect(result).not.toContain('user_data');
+      expect(result).not.toContain('email');
+      expect(result).not.toContain('WHERE');
+      expect(result).not.toContain('id = 1');
+      expect(result).toContain('[SQL_REDACTED]');
+    });
+
+    it('strips UPDATE SET clauses', () => {
+      const err = new Error("Failed: UPDATE users SET name = 'John' WHERE id = 1");
+      const result = sanitizeErrorMessage(err);
+      expect(result).not.toContain('SET');
+      expect(result).not.toContain('name');
+      expect(result).not.toContain('John');
+      expect(result).not.toContain('WHERE');
+    });
+
+    it('strips INSERT VALUES', () => {
+      const err = new Error("Failed: INSERT INTO users (email, name) VALUES ('a@b.com', 'Test')");
+      const result = sanitizeErrorMessage(err);
+      expect(result).not.toContain("a@b.com");
+      expect(result).not.toContain('Test');
+      expect(result).not.toContain('email');
+    });
+
+    it('handles SQL without trailing space', () => {
+      const err = new Error('Query: SELECT * FROM users');
+      const result = sanitizeErrorMessage(err);
+      expect(result).not.toContain('SELECT');
+      expect(result).not.toContain('users');
     });
 
     it('redacts email addresses in error messages', () => {
