@@ -150,14 +150,14 @@ export function FilterModal({
       <FocusTrap active={isOpen}>
         <div
           id="search-filters"
-          className="absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col"
+          className="absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)]"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
             <h2 id="filter-drawer-title" className="text-lg font-semibold text-zinc-900 dark:text-white">
               Filters
               {activeFilterCount > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">
+                <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-indigo-500 text-white">
                   {activeFilterCount}
                 </span>
               )}
@@ -243,7 +243,7 @@ export function FilterModal({
                       >
                         {type}
                         {count !== undefined && (
-                          <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">({count})</span>
+                          <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">({count})</span>
                         )}
                       </SelectItem>
                     );
@@ -276,7 +276,7 @@ export function FilterModal({
                     >
                       {amenity}
                       {count !== undefined && !isActive && (
-                        <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">({count})</span>
+                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">({count})</span>
                       )}
                       {isActive && (
                         <X className="w-3.5 h-3.5 ml-1.5" />
@@ -311,7 +311,7 @@ export function FilterModal({
                     >
                       {rule}
                       {count !== undefined && !isActive && (
-                        <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">({count})</span>
+                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">({count})</span>
                       )}
                       {isActive && (
                         <X className="w-3.5 h-3.5 ml-1.5" />
@@ -429,7 +429,7 @@ export function FilterModal({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-3">
+          <div className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-3">
             {hasActiveFilters && (
               <Button
                 type="button"
@@ -445,7 +445,7 @@ export function FilterModal({
               type="button"
               onClick={onApply}
               disabled={boundsRequired}
-              className="flex-1 rounded-xl h-12 bg-zinc-900 text-white hover:bg-zinc-800 shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 rounded-xl h-12 bg-indigo-500 text-white hover:bg-indigo-600 shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
               data-testid="filter-modal-apply"
             >
               {isCountLoading ? (

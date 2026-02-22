@@ -638,11 +638,11 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
-    // Look for "Showing X to Y of Z" text
+    // Look for "Showing X of ~Y listings" text (app format from SearchResultsClient)
     const paginationInfo = page.locator('text=/showing\\s+\\d+/i');
     if (await paginationInfo.isVisible({ timeout: 5000 }).catch(() => false)) {
       const text = await paginationInfo.textContent();
-      expect(text).toMatch(/showing\s+\d+\s+to\s+\d+/i);
+      expect(text).toMatch(/showing\s+\d+\s+of\s+/i);
     }
   });
 

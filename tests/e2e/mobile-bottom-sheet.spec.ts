@@ -152,10 +152,12 @@ test.describe("Mobile Bottom Sheet - Snap Points (7.1)", () => {
     const initialSnap = await getSnapIndex(page);
     expect(initialSnap).toBe(1);
 
-    // Verify initial height is approximately 50vh
-    const initialFraction = await getSheetHeightFraction(page);
-    expect(initialFraction).toBeGreaterThan(0.4);
-    expect(initialFraction).toBeLessThan(0.6);
+    // Verify initial height is approximately 50vh (poll for CI animation delay)
+    await expect(async () => {
+      const initialFraction = await getSheetHeightFraction(page);
+      expect(initialFraction).toBeGreaterThan(0.4);
+      expect(initialFraction).toBeLessThan(0.6);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
   });
 
   test("snap points are accessible via CSS custom properties", async ({
@@ -179,9 +181,9 @@ test.describe("Mobile Bottom Sheet - Snap Points (7.1)", () => {
       };
     });
 
-    expect(cssVars.collapsed).toBe("15vh");
-    expect(cssVars.half).toBe("50vh");
-    expect(cssVars.expanded).toBe("85vh");
+    expect(cssVars.collapsed).toBe("15dvh");
+    expect(cssVars.half).toBe("50dvh");
+    expect(cssVars.expanded).toBe("85dvh");
   });
 });
 
@@ -703,14 +705,19 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
     await handle.focus();
     await page.keyboard.press("ArrowUp");
     await waitForSheetAnimation(page);
-    expect(await getSnapIndex(page)).toBe(2);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(2);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
 
     // Press Home
     await page.keyboard.press("Home");
     await waitForSheetAnimation(page);
 
-    // Should collapse to index 0
-    expect(await getSnapIndex(page)).toBe(0);
+    // Should collapse to index 0 — use polling for CI reliability
+    // (animation from expanded→collapsed is the longest transition)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
   });
 
   test("end key expands sheet to maximum", async ({ page }) => {
@@ -760,12 +767,16 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
     // Press Enter - should expand
     await page.keyboard.press("Enter");
     await waitForSheetAnimation(page);
-    expect(await getSnapIndex(page)).toBe(2);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(2);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
 
     // Press Space - should go back to half
     await page.keyboard.press(" ");
     await waitForSheetAnimation(page);
-    expect(await getSnapIndex(page)).toBe(1);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(1);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
   });
 });
 
@@ -850,14 +861,14 @@ test.describe("Mobile Bottom Sheet - Accessibility", () => {
     await page.keyboard.press("End");
     await waitForSheetAnimation(page);
 
-    await expect(handle).toHaveAttribute("aria-valuenow", "2");
+    await expect(handle).toHaveAttribute("aria-valuenow", "2", { timeout: 10_000 });
     await expect(handle).toHaveAttribute("aria-valuetext", "expanded");
 
     // Collapse
     await page.keyboard.press("Home");
     await waitForSheetAnimation(page);
 
-    await expect(handle).toHaveAttribute("aria-valuenow", "0");
+    await expect(handle).toHaveAttribute("aria-valuenow", "0", { timeout: 10_000 });
     await expect(handle).toHaveAttribute("aria-valuetext", "collapsed");
   });
 });

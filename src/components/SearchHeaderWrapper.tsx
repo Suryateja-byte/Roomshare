@@ -59,18 +59,18 @@ export default function SearchHeaderWrapper() {
         }`}
       >
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
-          <div className="flex items-center gap-3">
-            {/* Back to Home Button */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Back to Home Button — icon-only on mobile, branded on desktop */}
             <Link
               href="/"
-              className="flex items-center gap-2 px-3 py-2 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors group flex-shrink-0"
+              className="hidden md:flex items-center gap-2 px-3 py-2 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors group flex-shrink-0"
               aria-label="Back to home"
             >
               <ArrowLeft className="w-4 h-4 text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" />
-              <div className="w-6 h-6 bg-zinc-900 dark:bg-zinc-100 rounded-md flex items-center justify-center text-white dark:text-zinc-900 font-bold text-sm">
+              <div className="w-6 h-6 bg-indigo-500 rounded-md flex items-center justify-center text-white font-bold text-sm">
                 R
               </div>
-              <span className="hidden sm:inline text-sm font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
+              <span className="hidden md:inline text-sm font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
                 Home
               </span>
             </Link>
@@ -93,7 +93,7 @@ export default function SearchHeaderWrapper() {
 
               {/* Keyboard shortcut hint — desktop only */}
               <kbd
-                className="hidden md:inline-flex absolute right-3 top-1/2 -translate-y-1/2 items-center px-1.5 py-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded pointer-events-none"
+                className="hidden md:inline-flex absolute right-3 top-1/2 -translate-y-1/2 items-center px-1.5 py-0.5 text-xs font-medium text-zinc-500 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded pointer-events-none"
                 aria-hidden="true"
               >
                 {formatShortcut({ key: "k", meta: true })}

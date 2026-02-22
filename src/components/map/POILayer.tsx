@@ -132,7 +132,7 @@ export function POILayer({ mapRef, isMapLoaded }: POILayerProps) {
                 className={cn(
                     // P2-8 FIX: Ensure 44px minimum touch target for WCAG 2.5.5
                     // P2-9 FIX: Add focus ring for keyboard navigation
-                    "flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg shadow-md border text-xs font-medium transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+                    "flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg shadow-md border text-xs font-medium transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2",
                     activeCategories.size > 0
                         ? "bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900 dark:border-white"
                         : "bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
@@ -153,7 +153,7 @@ export function POILayer({ mapRef, isMapLoaded }: POILayerProps) {
                     className={cn(
                         // P2-8 FIX: Ensure 44px minimum touch target for WCAG 2.5.5
                         // P2-9 FIX: Add focus ring for keyboard navigation
-                        "flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg shadow-sm border text-xs transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+                        "flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg shadow-sm border text-xs transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2",
                         activeCategories.has(cat.id)
                             ? "bg-zinc-800 text-white border-zinc-800 dark:bg-zinc-200 dark:text-zinc-900 dark:border-zinc-200"
                             : "bg-white/90 dark:bg-zinc-800/90 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"

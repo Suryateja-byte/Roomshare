@@ -12,7 +12,9 @@ export default function SavedSearchesError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error('Saved searches error:', error);
+        if (process.env.NODE_ENV === 'development') {
+            console.error('Saved searches error:', error);
+        }
     }, [error]);
 
     return (
@@ -24,7 +26,7 @@ export default function SavedSearchesError({
                 Unable to load saved searches
             </h2>
             <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
-                {error.message || 'We encountered an error while loading your saved searches. Please try again.'}
+                We encountered an error while loading your saved searches. Please try again.
             </p>
             <div className="flex gap-3">
                 <button

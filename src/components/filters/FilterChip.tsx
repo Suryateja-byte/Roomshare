@@ -56,8 +56,8 @@ export function FilterChip({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 px-3 py-1.5",
-        "bg-zinc-100 dark:bg-zinc-800",
-        "text-sm text-zinc-700 dark:text-zinc-300",
+        "bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800",
+        "text-sm text-indigo-700 dark:text-indigo-300",
         "rounded-full",
         "transition-colors duration-150",
         "group/chip",
@@ -75,7 +75,7 @@ export function FilterChip({
           className={cn(
             "inline-flex items-center justify-center",
             "min-w-[1.25rem] px-1 py-0.5",
-            "text-2xs font-semibold",
+            "text-xs font-semibold",
             "rounded-full",
             "bg-emerald-100 dark:bg-emerald-900/50",
             "text-emerald-700 dark:text-emerald-300",

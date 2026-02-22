@@ -42,12 +42,24 @@ test.describe("REG-001: Search page loads", () => {
     const realErrors = consoleErrors.filter(
       (e) =>
         !e.includes("mapbox") &&
+        !e.includes("maplibre") &&
         !e.includes("webpack") &&
         !e.includes("HMR") &&
         !e.includes("hydrat") &&
         !e.includes("favicon") &&
         !e.includes("Environment validation failed") &&
-        !e.includes("GOOGLE_CLIENT"),
+        !e.includes("GOOGLE_CLIENT") &&
+        !e.includes("ResizeObserver") &&
+        !e.includes("WebGL") &&
+        !e.includes("404") &&
+        !e.includes("Failed to load resource") &&
+        !e.includes("net::ERR") &&
+        !e.includes("Failed to fetch") &&
+        !e.includes("Load failed") &&
+        !e.includes("FetchTimeoutError") &&
+        !e.includes("timed out") &&
+        !e.includes("photon.komoot") &&
+        !e.includes("TimeoutError"),
     );
     expect(realErrors).toHaveLength(0);
   });

@@ -115,13 +115,13 @@ export default function PullToRefresh({
             className="flex items-center justify-center overflow-hidden"
           >
             {isRefreshing ? (
-              <Loader2 className="w-5 h-5 text-zinc-400 animate-spin" />
+              <Loader2 className="w-5 h-5 text-zinc-500 animate-spin" />
             ) : (
               <m.div
                 animate={{ rotate: progress >= 1 ? 180 : 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <ArrowDown className="w-5 h-5 text-zinc-400" />
+                <ArrowDown className="w-5 h-5 text-zinc-500" />
               </m.div>
             )}
           </m.div>

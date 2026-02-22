@@ -335,7 +335,7 @@ export default function LocationSearchInput({
     if (placeTypes.includes('locality')) return 'text-blue-500';
     if (placeTypes.includes('place')) return 'text-green-500';
     if (placeTypes.includes('region')) return 'text-purple-500';
-    return 'text-zinc-400';
+    return 'text-zinc-500';
   };
 
   // Show "type more" hint when user has typed but not enough characters
@@ -385,7 +385,7 @@ export default function LocationSearchInput({
         {/* Loading/Clear indicator */}
         <div className="absolute right-0 top-1/2 -translate-y-1/2">
           {isLoading ? (
-            <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" aria-hidden="true" />
+            <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" aria-hidden="true" />
           ) : value ? (
             <button
               type="button"
@@ -393,7 +393,7 @@ export default function LocationSearchInput({
               className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-full transition-colors"
               aria-label="Clear search"
             >
-              <X className="w-3 h-3 text-zinc-400" />
+              <X className="w-3 h-3 text-zinc-500" />
             </button>
           ) : null}
         </div>
@@ -405,7 +405,7 @@ export default function LocationSearchInput({
           ref={suggestionsRef}
           role="status"
           aria-live="polite"
-          className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
           <div className="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">
             Type at least {MIN_QUERY_LENGTH} characters to search
@@ -417,7 +417,7 @@ export default function LocationSearchInput({
       {showSuggestions && suggestions.length > 0 && !showTypeMoreHint && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
           <ul
             className="p-2"
@@ -463,7 +463,7 @@ export default function LocationSearchInput({
           ref={suggestionsRef}
           role="alert"
           aria-live="assertive"
-          className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
           <div className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
@@ -487,7 +487,7 @@ export default function LocationSearchInput({
           ref={suggestionsRef}
           role="status"
           aria-live="polite"
-          className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
           <div className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800">

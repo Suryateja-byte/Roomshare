@@ -349,10 +349,10 @@ test.describe("Search API v2 Endpoint", () => {
     });
   });
 
-  test.describe("Page integration with ?searchV2=1", () => {
+  test.describe("Page integration with ?v2=1", () => {
     test(`${tags.core} - Search page loads with v2 flag`, async ({ page }) => {
       // Navigate to search page with v2 flag
-      await page.goto("/search?searchV2=1");
+      await page.goto("/search?v2=1");
 
       // Wait for DOM to be ready (not domcontentloaded - search page has polling)
       await page.waitForLoadState("domcontentloaded");
@@ -369,7 +369,7 @@ test.describe("Search API v2 Endpoint", () => {
     });
 
     test(`${tags.core} - List items render with v2 data`, async ({ page }) => {
-      await page.goto("/search?searchV2=1");
+      await page.goto("/search?v2=1");
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for heading first (known to work), confirms page loaded
@@ -395,7 +395,7 @@ test.describe("Search API v2 Endpoint", () => {
       // Use desktop viewport to ensure map is visible (hidden on mobile by default)
       await page.setViewportSize({ width: 1280, height: 800 });
 
-      await page.goto("/search?searchV2=1");
+      await page.goto("/search?v2=1");
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for heading first to confirm page loaded
@@ -436,7 +436,7 @@ test.describe("Search API v2 Endpoint", () => {
       const v1Text = await v1Heading.textContent();
 
       // Then get v2 results count
-      await page.goto("/search?searchV2=1");
+      await page.goto("/search?v2=1");
       await page.waitForLoadState("domcontentloaded");
 
       const v2Heading = page

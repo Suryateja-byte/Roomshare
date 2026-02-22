@@ -102,7 +102,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
                 onClick={() => setMobileOpen(true)}
                 className={`md:hidden flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full border text-sm font-medium transition-colors ${
                     isNonDefault
-                        ? 'border-zinc-900 dark:border-white bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                        ? 'border-indigo-500 bg-indigo-500 text-white'
                         : 'border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                 }`}
                 aria-label={`Sort: ${currentLabel}`}
@@ -144,7 +144,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
                                             onClick={() => handleSortChange(option.value)}
                                             className={`flex items-center justify-between w-full px-4 py-3.5 min-h-[44px] rounded-xl text-sm font-medium transition-colors ${
                                                 isActive
-                                                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white'
+                                                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
                                                     : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
                                             }`}
                                         >

@@ -30,7 +30,7 @@ export default function SuggestedSearches() {
     return (
       <div className="py-6">
         <div className="flex items-center gap-2 mb-3">
-          <Clock className="w-4 h-4 text-zinc-400" />
+          <Clock className="w-4 h-4 text-zinc-500" />
           <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
             Recent searches
           </h3>
@@ -42,7 +42,7 @@ export default function SuggestedSearches() {
               href={`/search?q=${encodeURIComponent(search.location)}`}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm text-zinc-700 dark:text-zinc-300 transition-colors"
             >
-              <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+              <MapPin className="w-3.5 h-3.5 text-zinc-500" />
               {search.location}
             </Link>
           ))}
@@ -54,7 +54,7 @@ export default function SuggestedSearches() {
   return (
     <div className="py-6">
       <div className="flex items-center gap-2 mb-3">
-        <TrendingUp className="w-4 h-4 text-zinc-400" />
+        <TrendingUp className="w-4 h-4 text-zinc-500" />
         <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
           Popular areas
         </h3>
@@ -66,7 +66,7 @@ export default function SuggestedSearches() {
             href={`/search?q=${encodeURIComponent(area.q)}`}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm text-zinc-700 dark:text-zinc-300 transition-colors"
           >
-            <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+            <MapPin className="w-3.5 h-3.5 text-zinc-500" />
             {area.label}
           </Link>
         ))}
