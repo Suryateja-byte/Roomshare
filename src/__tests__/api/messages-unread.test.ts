@@ -21,6 +21,9 @@ jest.mock('@/lib/logger', () => ({
       error: jest.fn(),
     },
   },
+  sanitizeErrorMessage: jest.fn((e: unknown) =>
+    e instanceof Error ? e.message : typeof e === 'string' ? e : 'Unknown error'
+  ),
 }))
 
 jest.mock('next/server', () => ({
