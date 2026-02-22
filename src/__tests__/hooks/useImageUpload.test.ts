@@ -168,14 +168,19 @@ describe('useImageUpload', () => {
                 useImageUpload({ uploadType: 'listing' })
             );
 
-            await expect(
-                act(async () => {
+            let thrownError: Error | undefined;
+            await act(async () => {
+                try {
                     await result.current.uploadImage(
                         createFile('photo.jpg', 1024, 'image/jpeg')
                     );
-                })
-            ).rejects.toThrow('File too large for server');
+                } catch (err) {
+                    thrownError = err as Error;
+                }
+            });
 
+            expect(thrownError).toBeDefined();
+            expect(thrownError!.message).toBe('File too large for server');
             expect(result.current.error).toBe('File too large for server');
             expect(result.current.isUploading).toBe(false);
         });
@@ -187,14 +192,19 @@ describe('useImageUpload', () => {
                 useImageUpload({ uploadType: 'listing' })
             );
 
-            await expect(
-                act(async () => {
+            let thrownError: Error | undefined;
+            await act(async () => {
+                try {
                     await result.current.uploadImage(
                         createFile('photo.jpg', 1024, 'image/jpeg')
                     );
-                })
-            ).rejects.toThrow('Network error');
+                } catch (err) {
+                    thrownError = err as Error;
+                }
+            });
 
+            expect(thrownError).toBeDefined();
+            expect(thrownError!.message).toBe('Network error');
             expect(result.current.error).toBe('Network error');
             expect(result.current.isUploading).toBe(false);
         });
@@ -204,14 +214,19 @@ describe('useImageUpload', () => {
                 useImageUpload({ uploadType: 'listing' })
             );
 
-            await expect(
-                act(async () => {
+            let thrownError: Error | undefined;
+            await act(async () => {
+                try {
                     await result.current.uploadImage(
                         createFile('doc.pdf', 1024, 'application/pdf')
                     );
-                })
-            ).rejects.toThrow('File type not accepted');
+                } catch (err) {
+                    thrownError = err as Error;
+                }
+            });
 
+            expect(thrownError).toBeDefined();
+            expect(thrownError!.message).toContain('File type not accepted');
             expect(mockFetch).not.toHaveBeenCalled();
             expect(result.current.error).toContain('File type not accepted');
         });
@@ -226,14 +241,19 @@ describe('useImageUpload', () => {
                 useImageUpload({ uploadType: 'listing' })
             );
 
-            await expect(
-                act(async () => {
+            let thrownError: Error | undefined;
+            await act(async () => {
+                try {
                     await result.current.uploadImage(
                         createFile('photo.jpg', 1024, 'image/jpeg')
                     );
-                })
-            ).rejects.toThrow('Upload failed');
+                } catch (err) {
+                    thrownError = err as Error;
+                }
+            });
 
+            expect(thrownError).toBeDefined();
+            expect(thrownError!.message).toBe('Upload failed');
             expect(result.current.error).toBe('Upload failed');
         });
     });
@@ -247,13 +267,15 @@ describe('useImageUpload', () => {
             );
 
             // Trigger an error
-            await expect(
-                act(async () => {
+            await act(async () => {
+                try {
                     await result.current.uploadImage(
                         createFile('photo.jpg', 1024, 'image/jpeg')
                     );
-                })
-            ).rejects.toThrow();
+                } catch {
+                    // expected
+                }
+            });
 
             expect(result.current.error).toBe('Network error');
 

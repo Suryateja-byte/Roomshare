@@ -129,7 +129,7 @@ describe("DeleteListingButton", () => {
       }),
     });
     // Second call: actual delete
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}) });
 
     render(<DeleteListingButton listingId="listing-123" />);
 
@@ -144,6 +144,7 @@ describe("DeleteListingButton", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith("/api/listings/listing-123", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
       });
       expect(toast.success).toHaveBeenCalledWith(
         "Listing deleted successfully",

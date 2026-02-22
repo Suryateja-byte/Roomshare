@@ -83,7 +83,7 @@ describe('POST /api/nearby - Malformed Radar Place Coordinates', () => {
       },
       {
         _id: 'place-valid',
-        name: 'Good Place',
+        name: 'Good Grocery',
         formattedAddress: '456 Oak St',
         categories: ['food-grocery'],
         location: { coordinates: [-122.4194, 37.7749] },
@@ -146,7 +146,7 @@ describe('POST /api/nearby - Malformed Radar Place Coordinates', () => {
     mockRadarResponse([
       {
         _id: 'place-valid',
-        name: 'Valid Place',
+        name: 'Valid Market',
         formattedAddress: '100 Good St',
         categories: ['food-grocery'],
         location: { coordinates: [-122.4194, 37.7749] },
