@@ -751,11 +751,18 @@ async function getSearchDocMapListingsInternal(
     );
   }
 
+  // Apply near-match filter expansion for map markers
+  let effectiveParams = params;
+  if (params.nearMatches) {
+    const { expanded } = expandFiltersForNearMatches(params);
+    effectiveParams = { ...expanded, nearMatches: false }; // prevent recursion
+  }
+
   const {
     conditions,
     params: queryParams,
     paramIndex,
-  } = buildSearchDocWhereConditions(params);
+  } = buildSearchDocWhereConditions(effectiveParams);
   const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
   // Query with minimal fields for map markers
