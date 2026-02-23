@@ -29,17 +29,11 @@ export function PriceRangeFilter({
   const [localMax, setLocalMax] = useState(maxPrice);
   const isDragging = useRef(false);
 
-  // Sync local state when props change (from external reset/URL sync)
-  const prevMin = useRef(minPrice);
-  const prevMax = useRef(maxPrice);
+  // Sync local state when props change (from external reset/URL sync/category bar)
   useEffect(() => {
-    if (prevMin.current !== minPrice || prevMax.current !== maxPrice) {
-      prevMin.current = minPrice;
-      prevMax.current = maxPrice;
-      if (!isDragging.current) {
-        setLocalMin(minPrice);
-        setLocalMax(maxPrice);
-      }
+    if (!isDragging.current) {
+      setLocalMin(minPrice);
+      setLocalMax(maxPrice);
     }
   }, [minPrice, maxPrice]);
 
@@ -54,7 +48,8 @@ export function PriceRangeFilter({
 
   const handleValueCommit = useCallback((values: number[]) => {
     isDragging.current = false;
-    onChange(values[0], values[1]);
+    const [min, max] = values;
+    onChange(Math.min(min, max), Math.max(min, max));
   }, [onChange]);
 
   // Format price for display
