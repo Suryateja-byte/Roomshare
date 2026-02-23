@@ -104,4 +104,44 @@ describe("MapEmptyState", () => {
     expect(chips.length).toBeLessThanOrEqual(3);
     expect(screen.getByText(/\+\d+ more/)).toBeInTheDocument();
   });
+
+  // --- Task 1.3: Near matches toggle ---
+
+  it('shows "Include near matches" when price filter active and nearMatches not set', () => {
+    const params = new URLSearchParams("maxPrice=1500");
+    render(<MapEmptyState {...defaultProps} searchParams={params} />);
+    expect(screen.getByText("Include near matches")).toBeInTheDocument();
+  });
+
+  it("hides near matches button when nearMatches=1 already in URL", () => {
+    const params = new URLSearchParams("maxPrice=1500&nearMatches=1");
+    render(<MapEmptyState {...defaultProps} searchParams={params} />);
+    expect(screen.queryByText("Include near matches")).not.toBeInTheDocument();
+  });
+
+  it("hides near matches button when no price or date filters", () => {
+    const params = new URLSearchParams("roomType=Private+Room");
+    render(<MapEmptyState {...defaultProps} searchParams={params} />);
+    expect(screen.queryByText("Include near matches")).not.toBeInTheDocument();
+  });
+
+  it("clicking near matches adds nearMatches=1 to URL", () => {
+    const params = new URLSearchParams("maxPrice=1500&q=Austin");
+    render(<MapEmptyState {...defaultProps} searchParams={params} />);
+    fireEvent.click(screen.getByText("Include near matches"));
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const pushedUrl = mockPush.mock.calls[0][0];
+    expect(pushedUrl).toContain("nearMatches=1");
+    expect(pushedUrl).toContain("maxPrice=1500");
+  });
+
+  it('shows "Include near matches" when moveInDate filter active', () => {
+    // Use a future date to pass validation
+    const futureDate = new Date();
+    futureDate.setMonth(futureDate.getMonth() + 1);
+    const dateStr = futureDate.toISOString().split("T")[0];
+    const params = new URLSearchParams(`moveInDate=${dateStr}`);
+    render(<MapEmptyState {...defaultProps} searchParams={params} />);
+    expect(screen.getByText("Include near matches")).toBeInTheDocument();
+  });
 });

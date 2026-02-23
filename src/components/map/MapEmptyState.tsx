@@ -2,12 +2,13 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin } from 'lucide-react';
+import { MapPin, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   urlToFilterChips,
   clearAllFilters,
 } from '@/components/filters/filter-chip-utils';
+import { getPriceParam } from '@/lib/search-params';
 
 const MAX_VISIBLE_CHIPS = 3;
 
@@ -24,9 +25,24 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
   const visibleChips = chips.slice(0, MAX_VISIBLE_CHIPS);
   const overflowCount = chips.length - MAX_VISIBLE_CHIPS;
 
+  // Near matches: show toggle when price or date filters are active and nearMatches not already on
+  const hasPriceOrDateFilter = useMemo(() => {
+    const hasPrice = getPriceParam(searchParams, 'min') !== undefined || getPriceParam(searchParams, 'max') !== undefined;
+    const hasDate = !!searchParams.get('moveInDate');
+    return hasPrice || hasDate;
+  }, [searchParams]);
+  const nearMatchesAlreadyOn = searchParams.get('nearMatches') === '1';
+  const showNearMatches = hasPriceOrDateFilter && !nearMatchesAlreadyOn;
+
   const handleClearFilters = () => {
     const cleared = clearAllFilters(searchParams);
     router.push('/search?' + cleared);
+  };
+
+  const handleNearMatches = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('nearMatches', '1');
+    router.push('/search?' + newParams.toString());
   };
 
   return (
@@ -72,6 +88,17 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
             onClick={handleClearFilters}
           >
             Clear filters
+          </Button>
+        )}
+        {showNearMatches && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-8"
+            onClick={handleNearMatches}
+          >
+            <Sparkles className="w-3 h-3 mr-1" aria-hidden="true" />
+            Include near matches
           </Button>
         )}
       </div>
