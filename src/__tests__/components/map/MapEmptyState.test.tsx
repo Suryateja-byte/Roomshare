@@ -144,4 +144,36 @@ describe("MapEmptyState", () => {
     render(<MapEmptyState {...defaultProps} searchParams={params} />);
     expect(screen.getByText("Include near matches")).toBeInTheDocument();
   });
+
+  // --- Task 1.4: Smart filter removal suggestions ---
+
+  it("shows up to 2 filter suggestions when filters active", () => {
+    const params = new URLSearchParams("maxPrice=1500&roomType=Private+Room");
+    render(<MapEmptyState {...defaultProps} searchParams={params} />);
+    const suggestions = screen.getByTestId("filter-suggestions");
+    const pills = suggestions.querySelectorAll("[data-testid='suggestion-pill']");
+    expect(pills.length).toBeGreaterThanOrEqual(1);
+    expect(pills.length).toBeLessThanOrEqual(2);
+  });
+
+  it("clicking a suggestion removes that filter from URL", () => {
+    const params = new URLSearchParams("maxPrice=1500&roomType=Private+Room&q=Austin");
+    render(<MapEmptyState {...defaultProps} searchParams={params} />);
+    // First suggestion should be price (highest priority)
+    const suggestions = screen.getByTestId("filter-suggestions");
+    const firstPill = suggestions.querySelector("[data-testid='suggestion-pill']");
+    expect(firstPill).toBeTruthy();
+    fireEvent.click(firstPill!);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const pushedUrl = mockPush.mock.calls[0][0];
+    // Price should be removed
+    expect(pushedUrl).not.toContain("maxPrice");
+    // Other filters preserved
+    expect(pushedUrl).toContain("roomType");
+  });
+
+  it("shows no suggestions when no filters active", () => {
+    render(<MapEmptyState {...defaultProps} searchParams={new URLSearchParams()} />);
+    expect(screen.queryByTestId("filter-suggestions")).not.toBeInTheDocument();
+  });
 });

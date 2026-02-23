@@ -2,15 +2,26 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin, Sparkles } from 'lucide-react';
+import { MapPin, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   urlToFilterChips,
   clearAllFilters,
 } from '@/components/filters/filter-chip-utils';
-import { getPriceParam } from '@/lib/search-params';
+import { getPriceParam, buildRawParamsFromSearchParams, parseSearchParams } from '@/lib/search-params';
+import { generateFilterSuggestions, type FilterSuggestion } from '@/lib/near-matches';
 
 const MAX_VISIBLE_CHIPS = 3;
+const MAX_SUGGESTIONS = 2;
+
+/** Map suggestion type to the URL param keys that should be removed */
+const SUGGESTION_TYPE_TO_PARAMS: Record<FilterSuggestion['type'], string[]> = {
+  price: ['minPrice', 'maxPrice', 'minBudget', 'maxBudget'],
+  date: ['moveInDate'],
+  roomType: ['roomType'],
+  amenities: ['amenities'],
+  leaseDuration: ['leaseDuration'],
+};
 
 interface MapEmptyStateProps {
   onZoomOut: () => void;
@@ -34,6 +45,14 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
   const nearMatchesAlreadyOn = searchParams.get('nearMatches') === '1';
   const showNearMatches = hasPriceOrDateFilter && !nearMatchesAlreadyOn;
 
+  // Smart filter suggestions
+  const suggestions = useMemo(() => {
+    if (!filtersActive) return [];
+    const raw = buildRawParamsFromSearchParams(searchParams);
+    const { filterParams } = parseSearchParams(raw);
+    return generateFilterSuggestions(filterParams, 0).slice(0, MAX_SUGGESTIONS);
+  }, [searchParams, filtersActive]);
+
   const handleClearFilters = () => {
     const cleared = clearAllFilters(searchParams);
     router.push('/search?' + cleared);
@@ -42,6 +61,20 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
   const handleNearMatches = () => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set('nearMatches', '1');
+    router.push('/search?' + newParams.toString());
+  };
+
+  const handleRemoveSuggestion = (suggestion: FilterSuggestion) => {
+    const newParams = new URLSearchParams(searchParams);
+    const keysToRemove = SUGGESTION_TYPE_TO_PARAMS[suggestion.type] || [];
+    for (const key of keysToRemove) {
+      newParams.delete(key);
+    }
+    // Reset pagination
+    newParams.delete('page');
+    newParams.delete('cursor');
+    newParams.delete('cursorStack');
+    newParams.delete('pageNumber');
     router.push('/search?' + newParams.toString());
   };
 
@@ -68,6 +101,23 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
               +{overflowCount} more
             </span>
           )}
+        </div>
+      )}
+
+      {/* Smart filter suggestions */}
+      {suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 justify-center mb-3" data-testid="filter-suggestions">
+          {suggestions.map((suggestion) => (
+            <button
+              key={suggestion.type}
+              data-testid="suggestion-pill"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 transition-colors"
+              onClick={() => handleRemoveSuggestion(suggestion)}
+            >
+              <X className="w-3 h-3" aria-hidden="true" />
+              Remove {suggestion.type}
+            </button>
+          ))}
         </div>
       )}
 
