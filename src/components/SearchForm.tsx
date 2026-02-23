@@ -26,6 +26,8 @@ import { useDebouncedFilterCount } from '@/hooks/useDebouncedFilterCount';
 import { useFacets } from '@/hooks/useFacets';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useBatchedFilters } from '@/hooks/useBatchedFilters';
+import { pendingToFilterParams } from '@/lib/pending-to-filter-params';
+import { generateFilterSuggestions, type FilterSuggestion } from '@/lib/near-matches';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -538,6 +540,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // P3-NEW-b: Get dynamic count for FilterModal button
     // filtersDirty is now computed by useBatchedFilters
     const {
+        count,
         formattedCount,
         isLoading: isCountLoading,
         boundsRequired,
@@ -570,6 +573,31 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             });
         });
     }, [priceAbsoluteMin, priceAbsoluteMax, setPending]);
+
+    // P4: Compute drawer suggestions when count drops to 0
+    const drawerSuggestions = useMemo(() => {
+        if (count === null || count >= 5 || isCountLoading) return [];
+        const fp = pendingToFilterParams(pending);
+        return generateFilterSuggestions(fp, count).slice(0, 2);
+    }, [count, isCountLoading, pending]);
+
+    // P4: Handle removing a filter suggestion from the drawer
+    const handleRemoveFilterSuggestion = useCallback((suggestion: FilterSuggestion) => {
+        const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<FilterSuggestion['type'], (keyof typeof pending)[]> = {
+            price: ['minPrice', 'maxPrice'],
+            date: ['moveInDate'],
+            roomType: ['roomType'],
+            amenities: ['amenities'],
+            leaseDuration: ['leaseDuration'],
+        };
+        const keys = SUGGESTION_TYPE_TO_PENDING_KEYS[suggestion.type];
+        if (!keys) return;
+        const updates: Record<string, string | string[]> = {};
+        for (const key of keys) {
+            updates[key] = Array.isArray(pending[key]) ? [] : '';
+        }
+        setPending(updates as Partial<typeof pending>);
+    }, [pending, setPending]);
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;
@@ -893,6 +921,10 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 formattedCount={formattedCount}
                 isCountLoading={isCountLoading}
                 boundsRequired={boundsRequired}
+                // P4: Zero-count warning
+                count={count}
+                drawerSuggestions={drawerSuggestions}
+                onRemoveFilterSuggestion={handleRemoveFilterSuggestion}
             />
         </div>
     );
