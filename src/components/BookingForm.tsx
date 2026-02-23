@@ -518,7 +518,8 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className={`space-y-4 ${status !== 'ACTIVE' || !isLoggedIn ? 'opacity-50 pointer-events-none' : ''}`}>
+            {isLoggedIn && (
+            <form onSubmit={handleSubmit} className={`space-y-4 ${status !== 'ACTIVE' ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase">Check-in</label>
@@ -624,7 +625,9 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     You won't be charged yet
                 </p>
             </form>
+            )}
 
+            {isLoggedIn && (
             <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
                 <h4 className="text-sm font-semibold text-zinc-900 dark:text-white mb-3">Price breakdown</h4>
 
@@ -678,6 +681,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     </p>
                 )}
             </div>
+            )}
 
             {/* Confirmation Modal - Using Portal to escape sticky container stacking context */}
             {showConfirmModal && bookingInfo && typeof document !== 'undefined' && createPortal(

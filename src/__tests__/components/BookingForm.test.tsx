@@ -80,6 +80,16 @@ describe('BookingForm', () => {
       expect(screen.getByText('Sign in to book this room')).toBeInTheDocument()
     })
 
+    it('hides booking form and price breakdown for non-logged-in users', () => {
+      render(<BookingForm {...defaultProps} isLoggedIn={false} />)
+      // Login gate should be visible
+      expect(screen.getByText('Sign in to book this room')).toBeInTheDocument()
+      // Form elements should NOT be in the DOM
+      expect(screen.queryByText('Check-in')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /request to book/i })).not.toBeInTheDocument()
+      expect(screen.queryByText('Price breakdown')).not.toBeInTheDocument()
+    })
+
     it('shows minimum stay requirement', () => {
       render(<BookingForm {...defaultProps} />)
 
