@@ -104,11 +104,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     };
     const [location, setLocation] = useState(searchParams.get('q') || '');
     // Batched filter state — single hook manages pending vs committed
-    const { pending, isDirty: filtersDirty, setPending, commit: commitFilters } = useBatchedFilters();
+    const [showFilters, setShowFilters] = useState(false);
+
+    const { pending, isDirty: filtersDirty, setPending, commit: commitFilters } = useBatchedFilters({ isDrawerOpen: showFilters });
     // Destructure for convenient access (read-only aliases)
     const { minPrice, maxPrice, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender } = pending;
-
-    const [showFilters, setShowFilters] = useState(false);
 
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(parseCoords);
     const [geoLoading, setGeoLoading] = useState(false);
@@ -138,8 +138,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // Navigation version counter - ensures only the latest search executes navigation
     // Incremented on each new search to invalidate stale timeout callbacks
     const navigationVersionRef = useRef(0);
-    // AbortController for canceling in-flight async operations on rapid filter changes
-    const abortControllerRef = useRef<AbortController | null>(null);
+    // Track the isSearching reset timeout so it can be cleaned up on unmount
+    const resetSearchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Recent searches from canonical hook (handles localStorage, migration, enhanced format)
     const { recentSearches, saveRecentSearch, clearRecentSearches } = useRecentSearches();
@@ -301,13 +301,6 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         // This prevents race conditions when filters change rapidly
         navigationVersionRef.current++;
 
-        // Cancel any in-flight async operations from previous filter changes
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-        // Create new AbortController for this search operation
-        abortControllerRef.current = new AbortController();
-
         // Clone existing URL params to preserve bounds, nearMatches, and sort
         // These are set by the map and should persist across filter changes
         const params = new URLSearchParams(searchParams.toString());
@@ -424,20 +417,20 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             } else {
                 router.push(searchUrl);
             }
-            // Reset searching state after navigation starts
-            setTimeout(() => setIsSearching(false), 500);
+            // Reset searching state after navigation starts (tracked for cleanup)
+            if (resetSearchingTimeoutRef.current) clearTimeout(resetSearchingTimeoutRef.current);
+            resetSearchingTimeoutRef.current = setTimeout(() => setIsSearching(false), 500);
         }, SEARCH_DEBOUNCE_MS);
     }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching, saveRecentSearch, searchParams]);
 
-    // Cleanup timeout and abort controller on unmount
+    // Cleanup timeouts on unmount
     useEffect(() => {
         return () => {
             if (searchTimeoutRef.current) {
                 clearTimeout(searchTimeoutRef.current);
             }
-            // Cancel any in-flight operations
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
+            if (resetSearchingTimeoutRef.current) {
+                clearTimeout(resetSearchingTimeoutRef.current);
             }
         };
     }, []);

@@ -600,14 +600,24 @@ export async function GET(request: NextRequest) {
 
       const { filterParams } = parseSearchParams(rawParams);
 
-      // M1/S4 Fix: When no text query AND no bounds, cap the facet results to prevent
-      // full-table aggregation DoS. The per-facet LIMIT (MAX_FACET_RESULTS=100) already
-      // limits individual queries, and the statement timeout (5s) provides a backstop.
-      // Log for monitoring.
+      // Security: Return empty facets for unbounded requests to prevent
+      // full-table GROUP BY aggregation DoS (5 parallel scans with no WHERE bounds).
       if (!filterParams.bounds && !filterParams.query) {
-        logger.debug("[search/facets] Unbounded browse facets request", {
+        logger.debug("[search/facets] Unbounded browse — returning empty facets", {
           hasQuery: false,
           hasBounds: false,
+        });
+        return NextResponse.json({
+          amenities: {},
+          houseRules: {},
+          roomTypes: {},
+          priceRanges: { min: null, max: null, median: null },
+          priceHistogram: null,
+        } satisfies FacetsResponse, {
+          headers: {
+            "Cache-Control": "private, no-store",
+            "x-request-id": getRequestId(),
+          },
         });
       }
 

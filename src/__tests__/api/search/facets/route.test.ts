@@ -136,8 +136,16 @@ describe("/api/search/facets", () => {
   });
 
   describe("response structure", () => {
+    // All structure tests need bounds to avoid the empty-facets early return
+    const boundsParams = {
+      minLng: "-97.8",
+      maxLng: "-97.6",
+      minLat: "30.2",
+      maxLat: "30.4",
+    };
+
     it("should set a literal statement timeout before facet queries", async () => {
-      const request = createRequest();
+      const request = createRequest(boundsParams);
 
       await GET(request);
 
@@ -148,7 +156,7 @@ describe("/api/search/facets", () => {
     });
 
     it("should return facets with correct structure", async () => {
-      const request = createRequest();
+      const request = createRequest(boundsParams);
       const response = await GET(request);
       const data = await response.json();
 
@@ -159,7 +167,7 @@ describe("/api/search/facets", () => {
     });
 
     it("should return amenities as Record<string, number>", async () => {
-      const request = createRequest();
+      const request = createRequest(boundsParams);
       const response = await GET(request);
       const data = await response.json();
 
@@ -171,7 +179,7 @@ describe("/api/search/facets", () => {
     });
 
     it("should return house rules as Record<string, number>", async () => {
-      const request = createRequest();
+      const request = createRequest(boundsParams);
       const response = await GET(request);
       const data = await response.json();
 
@@ -182,7 +190,7 @@ describe("/api/search/facets", () => {
     });
 
     it("should return room types as Record<string, number>", async () => {
-      const request = createRequest();
+      const request = createRequest(boundsParams);
       const response = await GET(request);
       const data = await response.json();
 
@@ -193,7 +201,7 @@ describe("/api/search/facets", () => {
     });
 
     it("should return price ranges with min, max, median", async () => {
-      const request = createRequest();
+      const request = createRequest(boundsParams);
       const response = await GET(request);
       const data = await response.json();
 
@@ -227,6 +235,10 @@ describe("/api/search/facets", () => {
       const request = createRequest({
         minPrice: "500",
         maxPrice: "2000",
+        minLng: "-97.8",
+        maxLng: "-97.6",
+        minLat: "30.2",
+        maxLat: "30.4",
       });
 
       await GET(request);
@@ -245,6 +257,10 @@ describe("/api/search/facets", () => {
     it("should apply roomType filter to non-roomType facets", async () => {
       const request = createRequest({
         roomType: "Private Room",
+        minLng: "-97.8",
+        maxLng: "-97.6",
+        minLat: "30.2",
+        maxLat: "30.4",
       });
 
       await GET(request);
@@ -286,7 +302,12 @@ describe("/api/search/facets", () => {
         .mockResolvedValueOnce([]) // Empty room types
         .mockResolvedValueOnce([{ min: null, max: null, median: null }]); // Null price ranges
 
-      const request = createRequest();
+      const request = createRequest({
+        minLng: "-97.8",
+        maxLng: "-97.6",
+        minLat: "30.2",
+        maxLat: "30.4",
+      });
       const response = await GET(request);
       const data = await response.json();
 
@@ -306,7 +327,12 @@ describe("/api/search/facets", () => {
       mockQueryRawUnsafe.mockReset();
       mockQueryRawUnsafe.mockRejectedValue(new Error("Database error"));
 
-      const request = createRequest();
+      const request = createRequest({
+        minLng: "-97.8",
+        maxLng: "-97.6",
+        minLat: "30.2",
+        maxLat: "30.4",
+      });
       const response = await GET(request);
 
       expect(response.status).toBe(500);
@@ -317,7 +343,12 @@ describe("/api/search/facets", () => {
 
   describe("headers", () => {
     it("should include cache control headers", async () => {
-      const request = createRequest();
+      const request = createRequest({
+        minLng: "-97.8",
+        maxLng: "-97.6",
+        minLat: "30.2",
+        maxLat: "30.4",
+      });
       const response = await GET(request);
 
       expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -424,20 +455,21 @@ describe("bounds validation (P1 - DoS prevention)", () => {
     expect(data.error).toBeDefined();
   });
 
-  it("allows facet queries without bounds when no text query", async () => {
-    // Setup mocks for DB calls
-    mockQueryRawUnsafe
-      .mockResolvedValueOnce([{ amenity: "Wifi", count: BigInt(45) }])
-      .mockResolvedValueOnce([{ rule: "No smoking", count: BigInt(20) }])
-      .mockResolvedValueOnce([{ roomType: "Private Room", count: BigInt(50) }])
-      .mockResolvedValueOnce([{ min: 500, max: 3000, median: 1200 }])
-      .mockResolvedValueOnce([{ bucket_min: 500, count: BigInt(10) }]);
-
-    // No query param, no bounds - should be allowed (not a DoS vector without text search)
+  it("returns empty facets for unbounded browse (no query, no bounds) to prevent DoS", async () => {
+    // No query param, no bounds — should return empty facets without hitting DB
     const request = createRequest({});
     const response = await GET(request);
 
     expect(response.status).toBe(200);
+    const data = await response.json();
+    // Should return empty facets, not run 5 GROUP BY scans
+    expect(data.amenities).toEqual({});
+    expect(data.houseRules).toEqual({});
+    expect(data.roomTypes).toEqual({});
+    expect(data.priceRanges).toEqual({ min: null, max: null, median: null });
+    expect(data.priceHistogram).toBeNull();
+    // DB should NOT be queried
+    expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
   });
 });
 
@@ -562,6 +594,13 @@ describe("P2-NEW: lat/lng bounds derivation", () => {
 });
 
 describe("facet exclusion logic", () => {
+  const boundsParams = {
+    minLng: "-97.8",
+    maxLng: "-97.6",
+    minLat: "30.2",
+    maxLat: "30.4",
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -575,6 +614,7 @@ describe("facet exclusion logic", () => {
       .mockResolvedValueOnce([{ min: null, max: null, median: null }]);
 
     const request = createRequest({
+      ...boundsParams,
       amenities: "Wifi,Parking",
     });
 
@@ -597,6 +637,7 @@ describe("facet exclusion logic", () => {
       .mockResolvedValueOnce([{ min: null, max: null, median: null }]);
 
     const request = createRequest({
+      ...boundsParams,
       houseRules: "Pets allowed",
     });
 

@@ -126,7 +126,7 @@ export default function MobileBottomSheet({
       }
       return rawOffset;
     },
-    [currentSnap],
+    [currentSnap, viewportHeight],
   );
 
   const displayOffset = isDragging ? getRubberbandOffset(dragOffset) : 0;
@@ -232,6 +232,27 @@ export default function MobileBottomSheet({
     setIsDragging(false);
     setDragOffset(0);
   }, []);
+
+  // Safety net: clear drag state when touch ends outside the handle
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleDocumentTouchEnd = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        setDragOffset(0);
+      }
+    };
+
+    document.addEventListener("touchend", handleDocumentTouchEnd);
+    document.addEventListener("touchcancel", handleDocumentTouchEnd);
+
+    return () => {
+      document.removeEventListener("touchend", handleDocumentTouchEnd);
+      document.removeEventListener("touchcancel", handleDocumentTouchEnd);
+    };
+  }, [isDragging]);
 
   // Content area touch start — track that drag originated from content
   const handleContentTouchStart = useCallback(

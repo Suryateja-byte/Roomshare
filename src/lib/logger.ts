@@ -75,6 +75,10 @@ const REDACT_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
   // Street addresses - matches "123 Main Street", "456 Oak Ave", etc.
   // Pattern: number + street name + common suffix (with optional apartment/unit)
   { pattern: /\b\d+\s+[A-Za-z]+(?:\s+[A-Za-z]+)*\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Court|Ct|Circle|Cir|Way|Place|Pl|Terrace|Ter|Trail|Trl|Parkway|Pkwy|Highway|Hwy|Alley|Aly)\.?(?:\s*,?\s*(?:Apt|Apartment|Suite|Ste|Unit|#|No\.?)\s*\w+)?\b/gi, replacement: '[REDACTED_ADDRESS]' },
+  // Bare IPv4:port (e.g. ECONNREFUSED 192.168.1.5:5432)
+  { pattern: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d{1,5})?\b/g, replacement: '[REDACTED_HOST]' },
+  // DB auth failure messages (e.g. "password authentication failed for user \"dbuser\"")
+  { pattern: /password authentication failed(?:\s+for\s+user\s+[^\s,;)}\]]+)?/gi, replacement: '[REDACTED_AUTH]' },
 ];
 
 /**

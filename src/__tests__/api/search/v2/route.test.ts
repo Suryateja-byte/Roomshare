@@ -135,7 +135,7 @@ function createMockMapListingData(
     title: `Listing ${id}`,
     price: 1500,
     availableSlots: 1,
-    ownerId: "owner-1",
+
     images: ["img.jpg"],
     location: { lat, lng },
   };

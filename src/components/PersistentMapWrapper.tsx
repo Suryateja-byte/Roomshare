@@ -247,7 +247,6 @@ function MapDataLoadingBar() {
  * - price: for pin label
  * - title: for popup/tooltip
  * - availableSlots: for "N Available" / "Filled" badge in popup
- * - ownerId: for showing "Message" button in popup
  * - tier: for differentiated pin styling (primary = larger, mini = smaller)
  */
 function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
@@ -265,7 +264,13 @@ function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
   return v2MapData.geojson.features
     .filter((feature) => {
       const coordinates = feature.geometry?.coordinates;
-      return Array.isArray(coordinates) && coordinates.length >= 2;
+      if (!Array.isArray(coordinates) || coordinates.length < 2) return false;
+      const [lng, lat] = coordinates;
+      return (
+        Number.isFinite(lng) && Number.isFinite(lat) &&
+        lat >= -90 && lat <= 90 &&
+        lng >= -180 && lng <= 180
+      );
     })
     .map((feature) => {
       const [lng, lat] = feature.geometry.coordinates;
@@ -274,7 +279,6 @@ function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
         title: feature.properties.title ?? "",
         price: feature.properties.price ?? 0,
         availableSlots: feature.properties.availableSlots,
-        ownerId: feature.properties.ownerId,
         images: feature.properties.image ? [feature.properties.image] : [],
         location: { lng, lat },
         // Add tier from pins lookup (defaults to undefined if not in pins mode)

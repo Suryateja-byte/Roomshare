@@ -200,7 +200,14 @@ export interface UseBatchedFiltersReturn {
   committed: BatchedFilterValues;
 }
 
-export function useBatchedFilters(): UseBatchedFiltersReturn {
+interface UseBatchedFiltersOptions {
+  isDrawerOpen?: boolean;
+}
+
+export function useBatchedFilters(
+  options: UseBatchedFiltersOptions = {}
+): UseBatchedFiltersReturn {
+  const { isDrawerOpen = false } = options;
   const searchParams = useSearchParams();
   const transitionContext = useSearchTransitionSafe();
   const router = useRouter();
@@ -224,6 +231,13 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
       const committedFiltersChanged = !filtersEqual(committed, previousCommitted);
       const hasUnsavedEdits = !filtersEqual(prevPending, previousCommitted);
       const isPostCommitSyncActive = Date.now() < forceSyncUntilRef.current;
+
+      // Guard: when the drawer is open and user has dirty edits,
+      // don't overwrite with force-sync — preserve the user's in-progress changes
+      if (isPostCommitSyncActive && isDrawerOpen && hasUnsavedEdits) {
+        return prevPending;
+      }
+
       const shouldPreserveDirtyEdits =
         !isPostCommitSyncActive &&
         !committedFiltersChanged &&
@@ -236,7 +250,7 @@ export function useBatchedFilters(): UseBatchedFiltersReturn {
       return committed;
     });
     previousCommittedRef.current = committed;
-  }, [committed]);
+  }, [committed, isDrawerOpen]);
 
   const isDirty = useMemo(
     () => !filtersEqual(pending, committed),

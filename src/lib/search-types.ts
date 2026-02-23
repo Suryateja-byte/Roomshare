@@ -111,7 +111,6 @@ export interface MapListingData {
   title: string;
   price: number;
   availableSlots: number;
-  ownerId?: string;
   images: string[];
   location: {
     lat: number;

@@ -586,12 +586,30 @@ function buildSearchDocWhereConditions(
  * @param ftsQueryParamIndex - Index of FTS query param (or null if no FTS)
  * @returns ORDER BY clause string
  */
-function buildOrderByClause(
+/**
+ * Build ORDER BY clause with optional ts_rank_cd tie-breaker.
+ *
+ * When FTS is active (ftsQueryParamIndex is set), adds ts_rank_cd as secondary
+ * sort factor to break ties within primary sort. This leverages tsvector weights
+ * (A=title, B=city/state, C=description) for relevance ranking.
+ *
+ * IMPORTANT: ts_rank_cd must be SKIPPED for keyset pagination because the cursor
+ * does not capture ts_rank values. Including ts_rank_cd in ORDER BY for keyset
+ * queries causes page drift as ranks shift between requests.
+ *
+ * @param sort - Sort option
+ * @param ftsQueryParamIndex - Index of FTS query param (or null if no FTS)
+ * @param useKeysetPagination - When true, skips ts_rank_cd (keyset cursor doesn't capture rank)
+ * @returns ORDER BY clause string
+ */
+export function buildOrderByClause(
   sort: SortOption,
   ftsQueryParamIndex: number | null,
+  useKeysetPagination: boolean = false,
 ): string {
-  // ts_rank_cd expression (only used when FTS is active)
-  const tsRankExpr = ftsQueryParamIndex !== null
+  // ts_rank_cd expression: only used when FTS is active AND not using keyset pagination
+  // Keyset cursors don't capture ts_rank_cd, so including it causes page drift
+  const tsRankExpr = ftsQueryParamIndex !== null && !useKeysetPagination
     ? `ts_rank_cd(d.search_tsv, plainto_tsquery('english', $${ftsQueryParamIndex})) DESC, `
     : "";
 
@@ -1093,8 +1111,8 @@ export async function getSearchDocListingsWithKeyset(
 
     const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
-    // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
-    const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex);
+    // Build ORDER BY clause — skip ts_rank_cd for keyset (cursor doesn't capture rank)
+    const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex, true);
 
     // Fetch limit+1 items to determine hasNextPage
     const fetchLimit = limit + 1;
@@ -1246,8 +1264,8 @@ export async function getSearchDocListingsFirstPage(
     } = buildSearchDocWhereConditions(params);
     const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
-    // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
-    const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex);
+    // Build ORDER BY clause — skip ts_rank_cd for keyset (cursor doesn't capture rank)
+    const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex, true);
 
     // Hybrid count
     const limitedCount = await getSearchDocLimitedCount(params);

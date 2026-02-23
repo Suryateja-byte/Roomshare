@@ -290,22 +290,25 @@ export function getClientIP(request: Request): string {
     return realIP;
   }
 
-  const cloudflareIp = request.headers.get("cf-connecting-ip");
-  if (cloudflareIp) {
-    return cloudflareIp;
-  }
+  // CDN headers (Cloudflare) — only trust when explicitly configured
+  const trustCdnHeaders = process.env.TRUST_CDN_HEADERS === "true";
+  if (trustCdnHeaders) {
+    const cloudflareIp = request.headers.get("cf-connecting-ip");
+    if (cloudflareIp) {
+      return cloudflareIp;
+    }
 
-  const trueClientIp = request.headers.get("true-client-ip");
-  if (trueClientIp) {
-    return trueClientIp;
+    const trueClientIp = request.headers.get("true-client-ip");
+    if (trueClientIp) {
+      return trueClientIp;
+    }
   }
 
   // Proxy fallback for non-Vercel environments.
   const forwarded = getFirstForwardedIp(request.headers.get("x-forwarded-for"));
   const shouldTrustForwarded =
     process.env.NODE_ENV === "development"
-    || process.env.TRUST_PROXY === "true"
-    || Boolean(request.headers.get("x-forwarded-proto"));
+    || process.env.TRUST_PROXY === "true";
 
   if (forwarded && shouldTrustForwarded) {
     return forwarded;
@@ -329,21 +332,24 @@ export function getClientIPFromHeaders(headersList: Headers): string {
     return realIP;
   }
 
-  const cloudflareIp = headersList.get("cf-connecting-ip");
-  if (cloudflareIp) {
-    return cloudflareIp;
-  }
+  // CDN headers (Cloudflare) — only trust when explicitly configured
+  const trustCdnHeaders = process.env.TRUST_CDN_HEADERS === "true";
+  if (trustCdnHeaders) {
+    const cloudflareIp = headersList.get("cf-connecting-ip");
+    if (cloudflareIp) {
+      return cloudflareIp;
+    }
 
-  const trueClientIp = headersList.get("true-client-ip");
-  if (trueClientIp) {
-    return trueClientIp;
+    const trueClientIp = headersList.get("true-client-ip");
+    if (trueClientIp) {
+      return trueClientIp;
+    }
   }
 
   const forwarded = getFirstForwardedIp(headersList.get("x-forwarded-for"));
   const shouldTrustForwarded =
     process.env.NODE_ENV === "development"
-    || process.env.TRUST_PROXY === "true"
-    || Boolean(headersList.get("x-forwarded-proto"));
+    || process.env.TRUST_PROXY === "true";
 
   if (forwarded && shouldTrustForwarded) {
     return forwarded;

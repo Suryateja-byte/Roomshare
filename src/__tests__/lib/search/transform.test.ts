@@ -189,7 +189,7 @@ describe("search/transform", () => {
       images: ["img.jpg"],
       location: { lat, lng },
       availableSlots: 1,
-      ownerId: "owner-1",
+
     });
 
     it("should return valid FeatureCollection", () => {
@@ -233,7 +233,7 @@ describe("search/transform", () => {
           images: ["first.jpg", "second.jpg"],
           location: { lat: 37.7749, lng: -122.4194 },
           availableSlots: 1,
-          ownerId: "owner",
+
         },
       ];
 
@@ -255,7 +255,7 @@ describe("search/transform", () => {
           images: [],
           location: { lat: 37.7749, lng: -122.4194 },
           availableSlots: 1,
-          ownerId: "owner",
+
         },
       ];
 
@@ -284,7 +284,7 @@ describe("search/transform", () => {
       images: ["img.jpg"],
       location: { lat, lng },
       availableSlots: 1,
-      ownerId: "owner-1",
+
     });
 
     it("should return empty array for empty input", () => {
@@ -377,7 +377,7 @@ describe("search/transform", () => {
       images: ["img.jpg"],
       location: { lat, lng },
       availableSlots: 1,
-      ownerId: "owner-1",
+
     });
 
     it("should always include geojson", () => {

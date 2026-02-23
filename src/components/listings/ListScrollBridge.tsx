@@ -30,7 +30,9 @@ export default function ListScrollBridge() {
 
     // Escape ID for safe use in CSS selectors (handles special characters)
     const safeId =
-      typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id;
+      typeof CSS !== "undefined" && CSS.escape
+        ? CSS.escape(id)
+        : id.replace(/[^\w-]/g, "");
 
     // Find target card using data-testid (preferred) with fallback to data-listing-id
     const targetCard =
