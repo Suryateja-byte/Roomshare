@@ -74,18 +74,38 @@ export function ImageCarousel({
     };
   }, [emblaApi, onSelect]);
 
-  // Track drag state to prevent parent link click during swipe
+  // Track drag state to prevent parent link click during swipe.
+  // Only block clicks when an actual drag/scroll occurs — not on plain clicks.
   useEffect(() => {
-    if (!emblaApi || !onDragStateChange) return;
-    const onPointerDown = () => onDragStateChange(true);
-    const onPointerUp = () => {
-      // Small delay so the click event on the parent link is still blocked
-      setTimeout(() => onDragStateChange(false), 10);
+    if (!emblaApi) return;
+    let hasDragged = false;
+
+    const onPointerDown = () => {
+      hasDragged = false;
     };
+
+    // Embla fires 'scroll' when the carousel position changes during a drag
+    const onScroll = () => {
+      if (!hasDragged) {
+        hasDragged = true;
+        onDragStateChange?.(true);
+      }
+    };
+
+    const onPointerUp = () => {
+      if (hasDragged) {
+        // Small delay so the click event on the parent link is still blocked
+        setTimeout(() => onDragStateChange?.(false), 10);
+      }
+      hasDragged = false;
+    };
+
     emblaApi.on('pointerDown', onPointerDown);
+    emblaApi.on('scroll', onScroll);
     emblaApi.on('pointerUp', onPointerUp);
     return () => {
       emblaApi.off('pointerDown', onPointerDown);
+      emblaApi.off('scroll', onScroll);
       emblaApi.off('pointerUp', onPointerUp);
     };
   }, [emblaApi, onDragStateChange]);
