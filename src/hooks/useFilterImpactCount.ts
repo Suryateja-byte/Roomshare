@@ -216,13 +216,10 @@ export function useFilterImpactCount({
     impactDelta = null;
   }
 
-  // Format delta for display
+  // Format delta for display — only show when both counts are known
   let formattedDelta: string | null = null;
   if (impactDelta !== null && impactDelta > 0) {
     formattedDelta = `+${impactDelta}`;
-  } else if (countWithoutFilter === null && currentCount !== null) {
-    // Removing the filter would result in 100+ results
-    formattedDelta = "+100";
   }
 
   return {
