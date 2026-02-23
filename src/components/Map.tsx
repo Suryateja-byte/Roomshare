@@ -2180,18 +2180,6 @@ export default function MapComponent({
                                             View Details
                                         </Button>
                                     </Link>
-                                    <Link href={`/listings/${selectedListing.id}`} className="flex-1">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className={`w-full h-9 text-xs-plus font-medium rounded-lg ${isDarkMode
-                                                ? 'border-zinc-700 text-white hover:bg-zinc-800'
-                                                : 'border-zinc-300 text-zinc-900 hover:bg-zinc-100'
-                                                }`}
-                                        >
-                                            View Listing
-                                        </Button>
-                                    </Link>
                                 </div>
                             </div>
                         </div>

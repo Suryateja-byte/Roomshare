@@ -7,7 +7,7 @@
 
 import { executeSearchV2 } from "./search-v2-service";
 import { getListingsPaginated } from "@/lib/data";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import type { PaginatedResultHybrid, ListingData } from "@/lib/data";
 import type { V2MapData } from "@/contexts/SearchV2DataContext";
 import type { FilterParams } from "@/lib/search-params";
@@ -79,7 +79,7 @@ export async function orchestrateSearch(
     } catch (err) {
       logger.sync.error("Search listings fetch failed", {
         action: "getListingsPaginated",
-        error: err instanceof Error ? err.message : "Unknown error",
+        error: sanitizeErrorMessage(err),
       });
       // Security: Always use generic message for user-facing fetchError.
       // Raw err.message may contain DB connection strings or internal IPs.
