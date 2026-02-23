@@ -224,7 +224,9 @@ export function SearchResultsClient({
                   ? `${total} ${total === 1 ? 'place' : 'places'}${query ? ` in ${query}` : ''}`
                   : `100+ places${query ? ` in ${query}` : ''}`}
               </p>
-              <TotalPriceToggle showTotal={showTotalPrice} onToggle={setShowTotalPrice} />
+              {estimatedMonths > 1 && (
+                <TotalPriceToggle showTotal={showTotalPrice} onToggle={setShowTotalPrice} />
+              )}
             </div>
           )}
 
