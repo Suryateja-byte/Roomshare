@@ -26,6 +26,7 @@ import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
 import { MapMovedBanner } from './map/MapMovedBanner';
 import { MapGestureHint } from './map/MapGestureHint';
+import { MapEmptyState } from './map/MapEmptyState';
 import { PrivacyCircle } from './map/PrivacyCircle';
 import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
@@ -2277,33 +2278,22 @@ export default function MapComponent({
 
             {/* Empty state overlay - when map is loaded but no listings in viewport */}
             {isMapLoaded && !areTilesLoading && !isSearching && listings.length === 0 && (
-                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 px-5 py-4 max-w-[280px] text-center pointer-events-auto">
-                    <MapPin className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2" aria-hidden="true" />
-                    <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">No listings in this area</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Try zooming out or adjusting your filters</p>
-                    <div className="flex gap-2 justify-center">
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs h-8"
-                            onClick={() => {
-                                if (!mapRef.current) return;
-                                const map = mapRef.current.getMap();
-                                if (!map) return;
-                                const currentZoom = map.getZoom();
-                                setProgrammaticMove(true);
-                                // P2-FIX (#167): Add safety timeout to clear programmatic flag if moveEnd doesn't fire
-                                if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
-                                programmaticClearTimeoutRef.current = setTimeout(() => {
-                                    if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
-                                }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-                                mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
-                            }}
-                        >
-                            Zoom out
-                        </Button>
-                    </div>
-                </div>
+                <MapEmptyState
+                    searchParams={searchParams}
+                    onZoomOut={() => {
+                        if (!mapRef.current) return;
+                        const map = mapRef.current.getMap();
+                        if (!map) return;
+                        const currentZoom = map.getZoom();
+                        setProgrammaticMove(true);
+                        // P2-FIX (#167): Add safety timeout to clear programmatic flag if moveEnd doesn't fire
+                        if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+                        programmaticClearTimeoutRef.current = setTimeout(() => {
+                            if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+                        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+                        mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
+                    }}
+                />
             )}
         </div>
     );
