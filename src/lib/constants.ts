@@ -41,14 +41,15 @@ export const MAX_QUERY_LENGTH = 200;
 /**
  * Default radius for point-to-bounds conversion (in km).
  * Used when user provides lat/lng instead of bounding box.
+ * 30km captures city-level geocoding results without being too broad.
  */
-export const LAT_OFFSET_KM = 10;
+export const LAT_OFFSET_KM = 30;
 
 /**
  * LAT_OFFSET in degrees (1° latitude ≈ 111km).
- * 10km ≈ 0.09 degrees latitude.
+ * 30km ≈ 0.27 degrees latitude.
  */
-export const LAT_OFFSET_DEGREES = 0.09;
+export const LAT_OFFSET_DEGREES = 0.27;
 
 /**
  * Maximum viewport span for latitude (in degrees).
