@@ -303,6 +303,7 @@ jest.mock('@/contexts/SearchTransitionContext', () => ({
 jest.mock('@/contexts/MapBoundsContext', () => ({
   useMapBounds: () => ({
     searchAsMove: false,
+    hasUserMoved: false,
     setSearchAsMove: mockSetSearchAsMove,
     setHasUserMoved: mockSetHasUserMoved,
     setBoundsDirty: mockSetBoundsDirty,
@@ -1769,6 +1770,45 @@ describe('Map Component', () => {
 
       // Source should still be present - clustering state preserved
       expect(screen.getByTestId('map-source')).toBeInTheDocument();
+    });
+  });
+
+  describe('Auto-zoom on empty results', () => {
+    it('auto-zooms out when listings empty AND no filters active', async () => {
+      mockSearchParams = new URLSearchParams('minLat=37&maxLat=38&minLng=-123&maxLng=-122');
+
+      render(<MapComponent listings={[]} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // Auto-zoom should trigger flyTo with reduced zoom
+      expect(mockMapInstance.flyTo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          zoom: expect.any(Number),
+          duration: 800,
+        })
+      );
+      expect(mockSetProgrammaticMove).toHaveBeenCalledWith(true);
+    });
+
+    it('does NOT auto-zoom when filters are active', async () => {
+      mockSearchParams = new URLSearchParams('minLat=37&maxLat=38&minLng=-123&maxLng=-122&maxPrice=1500');
+
+      render(<MapComponent listings={[]} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // Should NOT call flyTo for auto-zoom (flyTo may be called for other reasons)
+      // The key is setProgrammaticMove should not be called for auto-zoom
+      const flyToCalls = mockMapInstance.flyTo.mock.calls;
+      const autoZoomCalls = flyToCalls.filter(
+        (call: unknown[]) => (call[0] as { duration?: number })?.duration === 800
+      );
+      expect(autoZoomCalls.length).toBe(0);
     });
   });
 });

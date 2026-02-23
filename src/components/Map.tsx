@@ -27,6 +27,7 @@ import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
 import { MapMovedBanner } from './map/MapMovedBanner';
 import { MapGestureHint } from './map/MapGestureHint';
 import { MapEmptyState } from './map/MapEmptyState';
+import { hasFilterChips } from './filters/filter-chip-utils';
 import { PrivacyCircle } from './map/PrivacyCircle';
 import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
@@ -397,6 +398,7 @@ export default function MapComponent({
     const {
         searchAsMove,
         setSearchAsMove,
+        hasUserMoved,
         setHasUserMoved,
         setBoundsDirty,
         setCurrentMapBounds,
@@ -432,6 +434,8 @@ export default function MapComponent({
     const isInitialMoveRef = useRef(true);
     // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
     const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // Auto-zoom: fire once per search context when results are empty and no filters active
+    const hasAutoZoomedRef = useRef(false);
     // Ref for sourcedata handler cleanup
     const sourcedataHandlerRef = useRef<((e: MapSourceDataEvent) => void) | null>(null);
     const webglCleanupRef = useRef<(() => void) | null>(null);
@@ -1018,6 +1022,41 @@ export default function MapComponent({
             );
         }
     }, [listings, searchParams, searchAsMove, setProgrammaticMove, disableAutoFit, isControlledViewState]);
+
+    // Auto-zoom-out: when map loads empty with no active filters, zoom out once
+    // Build a key from non-bounds params so we reset per search context
+    const nonBoundsParamsKey = useMemo(() => {
+        const keys = ['q', 'minPrice', 'maxPrice', 'amenities', 'houseRules', 'languages',
+            'roomType', 'leaseDuration', 'moveInDate', 'genderPreference', 'householdGender', 'nearMatches'];
+        return keys.map(k => `${k}=${searchParams.get(k) ?? ''}`).join('&');
+    }, [searchParams]);
+
+    // Reset auto-zoom flag when search context (non-bounds filters) changes
+    useEffect(() => {
+        hasAutoZoomedRef.current = false;
+    }, [nonBoundsParamsKey]);
+
+    // Fire auto-zoom when empty results, no filters, and user hasn't manually panned
+    useEffect(() => {
+        if (!isMapLoaded || areTilesLoading || isSearching) return;
+        if (listings.length > 0) return;
+        if (hasAutoZoomedRef.current) return;
+        if (hasFilterChips(searchParams)) return;
+        if (hasUserMoved) return;
+        if (!mapRef.current) return;
+
+        const map = mapRef.current.getMap();
+        if (!map) return;
+
+        const currentZoom = map.getZoom();
+        hasAutoZoomedRef.current = true;
+        setProgrammaticMove(true);
+        if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+        programmaticClearTimeoutRef.current = setTimeout(() => {
+            if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+        mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
+    }, [isMapLoaded, areTilesLoading, isSearching, listings.length, searchParams, hasUserMoved, setProgrammaticMove, isProgrammaticMoveRef]);
 
     // Expose map ref and helpers for E2E testing
     useEffect(() => {
