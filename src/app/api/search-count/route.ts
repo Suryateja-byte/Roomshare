@@ -23,6 +23,7 @@ import {
 import {
   parseSearchParams,
   buildRawParamsFromSearchParams,
+  hasActiveFilters,
 } from "@/lib/search-params";
 import { getLimitedCount } from "@/lib/data";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
@@ -65,9 +66,9 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // Handle unbounded browse (no query, no bounds)
+      // Handle unbounded browse (no query, no bounds, no filters)
       // Return null count with browseMode flag to indicate capped results
-      if (!filterParams.query && !filterParams.bounds) {
+      if (!filterParams.query && !filterParams.bounds && !hasActiveFilters(filterParams)) {
         return NextResponse.json(
           { count: null, browseMode: true },
           {

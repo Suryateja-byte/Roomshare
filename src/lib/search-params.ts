@@ -39,6 +39,25 @@ export interface FilterParams {
   nearMatches?: boolean;
 }
 
+/**
+ * Returns true if any narrowing filter is active (excludes query, bounds, sort, nearMatches).
+ * Used to distinguish "unbounded browse" (no filters) from "filtered browse" (filters but no query/bounds).
+ */
+export function hasActiveFilters(params: FilterParams): boolean {
+  return Boolean(
+    params.minPrice != null ||
+    params.maxPrice != null ||
+    (params.amenities && params.amenities.length > 0) ||
+    params.moveInDate ||
+    params.leaseDuration ||
+    (params.houseRules && params.houseRules.length > 0) ||
+    params.roomType ||
+    (params.languages && params.languages.length > 0) ||
+    params.genderPreference ||
+    params.householdGender
+  );
+}
+
 export interface RawSearchParams {
   q?: string | string[];
   minPrice?: string | string[];

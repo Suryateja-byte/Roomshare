@@ -6,6 +6,7 @@ import {
   isSearchDocEnabled,
   MAX_UNBOUNDED_RESULTS,
 } from "@/lib/search/search-doc-queries";
+import { hasActiveFilters } from "@/lib/search-params";
 import {
   clampBoundsToMaxSpan,
   MAX_LAT_SPAN,
@@ -815,8 +816,8 @@ export async function getListingsPaginated(
   }
 
   // P1 Fix: Cap unbounded browse queries to prevent full-table scans
-  // Browse mode = no query AND no bounds (user is just browsing, no location selected)
-  const isUnboundedBrowse = !query && !bounds;
+  // Browse mode = no query AND no bounds AND no filters (user is just browsing)
+  const isUnboundedBrowse = !query && !bounds && !hasActiveFilters(params);
   const MAX_BROWSE_PAGES = Math.ceil(MAX_UNBOUNDED_RESULTS / 12);
   const effectiveLimit = isUnboundedBrowse
     ? Math.min(limit, MAX_UNBOUNDED_RESULTS)

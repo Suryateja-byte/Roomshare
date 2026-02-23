@@ -32,6 +32,7 @@ import {
   expandFiltersForNearMatches,
   isNearMatch,
 } from "@/lib/near-matches";
+import { hasActiveFilters } from "@/lib/search-params";
 import { BOUNDS_EPSILON } from "@/lib/constants";
 import { features } from "@/lib/env";
 import { parseLocalDate } from "@/lib/utils";
@@ -617,9 +618,9 @@ function buildOrderByClause(
 async function getSearchDocLimitedCountInternal(
   params: FilterParams,
 ): Promise<number | null> {
-  // Defense in depth: Return null for unbounded browse (no query, no bounds)
+  // Defense in depth: Return null for unbounded browse (no query, no bounds, no filters)
   // This prevents COUNT(*) full-table scans on listing_search_docs
-  if (!params.query && !params.bounds) {
+  if (!params.query && !params.bounds && !hasActiveFilters(params)) {
     return null;
   }
 
@@ -831,8 +832,8 @@ async function getSearchDocListingsPaginatedInternal(
     );
   }
 
-  // Cap limit for unbounded browse (no query, no bounds) to prevent full-table scans
-  const isUnboundedBrowse = !params.query && !params.bounds;
+  // Cap limit for unbounded browse (no query, no bounds, no filters) to prevent full-table scans
+  const isUnboundedBrowse = !params.query && !params.bounds && !hasActiveFilters(params);
   const effectiveLimit = isUnboundedBrowse
     ? Math.min(limit, MAX_UNBOUNDED_RESULTS)
     : limit;
