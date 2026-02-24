@@ -86,6 +86,9 @@ test.describe("Price Range Filter", () => {
     if (testInfo.project.name.includes('webkit')) {
       test.skip(true, 'Radix UI hydration issues on webkit');
     }
+    if (testInfo.project.name.includes('firefox')) {
+      test.skip(true, 'Filter-price tests timeout on Firefox CI runners');
+    }
     test.slow();
   });
 

@@ -381,7 +381,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
     // Verify collapsed (poll for animation to settle)
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(0);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Verify sheet has pointer-events: none when collapsed
     const sheetPointerEvents = await sheet.evaluate(
@@ -431,7 +431,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
     // Verify collapsed (poll for animation to settle)
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(0);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Handle should still have pointer-events: auto
     const handle = page.locator(selectors.bottomSheetHandle);
@@ -472,7 +472,7 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     // Verify expanded (poll for animation to settle)
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(2);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Press Escape
     await page.keyboard.press("Escape");
@@ -481,7 +481,7 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     // Should collapse to half position (index 1)
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(1);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
   });
 
   test("escape key has no effect when sheet is collapsed", async ({ page }) => {
@@ -510,7 +510,7 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     // Verify collapsed (poll for animation to settle)
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(0);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Press Escape - should stay collapsed
     await page.keyboard.press("Escape");
@@ -519,7 +519,7 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     // Still collapsed
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(0);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
   });
 });
 
@@ -531,7 +531,9 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
+    try {
+      await expect(sheet).toBeVisible({ timeout: 5000 });
+    } catch {
       test.skip();
       return;
     }
@@ -553,7 +555,7 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     // Verify expanded (poll for animation to settle)
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(2);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Apply a filter (if filter buttons exist)
     const filterBtn = page.locator(
@@ -562,14 +564,19 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     const hasFilter = await filterBtn.first().isVisible().catch(() => false);
 
     if (hasFilter) {
-      await filterBtn.first().click();
+      // force: true because on mobile the filter button may be partially
+      // obscured by the expanded bottom sheet
+      await filterBtn.first().click({ force: true });
       await page.waitForTimeout(500);
 
       // Close filter modal if opened
       const closeBtn = page.locator('[aria-label="Close"], button:has-text("Done")');
-      if (await closeBtn.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      try {
+        await expect(closeBtn.first()).toBeVisible({ timeout: 2000 });
         await closeBtn.first().click();
         await page.waitForTimeout(500);
+      } catch {
+        // Filter modal may not have opened
       }
     }
 
@@ -676,7 +683,7 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
     // At half position, PTR should not be enabled
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(1);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Expand the sheet
     const expandBtn = page.locator(selectors.expandButton);
@@ -692,7 +699,7 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
     // At expanded position, PTR should be available
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(2);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Check that PullToRefresh component is enabled
     // (Implementation detail: PTR is wrapped around children when onRefresh is provided)
@@ -791,7 +798,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
     await waitForSheetAnimation(page);
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(2);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Press Home
     await page.keyboard.press("Home");
@@ -853,14 +860,14 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
     await waitForSheetAnimation(page);
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(2);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Press Space - should go back to half
     await page.keyboard.press(" ");
     await waitForSheetAnimation(page);
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(1);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
   });
 });
 

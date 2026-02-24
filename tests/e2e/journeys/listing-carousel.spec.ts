@@ -143,8 +143,11 @@ test.describe("Listing Card Carousel", () => {
     await secondDot.click({ force: true });
     await page.waitForTimeout(timeouts.animation);
 
-    // Second dot should be selected
-    await expect(secondDot).toHaveAttribute("aria-selected", "true");
+    // Second dot should be selected (Embla scroll animation can be slow on
+    // Mobile Chrome CI — use toPass polling to handle delayed onSelect callback)
+    await expect(async () => {
+      await expect(secondDot).toHaveAttribute("aria-selected", "true", { timeout: 2000 });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // URL should not have changed
     expect(page.url()).toBe(initialUrl);
