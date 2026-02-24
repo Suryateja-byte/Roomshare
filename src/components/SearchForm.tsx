@@ -813,6 +813,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                                 : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
                                             }`}
                                             aria-pressed={isSelected}
+                                            aria-label={label}
                                         >
                                             <Icon className="w-3 h-3" />
                                             <span className="hidden xl:inline">{label}</span>

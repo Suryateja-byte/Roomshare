@@ -69,7 +69,7 @@ export default function Footer() {
                     </p>
                     <div className="flex items-center gap-8 order-1 sm:order-2">
                         <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">Instagram</button>
-                        <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">Twitter</button>
+                        <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">X</button>
                         <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">LinkedIn</button>
                     </div>
                 </div>

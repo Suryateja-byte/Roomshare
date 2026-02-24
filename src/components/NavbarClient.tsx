@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 
@@ -16,9 +15,6 @@ import {
     Settings,
     Calendar,
     Heart,
-    Clock,
-    ChevronDown,
-    Bell
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UserAvatar from '@/components/UserAvatar';
@@ -141,7 +137,6 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [currentUnreadCount, setCurrentUnreadCount] = useState(unreadCount);
     const profileRef = useRef<HTMLDivElement>(null);
-    const pathname = usePathname();
 
     // Refs for exponential backoff polling
     const failureCountRef = useRef(0);
@@ -376,6 +371,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                                 className="text-zinc-900 dark:text-white p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full"
                                 aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+                                aria-expanded={isMobileMenuOpen}
                             >
                                 {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
                             </button>
