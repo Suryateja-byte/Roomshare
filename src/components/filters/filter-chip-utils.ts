@@ -39,32 +39,6 @@ const PRESERVED_PARAMS = [
 ] as const;
 
 /**
- * Parameters that are UI state, not filters - should be ignored for chips.
- * Kept for documentation; prefixed to avoid unused variable warnings.
- */
-const _UI_STATE_PARAMS = ["page", "view", "drawerOpen"] as const;
-
-/**
- * Parameters that represent filter state (eligible for chips).
- * Used for reference; prefixed to avoid unused variable warnings.
- */
-const _FILTER_PARAMS = [
-  "minPrice",
-  "maxPrice",
-  "amenities",
-  "houseRules",
-  "languages",
-  "roomType",
-  "leaseDuration",
-  "moveInDate",
-  "nearMatches",
-  "genderPreference",
-  "householdGender",
-] as const;
-
-type _FilterParamKey = (typeof _FILTER_PARAMS)[number];
-
-/**
  * Format a price value for display
  */
 function formatPrice(value: number | string): string {
@@ -364,7 +338,7 @@ export function clearAllFilters(searchParams: URLSearchParams): string {
 }
 
 /** Quick check — returns true if any filter param is set (no chip construction) */
-const FILTER_PARAM_KEYS = [
+export const FILTER_PARAM_KEYS = [
   'minPrice', 'maxPrice', 'minBudget', 'maxBudget',
   'moveInDate', 'roomType', 'leaseDuration',
   'amenities', 'houseRules', 'languages',

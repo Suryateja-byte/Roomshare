@@ -584,12 +584,20 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         });
     }, [priceAbsoluteMin, priceAbsoluteMax, setPending]);
 
+    // Snapshot pending when count drops to 0 — prevents stale suggestions during rapid filter changes
+    const pendingAtZeroRef = useRef(pending);
+    useEffect(() => {
+        if (count === 0 && !isCountLoading) {
+            pendingAtZeroRef.current = pending;
+        }
+    }, [count, isCountLoading, pending]);
+
     // P4: Compute drawer suggestions when count drops to 0
     const drawerSuggestions = useMemo(() => {
         if (count !== 0 || isCountLoading) return [];
-        const fp = pendingToFilterParams(pending);
+        const fp = pendingToFilterParams(pendingAtZeroRef.current);
         return generateFilterSuggestions(fp, count).slice(0, 2);
-    }, [count, isCountLoading, pending]);
+    }, [count, isCountLoading]);
 
     // P4: Handle removing a filter suggestion from the drawer
     const handleRemoveFilterSuggestion = useCallback((suggestion: FilterSuggestion) => {

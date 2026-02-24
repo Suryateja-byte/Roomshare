@@ -841,6 +841,63 @@ export async function getSearchDocMapListings(
 }
 
 // ============================================
+// Near-match expansion helper (shared)
+// ============================================
+
+/**
+ * Expand search results with near-match listings when exact matches are low.
+ * Shared by both offset-paginated and keyset-paginated query paths.
+ */
+async function expandWithNearMatches(
+  items: ListingData[],
+  params: FilterParams,
+  fetchExpanded: (p: FilterParams) => Promise<{ items: ListingData[] }>,
+): Promise<{
+  items: ListingData[];
+  nearMatchCount: number;
+  nearMatchExpansion: string | undefined;
+}> {
+  const expansion = expandFiltersForNearMatches(params);
+
+  if (expansion.expandedDimension === null) {
+    return { items, nearMatchCount: 0, nearMatchExpansion: undefined };
+  }
+
+  const nearMatchExpansion = expansion.expansionDescription ?? undefined;
+
+  const expandedResult = await fetchExpanded({
+    ...expansion.expanded,
+    nearMatches: false,
+    page: 1,
+    limit: LOW_RESULTS_THRESHOLD * 2,
+  });
+
+  const exactIds = new Set(items.map((item) => item.id));
+
+  const nearMatchItems = expandedResult.items
+    .filter((item) => !exactIds.has(item.id))
+    .slice(0, LOW_RESULTS_THRESHOLD)
+    .map((item) => {
+      const availableFromStr = item.moveInDate
+        ? item.moveInDate.toISOString().split("T")[0]
+        : null;
+      const isNearMatchResult = isNearMatch(
+        { price: item.price, available_from: availableFromStr },
+        params,
+        expansion.expandedDimension,
+      );
+      return { ...item, isNearMatch: isNearMatchResult };
+    })
+    .filter((item) => item.isNearMatch);
+
+  return {
+    items: [...items, ...nearMatchItems],
+    nearMatchCount: nearMatchItems.length,
+    nearMatchExpansion,
+  };
+}
+
+// ============================================
 // Paginated Listings Query (SearchDoc)
 // ============================================
 
@@ -954,7 +1011,6 @@ async function getSearchDocListingsPaginatedInternal(
     let nearMatchCount = 0;
     let nearMatchExpansion: string | undefined;
 
-    // P5 cost guard: skip near-match expansion if initial query already has enough results
     if (
       nearMatches &&
       !hasNextPage &&
@@ -962,47 +1018,12 @@ async function getSearchDocListingsPaginatedInternal(
       items.length > 0 &&
       safePage === 1
     ) {
-      const expansion = expandFiltersForNearMatches(params);
-
-      if (expansion.expandedDimension !== null) {
-        nearMatchExpansion = expansion.expansionDescription ?? undefined;
-
-        // Run expanded query (without nearMatches flag to prevent recursion)
-        const expandedResult = await getSearchDocListingsPaginatedInternal({
-          ...expansion.expanded,
-          nearMatches: false,
-          page: 1,
-          limit: LOW_RESULTS_THRESHOLD * 2,
-        });
-
-        // Get IDs of exact matches to dedupe
-        const exactIds = new Set(items.map((item) => item.id));
-
-        // Filter to only near matches and tag them
-        const nearMatchItems = expandedResult.items
-          .filter((item) => !exactIds.has(item.id))
-          .slice(0, LOW_RESULTS_THRESHOLD)
-          .map((item) => {
-            const availableFromStr = item.moveInDate
-              ? item.moveInDate.toISOString().split("T")[0]
-              : null;
-            const isNearMatchResult = isNearMatch(
-              { price: item.price, available_from: availableFromStr },
-              params,
-              expansion.expandedDimension,
-            );
-            return {
-              ...item,
-              isNearMatch: isNearMatchResult,
-            };
-          })
-          .filter((item) => item.isNearMatch);
-
-        nearMatchCount = nearMatchItems.length;
-
-        // Merge results: exact matches first, then near matches
-        items = [...items, ...nearMatchItems];
-      }
+      const result = await expandWithNearMatches(items, params, (p) =>
+        getSearchDocListingsPaginatedInternal(p),
+      );
+      items = result.items;
+      nearMatchCount = result.nearMatchCount;
+      nearMatchExpansion = result.nearMatchExpansion;
     }
 
     return {
@@ -1337,8 +1358,7 @@ export async function getSearchDocListingsFirstPage(
     // Only return `limit` items
     let items: ListingData[] = hasNextPage ? results.slice(0, limit) : results;
 
-    // Near-match expansion: if enabled and low results on page 1, fetch near matches
-    // P5 cost guard: skip expansion if initial query already has enough results
+    // Near-match expansion: if enabled and low results, fetch near matches
     let nearMatchCount = 0;
     let nearMatchExpansion: string | undefined;
 
@@ -1348,47 +1368,12 @@ export async function getSearchDocListingsFirstPage(
       items.length < LOW_RESULTS_THRESHOLD &&
       items.length > 0
     ) {
-      const expansion = expandFiltersForNearMatches(params);
-
-      if (expansion.expandedDimension !== null) {
-        nearMatchExpansion = expansion.expansionDescription ?? undefined;
-
-        // Run expanded query (without nearMatches flag to prevent recursion)
-        const expandedResult = await getSearchDocListingsFirstPage({
-          ...expansion.expanded,
-          nearMatches: false,
-          page: 1,
-          limit: LOW_RESULTS_THRESHOLD * 2,
-        });
-
-        // Get IDs of exact matches to dedupe
-        const exactIds = new Set(items.map((item) => item.id));
-
-        // Filter to only near matches and tag them
-        const nearMatchItems = expandedResult.items
-          .filter((item) => !exactIds.has(item.id))
-          .slice(0, LOW_RESULTS_THRESHOLD)
-          .map((item) => {
-            const availableFromStr = item.moveInDate
-              ? item.moveInDate.toISOString().split("T")[0]
-              : null;
-            const isNearMatchResult = isNearMatch(
-              { price: item.price, available_from: availableFromStr },
-              params,
-              expansion.expandedDimension,
-            );
-            return {
-              ...item,
-              isNearMatch: isNearMatchResult,
-            };
-          })
-          .filter((item) => item.isNearMatch);
-
-        nearMatchCount = nearMatchItems.length;
-
-        // Merge results: exact matches first, then near matches
-        items = [...items, ...nearMatchItems];
-      }
+      const result = await expandWithNearMatches(items, params, (p) =>
+        getSearchDocListingsFirstPage(p),
+      );
+      items = result.items;
+      nearMatchCount = result.nearMatchCount;
+      nearMatchExpansion = result.nearMatchExpansion;
     }
 
     // Build nextCursor from the last item

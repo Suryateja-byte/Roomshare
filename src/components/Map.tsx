@@ -27,7 +27,7 @@ import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
 import { MapMovedBanner } from './map/MapMovedBanner';
 import { MapGestureHint } from './map/MapGestureHint';
 import { MapEmptyState } from './map/MapEmptyState';
-import { hasAnyFilter } from './filters/filter-chip-utils';
+import { hasAnyFilter, FILTER_PARAM_KEYS } from './filters/filter-chip-utils';
 import { PrivacyCircle } from './map/PrivacyCircle';
 import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
@@ -1026,8 +1026,7 @@ export default function MapComponent({
     // Auto-zoom-out: when map loads empty with no active filters, zoom out once
     // Build a key from non-bounds params so we reset per search context
     const nonBoundsParamsKey = useMemo(() => {
-        const keys = ['q', 'minPrice', 'maxPrice', 'amenities', 'houseRules', 'languages',
-            'roomType', 'leaseDuration', 'moveInDate', 'genderPreference', 'householdGender', 'nearMatches'];
+        const keys = ['q', ...FILTER_PARAM_KEYS];
         return keys.map(k => `${k}=${searchParams.getAll(k).sort().join(',')}`).join('&');
     }, [searchParams]);
 
