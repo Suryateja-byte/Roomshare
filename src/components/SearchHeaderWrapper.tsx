@@ -31,42 +31,42 @@ import ThemeToggle from "@/components/ThemeToggle";
 import SearchForm from "@/components/SearchForm";
 
 const MenuItem = ({
-    icon,
-    text,
-    danger,
-    onClick,
-    href
+  icon,
+  text,
+  danger,
+  onClick,
+  href
 }: {
-    icon: React.ReactNode;
-    text: string;
-    danger?: boolean;
-    onClick?: () => void;
-    href?: string;
+  icon: React.ReactNode;
+  text: string;
+  danger?: boolean;
+  onClick?: () => void;
+  href?: string;
 }) => {
-    const className = `w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 ${danger
-        ? 'text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
-        : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
-        }`;
+  const className = `w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 ${danger
+    ? 'text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
+    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
+    }`;
 
-    const content = (
-        <>
-            <span className={danger ? 'text-red-500' : 'text-zinc-400 dark:text-zinc-500'}>{icon}</span>
-            {text}
-        </>
-    );
+  const content = (
+    <>
+      <span className={danger ? 'text-red-500' : 'text-zinc-400 dark:text-zinc-500'}>{icon}</span>
+      {text}
+    </>
+  );
 
-    if (href) {
-        return (
-            <Link href={href} className={className} onClick={onClick}>
-                {content}
-            </Link>
-        );
-    }
+  if (href) {
     return (
-        <button onClick={onClick} className={className}>
-            {content}
-        </button>
+      <Link href={href} className={className} onClick={onClick}>
+        {content}
+      </Link>
     );
+  }
+  return (
+    <button onClick={onClick} className={className}>
+      {content}
+    </button>
+  );
 };
 
 export default function SearchHeaderWrapper() {
@@ -74,19 +74,49 @@ export default function SearchHeaderWrapper() {
   const { isExpanded, expand, openFilters } = useMobileSearch();
   const { data: session } = useSession();
   const user = session?.user;
-  
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
-          if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
-              setIsProfileOpen(false);
-          }
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Dynamically update --header-height CSS variable to ensure perfect layout spacing
+  // regardless of responsive wrapping inside the search form.
+  useEffect(() => {
+    const updateHeaderHeight = () => {
+      // Find the parent <header> element (which is in layout.tsx)
+      const headerEl = document.querySelector('header');
+      if (headerEl) {
+        document.documentElement.style.setProperty('--header-height', `${headerEl.offsetHeight}px`);
+      }
+    };
+
+    // Initial update
+    updateHeaderHeight();
+
+    // Create an observer
+    const headerEl = document.querySelector('header');
+    if (!headerEl) return;
+
+    const observer = new ResizeObserver(() => {
+      // Use requestAnimationFrame to avoid ResizeObserver loop limit errors
+      window.requestAnimationFrame(updateHeaderHeight);
+    });
+
+    observer.observe(headerEl);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isCollapsed, isExpanded]);
 
   useKeyboardShortcuts([
     {
@@ -109,20 +139,19 @@ export default function SearchHeaderWrapper() {
     <>
       {/* Full search form - hidden when collapsed */}
       <div
-        className={`transition-all duration-300 ease-out ${
-          showCollapsed ? "hidden" : "block"
-        }`}
+        className={`transition-all duration-300 ease-out ${showCollapsed ? "hidden" : "block"
+          }`}
       >
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0 mr-2 md:mr-6" aria-label="RoomShare Home">
-                <div className="w-9 h-9 bg-zinc-900 dark:bg-white rounded-xl flex items-center justify-center text-white dark:text-zinc-900 font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-lg shadow-zinc-900/10 dark:shadow-white/5">
-                    R
-                </div>
-                <span className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-white hidden lg:block">
-                    RoomShare<span className="text-indigo-600 dark:text-indigo-400">.</span>
-                </span>
+              <div className="w-9 h-9 bg-zinc-900 dark:bg-white rounded-xl flex items-center justify-center text-white dark:text-zinc-900 font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-lg shadow-zinc-900/10 dark:shadow-white/5">
+                R
+              </div>
+              <span className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-white hidden lg:block">
+                RoomShare<span className="text-indigo-600 dark:text-indigo-400">.</span>
+              </span>
             </Link>
 
             {/* Search Form */}
@@ -132,81 +161,81 @@ export default function SearchHeaderWrapper() {
 
             {/* Right Actions - User Profile / Auth */}
             <div className="hidden lg:flex items-center gap-3 sm:gap-5 flex-shrink-0 ml-2">
-                <div className="flex items-center gap-1 pr-2 border-r border-zinc-200/50 dark:border-white/10">
-                    <NotificationCenter />
-                    <Link
-                        href="/messages"
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all relative focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
-                        aria-label="Messages"
-                    >
-                        <MessageSquare size={18} strokeWidth={2} />
-                    </Link>
+              <div className="flex items-center gap-1 pr-2">
+                <NotificationCenter />
+                <Link
+                  href="/messages"
+                  className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all relative focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
+                  aria-label="Messages"
+                >
+                  <MessageSquare size={18} strokeWidth={2} />
+                </Link>
+              </div>
+
+              {user ? (
+                <div className="relative" ref={profileRef}>
+                  <button
+                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                    className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full transition-all duration-300 ${isProfileOpen
+                      ? 'bg-zinc-100 dark:bg-zinc-800'
+                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                      }`}
+                    aria-expanded={isProfileOpen}
+                    aria-haspopup="true"
+                    aria-label="User menu"
+                  >
+                    <UserAvatar image={user.image} name={user.name} size="sm" />
+                    <Menu
+                      size={16}
+                      className={`transition-colors duration-300 ${isProfileOpen ? 'text-white dark:text-zinc-900' : 'text-zinc-500 dark:text-zinc-400'}`}
+                    />
+                  </button>
+
+                  <div
+                    className={`absolute right-0 mt-4 w-72 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-zinc-900/10 dark:shadow-black/60 border border-zinc-200/50 dark:border-white/5 overflow-hidden origin-top-right z-[1200] transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) ${isProfileOpen
+                      ? 'opacity-100 translate-y-0 visible scale-100'
+                      : 'opacity-0 -translate-y-4 invisible scale-95 pointer-events-none'
+                      }`}
+                  >
+                    <div className="p-6 border-b border-zinc-100 dark:border-white/5 bg-zinc-50/50 dark:bg-white/[0.02]">
+                      <p className="font-semibold text-zinc-900 dark:text-white tracking-tight">{user.name}</p>
+                      <p className="text-xs text-zinc-400 truncate mt-0.5">{user.email}</p>
+                    </div>
+                    <div className="p-2.5 space-y-0.5">
+                      <MenuItem icon={<User size={16} />} text="Profile" href="/profile" onClick={() => setIsProfileOpen(false)} />
+                      <MenuItem icon={<Plus size={16} />} text="List a Room" href="/listings/create" onClick={() => setIsProfileOpen(false)} />
+                      <MenuItem icon={<Heart size={16} />} text="Saved" href="/saved" onClick={() => setIsProfileOpen(false)} />
+                      <div className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
+                      <MenuItem icon={<Settings size={16} />} text="Settings" href="/settings" onClick={() => setIsProfileOpen(false)} />
+                      <ThemeToggle variant="menu-item" />
+                      <div className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
+                      <MenuItem
+                        icon={<LogOut size={16} />}
+                        text="Log out"
+                        danger
+                        onClick={() => {
+                          signOut({ callbackUrl: '/' });
+                          setIsProfileOpen(false);
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-
-                {user ? (
-                    <div className="relative" ref={profileRef}>
-                        <button
-                            onClick={() => setIsProfileOpen(!isProfileOpen)}
-                            className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full border transition-all duration-300 ${isProfileOpen
-                                ? 'border-zinc-900 dark:border-white bg-zinc-900 dark:bg-white'
-                                : 'border-zinc-200/50 dark:border-white/10 hover:border-zinc-400 dark:hover:border-zinc-500'
-                                }`}
-                            aria-expanded={isProfileOpen}
-                            aria-haspopup="true"
-                            aria-label="User menu"
-                        >
-                            <UserAvatar image={user.image} name={user.name} size="sm" />
-                            <Menu
-                                size={16}
-                                className={`transition-colors duration-300 ${isProfileOpen ? 'text-white dark:text-zinc-900' : 'text-zinc-500 dark:text-zinc-400'}`}
-                            />
-                        </button>
-
-                        <div
-                            className={`absolute right-0 mt-4 w-72 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-zinc-900/10 dark:shadow-black/60 border border-zinc-200/50 dark:border-white/5 overflow-hidden origin-top-right z-[1200] transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) ${isProfileOpen
-                                    ? 'opacity-100 translate-y-0 visible scale-100'
-                                    : 'opacity-0 -translate-y-4 invisible scale-95 pointer-events-none'
-                                }`}
-                        >
-                            <div className="p-6 border-b border-zinc-100 dark:border-white/5 bg-zinc-50/50 dark:bg-white/[0.02]">
-                                <p className="font-semibold text-zinc-900 dark:text-white tracking-tight">{user.name}</p>
-                                <p className="text-xs text-zinc-400 truncate mt-0.5">{user.email}</p>
-                            </div>
-                            <div className="p-2.5 space-y-0.5">
-                                <MenuItem icon={<User size={16} />} text="Profile" href="/profile" onClick={() => setIsProfileOpen(false)} />
-                                <MenuItem icon={<Plus size={16} />} text="List a Room" href="/listings/create" onClick={() => setIsProfileOpen(false)} />
-                                <MenuItem icon={<Heart size={16} />} text="Saved" href="/saved" onClick={() => setIsProfileOpen(false)} />
-                                <div className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
-                                <MenuItem icon={<Settings size={16} />} text="Settings" href="/settings" onClick={() => setIsProfileOpen(false)} />
-                                <ThemeToggle variant="menu-item" />
-                                <div className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
-                                <MenuItem
-                                    icon={<LogOut size={16} />}
-                                    text="Log out"
-                                    danger
-                                    onClick={() => {
-                                        signOut({ callbackUrl: '/' });
-                                        setIsProfileOpen(false);
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-1.5">
-                        <Link
-                            href="/login"
-                            className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-4 py-2 transition-all duration-300 rounded-full hover:bg-zinc-100 dark:hover:bg-white/5"
-                        >
-                            Log in
-                        </Link>
-                        <Link href="/signup">
-                            <Button size="sm" className="rounded-full px-6 h-10 shadow-lg shadow-zinc-900/10">
-                                Join
-                            </Button>
-                        </Link>
-                    </div>
-                )}
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href="/login"
+                    className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-4 py-2 transition-all duration-300 rounded-full hover:bg-zinc-100 dark:hover:bg-white/5"
+                  >
+                    Log in
+                  </Link>
+                  <Link href="/signup">
+                    <Button size="sm" className="rounded-full px-6 h-10 shadow-lg shadow-zinc-900/10">
+                      Join
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -214,18 +243,16 @@ export default function SearchHeaderWrapper() {
 
       {/* Collapsed search bar - visible on mobile only when collapsed */}
       <div
-        className={`transition-all duration-300 ease-out ${
-          showCollapsed ? "md:hidden block py-2" : "hidden"
-        }`}
+        className={`transition-all duration-300 ease-out ${showCollapsed ? "md:hidden block py-2" : "hidden"
+          }`}
       >
         <CollapsedMobileSearch onExpand={expand} onOpenFilters={openFilters} />
       </div>
 
       {/* Compact search pill - visible on desktop only when collapsed */}
       <div
-        className={`transition-all duration-300 ease-out ${
-          showCollapsed ? "hidden md:block py-2 px-6" : "hidden"
-        }`}
+        className={`transition-all duration-300 ease-out ${showCollapsed ? "hidden md:block py-2 px-6" : "hidden"
+          }`}
       >
         <CompactSearchPill
           onExpand={handleExpandDesktop}

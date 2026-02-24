@@ -20,7 +20,7 @@ export default async function HomePage() {
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {[1, 2, 3, 4, 5, 6].map((i) => (
-                                <div key={i} className="bg-white dark:bg-zinc-800 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 animate-pulse">
+                                <div key={i} className="bg-white dark:bg-zinc-800 rounded-3xl overflow-hidden animate-pulse">
                                     <div className="aspect-[4/3] bg-zinc-200 dark:bg-zinc-700" />
                                     <div className="p-4 space-y-3">
                                         <div className="h-5 bg-zinc-200 dark:bg-zinc-700 rounded w-3/4" />

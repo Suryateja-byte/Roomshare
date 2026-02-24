@@ -43,6 +43,9 @@ function LoginForm() {
         const formData = new FormData(e.currentTarget);
         const email = formData.get('email') as string;
         const password = formData.get('password') as string;
+        // Use callback state first, then hidden response field as a fallback.
+        const resolvedTurnstileToken =
+            turnstileToken || (formData.get('cf-turnstile-response') as string | null) || undefined;
 
         try {
             // Clear any existing session to prevent stale data
@@ -53,8 +56,8 @@ function LoginForm() {
             const result = await signIn('credentials', {
                 email,
                 password,
-                turnstileToken,
                 redirect: false,
+                ...(resolvedTurnstileToken ? { turnstileToken: resolvedTurnstileToken } : {}),
             });
 
             if (result?.error) {
@@ -243,7 +246,7 @@ function LoginForm() {
 
                         <Button
                             type="submit"
-                            disabled={loading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
+                            disabled={loading}
                             className="w-full h-11 sm:h-12 rounded-lg shadow-sm hover:shadow-md transition-all"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Sign in <ArrowRight className="w-4 h-4 ml-2" /></>}

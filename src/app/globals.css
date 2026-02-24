@@ -76,7 +76,7 @@
 
   @media (min-width: 640px) {
     :root {
-      --header-height: 96px;
+      --header-height: 120px;
     }
   }
 
@@ -227,11 +227,27 @@
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-4px); }
-  40% { transform: translateX(4px); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(3px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-4px);
+  }
+
+  40% {
+    transform: translateX(4px);
+  }
+
+  60% {
+    transform: translateX(-3px);
+  }
+
+  80% {
+    transform: translateX(3px);
+  }
 }
 
 .animate-shake {
@@ -361,6 +377,7 @@ textarea:focus-visible {
 
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -388,11 +405,25 @@ textarea:focus-visible {
 
 /* Heart bounce animation for wishlist save */
 @keyframes heart-bounce {
-  0% { transform: scale(1); }
-  25% { transform: scale(1.3); }
-  50% { transform: scale(0.95); }
-  75% { transform: scale(1.15); }
-  100% { transform: scale(1.1); }
+  0% {
+    transform: scale(1);
+  }
+
+  25% {
+    transform: scale(1.3);
+  }
+
+  50% {
+    transform: scale(0.95);
+  }
+
+  75% {
+    transform: scale(1.15);
+  }
+
+  100% {
+    transform: scale(1.1);
+  }
 }
 
 .animate-heart-bounce {
@@ -441,12 +472,12 @@ textarea:focus-visible {
   }
 
   /* Map pin high contrast: thicker borders, stronger shadows */
-  [role="button"][data-listing-id] > div:first-child {
+  [role="button"][data-listing-id]>div:first-child {
     border: 2px solid black !important;
     box-shadow: 0 0 0 2px white, 0 2px 8px rgba(0, 0, 0, 0.5) !important;
   }
 
-  .dark [role="button"][data-listing-id] > div:first-child {
+  .dark [role="button"][data-listing-id]>div:first-child {
     border: 2px solid white !important;
     box-shadow: 0 0 0 2px black, 0 2px 8px rgba(255, 255, 255, 0.3) !important;
   }
@@ -657,6 +688,15 @@ input:autofill {
 
 /* Map pin pulse ring animation for active/selected pins */
 @keyframes pulse-ring {
-  0%, 100% { transform: scale(1); opacity: 0.3; }
-  50% { transform: scale(1.2); opacity: 0.15; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 0.15;
+  }
 }

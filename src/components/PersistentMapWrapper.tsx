@@ -33,17 +33,105 @@ import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params"
 import { useSearchV2Data, type V2MapData } from "@/contexts/SearchV2DataContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
+import {
+  MAX_LAT_SPAN,
+  MAX_LNG_SPAN,
+  LAT_MIN,
+  LAT_MAX,
+  LNG_MIN,
+  LNG_MAX,
+  BOUNDS_EPSILON,
+} from "@/lib/constants";
 
 // CRITICAL: Lazy import - only loads when component renders
 // This defers the maplibre-gl bundle until user opts to see map
 const LazyDynamicMap = lazy(() => import("./DynamicMap"));
 
-// Maximum viewport span (matches server-side validation)
-// Increased from 2 to 5 (~550km) to allow regional zoom-out views
-// with Mapbox native clustering handling dense markers at wide viewports
-const MAX_LAT_SPAN = 5;
-const MAX_LNG_SPAN = 5;
 const MAP_FETCH_DEBOUNCE_MS = 250;
+
+// Spatial cache constants
+const SPATIAL_CACHE_MAX_ENTRIES = 20;
+const MAX_MAP_MARKERS = 200;
+const FETCH_BOUNDS_PADDING = 0.2;
+
+// ============================================
+// Spatial Cache Types & Utilities
+// ============================================
+
+interface ViewportBounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
+interface SpatialCacheEntry {
+  listings: MapListingData[];
+  bounds: ViewportBounds;
+  filterKey: string;
+  timestamp: number;
+}
+
+/** Quantize bounds to BOUNDS_EPSILON precision for cache key */
+function quantizeBounds(bounds: ViewportBounds): string {
+  const q = (n: number) => (Math.round(n / BOUNDS_EPSILON) * BOUNDS_EPSILON).toFixed(3);
+  return `${q(bounds.minLat)},${q(bounds.maxLat)},${q(bounds.minLng)},${q(bounds.maxLng)}`;
+}
+
+/**
+ * Check if inner viewport is mostly contained within outer bounds.
+ * Returns true if overlap >= threshold of inner's area (skip fetch).
+ */
+function isViewportContained(inner: ViewportBounds, outer: ViewportBounds, threshold = 0.9): boolean {
+  const innerArea = (inner.maxLat - inner.minLat) * (inner.maxLng - inner.minLng);
+  if (innerArea <= 0) return false;
+
+  const overlapMinLat = Math.max(inner.minLat, outer.minLat);
+  const overlapMaxLat = Math.min(inner.maxLat, outer.maxLat);
+  const overlapMinLng = Math.max(inner.minLng, outer.minLng);
+  const overlapMaxLng = Math.min(inner.maxLng, outer.maxLng);
+
+  if (overlapMinLat >= overlapMaxLat || overlapMinLng >= overlapMaxLng) return false;
+
+  const overlapArea = (overlapMaxLat - overlapMinLat) * (overlapMaxLng - overlapMinLng);
+  return (overlapArea / innerArea) >= threshold;
+}
+
+/**
+ * Pad viewport bounds by a percentage to pre-fetch nearby listings.
+ * Clamps to LAT/LNG limits and MAX_LAT/LNG_SPAN.
+ */
+function padBounds(bounds: ViewportBounds, padding = FETCH_BOUNDS_PADDING): ViewportBounds {
+  const latSpan = bounds.maxLat - bounds.minLat;
+  const lngSpan = bounds.maxLng - bounds.minLng;
+  const padded = {
+    minLat: Math.max(LAT_MIN, bounds.minLat - latSpan * padding),
+    maxLat: Math.min(LAT_MAX, bounds.maxLat + latSpan * padding),
+    minLng: Math.max(LNG_MIN, bounds.minLng - lngSpan * padding),
+    maxLng: Math.min(LNG_MAX, bounds.maxLng + lngSpan * padding),
+  };
+  // Clamp padded result to MAX_LAT/LNG_SPAN
+  const paddedLatSpan = padded.maxLat - padded.minLat;
+  const paddedLngSpan = padded.maxLng - padded.minLng;
+  if (paddedLatSpan > MAX_LAT_SPAN) {
+    const center = (padded.minLat + padded.maxLat) / 2;
+    padded.minLat = center - MAX_LAT_SPAN / 2;
+    padded.maxLat = center + MAX_LAT_SPAN / 2;
+  }
+  if (paddedLngSpan > MAX_LNG_SPAN) {
+    const center = (padded.minLng + padded.maxLng) / 2;
+    padded.minLng = center - MAX_LNG_SPAN / 2;
+    padded.maxLng = center + MAX_LNG_SPAN / 2;
+  }
+  return padded;
+}
+
+/** Build a filter-only key (excludes viewport params) for cache invalidation */
+function getFilterKey(searchParams: URLSearchParams): string {
+  const filtered = buildCanonicalFilterParamsFromSearchParams(searchParams);
+  filtered.sort();
+  return filtered.toString();
+}
 
 // Legacy map-relevant key list kept as explicit documentation and fallback shape.
 // The active serialization path uses canonical parser output so map/list stay in sync.
@@ -205,7 +293,7 @@ function MapLoadingPlaceholder() {
 function MapTransitionOverlay() {
   return (
     <div
-      className="absolute inset-0 z-10 bg-white/30 dark:bg-zinc-950/30 pointer-events-none flex items-start justify-center pt-20"
+      className="absolute inset-0 z-10 bg-transparent pointer-events-none flex items-start justify-center pt-20"
       role="status"
       aria-label="Updating map results"
     >
@@ -302,6 +390,14 @@ export default function PersistentMapWrapper({
   const [listings, setListings] = useState<MapListingData[]>([]);
   const [isFetchingMapData, setIsFetchingMapData] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Stale-while-revalidate: keep last successful fetch visible during loading
+  const previousListingsRef = useRef<MapListingData[]>([]);
+  // Spatial cache: instant markers from previously-viewed areas on zoom-out/pan-back
+  const spatialCacheRef = useRef<Map<string, SpatialCacheEntry>>(new Map());
+  // Track last-fetched padded bounds for hysteresis (skip fetch when viewport mostly contained)
+  const lastFetchedBoundsRef = useRef<ViewportBounds | null>(null);
+  // Track filter key to invalidate spatial cache on filter change
+  const lastFilterKeyRef = useRef<string>("");
   // P2-FIX (#151): Separate info messages from errors - info is non-blocking (no retry needed)
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
@@ -349,14 +445,47 @@ export default function PersistentMapWrapper({
 
   // Compute effective listings based on data source (v2 context or v1 fetch)
   // Memoized for stable reference to prevent unnecessary Map re-renders
+  // During V1 fetch: merge cached listings from overlapping areas for instant display
   const effectiveListings = useMemo(() => {
     // P2-FIX (#124): Use lastV2Data state (not ref) so memo properly recalculates
     const activeV2Data = isV2Enabled ? (v2MapData ?? lastV2Data) : null;
     if (activeV2Data) {
       return v2MapDataToListings(activeV2Data);
     }
+    // During V1 fetch, merge previous data + cached spatial data so markers never disappear
+    if (isFetchingMapData && previousListingsRef.current.length > 0) {
+      // Deduplicate by listing ID, cap at MAX_MAP_MARKERS
+      const seenIds = new Set<string>();
+      const merged: MapListingData[] = [];
+      // Start with current listings (highest priority)
+      for (const l of listings) {
+        if (!seenIds.has(l.id) && merged.length < MAX_MAP_MARKERS) {
+          seenIds.add(l.id);
+          merged.push(l);
+        }
+      }
+      // Add previous listings
+      for (const l of previousListingsRef.current) {
+        if (!seenIds.has(l.id) && merged.length < MAX_MAP_MARKERS) {
+          seenIds.add(l.id);
+          merged.push(l);
+        }
+      }
+      // Add from spatial cache entries that overlap current viewport
+      const currentFilterKey = lastFilterKeyRef.current;
+      for (const entry of spatialCacheRef.current.values()) {
+        if (entry.filterKey !== currentFilterKey) continue;
+        for (const l of entry.listings) {
+          if (!seenIds.has(l.id) && merged.length < MAX_MAP_MARKERS) {
+            seenIds.add(l.id);
+            merged.push(l);
+          }
+        }
+      }
+      return merged;
+    }
     return listings;
-  }, [isV2Enabled, v2MapData, lastV2Data, listings]);
+  }, [isV2Enabled, v2MapData, lastV2Data, listings, isFetchingMapData]);
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
@@ -366,7 +495,7 @@ export default function PersistentMapWrapper({
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchListings = useCallback(
-    async (paramsString: string, signal?: AbortSignal) => {
+    async (paramsString: string, signal?: AbortSignal, fetchBounds?: ViewportBounds) => {
       setIsFetchingMapData(true);
       setError(null);
 
@@ -405,7 +534,7 @@ export default function PersistentMapWrapper({
 
             // Schedule automatic retry
             retryTimeoutRef.current = setTimeout(() => {
-              fetchListings(paramsString, signal);
+              fetchListings(paramsString, signal, fetchBounds);
             }, retryDelayMs);
 
             return; // Exit without throwing - retry will happen automatically
@@ -438,7 +567,35 @@ export default function PersistentMapWrapper({
         }
 
         const data = await response.json();
-        setListings(data.listings || []);
+        const fetched = data.listings || [];
+        previousListingsRef.current = fetched;
+        setListings(fetched);
+
+        // Store in spatial cache for instant zoom-out/pan-back display
+        if (fetchBounds) {
+          const cacheKey = quantizeBounds(fetchBounds);
+          const filterKey = lastFilterKeyRef.current;
+          spatialCacheRef.current.set(cacheKey, {
+            listings: fetched,
+            bounds: fetchBounds,
+            filterKey,
+            timestamp: Date.now(),
+          });
+          // LRU eviction: remove oldest entries beyond limit
+          if (spatialCacheRef.current.size > SPATIAL_CACHE_MAX_ENTRIES) {
+            let oldestKey: string | null = null;
+            let oldestTime = Infinity;
+            for (const [key, entry] of spatialCacheRef.current) {
+              if (entry.timestamp < oldestTime) {
+                oldestTime = entry.timestamp;
+                oldestKey = key;
+              }
+            }
+            if (oldestKey) spatialCacheRef.current.delete(oldestKey);
+          }
+          // Update last-fetched bounds for hysteresis checks
+          lastFetchedBoundsRef.current = fetchBounds;
+        }
 
         // Reset retry counter on successful fetch
         retryCountRef.current = 0;
@@ -567,6 +724,27 @@ export default function PersistentMapWrapper({
       return;
     }
 
+    // Parse current viewport bounds for spatial cache + hysteresis
+    const currentBounds: ViewportBounds = {
+      minLat: parseFloat(clampedSearchParams.get("minLat") || "0"),
+      maxLat: parseFloat(clampedSearchParams.get("maxLat") || "0"),
+      minLng: parseFloat(clampedSearchParams.get("minLng") || "0"),
+      maxLng: parseFloat(clampedSearchParams.get("maxLng") || "0"),
+    };
+
+    // Invalidate spatial cache when filters change
+    const currentFilterKey = getFilterKey(clampedSearchParams);
+    if (currentFilterKey !== lastFilterKeyRef.current) {
+      spatialCacheRef.current.clear();
+      lastFetchedBoundsRef.current = null;
+      lastFilterKeyRef.current = currentFilterKey;
+    }
+
+    // Viewport hysteresis: skip fetch if new viewport is mostly within last-fetched padded area
+    if (lastFetchedBoundsRef.current && isViewportContained(currentBounds, lastFetchedBoundsRef.current)) {
+      return;
+    }
+
     // Clear any pending fetch timeout
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
@@ -583,10 +761,21 @@ export default function PersistentMapWrapper({
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    // Pad fetch bounds by 20% to pre-fetch nearby listings (reduces fetches on small pans)
+    // Only the map's /api/map-listings fetch uses padded bounds.
+    // URL params (for list/page sync) continue using actual visible viewport — no conflict.
+    const paddedBounds = padBounds(currentBounds);
+    const paddedParams = new URLSearchParams(clampedSearchParams.toString());
+    paddedParams.set("minLat", paddedBounds.minLat.toString());
+    paddedParams.set("maxLat", paddedBounds.maxLat.toString());
+    paddedParams.set("minLng", paddedBounds.minLng.toString());
+    paddedParams.set("maxLng", paddedBounds.maxLng.toString());
+    const paddedParamsString = getMapRelevantParams(paddedParams);
+
     // Small debounce to coalesce rapid URL updates without adding noticeable lag.
     fetchTimeoutRef.current = setTimeout(() => {
       lastFetchedParamsRef.current = paramsString;
-      fetchListings(paramsString, abortController.signal);
+      fetchListings(paddedParamsString, abortController.signal, paddedBounds);
     }, MAP_FETCH_DEBOUNCE_MS);
 
     return () => {
@@ -662,14 +851,7 @@ export default function PersistentMapWrapper({
       {(isFetchingMapData || isListTransitioning || showV2LoadingOverlay) && (
         <MapDataLoadingBar />
       )}
-      {/* Marker loading shimmer - subtle overlay when map data is being fetched */}
-      {(isFetchingMapData || showV2LoadingOverlay) && !isListTransitioning && (
-        <div
-          className="absolute inset-0 z-10 pointer-events-none bg-white/10 dark:bg-zinc-950/10"
-          role="status"
-          aria-label="Loading listings"
-        />
-      )}
+      {/* Marker loading shimmer removed - stale-while-revalidate keeps old markers visible */}
       {/* Coordinated loading overlay - shows when list is transitioning (filter change) */}
       {isListTransitioning && <MapTransitionOverlay />}
       <MapErrorBoundary>

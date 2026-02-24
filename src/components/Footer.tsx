@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 export default function Footer() {
     return (
-        <footer className="bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-white/5 pt-24 pb-12 overflow-hidden">
+        <footer className="bg-white dark:bg-zinc-950 pt-24 pb-12 overflow-hidden">
             <div className="max-w-7xl mx-auto px-6 sm:px-8">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-12 md:gap-16 mb-20">
                     {/* Brand Section */}
@@ -63,7 +63,7 @@ export default function Footer() {
                 </div>
 
                 {/* Bottom Bar */}
-                <div className="border-t border-zinc-100 dark:border-white/5 pt-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="pt-10 flex flex-col sm:flex-row items-center justify-between gap-6">
                     <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em] order-2 sm:order-1">
                         © {new Date().getFullYear()} RoomShare Inc.
                     </p>

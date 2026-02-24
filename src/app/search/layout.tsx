@@ -50,9 +50,9 @@ export default function SearchLayout({
             </header>
 
             {/* Main content with top padding to account for fixed header.
-                Uses --header-height CSS variable (80px mobile, 96px sm+)
-                defined in globals.css */}
-            <div className="flex-1 flex flex-col pt-[var(--header-height)] overflow-hidden">
+                Uses --header-height CSS variable updated dynamically by SearchHeaderWrapper to
+                perfectly flush clear the search bar regardless of responsive wrapping. */}
+            <div className="flex-1 flex flex-col pt-[var(--header-height)] overflow-hidden" style={{ transition: 'padding-top 0.3s ease-out' }}>
               {/* Split view: List (from page) + Map (managed by SearchLayoutView) */}
               <MapBoundsProvider>
                 <ListingFocusProvider>

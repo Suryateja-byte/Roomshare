@@ -251,8 +251,10 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
     await waitForLayoutStable(page);
     await waitForSheetAnimation(page);
 
-    // Get initial sheet height (after layout is stable)
-    const initialBox = await bottomSheet.boundingBox();
+    // Use data-snap-current attribute (0=collapsed, 1=half, 2=expanded)
+    // This is more reliable than pixel measurements which race with spring animations
+    const snapContent = bottomSheet.locator('[data-snap-current]');
+    const hasSnapAttr = await snapContent.count() > 0;
 
     // Click "Show map" to switch to map view
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
@@ -260,18 +262,16 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
       await showMapBtn.click();
       await waitForSheetAnimation(page);
 
-      // Sheet should be collapsed (smaller height or moved down).
-      // Poll because framer-motion spring may still be settling on CI.
-      if (initialBox) {
-        await expect(async () => {
-          const afterBox = await bottomSheet.boundingBox();
-          expect(afterBox).not.toBeNull();
-          if (afterBox) {
-            const heightReduced = afterBox.height < initialBox.height;
-            const movedDown = afterBox.y > initialBox.y;
-            expect(heightReduced || movedDown).toBeTruthy();
-          }
-        }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+      if (hasSnapAttr) {
+        // Assert snap index is 0 (collapsed) via the data attribute
+        await expect(snapContent).toHaveAttribute("data-snap-current", "0", { timeout: 5000 });
+      } else {
+        // Fallback: measure bounding box if data attribute not present
+        const afterBox = await bottomSheet.boundingBox();
+        if (afterBox) {
+          const viewportHeight = page.viewportSize()?.height ?? 844;
+          expect(afterBox.height).toBeLessThan(viewportHeight * 0.3);
+        }
       }
     }
   });

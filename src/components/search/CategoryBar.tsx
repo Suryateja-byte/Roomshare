@@ -211,7 +211,7 @@ export function CategoryBar() {
       {/* Scrollable container */}
       <div
         ref={scrollRef}
-        className="flex items-center gap-8 px-6 py-2 overflow-x-auto scrollbar-hide scroll-smooth"
+        className="flex items-center gap-8 px-6 pt-6 pb-4 overflow-x-auto scrollbar-hide scroll-smooth"
         style={{ cursor: 'grab' }}
       >
         {CATEGORIES.map((cat) => {
@@ -219,7 +219,7 @@ export function CategoryBar() {
           // Determine active status manually using our helper
           const params = new URLSearchParams(searchParams.toString());
           const isActive = isCategoryActive(cat.params, params);
-          
+
           return (
             <button
               key={cat.id}
@@ -227,7 +227,7 @@ export function CategoryBar() {
               onClick={() => handleSelect(cat.params)}
               disabled={isPending}
               className={`
-                flex flex-col items-center gap-2 pb-3 min-w-[56px] text-xs font-medium
+                flex flex-col items-center gap-2 pt-2 pb-3 min-w-[56px] text-xs font-medium
                 transition-all duration-200 flex-shrink-0 border-b-2
                 ${isActive
                   ? 'border-zinc-900 dark:border-white text-zinc-900 dark:text-white'
@@ -237,7 +237,7 @@ export function CategoryBar() {
               `}
               aria-pressed={isActive}
             >
-              <Icon className={`w-6 h-6 ${isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`} strokeWidth={isActive ? 2 : 1.5} />
+              <Icon className={`w-6 h-6 overflow-visible ${isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`} strokeWidth={isActive ? 2 : 1.5} />
               <span className="whitespace-nowrap">{cat.label}</span>
             </button>
           );

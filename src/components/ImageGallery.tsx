@@ -169,7 +169,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
         // 0 images - Placeholder
         if (imageCount === 0) {
             return (
-                <div className={cn(containerClasses, "flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-600 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800")}>
+                <div className={cn(containerClasses, "flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-600 bg-zinc-50 dark:bg-zinc-900")}>
                     <div className="p-6 rounded-full bg-zinc-100 dark:bg-zinc-800 mb-4">
                         <ImageIcon className="w-10 h-10" />
                     </div>

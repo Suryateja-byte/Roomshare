@@ -52,12 +52,12 @@ describe('Bounds Validation', () => {
     });
 
     it('clamps oversized bounds instead of rejecting (P1-5)', () => {
-      // 10 degree span - larger than MAX_LAT_SPAN (5)
+      // 15 degree span - larger than MAX_LAT_SPAN (10)
       const result = validateAndParseBounds(
-        '-122',
-        '-112', // 10 degree lng span
-        '30',
-        '40'    // 10 degree lat span
+        '-125',
+        '-110', // 15 degree lng span
+        '28',
+        '43'    // 15 degree lat span
       );
 
       // P1-5: Should clamp, not reject
@@ -74,7 +74,7 @@ describe('Bounds Validation', () => {
 
     it('preserves antimeridian crossing when within span limits', () => {
       // minLng > maxLng indicates antimeridian crossing
-      // 178 to -178 = 4 degrees (within MAX_LNG_SPAN of 5)
+      // 178 to -178 = 4 degrees (within MAX_LNG_SPAN of 10)
       const result = validateAndParseBounds('178', '-178', '35', '38');
       expect(result.valid).toBe(true);
       expect(result.bounds?.minLng).toBe(178);
@@ -82,7 +82,7 @@ describe('Bounds Validation', () => {
     });
 
     it('clamps oversized antimeridian crossing bounds', () => {
-      // 170 to -170 = 20 degrees (exceeds MAX_LNG_SPAN of 5)
+      // 170 to -170 = 20 degrees (exceeds MAX_LNG_SPAN of 10)
       const result = validateAndParseBounds('170', '-170', '35', '38');
       expect(result.valid).toBe(true);
 

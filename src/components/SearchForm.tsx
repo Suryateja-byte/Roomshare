@@ -657,7 +657,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             <form
                 ref={formRef}
                 onSubmit={handleSearch}
-                className={`group relative flex flex-col md:flex-row md:items-center bg-white dark:bg-zinc-800/95 backdrop-blur-2xl rounded-3xl md:rounded-full shadow-lg dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] border border-zinc-200/80 dark:border-zinc-700/80 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-xl dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)] transition-all duration-300 w-full ${isCompact ? 'p-1' : 'p-2'}`}
+                className={`group relative flex flex-col md:flex-row md:items-center bg-white dark:bg-zinc-900 backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 w-full ${isCompact ? 'p-1' : 'p-2'}`}
                 role="search"
             >
                 {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
@@ -811,7 +811,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                             className={`flex items-center justify-center gap-1.5 px-3 h-8 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isSelected
                                                 ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm border border-zinc-200/50 dark:border-white/10'
                                                 : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
-                                            }`}
+                                                }`}
                                             aria-pressed={isSelected}
                                             aria-label={label}
                                         >
@@ -837,7 +837,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                 className={`flex items-center gap-2 h-10 px-4 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${activeFilterCount > 0
                                     ? 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400'
                                     : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700'
-                                }`}
+                                    }`}
                             >
                                 <SlidersHorizontal className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">Filters</span>

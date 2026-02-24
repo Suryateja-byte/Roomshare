@@ -52,15 +52,16 @@ export const LAT_OFFSET_DEGREES = 0.09;
 
 /**
  * Maximum viewport span for latitude (in degrees).
- * 5° ≈ 550km - allows regional views with clustering.
+ * 10° ≈ 1100km - allows seeing SF+LA or entire Northeast corridor.
+ * MapLibre clustering handles dense markers; DB protected with LIMIT 200.
  */
-export const MAX_LAT_SPAN = 5;
+export const MAX_LAT_SPAN = 10;
 
 /**
  * Maximum viewport span for longitude (in degrees).
- * 5° ≈ 550km at equator, less at higher latitudes.
+ * 10° ≈ 1100km at equator, less at higher latitudes.
  */
-export const MAX_LNG_SPAN = 5;
+export const MAX_LNG_SPAN = 10;
 
 // ============================================
 // Coordinate Limits (Web Mercator practical)
@@ -99,3 +100,16 @@ export const CLUSTER_THRESHOLD = 50;
 
 /** Bounds quantization for cache key normalization (~100m precision) */
 export const BOUNDS_EPSILON = 0.001;
+
+// ============================================
+// Map Viewport Restrictions
+// ============================================
+
+/** USA maxBounds for MapLibre — covers all 50 states including Alaska + Hawaii */
+export const USA_MAX_BOUNDS: [[number, number], [number, number]] = [
+  [-180, 17],  // SW corner: covers Hawaii (19N) + territories with margin
+  [-64, 72],   // NE corner: covers Alaska (71N) + Maine with margin
+];
+
+/** Minimum zoom level to prevent world-view zoom out */
+export const MAP_MIN_ZOOM = 3;

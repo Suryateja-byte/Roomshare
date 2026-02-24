@@ -251,7 +251,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
         <nav
             aria-label="Main navigation"
             className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-500 ease-in-out ${isScrolled
-                ? 'py-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-200/50 dark:border-white/5 shadow-xl shadow-zinc-900/5 dark:shadow-black/20'
+                ? 'py-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl shadow-sm'
                 : 'py-6 bg-transparent'
                 }`}
         >
@@ -287,7 +287,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                     {/* --- RIGHT: Actions --- */}
                     <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
 
-                        <div className="hidden md:flex items-center gap-1 pr-2 border-r border-zinc-200/50 dark:border-white/10">
+                        <div className="hidden md:flex items-center gap-1 pr-2">
                             <NotificationCenter />
                             <IconButton
                                 icon={<MessageSquare size={18} strokeWidth={2} />}
@@ -302,9 +302,9 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                             <div className="relative" ref={profileRef}>
                                 <button
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                    className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full border transition-all duration-300 ${isProfileOpen
-                                        ? 'border-zinc-900 dark:border-white bg-zinc-900 dark:bg-white'
-                                        : 'border-zinc-200/50 dark:border-white/10 hover:border-zinc-400 dark:hover:border-zinc-500'
+                                    className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full transition-all duration-300 ${isProfileOpen
+                                        ? 'bg-zinc-100 dark:bg-zinc-800'
+                                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
                                         }`}
                                     aria-expanded={isProfileOpen}
                                     aria-haspopup="true"
@@ -321,8 +321,8 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                 {/* Dropdown Menu - CSS animated */}
                                 <div
                                     className={`absolute right-0 mt-4 w-72 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-zinc-900/10 dark:shadow-black/60 border border-zinc-200/50 dark:border-white/5 overflow-hidden origin-top-right z-sticky transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) ${isProfileOpen
-                                            ? 'opacity-100 translate-y-0 visible scale-100'
-                                            : 'opacity-0 -translate-y-4 invisible scale-95 pointer-events-none'
+                                        ? 'opacity-100 translate-y-0 visible scale-100'
+                                        : 'opacity-0 -translate-y-4 invisible scale-95 pointer-events-none'
                                         }`}
                                 >
                                     <div className="p-6 border-b border-zinc-100 dark:border-white/5 bg-zinc-50/50 dark:bg-white/[0.02]">

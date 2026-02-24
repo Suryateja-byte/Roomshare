@@ -152,7 +152,7 @@ export function FilterModal({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"
+        className="absolute inset-0 z-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
         aria-label="Close filters"
       />
@@ -161,7 +161,7 @@ export function FilterModal({
       <FocusTrap active={isOpen}>
         <div
           id="search-filters"
-          className="absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)]"
+          className="absolute right-0 top-0 z-10 h-full w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)]"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
