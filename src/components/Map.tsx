@@ -27,7 +27,7 @@ import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
 import { MapMovedBanner } from './map/MapMovedBanner';
 import { MapGestureHint } from './map/MapGestureHint';
 import { MapEmptyState } from './map/MapEmptyState';
-import { hasFilterChips } from './filters/filter-chip-utils';
+import { hasAnyFilter } from './filters/filter-chip-utils';
 import { PrivacyCircle } from './map/PrivacyCircle';
 import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
@@ -1028,7 +1028,7 @@ export default function MapComponent({
     const nonBoundsParamsKey = useMemo(() => {
         const keys = ['q', 'minPrice', 'maxPrice', 'amenities', 'houseRules', 'languages',
             'roomType', 'leaseDuration', 'moveInDate', 'genderPreference', 'householdGender', 'nearMatches'];
-        return keys.map(k => `${k}=${searchParams.get(k) ?? ''}`).join('&');
+        return keys.map(k => `${k}=${searchParams.getAll(k).sort().join(',')}`).join('&');
     }, [searchParams]);
 
     // Reset auto-zoom flag when search context (non-bounds filters) changes
@@ -1036,27 +1036,30 @@ export default function MapComponent({
         hasAutoZoomedRef.current = false;
     }, [nonBoundsParamsKey]);
 
-    // Fire auto-zoom when empty results, no filters, and user hasn't manually panned
-    useEffect(() => {
-        if (!isMapLoaded || areTilesLoading || isSearching) return;
-        if (listings.length > 0) return;
-        if (hasAutoZoomedRef.current) return;
-        if (hasFilterChips(searchParams)) return;
-        if (hasUserMoved) return;
+    const handleZoomOut = useCallback(() => {
         if (!mapRef.current) return;
-
         const map = mapRef.current.getMap();
         if (!map) return;
-
         const currentZoom = map.getZoom();
-        hasAutoZoomedRef.current = true;
         setProgrammaticMove(true);
         if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
         programmaticClearTimeoutRef.current = setTimeout(() => {
             if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
         }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
         mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
-    }, [isMapLoaded, areTilesLoading, isSearching, listings.length, searchParams, hasUserMoved, setProgrammaticMove, isProgrammaticMoveRef]);
+    }, [setProgrammaticMove, isProgrammaticMoveRef]);
+
+    // Fire auto-zoom when empty results, no filters, and user hasn't manually panned
+    useEffect(() => {
+        if (!isMapLoaded || areTilesLoading || isSearching) return;
+        if (listings.length > 0) return;
+        if (hasAutoZoomedRef.current) return;
+        if (hasAnyFilter(searchParams)) return;
+        if (hasUserMoved) return;
+
+        hasAutoZoomedRef.current = true;
+        handleZoomOut();
+    }, [isMapLoaded, areTilesLoading, isSearching, listings.length, searchParams, hasUserMoved, handleZoomOut]);
 
     // Expose map ref and helpers for E2E testing
     useEffect(() => {
@@ -2319,19 +2322,7 @@ export default function MapComponent({
             {isMapLoaded && !areTilesLoading && !isSearching && listings.length === 0 && (
                 <MapEmptyState
                     searchParams={searchParams}
-                    onZoomOut={() => {
-                        if (!mapRef.current) return;
-                        const map = mapRef.current.getMap();
-                        if (!map) return;
-                        const currentZoom = map.getZoom();
-                        setProgrammaticMove(true);
-                        // P2-FIX (#167): Add safety timeout to clear programmatic flag if moveEnd doesn't fire
-                        if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
-                        programmaticClearTimeoutRef.current = setTimeout(() => {
-                            if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
-                        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-                        mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
-                    }}
+                    onZoomOut={handleZoomOut}
                 />
             )}
         </div>

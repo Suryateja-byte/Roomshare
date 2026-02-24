@@ -363,6 +363,21 @@ export function clearAllFilters(searchParams: URLSearchParams): string {
   return newParams.toString();
 }
 
+/** Quick check — returns true if any filter param is set (no chip construction) */
+const FILTER_PARAM_KEYS = [
+  'minPrice', 'maxPrice', 'minBudget', 'maxBudget',
+  'moveInDate', 'roomType', 'leaseDuration',
+  'amenities', 'houseRules', 'languages',
+  'genderPreference', 'householdGender', 'nearMatches',
+] as const;
+
+export function hasAnyFilter(searchParams: URLSearchParams): boolean {
+  return FILTER_PARAM_KEYS.some(k => {
+    const v = searchParams.get(k);
+    return v !== null && v !== '' && v !== 'any';
+  });
+}
+
 /**
  * Check if there are any filter chips to display
  */

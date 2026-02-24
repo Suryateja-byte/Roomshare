@@ -115,7 +115,7 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
               onClick={() => handleRemoveSuggestion(suggestion)}
             >
               <X className="w-3 h-3" aria-hidden="true" />
-              Remove {suggestion.type}
+              {suggestion.label}
             </button>
           ))}
         </div>

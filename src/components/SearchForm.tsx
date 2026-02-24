@@ -36,6 +36,16 @@ const SEARCH_DEBOUNCE_MS = 300;
 const AMENITY_OPTIONS = VALID_AMENITIES;
 const HOUSE_RULE_OPTIONS = VALID_HOUSE_RULES;
 
+const ARRAY_PENDING_KEYS = new Set<string>(['amenities', 'houseRules', 'languages']);
+
+const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<string, string[]> = {
+    price: ['minPrice', 'maxPrice'],
+    date: ['moveInDate'],
+    roomType: ['roomType'],
+    amenities: ['amenities'],
+    leaseDuration: ['leaseDuration'],
+};
+
 // Room type options for inline filter tabs
 const ROOM_TYPE_TABS = [
     { value: 'any', label: 'All', icon: LayoutGrid },
@@ -576,28 +586,21 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     // P4: Compute drawer suggestions when count drops to 0
     const drawerSuggestions = useMemo(() => {
-        if (count === null || count >= 5 || isCountLoading) return [];
+        if (count !== 0 || isCountLoading) return [];
         const fp = pendingToFilterParams(pending);
         return generateFilterSuggestions(fp, count).slice(0, 2);
     }, [count, isCountLoading, pending]);
 
     // P4: Handle removing a filter suggestion from the drawer
     const handleRemoveFilterSuggestion = useCallback((suggestion: FilterSuggestion) => {
-        const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<FilterSuggestion['type'], (keyof typeof pending)[]> = {
-            price: ['minPrice', 'maxPrice'],
-            date: ['moveInDate'],
-            roomType: ['roomType'],
-            amenities: ['amenities'],
-            leaseDuration: ['leaseDuration'],
-        };
         const keys = SUGGESTION_TYPE_TO_PENDING_KEYS[suggestion.type];
         if (!keys) return;
         const updates: Record<string, string | string[]> = {};
         for (const key of keys) {
-            updates[key] = Array.isArray(pending[key]) ? [] : '';
+            updates[key] = ARRAY_PENDING_KEYS.has(key) ? [] : '';
         }
         setPending(updates as Partial<typeof pending>);
-    }, [pending, setPending]);
+    }, [setPending]);
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;

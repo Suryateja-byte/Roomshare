@@ -65,4 +65,15 @@ describe("DrawerZeroState", () => {
     fireEvent.click(screen.getByText("Remove date filter"));
     expect(mockOnRemove).toHaveBeenCalledWith(suggestions[1]);
   });
+
+  it("has role=status and aria-live=polite for screen readers", () => {
+    const suggestions: FilterSuggestion[] = [
+      { type: "price", label: "Remove price filter", priority: 1 },
+    ];
+    render(
+      <DrawerZeroState suggestions={suggestions} onRemoveSuggestion={mockOnRemove} />
+    );
+    const container = screen.getByRole("status");
+    expect(container).toHaveAttribute("aria-live", "polite");
+  });
 });
