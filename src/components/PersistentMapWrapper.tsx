@@ -392,6 +392,12 @@ export default function PersistentMapWrapper({
   const [error, setError] = useState<string | null>(null);
   // Stale-while-revalidate: keep last successful fetch visible during loading
   const previousListingsRef = useRef<MapListingData[]>([]);
+  // Spatial cache: instant markers from previously-viewed areas on zoom-out/pan-back
+  const spatialCacheRef = useRef<Map<string, SpatialCacheEntry>>(new Map());
+  // Track last-fetched padded bounds for hysteresis (skip fetch when viewport mostly contained)
+  const lastFetchedBoundsRef = useRef<ViewportBounds | null>(null);
+  // Track filter key to invalidate spatial cache on filter change
+  const lastFilterKeyRef = useRef<string>("");
   // P2-FIX (#151): Separate info messages from errors - info is non-blocking (no retry needed)
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
@@ -487,13 +493,6 @@ export default function PersistentMapWrapper({
   const abortControllerRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Spatial cache: instant markers from previously-viewed areas on zoom-out/pan-back
-  const spatialCacheRef = useRef<Map<string, SpatialCacheEntry>>(new Map());
-  // Track last-fetched padded bounds for hysteresis (skip fetch when viewport mostly contained)
-  const lastFetchedBoundsRef = useRef<ViewportBounds | null>(null);
-  // Track filter key to invalidate spatial cache on filter change
-  const lastFilterKeyRef = useRef<string>("");
 
   const fetchListings = useCallback(
     async (paramsString: string, signal?: AbortSignal, fetchBounds?: ViewportBounds) => {
