@@ -16,7 +16,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PriceRangeFilter } from '@/components/search/PriceRangeFilter';
+import { DrawerZeroState } from '@/components/search/DrawerZeroState';
 import type { PriceHistogramBucket } from '@/app/api/search/facets/route';
+import type { FilterSuggestion } from '@/lib/near-matches';
 
 interface FilterModalProps {
   isOpen: boolean;
@@ -75,6 +77,11 @@ interface FilterModalProps {
   formattedCount?: string;
   isCountLoading?: boolean;
   boundsRequired?: boolean;
+
+  // P4: Zero-count warning
+  count?: number | null;
+  drawerSuggestions?: FilterSuggestion[];
+  onRemoveFilterSuggestion?: (suggestion: FilterSuggestion) => void;
 }
 
 /**
@@ -125,6 +132,10 @@ export function FilterModal({
   formattedCount,
   isCountLoading,
   boundsRequired,
+  // P4: Zero-count warning
+  count,
+  drawerSuggestions,
+  onRemoveFilterSuggestion,
 }: FilterModalProps) {
   useBodyScrollLock(isOpen);
 
@@ -429,34 +440,46 @@ export function FilterModal({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-3">
-            {hasActiveFilters && (
+          <div className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 space-y-3">
+            {count === 0 && !isCountLoading && drawerSuggestions && drawerSuggestions.length > 0 && onRemoveFilterSuggestion && (
+              <DrawerZeroState
+                suggestions={drawerSuggestions}
+                onRemoveSuggestion={onRemoveFilterSuggestion}
+              />
+            )}
+            <div className="flex items-center gap-3">
+              {hasActiveFilters && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClearAll}
+                  className="flex-1 rounded-xl h-12"
+                  data-testid="filter-modal-clear-all"
+                >
+                  Clear all
+                </Button>
+              )}
               <Button
                 type="button"
-                variant="outline"
-                onClick={onClearAll}
-                className="flex-1 rounded-xl h-12"
-                data-testid="filter-modal-clear-all"
+                onClick={onApply}
+                disabled={boundsRequired}
+                className={`flex-1 rounded-xl h-12 text-white shadow-md disabled:opacity-60 disabled:cursor-not-allowed ${
+                  count === 0 && !isCountLoading
+                    ? 'bg-amber-500 hover:bg-amber-600'
+                    : 'bg-indigo-500 hover:bg-indigo-600'
+                }`}
+                data-testid="filter-modal-apply"
               >
-                Clear all
+                {isCountLoading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    {formattedCount || 'listings'}
+                  </span>
+                ) : (
+                  formattedCount || 'Show Results'
+                )}
               </Button>
-            )}
-            <Button
-              type="button"
-              onClick={onApply}
-              disabled={boundsRequired}
-              className="flex-1 rounded-xl h-12 bg-indigo-500 text-white hover:bg-indigo-600 shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-              data-testid="filter-modal-apply"
-            >
-              {isCountLoading ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {formattedCount || 'listings'}
-                </span>
-              ) : (
-                formattedCount || 'Show Results'
-              )}
-            </Button>
+            </div>
           </div>
         </div>
       </FocusTrap>

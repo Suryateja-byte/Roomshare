@@ -2,7 +2,7 @@ import {
   urlToFilterChips,
   removeFilterFromUrl,
   clearAllFilters,
-  hasFilterChips,
+  hasAnyFilter,
   type FilterChipData,
 } from "@/components/filters/filter-chip-utils";
 
@@ -570,35 +570,36 @@ describe("filter-chip-utils", () => {
     });
   });
 
-  describe("hasFilterChips", () => {
-    it("returns true when filters are present", () => {
-      const params = new URLSearchParams("minPrice=500");
-
-      expect(hasFilterChips(params)).toBe(true);
+  describe("hasAnyFilter", () => {
+    it("returns false for empty params", () => {
+      expect(hasAnyFilter(new URLSearchParams())).toBe(false);
     });
 
-    it("returns false when no filters present", () => {
-      const params = new URLSearchParams("");
-
-      expect(hasFilterChips(params)).toBe(false);
+    it("returns true for a price filter", () => {
+      expect(hasAnyFilter(new URLSearchParams("maxPrice=1500"))).toBe(true);
     });
 
-    it("returns false when only preserved params present", () => {
-      const params = new URLSearchParams("q=downtown&sort=newest&lat=37.7");
-
-      expect(hasFilterChips(params)).toBe(false);
+    it("returns false for nearMatches=0", () => {
+      expect(hasAnyFilter(new URLSearchParams("nearMatches=0"))).toBe(false);
     });
 
-    it("returns false when only UI state params present", () => {
-      const params = new URLSearchParams("page=3&view=map");
-
-      expect(hasFilterChips(params)).toBe(false);
+    it("returns false for nearMatches=false", () => {
+      expect(hasAnyFilter(new URLSearchParams("nearMatches=false"))).toBe(
+        false,
+      );
     });
 
-    it("returns true when filters mixed with preserved params", () => {
-      const params = new URLSearchParams("q=downtown&minPrice=500");
+    it("returns true for nearMatches=1", () => {
+      expect(hasAnyFilter(new URLSearchParams("nearMatches=1"))).toBe(true);
+    });
 
-      expect(hasFilterChips(params)).toBe(true);
+    it("returns false for roomType=any", () => {
+      expect(hasAnyFilter(new URLSearchParams("roomType=any"))).toBe(false);
+    });
+
+    it("returns false for empty string values", () => {
+      expect(hasAnyFilter(new URLSearchParams("maxPrice="))).toBe(false);
     });
   });
+
 });

@@ -92,7 +92,7 @@ export interface PaginatedResult<T> {
 export type PaginatedResultHybrid<T> = {
   items: T[];
   total: number | null; // null when count is expensive (>100 results)
-  page: number;
+  page: number | null;
   limit: number;
   totalPages: number | null;
   hasNextPage?: boolean;

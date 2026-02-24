@@ -26,6 +26,8 @@ import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
 import { MapMovedBanner } from './map/MapMovedBanner';
 import { MapGestureHint } from './map/MapGestureHint';
+import { MapEmptyState } from './map/MapEmptyState';
+import { hasAnyFilter, FILTER_PARAM_KEYS } from './filters/filter-chip-utils';
 import { PrivacyCircle } from './map/PrivacyCircle';
 import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
@@ -396,6 +398,7 @@ export default function MapComponent({
     const {
         searchAsMove,
         setSearchAsMove,
+        hasUserMoved,
         setHasUserMoved,
         setBoundsDirty,
         setCurrentMapBounds,
@@ -431,6 +434,8 @@ export default function MapComponent({
     const isInitialMoveRef = useRef(true);
     // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
     const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // Auto-zoom: fire once per search context when results are empty and no filters active
+    const hasAutoZoomedRef = useRef(false);
     // Ref for sourcedata handler cleanup
     const sourcedataHandlerRef = useRef<((e: MapSourceDataEvent) => void) | null>(null);
     const webglCleanupRef = useRef<(() => void) | null>(null);
@@ -1017,6 +1022,43 @@ export default function MapComponent({
             );
         }
     }, [listings, searchParams, searchAsMove, setProgrammaticMove, disableAutoFit, isControlledViewState]);
+
+    // Auto-zoom-out: when map loads empty with no active filters, zoom out once
+    // Build a key from non-bounds params so we reset per search context
+    const nonBoundsParamsKey = useMemo(() => {
+        const keys = ['q', ...FILTER_PARAM_KEYS];
+        return keys.map(k => `${k}=${searchParams.getAll(k).sort().join(',')}`).join('&');
+    }, [searchParams]);
+
+    // Reset auto-zoom flag when search context (non-bounds filters) changes
+    useEffect(() => {
+        hasAutoZoomedRef.current = false;
+    }, [nonBoundsParamsKey]);
+
+    const handleZoomOut = useCallback(() => {
+        if (!mapRef.current) return;
+        const map = mapRef.current.getMap();
+        if (!map) return;
+        const currentZoom = map.getZoom();
+        setProgrammaticMove(true);
+        if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
+        programmaticClearTimeoutRef.current = setTimeout(() => {
+            if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+        mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
+    }, [setProgrammaticMove, isProgrammaticMoveRef]);
+
+    // Fire auto-zoom when empty results, no filters, and user hasn't manually panned
+    useEffect(() => {
+        if (!isMapLoaded || areTilesLoading || isSearching) return;
+        if (listings.length > 0) return;
+        if (hasAutoZoomedRef.current) return;
+        if (hasAnyFilter(searchParams)) return;
+        if (hasUserMoved) return;
+
+        hasAutoZoomedRef.current = true;
+        handleZoomOut();
+    }, [isMapLoaded, areTilesLoading, isSearching, listings.length, searchParams, hasUserMoved, handleZoomOut]);
 
     // Expose map ref and helpers for E2E testing
     useEffect(() => {
@@ -2277,33 +2319,10 @@ export default function MapComponent({
 
             {/* Empty state overlay - when map is loaded but no listings in viewport */}
             {isMapLoaded && !areTilesLoading && !isSearching && listings.length === 0 && (
-                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 px-5 py-4 max-w-[280px] text-center pointer-events-auto">
-                    <MapPin className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2" aria-hidden="true" />
-                    <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">No listings in this area</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Try zooming out or adjusting your filters</p>
-                    <div className="flex gap-2 justify-center">
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs h-8"
-                            onClick={() => {
-                                if (!mapRef.current) return;
-                                const map = mapRef.current.getMap();
-                                if (!map) return;
-                                const currentZoom = map.getZoom();
-                                setProgrammaticMove(true);
-                                // P2-FIX (#167): Add safety timeout to clear programmatic flag if moveEnd doesn't fire
-                                if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
-                                programmaticClearTimeoutRef.current = setTimeout(() => {
-                                    if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
-                                }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-                                mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
-                            }}
-                        >
-                            Zoom out
-                        </Button>
-                    </div>
-                </div>
+                <MapEmptyState
+                    searchParams={searchParams}
+                    onZoomOut={handleZoomOut}
+                />
             )}
         </div>
     );

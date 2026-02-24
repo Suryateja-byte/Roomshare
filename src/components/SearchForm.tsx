@@ -25,7 +25,9 @@ import { useRecentSearches, type RecentSearch, type RecentSearchFilters } from '
 import { useDebouncedFilterCount } from '@/hooks/useDebouncedFilterCount';
 import { useFacets } from '@/hooks/useFacets';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { useBatchedFilters } from '@/hooks/useBatchedFilters';
+import { useBatchedFilters, type BatchedFilterValues } from '@/hooks/useBatchedFilters';
+import { pendingToFilterParams } from '@/lib/pending-to-filter-params';
+import { generateFilterSuggestions, type FilterSuggestion } from '@/lib/near-matches';
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -33,6 +35,16 @@ const SEARCH_DEBOUNCE_MS = 300;
 // Alias for FilterModal props
 const AMENITY_OPTIONS = VALID_AMENITIES;
 const HOUSE_RULE_OPTIONS = VALID_HOUSE_RULES;
+
+const ARRAY_PENDING_KEYS = new Set<keyof BatchedFilterValues>(['amenities', 'houseRules', 'languages']);
+
+const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<FilterSuggestion['type'], Array<keyof BatchedFilterValues>> = {
+    price: ['minPrice', 'maxPrice'],
+    date: ['moveInDate'],
+    roomType: ['roomType'],
+    amenities: ['amenities'],
+    leaseDuration: ['leaseDuration'],
+};
 
 // Room type options for inline filter tabs
 const ROOM_TYPE_TABS = [
@@ -538,6 +550,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // P3-NEW-b: Get dynamic count for FilterModal button
     // filtersDirty is now computed by useBatchedFilters
     const {
+        count,
         formattedCount,
         isLoading: isCountLoading,
         boundsRequired,
@@ -570,6 +583,31 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             });
         });
     }, [priceAbsoluteMin, priceAbsoluteMax, setPending]);
+
+    // Snapshot pending when count drops to 0 — prevents stale suggestions during rapid filter changes
+    const pendingAtZeroRef = useRef(pending);
+    useEffect(() => {
+        if (count === 0 && !isCountLoading) {
+            pendingAtZeroRef.current = pending;
+        }
+    }, [count, isCountLoading, pending]);
+
+    // P4: Compute drawer suggestions when count drops to 0
+    const drawerSuggestions = useMemo(() => {
+        if (count !== 0 || isCountLoading) return [];
+        const fp = pendingToFilterParams(pendingAtZeroRef.current);
+        return generateFilterSuggestions(fp, count).slice(0, 2);
+    }, [count, isCountLoading]);
+
+    // P4: Handle removing a filter suggestion from the drawer
+    const handleRemoveFilterSuggestion = useCallback((suggestion: FilterSuggestion) => {
+        const keys = SUGGESTION_TYPE_TO_PENDING_KEYS[suggestion.type];
+        const updates: Partial<BatchedFilterValues> = {};
+        for (const key of keys) {
+            (updates as Record<string, string | string[]>)[key] = ARRAY_PENDING_KEYS.has(key) ? [] : '';
+        }
+        setPending(updates);
+    }, [setPending]);
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;
@@ -893,6 +931,10 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 formattedCount={formattedCount}
                 isCountLoading={isCountLoading}
                 boundsRequired={boundsRequired}
+                // P4: Zero-count warning
+                count={count}
+                drawerSuggestions={drawerSuggestions}
+                onRemoveFilterSuggestion={handleRemoveFilterSuggestion}
             />
         </div>
     );
