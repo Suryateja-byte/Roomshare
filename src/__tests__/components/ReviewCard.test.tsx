@@ -275,9 +275,9 @@ describe('ReviewCard', () => {
   })
 
   describe('styling', () => {
-    it('has border styling', () => {
+    it('has spacing styling', () => {
       const { container } = render(<ReviewCard review={baseReview} />)
-      expect(container.firstChild).toHaveClass('border-b')
+      expect(container.firstChild).toHaveClass('py-8')
     })
 
     it('response has border-left styling', () => {
