@@ -192,7 +192,36 @@ export async function isMobileViewport(page: Page): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /**
+ * Wait for the search layout header height to stabilize.
+ * The SearchHeaderWrapper uses a ResizeObserver to dynamically set --header-height,
+ * and the main content area transitions padding-top over 300ms. This helper
+ * polls until the CSS variable stops changing, indicating layout is stable.
+ */
+export async function waitForLayoutStable(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () => {
+        const w = window as any;
+        const curr = getComputedStyle(document.documentElement)
+          .getPropertyValue("--header-height")
+          .trim();
+        const prev = w.__prevHeaderHeight as string | undefined;
+        w.__prevHeaderHeight = curr;
+        if (prev === undefined) return false; // need at least 2 samples
+        return curr === prev && curr !== "";
+      },
+      undefined,
+      { timeout: 5000, polling: 150 },
+    )
+    .catch(() => {
+      /* Layout may not use --header-height; continue anyway */
+    });
+}
+
+/**
  * Wait for the bottom sheet to be visible and listings to load.
+ * Also waits for the search header layout to stabilize (ResizeObserver
+ * + padding-top transition) to avoid measurement/interaction flakes.
  * Returns true if the sheet is visible, false otherwise (caller should skip).
  */
 export async function waitForMobileSheet(
@@ -206,6 +235,9 @@ export async function waitForMobileSheet(
     .locator(mobileSelectors.listingCard)
     .first()
     .waitFor({ state: "attached", timeout });
+
+  // Wait for header ResizeObserver + padding-top transition to settle
+  await waitForLayoutStable(page);
 
   // Check if bottom sheet is visible
   const sheet = page.locator(mobileSelectors.bottomSheet);

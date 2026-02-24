@@ -69,7 +69,7 @@ async function submitSearch(page: Page) {
   // Dismiss any open popovers (e.g. Save Search) that could intercept clicks
   await page.keyboard.press("Escape");
 
-  const submitBtn = page.getByRole("button", { name: /search listings/i });
+  const submitBtn = page.getByRole("button", { name: /search/i });
   await submitBtn.waitFor({ state: "visible", timeout: 10_000 });
   await submitBtn.click();
   await page.waitForLoadState("domcontentloaded");

@@ -83,6 +83,31 @@ async function waitForSheetAnimation(
 }
 
 /**
+ * Wait for the search header layout to stabilize after the ResizeObserver
+ * dynamically updates --header-height and the padding-top transition completes.
+ */
+async function waitForLayoutStable(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  await page
+    .waitForFunction(
+      () => {
+        const w = window as any;
+        const curr = getComputedStyle(document.documentElement)
+          .getPropertyValue("--header-height")
+          .trim();
+        const prev = w.__prevHeaderHeight as string | undefined;
+        w.__prevHeaderHeight = curr;
+        if (prev === undefined) return false;
+        return curr === prev && curr !== "";
+      },
+      undefined,
+      { timeout: 5000, polling: 150 },
+    )
+    .catch(() => {});
+}
+
+/**
  * Helper to change sheet snap position via the keyboard-accessible slider.
  * Uses ArrowUp/ArrowDown on the role="slider" element which is far more
  * reliable than synthetic touch events (React doesn't capture manually
@@ -383,6 +408,9 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
       return;
     }
 
+    // Wait for header ResizeObserver + padding-top transition to settle
+    await waitForLayoutStable(page);
+
     // Collapse via minimize button
     const minimizeBtn = page.locator(selectors.minimizeButton);
     if (await minimizeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -390,8 +418,10 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
       await waitForSheetAnimation(page);
     }
 
-    // Verify collapsed
-    expect(await getSnapIndex(page)).toBe(0);
+    // Verify collapsed (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
 
     // Handle should still have pointer-events: auto
     const handle = page.locator(selectors.bottomSheetHandle);
@@ -480,21 +510,26 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
       return;
     }
 
+    // Wait for header ResizeObserver + padding-top transition to settle
+    await waitForLayoutStable(page);
+
     // Expand the sheet
     const expandBtn = page.locator(selectors.expandButton);
-    if (await expandBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (await expandBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await expandBtn.click();
       await waitForSheetAnimation(page);
     }
 
-    // Verify expanded
-    expect(await getSnapIndex(page)).toBe(2);
+    // Verify expanded (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(2);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
 
     // Apply a filter (if filter buttons exist)
     const filterBtn = page.locator(
       'button:has-text("Filter"), button:has-text("Filters")',
     );
-    const hasFilter = await filterBtn.first().isVisible().catch(() => false);
+    const hasFilter = await filterBtn.first().isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasFilter) {
       await filterBtn.first().click();
@@ -605,6 +640,9 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
       return;
     }
 
+    // Wait for header ResizeObserver + padding-top transition to settle
+    await waitForLayoutStable(page);
+
     // At half position, PTR should not be enabled
     expect(await getSnapIndex(page)).toBe(1);
 
@@ -616,7 +654,9 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
     }
 
     // At expanded position, PTR should be available
-    expect(await getSnapIndex(page)).toBe(2);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(2);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
 
     // Check that PullToRefresh component is enabled
     // (Implementation detail: PTR is wrapped around children when onRefresh is provided)

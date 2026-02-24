@@ -29,10 +29,10 @@ test.describe('Homepage — Anonymous User', () => {
         .first()
     ).toBeVisible();
 
-    // Check Sign Up Free CTA for non-logged-in users
+    // Check sign-up CTA for non-logged-in users
     await expect(
-      page.getByRole('link', { name: /sign up/i })
-        .or(page.getByText(/sign up free/i))
+      page.getByRole('link', { name: /create an account/i })
+        .or(page.getByRole('link', { name: /sign up/i }))
         .first()
     ).toBeVisible({ timeout: 10000 });
   });

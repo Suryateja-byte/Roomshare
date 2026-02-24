@@ -7,7 +7,7 @@
  */
 
 import { test, expect, SF_BOUNDS, timeouts } from "./helpers/test-utils";
-import { waitForSheetAnimation } from "./helpers/mobile-helpers";
+import { waitForSheetAnimation, waitForLayoutStable } from "./helpers/mobile-helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -246,7 +246,12 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
       return;
     }
 
-    // Get initial sheet height
+    // Wait for header ResizeObserver + padding-top transition to settle
+    // before taking baseline measurements
+    await waitForLayoutStable(page);
+    await waitForSheetAnimation(page);
+
+    // Get initial sheet height (after layout is stable)
     const initialBox = await bottomSheet.boundingBox();
 
     // Click "Show map" to switch to map view
@@ -255,14 +260,18 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
       await showMapBtn.click();
       await waitForSheetAnimation(page);
 
-      // Sheet should be collapsed (smaller height or moved down)
-      const afterBox = await bottomSheet.boundingBox();
-
-      if (initialBox && afterBox) {
-        // Either height is reduced or Y position is lower (sheet moved down / collapsed)
-        const heightReduced = afterBox.height < initialBox.height;
-        const movedDown = afterBox.y > initialBox.y;
-        expect(heightReduced || movedDown).toBeTruthy();
+      // Sheet should be collapsed (smaller height or moved down).
+      // Poll because framer-motion spring may still be settling on CI.
+      if (initialBox) {
+        await expect(async () => {
+          const afterBox = await bottomSheet.boundingBox();
+          expect(afterBox).not.toBeNull();
+          if (afterBox) {
+            const heightReduced = afterBox.height < initialBox.height;
+            const movedDown = afterBox.y > initialBox.y;
+            expect(heightReduced || movedDown).toBeTruthy();
+          }
+        }).toPass({ timeout: 5_000, intervals: [500, 1000] });
       }
     }
   });

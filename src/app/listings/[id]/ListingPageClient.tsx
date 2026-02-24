@@ -324,7 +324,7 @@ export default function ListingPageClient({
                                             return (
                                                 <div
                                                     key={i}
-                                                    className="flex items-center gap-4 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-white dark:hover:bg-zinc-800 hover:shadow-md hover:border-zinc-200 dark:hover:border-zinc-700 transition-all duration-300"
+                                                    className="flex items-center gap-4 p-4 rounded-2xl bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-white dark:hover:bg-zinc-800 hover:shadow-lg transition-all duration-300"
                                                 >
                                                     <div className="p-2 bg-white dark:bg-zinc-800 rounded-lg shadow-sm text-zinc-700 dark:text-zinc-300">
                                                         {AmenityIcon ? (
@@ -475,7 +475,7 @@ export default function ListingPageClient({
 
                                 {/* Owner Management Card */}
                                 {isOwner && (
-                                    <div className="rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-xl shadow-zinc-200/50 dark:shadow-black/20">
+                                    <div className="rounded-3xl bg-white dark:bg-zinc-900 p-6 shadow-2xl">
                                         <div className="flex items-center justify-between mb-6">
                                             <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Manage Listing</h3>
                                             <span className="relative flex h-2 w-2">
@@ -513,7 +513,7 @@ export default function ListingPageClient({
 
                                         <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 text-center">
                                             <button
-                                                onClick={() => window.open(`/listings/${listing.id}?preview=true`, '_blank')}
+                                                onClick={() => window.open(`/listings/${listing.id}?preview=true`, '_blank', 'noopener,noreferrer')}
                                                 className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 underline inline-flex items-center gap-1"
                                             >
                                                 <ExternalLink className="w-3 h-3" />
