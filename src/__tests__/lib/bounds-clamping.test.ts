@@ -178,8 +178,8 @@ describe('clampBoundsToMaxSpan', () => {
   describe('edge cases', () => {
     it('respects latitude limits (-85 to 85)', () => {
       const bounds: MapBounds = {
-        minLat: 80.0,
-        maxLat: 90.0, // Would go above 85 after clamping
+        minLat: 75.0,
+        maxLat: 90.0, // 15° span > MAX_LAT_SPAN, triggers clamping near pole
         minLng: -74.0,
         maxLng: -72.0,
       };

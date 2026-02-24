@@ -529,11 +529,11 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
   describe("Viewport Validation", () => {
     it("clamps oversized viewport and still fetches (P1-5 client-side check)", async () => {
-      // Set oversized bounds (> MAX_LAT_SPAN/MAX_LNG_SPAN of 5)
-      mockSearchParams.set("minLng", "-130.0");
-      mockSearchParams.set("maxLng", "-120.0"); // 10 degree span
-      mockSearchParams.set("minLat", "30.0");
-      mockSearchParams.set("maxLat", "42.0"); // 12 degree span
+      // Set oversized bounds (> MAX_LAT_SPAN/MAX_LNG_SPAN of 10)
+      mockSearchParams.set("minLng", "-135.0");
+      mockSearchParams.set("maxLng", "-120.0"); // 15 degree span
+      mockSearchParams.set("minLat", "28.0");
+      mockSearchParams.set("maxLat", "43.0"); // 15 degree span
 
       const { queryByRole } = render(
         <PersistentMapWrapper shouldRenderMap={true} />
@@ -553,7 +553,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     });
 
     it("does not show error for valid viewport bounds", async () => {
-      // Valid bounds (within MAX_LAT_SPAN/MAX_LNG_SPAN of 5)
+      // Valid bounds (within MAX_LAT_SPAN/MAX_LNG_SPAN of 10)
       mockSearchParams.set("minLng", "-122.5");
       mockSearchParams.set("maxLng", "-122.0"); // 0.5 degree span
       mockSearchParams.set("minLat", "37.5");

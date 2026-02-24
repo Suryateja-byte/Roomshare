@@ -90,9 +90,9 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
     it('returns false when bounds are exactly at limit', () => {
       const exactLimitBounds: MapBounds = {
         minLat: 40.0,
-        maxLat: 40.0 + MAX_LAT_SPAN, // Exactly 5° span
+        maxLat: 40.0 + MAX_LAT_SPAN, // Exactly at span limit
         minLng: -74.0,
-        maxLng: -74.0 + MAX_LNG_SPAN, // Exactly 5° span
+        maxLng: -74.0 + MAX_LNG_SPAN, // Exactly at span limit
       };
 
       expect(shouldClampBounds(exactLimitBounds)).toBe(false);

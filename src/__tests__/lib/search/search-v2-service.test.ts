@@ -88,7 +88,7 @@ jest.mock("@/lib/search-params", () => ({
 // Mock validation
 jest.mock("@/lib/validation", () => ({
   clampBoundsToMaxSpan: jest.fn(),
-  MAX_LAT_SPAN: 5,
+  MAX_LAT_SPAN: 10,
   MAX_LNG_SPAN: 10,
 }));
 

@@ -130,10 +130,10 @@ describe("Map Listings API", () => {
         (getMapListings as jest.Mock).mockResolvedValue(mockListings);
 
         const request = createRequest({
-          minLng: "-130.0",
-          maxLng: "-120.0", // 10 degree span > 5 degree limit
-          minLat: "30.0",
-          maxLat: "42.0", // 12 degree span > 5 degree limit
+          minLng: "-135.0",
+          maxLng: "-120.0", // 15 degree span > 10 degree limit
+          minLat: "28.0",
+          maxLat: "43.0", // 15 degree span > 10 degree limit
         });
 
         const response = await GET(request);
@@ -141,14 +141,13 @@ describe("Map Listings API", () => {
         // P1-5: Should clamp and succeed, not reject
         expect(response.status).toBe(200);
 
-        // Verify bounds were clamped to max span (5 degrees)
+        // Verify bounds were clamped to max span (10 degrees)
         expect(getMapListings).toHaveBeenCalledWith(
           expect.objectContaining({
             bounds: expect.objectContaining({
-              // Center preserved at -125, span reduced to 5
+              // Center preserved, span reduced to 10
               minLng: expect.any(Number),
               maxLng: expect.any(Number),
-              // Center preserved at 36, span reduced to 5
               minLat: expect.any(Number),
               maxLat: expect.any(Number),
             }),
@@ -159,8 +158,8 @@ describe("Map Listings API", () => {
         const call = (getMapListings as jest.Mock).mock.calls[0][0];
         const lngSpan = call.bounds.maxLng - call.bounds.minLng;
         const latSpan = call.bounds.maxLat - call.bounds.minLat;
-        expect(lngSpan).toBeLessThanOrEqual(5); // MAX_LNG_SPAN
-        expect(latSpan).toBeLessThanOrEqual(5); // MAX_LAT_SPAN
+        expect(lngSpan).toBeLessThanOrEqual(10); // MAX_LNG_SPAN
+        expect(latSpan).toBeLessThanOrEqual(10); // MAX_LAT_SPAN
       });
 
       it("returns 400 for latitude out of range", async () => {

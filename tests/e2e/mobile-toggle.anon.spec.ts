@@ -246,8 +246,10 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
       return;
     }
 
-    // Get initial sheet height
-    const initialBox = await bottomSheet.boundingBox();
+    // Use data-snap-current attribute (0=collapsed, 1=half, 2=expanded)
+    // This is more reliable than pixel measurements which race with spring animations
+    const snapContent = bottomSheet.locator('[data-snap-current]');
+    const hasSnapAttr = await snapContent.count() > 0;
 
     // Click "Show map" to switch to map view
     const showMapBtn = page.locator(toggleSelectors.showMapButton);
@@ -255,14 +257,18 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
       await showMapBtn.click();
       await waitForSheetAnimation(page);
 
-      // Sheet should be collapsed (smaller height or moved down)
-      const afterBox = await bottomSheet.boundingBox();
-
-      if (initialBox && afterBox) {
-        // Either height is reduced or Y position is lower (sheet moved down / collapsed)
-        const heightReduced = afterBox.height < initialBox.height;
-        const movedDown = afterBox.y > initialBox.y;
-        expect(heightReduced || movedDown).toBeTruthy();
+      if (hasSnapAttr) {
+        // Assert snap index is 0 (collapsed) via the data attribute
+        await expect(snapContent).toHaveAttribute("data-snap-current", "0", { timeout: 5000 });
+      } else {
+        // Fallback: measure bounding box if data attribute not present
+        // Wait for initial sheet to settle before comparing
+        const afterBox = await bottomSheet.boundingBox();
+        // Sheet should exist and be short (collapsed = ~15vh ≈ 127px on 844px viewport)
+        if (afterBox) {
+          const viewportHeight = page.viewportSize()?.height ?? 844;
+          expect(afterBox.height).toBeLessThan(viewportHeight * 0.3);
+        }
       }
     }
   });
