@@ -31,7 +31,7 @@ import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
 import { UserMarker, useUserPin } from './map/UserMarker';
 import { POILayer } from './map/POILayer';
-import { PROGRAMMATIC_MOVE_TIMEOUT_MS } from '@/lib/constants';
+import { PROGRAMMATIC_MOVE_TIMEOUT_MS, USA_MAX_BOUNDS, MAP_MIN_ZOOM } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 /** Parse a string to float and validate it's a finite number within an optional range. */
@@ -445,10 +445,10 @@ export default function MapComponent({
     const hoverScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Map-move auto-search tuning:
-    // - 300ms debounce keeps panning smooth while staying responsive.
-    // - 1000ms minimum interval prevents request bursts during continuous drag.
-    const MAP_MOVE_SEARCH_DEBOUNCE_MS = 300;
-    const MIN_SEARCH_INTERVAL_MS = 1000;
+    // - 400ms debounce reduces "fetch too soon during momentum scroll"
+    // - 800ms minimum interval allows more responsive intentional panning
+    const MAP_MOVE_SEARCH_DEBOUNCE_MS = 400;
+    const MIN_SEARCH_INTERVAL_MS = 800;
 
     // E2E testing instrumentation - track map instance for persistence tests
     // Only runs when NEXT_PUBLIC_E2E=true to avoid polluting production
@@ -1615,9 +1615,9 @@ export default function MapComponent({
                 </div>
             )}
 
-            {/* Tile loading indicator */}
+            {/* Tile loading indicator - transparent overlay with small centered pill */}
             {isMapLoaded && areTilesLoading && (
-                <div className="absolute inset-0 bg-zinc-100/30 dark:bg-zinc-900/30 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none" role="status" aria-label="Loading map tiles" aria-live="polite">
+                <div className="absolute inset-0 bg-transparent z-10 flex items-center justify-center pointer-events-none" role="status" aria-label="Loading map tiles" aria-live="polite">
                     <div className="flex items-center gap-2 bg-white/90 dark:bg-zinc-800/90 px-4 py-2 rounded-lg shadow-sm">
                         <Loader2 className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300" aria-hidden="true" />
                         <span className="text-sm text-zinc-600 dark:text-zinc-300">Loading tiles...</span>
@@ -1678,6 +1678,8 @@ export default function MapComponent({
                     : { initialViewState }
                 )}
                 style={{ width: '100%', height: '100%' }}
+                maxBounds={USA_MAX_BOUNDS}
+                minZoom={MAP_MIN_ZOOM}
                 scrollZoom={true}
                 dragPan={true}
                 doubleClickZoom={true}
