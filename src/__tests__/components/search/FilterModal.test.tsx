@@ -156,6 +156,25 @@ jest.mock("@/components/search/PriceRangeFilter", () => ({
   ),
 }));
 
+// Mock DrawerZeroState
+jest.mock("@/components/search/DrawerZeroState", () => ({
+  DrawerZeroState: ({
+    suggestions,
+    onRemoveSuggestion,
+  }: {
+    suggestions: { type: string; label: string; priority: number }[];
+    onRemoveSuggestion: (s: { type: string; label: string; priority: number }) => void;
+  }) => (
+    <div data-testid="drawer-zero-state">
+      {suggestions.map((s) => (
+        <button key={s.type} onClick={() => onRemoveSuggestion(s)}>
+          {s.label}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
 // Mock getLanguageName
 jest.mock("@/lib/languages", () => ({
   getLanguageName: (code: string) => {
@@ -414,6 +433,95 @@ describe("FilterModal", () => {
       const langBtn = screen.getByText("English").closest("button");
       fireEvent.click(langBtn!);
       expect(onToggleLanguage).toHaveBeenCalledWith("en");
+    });
+  });
+
+  describe("zero-count warning (P4)", () => {
+    it("apply button has amber bg when count === 0", () => {
+      render(
+        <FilterModal
+          {...makeProps({
+            count: 0,
+            isCountLoading: false,
+            formattedCount: "0 listings",
+            drawerSuggestions: [
+              { type: "price", label: "Remove price filter", priority: 1 },
+            ],
+            onRemoveFilterSuggestion: jest.fn(),
+          })}
+        />,
+      );
+
+      const applyBtn = screen.getByTestId("filter-modal-apply");
+      expect(applyBtn.className).toContain("bg-amber-500");
+      expect(applyBtn.className).not.toContain("bg-indigo-500");
+    });
+
+    it("apply button keeps indigo bg when count > 0", () => {
+      render(
+        <FilterModal
+          {...makeProps({
+            count: 10,
+            isCountLoading: false,
+            formattedCount: "10 listings",
+          })}
+        />,
+      );
+
+      const applyBtn = screen.getByTestId("filter-modal-apply");
+      expect(applyBtn.className).toContain("bg-indigo-500");
+      expect(applyBtn.className).not.toContain("bg-amber-500");
+    });
+
+    it("renders DrawerZeroState when count === 0 with suggestions", () => {
+      render(
+        <FilterModal
+          {...makeProps({
+            count: 0,
+            isCountLoading: false,
+            formattedCount: "0 listings",
+            drawerSuggestions: [
+              { type: "price", label: "Remove price filter", priority: 1 },
+            ],
+            onRemoveFilterSuggestion: jest.fn(),
+          })}
+        />,
+      );
+
+      expect(screen.getByTestId("drawer-zero-state")).toBeInTheDocument();
+      expect(screen.getByText("Remove price filter")).toBeInTheDocument();
+    });
+
+    it("does NOT render DrawerZeroState when count > 0", () => {
+      render(
+        <FilterModal
+          {...makeProps({
+            count: 5,
+            isCountLoading: false,
+            formattedCount: "5 listings",
+          })}
+        />,
+      );
+
+      expect(screen.queryByTestId("drawer-zero-state")).not.toBeInTheDocument();
+    });
+
+    it("does NOT render DrawerZeroState when loading", () => {
+      render(
+        <FilterModal
+          {...makeProps({
+            count: 0,
+            isCountLoading: true,
+            formattedCount: "listings",
+            drawerSuggestions: [
+              { type: "price", label: "Remove price filter", priority: 1 },
+            ],
+            onRemoveFilterSuggestion: jest.fn(),
+          })}
+        />,
+      );
+
+      expect(screen.queryByTestId("drawer-zero-state")).not.toBeInTheDocument();
     });
   });
 });

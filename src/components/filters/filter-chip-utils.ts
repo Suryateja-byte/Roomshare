@@ -39,32 +39,6 @@ const PRESERVED_PARAMS = [
 ] as const;
 
 /**
- * Parameters that are UI state, not filters - should be ignored for chips.
- * Kept for documentation; prefixed to avoid unused variable warnings.
- */
-const _UI_STATE_PARAMS = ["page", "view", "drawerOpen"] as const;
-
-/**
- * Parameters that represent filter state (eligible for chips).
- * Used for reference; prefixed to avoid unused variable warnings.
- */
-const _FILTER_PARAMS = [
-  "minPrice",
-  "maxPrice",
-  "amenities",
-  "houseRules",
-  "languages",
-  "roomType",
-  "leaseDuration",
-  "moveInDate",
-  "nearMatches",
-  "genderPreference",
-  "householdGender",
-] as const;
-
-type _FilterParamKey = (typeof _FILTER_PARAMS)[number];
-
-/**
  * Format a price value for display
  */
 function formatPrice(value: number | string): string {
@@ -363,9 +337,19 @@ export function clearAllFilters(searchParams: URLSearchParams): string {
   return newParams.toString();
 }
 
-/**
- * Check if there are any filter chips to display
- */
-export function hasFilterChips(searchParams: URLSearchParams): boolean {
-  return urlToFilterChips(searchParams).length > 0;
+/** Quick check — returns true if any filter param is set (no chip construction) */
+export const FILTER_PARAM_KEYS = [
+  'minPrice', 'maxPrice', 'minBudget', 'maxBudget',
+  'moveInDate', 'roomType', 'leaseDuration',
+  'amenities', 'houseRules', 'languages',
+  'genderPreference', 'householdGender', 'nearMatches',
+] as const;
+
+export function hasAnyFilter(searchParams: URLSearchParams): boolean {
+  return FILTER_PARAM_KEYS.some(k => {
+    const v = searchParams.get(k);
+    if (v === null || v === '' || v === 'any') return false;
+    if (k === 'nearMatches' && (v === '0' || v === 'false')) return false;
+    return true;
+  });
 }
