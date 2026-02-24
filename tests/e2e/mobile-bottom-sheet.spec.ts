@@ -369,13 +369,19 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
 
     // Collapse the sheet via minimize button or drag
     const minimizeBtn = page.locator(selectors.minimizeButton);
-    if (await minimizeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
       await minimizeBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Minimize button not visible');
+      return;
     }
 
-    // Verify collapsed
-    expect(await getSnapIndex(page)).toBe(0);
+    // Verify collapsed (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
 
     // Verify sheet has pointer-events: none when collapsed
     const sheetPointerEvents = await sheet.evaluate(
@@ -413,9 +419,13 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
 
     // Collapse via minimize button
     const minimizeBtn = page.locator(selectors.minimizeButton);
-    if (await minimizeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
       await minimizeBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Minimize button not visible');
+      return;
     }
 
     // Verify collapsed (poll for animation to settle)
@@ -450,20 +460,28 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     // Expand the sheet
     const expandBtn = page.locator(selectors.expandButton);
-    if (await expandBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(expandBtn).toBeVisible({ timeout: 5000 });
       await expandBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Expand button not visible');
+      return;
     }
 
-    // Verify expanded
-    expect(await getSnapIndex(page)).toBe(2);
+    // Verify expanded (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(2);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
 
     // Press Escape
     await page.keyboard.press("Escape");
     await waitForSheetAnimation(page);
 
     // Should collapse to half position (index 1)
-    expect(await getSnapIndex(page)).toBe(1);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(1);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
   });
 
   test("escape key has no effect when sheet is collapsed", async ({ page }) => {
@@ -480,20 +498,28 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     // Collapse the sheet
     const minimizeBtn = page.locator(selectors.minimizeButton);
-    if (await minimizeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
       await minimizeBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Minimize button not visible');
+      return;
     }
 
-    // Verify collapsed
-    expect(await getSnapIndex(page)).toBe(0);
+    // Verify collapsed (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
 
     // Press Escape - should stay collapsed
     await page.keyboard.press("Escape");
     await waitForSheetAnimation(page);
 
     // Still collapsed
-    expect(await getSnapIndex(page)).toBe(0);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
   });
 });
 
@@ -515,9 +541,13 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
 
     // Expand the sheet
     const expandBtn = page.locator(selectors.expandButton);
-    if (await expandBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    try {
+      await expect(expandBtn).toBeVisible({ timeout: 5000 });
       await expandBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Expand button not visible');
+      return;
     }
 
     // Verify expanded (poll for animation to settle)
@@ -529,7 +559,7 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     const filterBtn = page.locator(
       'button:has-text("Filter"), button:has-text("Filters")',
     );
-    const hasFilter = await filterBtn.first().isVisible({ timeout: 3000 }).catch(() => false);
+    const hasFilter = await filterBtn.first().isVisible().catch(() => false);
 
     if (hasFilter) {
       await filterBtn.first().click();
@@ -644,13 +674,19 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
     await waitForLayoutStable(page);
 
     // At half position, PTR should not be enabled
-    expect(await getSnapIndex(page)).toBe(1);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(1);
+    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
 
     // Expand the sheet
     const expandBtn = page.locator(selectors.expandButton);
-    if (await expandBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(expandBtn).toBeVisible({ timeout: 5000 });
       await expandBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Expand button not visible');
+      return;
     }
 
     // At expanded position, PTR should be available

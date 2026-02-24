@@ -198,7 +198,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                     />
 
                     {/* Gradient Overlay for better text readability and depth */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
                     {/* Empty state overlay - Intentional waiting state */}
                     {showImagePlaceholder && (

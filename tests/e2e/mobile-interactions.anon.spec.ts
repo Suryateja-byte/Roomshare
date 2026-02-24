@@ -651,7 +651,9 @@ test.describe("Mobile Edge Cases", () => {
 
     // The minimize (X) button should be visible at half position
     const minimizeBtn = page.locator(mobileSelectors.minimizeButton);
-    if (!(await minimizeBtn.isVisible({ timeout: 3000 }).catch(() => false))) {
+    try {
+      await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
+    } catch {
       test.skip(true, "Minimize button not visible");
       return;
     }

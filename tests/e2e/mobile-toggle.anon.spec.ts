@@ -238,9 +238,9 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
     await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     const bottomSheet = page.locator(toggleSelectors.bottomSheet);
-    const sheetVisible = await bottomSheet.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (!sheetVisible) {
+    try {
+      await expect(bottomSheet).toBeVisible({ timeout: 5000 });
+    } catch {
       // Bottom sheet not implemented or not visible on this viewport
       test.skip();
       return;
