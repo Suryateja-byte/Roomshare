@@ -25,7 +25,7 @@ import { useRecentSearches, type RecentSearch, type RecentSearchFilters } from '
 import { useDebouncedFilterCount } from '@/hooks/useDebouncedFilterCount';
 import { useFacets } from '@/hooks/useFacets';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { useBatchedFilters } from '@/hooks/useBatchedFilters';
+import { useBatchedFilters, type BatchedFilterValues } from '@/hooks/useBatchedFilters';
 import { pendingToFilterParams } from '@/lib/pending-to-filter-params';
 import { generateFilterSuggestions, type FilterSuggestion } from '@/lib/near-matches';
 
@@ -36,9 +36,9 @@ const SEARCH_DEBOUNCE_MS = 300;
 const AMENITY_OPTIONS = VALID_AMENITIES;
 const HOUSE_RULE_OPTIONS = VALID_HOUSE_RULES;
 
-const ARRAY_PENDING_KEYS = new Set<string>(['amenities', 'houseRules', 'languages']);
+const ARRAY_PENDING_KEYS = new Set<keyof BatchedFilterValues>(['amenities', 'houseRules', 'languages']);
 
-const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<string, string[]> = {
+const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<FilterSuggestion['type'], Array<keyof BatchedFilterValues>> = {
     price: ['minPrice', 'maxPrice'],
     date: ['moveInDate'],
     roomType: ['roomType'],
@@ -594,12 +594,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // P4: Handle removing a filter suggestion from the drawer
     const handleRemoveFilterSuggestion = useCallback((suggestion: FilterSuggestion) => {
         const keys = SUGGESTION_TYPE_TO_PENDING_KEYS[suggestion.type];
-        if (!keys) return;
-        const updates: Record<string, string | string[]> = {};
+        const updates: Partial<BatchedFilterValues> = {};
         for (const key of keys) {
-            updates[key] = ARRAY_PENDING_KEYS.has(key) ? [] : '';
+            (updates as Record<string, string | string[]>)[key] = ARRAY_PENDING_KEYS.has(key) ? [] : '';
         }
-        setPending(updates as Partial<typeof pending>);
+        setPending(updates);
     }, [setPending]);
 
     // Show warning when user has typed location but not selected from dropdown

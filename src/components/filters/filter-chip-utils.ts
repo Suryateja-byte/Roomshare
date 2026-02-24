@@ -374,7 +374,9 @@ const FILTER_PARAM_KEYS = [
 export function hasAnyFilter(searchParams: URLSearchParams): boolean {
   return FILTER_PARAM_KEYS.some(k => {
     const v = searchParams.get(k);
-    return v !== null && v !== '' && v !== 'any';
+    if (v === null || v === '' || v === 'any') return false;
+    if (k === 'nearMatches' && (v === '0' || v === 'false')) return false;
+    return true;
   });
 }
 

@@ -3,6 +3,7 @@ import {
   removeFilterFromUrl,
   clearAllFilters,
   hasFilterChips,
+  hasAnyFilter,
   type FilterChipData,
 } from "@/components/filters/filter-chip-utils";
 
@@ -567,6 +568,38 @@ describe("filter-chip-utils", () => {
       expect(preserved.get("minPrice")).toBeNull();
       expect(preserved.get("amenities")).toBeNull();
       expect(preserved.get("nearMatches")).toBeNull();
+    });
+  });
+
+  describe("hasAnyFilter", () => {
+    it("returns false for empty params", () => {
+      expect(hasAnyFilter(new URLSearchParams())).toBe(false);
+    });
+
+    it("returns true for a price filter", () => {
+      expect(hasAnyFilter(new URLSearchParams("maxPrice=1500"))).toBe(true);
+    });
+
+    it("returns false for nearMatches=0", () => {
+      expect(hasAnyFilter(new URLSearchParams("nearMatches=0"))).toBe(false);
+    });
+
+    it("returns false for nearMatches=false", () => {
+      expect(hasAnyFilter(new URLSearchParams("nearMatches=false"))).toBe(
+        false,
+      );
+    });
+
+    it("returns true for nearMatches=1", () => {
+      expect(hasAnyFilter(new URLSearchParams("nearMatches=1"))).toBe(true);
+    });
+
+    it("returns false for roomType=any", () => {
+      expect(hasAnyFilter(new URLSearchParams("roomType=any"))).toBe(false);
+    });
+
+    it("returns false for empty string values", () => {
+      expect(hasAnyFilter(new URLSearchParams("maxPrice="))).toBe(false);
     });
   });
 
