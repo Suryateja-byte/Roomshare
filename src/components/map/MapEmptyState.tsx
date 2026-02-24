@@ -66,7 +66,7 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
 
   const handleRemoveSuggestion = (suggestion: FilterSuggestion) => {
     const newParams = new URLSearchParams(searchParams);
-    const keysToRemove = SUGGESTION_TYPE_TO_PARAMS[suggestion.type] || [];
+    const keysToRemove = SUGGESTION_TYPE_TO_PARAMS[suggestion.type];
     for (const key of keysToRemove) {
       newParams.delete(key);
     }
@@ -107,9 +107,9 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
       {/* Smart filter suggestions */}
       {suggestions.length > 0 && (
         <div className="flex flex-wrap gap-1.5 justify-center mb-3" data-testid="filter-suggestions">
-          {suggestions.map((suggestion) => (
+          {suggestions.map((suggestion, i) => (
             <button
-              key={suggestion.type}
+              key={`${suggestion.type}-${i}`}
               data-testid="suggestion-pill"
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 transition-colors"
               onClick={() => handleRemoveSuggestion(suggestion)}

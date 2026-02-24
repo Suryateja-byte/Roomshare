@@ -26,9 +26,9 @@ export function DrawerZeroState({
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {visible.map((s) => (
+        {visible.map((s, i) => (
           <button
-            key={s.type}
+            key={`${s.type}-${i}`}
             type="button"
             onClick={() => onRemoveSuggestion(s)}
             className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-800/50"

@@ -2,7 +2,6 @@ import {
   urlToFilterChips,
   removeFilterFromUrl,
   clearAllFilters,
-  hasFilterChips,
   hasAnyFilter,
   type FilterChipData,
 } from "@/components/filters/filter-chip-utils";
@@ -603,35 +602,4 @@ describe("filter-chip-utils", () => {
     });
   });
 
-  describe("hasFilterChips", () => {
-    it("returns true when filters are present", () => {
-      const params = new URLSearchParams("minPrice=500");
-
-      expect(hasFilterChips(params)).toBe(true);
-    });
-
-    it("returns false when no filters present", () => {
-      const params = new URLSearchParams("");
-
-      expect(hasFilterChips(params)).toBe(false);
-    });
-
-    it("returns false when only preserved params present", () => {
-      const params = new URLSearchParams("q=downtown&sort=newest&lat=37.7");
-
-      expect(hasFilterChips(params)).toBe(false);
-    });
-
-    it("returns false when only UI state params present", () => {
-      const params = new URLSearchParams("page=3&view=map");
-
-      expect(hasFilterChips(params)).toBe(false);
-    });
-
-    it("returns true when filters mixed with preserved params", () => {
-      const params = new URLSearchParams("q=downtown&minPrice=500");
-
-      expect(hasFilterChips(params)).toBe(true);
-    });
-  });
 });

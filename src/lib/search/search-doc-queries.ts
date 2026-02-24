@@ -151,8 +151,9 @@ function quantizeBound(value: number): number {
   return Math.round(value / BOUNDS_EPSILON) * BOUNDS_EPSILON;
 }
 
-function createSearchDocListCacheKey(params: FilterParams): string {
-  const normalized = {
+/** Shared base fields for search cache keys */
+function buildBaseCacheFields(params: FilterParams) {
+  return {
     q: params.query?.toLowerCase().trim() || "",
     minPrice: params.minPrice ?? "",
     maxPrice: params.maxPrice ?? "",
@@ -167,53 +168,25 @@ function createSearchDocListCacheKey(params: FilterParams): string {
     bounds: params.bounds
       ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",
+  };
+}
+
+function createSearchDocListCacheKey(params: FilterParams): string {
+  return JSON.stringify({
+    ...buildBaseCacheFields(params),
     page: params.page ?? 1,
     limit: params.limit ?? 12,
     sort: params.sort || "recommended",
     nearMatches: params.nearMatches ?? false,
-  };
-  return JSON.stringify(normalized);
+  });
 }
 
 function createSearchDocMapCacheKey(params: FilterParams): string {
-  const normalized = {
-    q: params.query?.toLowerCase().trim() || "",
-    minPrice: params.minPrice ?? "",
-    maxPrice: params.maxPrice ?? "",
-    amenities: [...(params.amenities || [])].sort().join(","),
-    houseRules: [...(params.houseRules || [])].sort().join(","),
-    languages: [...(params.languages || [])].sort().join(","),
-    roomType: params.roomType?.toLowerCase() || "",
-    leaseDuration: params.leaseDuration?.toLowerCase() || "",
-    moveInDate: params.moveInDate || "",
-    genderPreference: params.genderPreference || "",
-    householdGender: params.householdGender || "",
-    bounds: params.bounds
-      ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
-      : "",
-  };
-  return JSON.stringify(normalized);
+  return JSON.stringify(buildBaseCacheFields(params));
 }
 
 function createSearchDocCountCacheKey(params: FilterParams): string {
-  const normalized = {
-    q: params.query?.toLowerCase().trim() || "",
-    minPrice: params.minPrice ?? "",
-    maxPrice: params.maxPrice ?? "",
-    amenities: [...(params.amenities || [])].sort().join(","),
-    houseRules: [...(params.houseRules || [])].sort().join(","),
-    languages: [...(params.languages || [])].sort().join(","),
-    roomType: params.roomType?.toLowerCase() || "",
-    leaseDuration: params.leaseDuration?.toLowerCase() || "",
-    moveInDate: params.moveInDate || "",
-    genderPreference: params.genderPreference || "",
-    householdGender: params.householdGender || "",
-    bounds: params.bounds
-      ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
-      : "",
-    // NOTE: No page or limit - intentionally excluded for cross-page caching
-  };
-  return JSON.stringify(normalized);
+  return JSON.stringify(buildBaseCacheFields(params));
 }
 
 // ============================================
@@ -1103,8 +1076,8 @@ export async function getSearchDocListingsWithKeyset(
     );
   }
 
-  const { sort = "recommended", limit = 12 } = params;
-  const sortOption = sort as SortOption;
+  const { sort = "recommended" as SortOption, limit = 12 } = params;
+  const sortOption = sort;
 
   // If keyset is disabled or no cursor, use offset-based pagination
   if (!features.searchKeyset || !cursor) {
@@ -1232,7 +1205,7 @@ export async function getSearchDocListingsWithKeyset(
       totalPages,
       hasNextPage,
       hasPrevPage: true, // Always true for keyset pagination (we have a cursor)
-      page: null as unknown as number, // Page number is not meaningful for keyset
+      page: null, // Page number is not meaningful for keyset pagination
       limit,
       nextCursor,
     };
@@ -1271,8 +1244,8 @@ export async function getSearchDocListingsFirstPage(
     );
   }
 
-  const { sort = "recommended", limit = 12, nearMatches } = params;
-  const sortOption = sort as SortOption;
+  const { sort = "recommended" as SortOption, limit = 12, nearMatches } = params;
+  const sortOption = sort;
 
   // If keyset is disabled, use offset-based pagination
   if (!features.searchKeyset) {

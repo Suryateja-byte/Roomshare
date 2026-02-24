@@ -353,10 +353,3 @@ export function hasAnyFilter(searchParams: URLSearchParams): boolean {
     return true;
   });
 }
-
-/**
- * Check if there are any filter chips to display
- */
-export function hasFilterChips(searchParams: URLSearchParams): boolean {
-  return urlToFilterChips(searchParams).length > 0;
-}
