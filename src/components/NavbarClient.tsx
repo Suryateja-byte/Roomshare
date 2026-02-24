@@ -255,65 +255,61 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     return (
         <nav
             aria-label="Main navigation"
-            className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-300 ease-in-out ${isScrolled
-                ? 'py-3 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border-b border-zinc-200/80 dark:border-white/10 shadow-lg shadow-zinc-900/5 dark:shadow-black/20'
-                : 'py-4 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-md'
+            className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-500 ease-in-out ${isScrolled
+                ? 'py-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-200/50 dark:border-white/5 shadow-xl shadow-zinc-900/5 dark:shadow-black/20'
+                : 'py-6 bg-transparent'
                 }`}
         >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center h-12">
+            <div className="max-w-7xl mx-auto px-6 sm:px-8">
+                <div className="flex justify-between items-center h-10">
 
                     {/* --- LEFT: Logo --- */}
-                    <Link href="/" className="flex items-center gap-1 cursor-pointer group flex-shrink-0">
-                        <div className="w-8 h-8 bg-zinc-900 dark:bg-zinc-100 rounded-lg flex items-center justify-center text-white dark:text-zinc-900 font-bold text-lg group-hover:rotate-3 transition-transform shadow-lg shadow-zinc-900/20">
+                    <Link href="/" className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0">
+                        <div className="w-9 h-9 bg-zinc-900 dark:bg-white rounded-xl flex items-center justify-center text-white dark:text-zinc-900 font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-lg shadow-zinc-900/10 dark:shadow-white/5">
                             R
                         </div>
-                        <span className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white hidden sm:block">
+                        <span className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-white hidden sm:block">
                             RoomShare<span className="text-indigo-600 dark:text-indigo-400">.</span>
                         </span>
                     </Link>
 
-                    {/* --- CENTER: Empty Spacer --- */}
-                    <div className="flex-1"></div>
-
-                    {/* --- RIGHT: All Actions --- */}
-                    <div className="hidden md:flex items-center gap-4 flex-shrink-0">
-
-                        {/* Navigation Link */}
+                    {/* --- CENTER: Navigation Links --- */}
+                    <div className="hidden lg:flex flex-1 items-center justify-center gap-1">
                         <Link
                             href="/search"
-                            className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-4 py-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all duration-200 mr-2 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
+                            className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-5 py-2 rounded-full transition-all duration-300 hover:bg-zinc-100 dark:hover:bg-white/5"
                         >
                             Find a Room
                         </Link>
+                        <Link
+                            href="/about"
+                            className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-5 py-2 rounded-full transition-all duration-300 hover:bg-zinc-100 dark:hover:bg-white/5"
+                        >
+                            How it works
+                        </Link>
+                    </div>
 
-                        {/* Icons Section */}
-                        <div className="flex items-center gap-1 border-l border-zinc-200 dark:border-zinc-700 pl-4">
+                    {/* --- RIGHT: Actions --- */}
+                    <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+
+                        <div className="hidden md:flex items-center gap-1 pr-2 border-r border-zinc-200/50 dark:border-white/10">
                             <NotificationCenter />
                             <IconButton
-                                icon={<MessageSquare size={20} />}
+                                icon={<MessageSquare size={18} strokeWidth={2} />}
                                 count={currentUnreadCount}
                                 href="/messages"
                                 ariaLabel={currentUnreadCount > 0 ? `Messages, ${currentUnreadCount} unread` : 'Messages'}
                             />
                         </div>
 
-                        {/* CTA Button */}
-                        <Link href="/listings/create">
-                            <Button variant="primary" className="flex items-center gap-2 px-5 py-2.5 h-auto transform hover:scale-105 shadow-lg shadow-zinc-900/20 dark:shadow-white/10">
-                                <Plus size={18} />
-                                <span>List a Room</span>
-                            </Button>
-                        </Link>
-
                         {/* Profile Dropdown / Auth Buttons */}
                         {user ? (
                             <div className="relative" ref={profileRef}>
                                 <button
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                    className={`flex items-center gap-2 p-1 pl-2 pr-1 min-h-[44px] rounded-full border transition-all ${isProfileOpen
-                                        ? 'border-indigo-500 ring-2 ring-indigo-100 dark:ring-indigo-900'
-                                        : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                                    className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full border transition-all duration-300 ${isProfileOpen
+                                        ? 'border-zinc-900 dark:border-white bg-zinc-900 dark:bg-white'
+                                        : 'border-zinc-200/50 dark:border-white/10 hover:border-zinc-400 dark:hover:border-zinc-500'
                                         }`}
                                     aria-expanded={isProfileOpen}
                                     aria-haspopup="true"
@@ -321,35 +317,33 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                     aria-label="User menu"
                                 >
                                     <UserAvatar image={user.image} name={user.name} size="sm" />
-                                    <ChevronDown
-                                        size={14}
-                                        className={`text-zinc-400 dark:text-zinc-500 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}
+                                    <Menu
+                                        size={16}
+                                        className={`transition-colors duration-300 ${isProfileOpen ? 'text-white dark:text-zinc-900' : 'text-zinc-500 dark:text-zinc-400'}`}
                                     />
                                 </button>
 
-                                {/* Dropdown Menu - CSS animated for performance */}
+                                {/* Dropdown Menu - CSS animated */}
                                 <div
-                                    className={`absolute right-0 mt-3 w-72 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden origin-top-right ring-1 ring-black/5 z-sticky transition-all duration-200 ease-out ${isProfileOpen
-                                            ? 'opacity-100 translate-y-0 visible'
-                                            : 'opacity-0 -translate-y-2 invisible pointer-events-none'
+                                    className={`absolute right-0 mt-4 w-72 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-zinc-900/10 dark:shadow-black/60 border border-zinc-200/50 dark:border-white/5 overflow-hidden origin-top-right z-sticky transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) ${isProfileOpen
+                                            ? 'opacity-100 translate-y-0 visible scale-100'
+                                            : 'opacity-0 -translate-y-4 invisible scale-95 pointer-events-none'
                                         }`}
                                 >
-                                    <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                                        <p className="font-semibold text-zinc-900 dark:text-white">{user.name}</p>
-                                        <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">{user.email}</p>
+                                    <div className="p-6 border-b border-zinc-100 dark:border-white/5 bg-zinc-50/50 dark:bg-white/[0.02]">
+                                        <p className="font-semibold text-zinc-900 dark:text-white tracking-tight">{user.name}</p>
+                                        <p className="text-xs text-zinc-400 truncate mt-0.5">{user.email}</p>
                                     </div>
-                                    <div className="p-2 space-y-1">
-                                        <MenuItem icon={<User size={18} />} text="Profile" href="/profile" onClick={() => setIsProfileOpen(false)} />
-                                        <MenuItem icon={<Calendar size={18} />} text="Bookings" href="/bookings" onClick={() => setIsProfileOpen(false)} />
-                                        <MenuItem icon={<Heart size={18} />} text="Saved Listings" href="/saved" onClick={() => setIsProfileOpen(false)} />
-                                        <MenuItem icon={<Clock size={18} />} text="Recently Viewed" href="/recently-viewed" onClick={() => setIsProfileOpen(false)} />
-                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
-                                        <MenuItem icon={<Settings size={18} />} text="Settings" href="/settings" onClick={() => setIsProfileOpen(false)} />
-                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
+                                    <div className="p-2.5 space-y-0.5">
+                                        <MenuItem icon={<User size={16} />} text="Profile" href="/profile" onClick={() => setIsProfileOpen(false)} />
+                                        <MenuItem icon={<Plus size={16} />} text="List a Room" href="/listings/create" onClick={() => setIsProfileOpen(false)} />
+                                        <MenuItem icon={<Heart size={16} />} text="Saved" href="/saved" onClick={() => setIsProfileOpen(false)} />
+                                        <div className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
+                                        <MenuItem icon={<Settings size={16} />} text="Settings" href="/settings" onClick={() => setIsProfileOpen(false)} />
                                         <ThemeToggle variant="menu-item" />
-                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1 mx-2"></div>
+                                        <div className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
                                         <MenuItem
-                                            icon={<LogOut size={18} />}
+                                            icon={<LogOut size={16} />}
                                             text="Log out"
                                             danger
                                             onClick={() => {
@@ -361,32 +355,31 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-2 ml-2">
+                            <div className="flex items-center gap-1.5">
                                 <Link
                                     href="/login"
-                                    className="text-zinc-600 dark:text-zinc-400 font-medium hover:text-zinc-900 dark:hover:text-white px-3 py-2 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-md"
+                                    className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-4 py-2 transition-all duration-300 rounded-full hover:bg-zinc-100 dark:hover:bg-white/5"
                                 >
                                     Log in
                                 </Link>
                                 <Link href="/signup">
-                                    <Button variant="secondary" className="px-4 py-2 h-auto">
-                                        Sign up
+                                    <Button size="sm" className="rounded-full px-6 h-10 shadow-lg shadow-zinc-900/10">
+                                        Join
                                     </Button>
                                 </Link>
                             </div>
                         )}
-                    </div>
 
-                    {/* Mobile Menu Toggle */}
-                    <div className="md:hidden flex items-center gap-4">
-                        <button
-                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            className="text-zinc-900 dark:text-white p-2 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-md"
-                            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-                            aria-expanded={isMobileMenuOpen}
-                        >
-                            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-                        </button>
+                        {/* Mobile Menu Toggle */}
+                        <div className="lg:hidden flex items-center">
+                            <button
+                                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                                className="text-zinc-900 dark:text-white p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full"
+                                aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+                            >
+                                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -1590,7 +1590,7 @@ export default function MapComponent({
 
     return (
         <div
-            className="w-full h-full rounded-xl overflow-hidden border shadow-lg relative group"
+            className="w-full h-full overflow-hidden relative group"
             role="region"
             aria-label="Interactive map showing listing locations"
             aria-roledescription="map"
@@ -2198,18 +2198,18 @@ export default function MapComponent({
             </Map>
 
             {/* Search as I move toggle - prominent pill button */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[50]">
                 <button
                     role="switch"
                     aria-checked={searchAsMove}
                     onClick={() => setSearchAsMove(!searchAsMove)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 backdrop-blur-md ${
                         searchAsMove
-                            ? "bg-zinc-900 text-white border-zinc-900 ring-2 ring-green-400/30 dark:bg-white dark:text-zinc-900 dark:border-white dark:ring-green-500/30"
-                            : "bg-white text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
+                            ? "bg-white/95 text-zinc-900 border-white/20 dark:bg-zinc-900/95 dark:text-white dark:border-zinc-800/50 ring-2 ring-green-500/50 dark:ring-green-400/30"
+                            : "bg-zinc-900/90 text-white border-white/10 dark:bg-zinc-800/90 dark:text-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-700"
                     }`}
                 >
-                    <div data-testid="search-toggle-indicator" className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-400" : "bg-zinc-300 dark:bg-zinc-600"}`} />
+                    <div data-testid="search-toggle-indicator" className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-500 dark:bg-green-400 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-zinc-500 dark:bg-zinc-500"}`} />
                     Search as I move
                 </button>
             </div>
@@ -2238,7 +2238,7 @@ export default function MapComponent({
                             { padding: 50, duration: 1000 }
                         );
                     }}
-                    className="absolute bottom-4 right-4 z-10 w-11 h-11 flex items-center justify-center bg-white dark:bg-zinc-800 rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
                     aria-label="Fit all results in view"
                     title="Fit all results"
                 >
@@ -2264,7 +2264,7 @@ export default function MapComponent({
                 <div
                     role="status"
                     aria-live="polite"
-                    className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 rounded-lg px-3 py-2 shadow-sm pointer-events-none"
+                    className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-blue-50/90 dark:bg-blue-950/80 backdrop-blur-md border border-blue-200/50 dark:border-blue-900/50 rounded-full px-4 py-2 shadow-lg pointer-events-none"
                 >
                     <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
                         {viewportInfoMessage}
@@ -2277,7 +2277,7 @@ export default function MapComponent({
 
             {/* Empty state overlay - when map is loaded but no listings in viewport */}
             {isMapLoaded && !areTilesLoading && !isSearching && listings.length === 0 && (
-                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 px-5 py-4 max-w-[280px] text-center pointer-events-auto">
+                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200/50 dark:border-zinc-700/50 px-6 py-5 max-w-[280px] text-center pointer-events-auto">
                     <MapPin className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2" aria-hidden="true" />
                     <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">No listings in this area</p>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Try zooming out or adjusting your filters</p>

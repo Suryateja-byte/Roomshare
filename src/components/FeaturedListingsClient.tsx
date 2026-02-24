@@ -39,12 +39,9 @@ interface FeaturedListingsClientProps {
     listings: Listing[];
 }
 
-// Use 'm' (lightweight motion) instead of 'motion' with LazyMotion
-// This reduces bundle from ~200KB to ~20KB by only loading DOM animation features
-
 const fadeInUp: Variants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } }
 };
 
 const staggerContainer: Variants = {
@@ -56,11 +53,10 @@ const staggerContainer: Variants = {
 };
 
 export default function FeaturedListingsClient({ listings }: FeaturedListingsClientProps) {
-    // Show empty state with CTA when no listings exist
     if (!listings || listings.length === 0) {
         return (
             <LazyMotion features={domAnimation}>
-            <section className="py-16 md:py-24 bg-zinc-50 dark:bg-zinc-900/50">
+            <section className="py-24 md:py-32 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800/50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
                     <m.div
                         initial="hidden"
@@ -69,15 +65,15 @@ export default function FeaturedListingsClient({ listings }: FeaturedListingsCli
                         variants={staggerContainer}
                         className="text-center"
                     >
-                        <m.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-semibold tracking-[-0.02em] text-zinc-900 dark:text-white mb-4">
-                            Be the First to List
+                        <m.h2 variants={fadeInUp} className="text-3xl md:text-5xl font-medium tracking-tight text-zinc-900 dark:text-white mb-6">
+                            Be the first to share.
                         </m.h2>
-                        <m.p variants={fadeInUp} className="text-zinc-500 dark:text-zinc-400 text-lg font-light max-w-2xl mx-auto mb-8">
-                            No rooms listed yet — be the first to share your space with our growing community of roommates.
+                        <m.p variants={fadeInUp} className="text-zinc-500 dark:text-zinc-400 text-lg font-light max-w-xl mx-auto mb-10">
+                            No rooms listed in this area yet. Share your space and find the perfect roommate today.
                         </m.p>
                         <m.div variants={fadeInUp}>
                             <Link href="/listings/create">
-                                <Button size="lg" className="h-12 px-8 rounded-xl text-base font-medium gap-2">
+                                <Button size="lg" className="rounded-full px-8 h-12 text-base font-medium gap-2">
                                     List Your Room
                                     <ArrowRight className="w-4 h-4" />
                                 </Button>
@@ -92,69 +88,65 @@ export default function FeaturedListingsClient({ listings }: FeaturedListingsCli
 
     return (
         <LazyMotion features={domAnimation}>
-        <section className="py-16 md:py-24 bg-zinc-50 dark:bg-zinc-900/50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <section className="py-24 md:py-32 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800/50 relative">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
                 <m.div
                     initial="hidden"
                     whileInView="visible"
-                    viewport={{ once: true }}
+                    viewport={{ once: true, margin: "-100px" }}
                     variants={staggerContainer}
-                    className="text-center mb-12"
+                    className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16"
                 >
-                    <m.div variants={fadeInUp} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 mb-4">
-                        <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-                        <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wide">Just Listed</span>
+                    <div className="max-w-2xl">
+                        <m.div variants={fadeInUp} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-6">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                            New Arrivals
+                        </m.div>
+                        <m.h2 variants={fadeInUp} className="text-3xl md:text-5xl font-medium tracking-tight text-zinc-900 dark:text-white mb-4">
+                            Latest curated spaces.
+                        </m.h2>
+                        <m.p variants={fadeInUp} className="text-zinc-500 dark:text-zinc-400 text-lg font-light">
+                            Find your next home among these hand-picked listings.
+                        </m.p>
+                    </div>
+                    
+                    <m.div variants={fadeInUp} className="hidden md:block">
+                        <Link href="/search" className="group">
+                            <Button variant="ghost" className="rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 px-6 gap-2">
+                                View all <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                            </Button>
+                        </Link>
                     </m.div>
-                    <m.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-semibold tracking-[-0.02em] text-zinc-900 dark:text-white mb-4">
-                        Newest Listings
-                    </m.h2>
-                    <m.p variants={fadeInUp} className="text-zinc-500 dark:text-zinc-400 text-lg font-light max-w-2xl mx-auto">
-                        Fresh spaces just added by our community. Find your perfect match before anyone else.
-                    </m.p>
                 </m.div>
 
                 <m.div
                     initial="hidden"
                     whileInView="visible"
-                    viewport={{ once: true }}
+                    viewport={{ once: true, margin: "-100px" }}
                     variants={staggerContainer}
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10"
                 >
                     {listings.map((listing, index) => (
                         <m.div key={listing.id} variants={fadeInUp}>
                             <ListingCard
-                                listing={{
-                                    id: listing.id,
-                                    title: listing.title,
-                                    price: listing.price,
-                                    description: listing.description,
-                                    location: {
-                                        city: listing.location.city,
-                                        state: listing.location.state,
-                                    },
-                                    amenities: listing.amenities,
-                                    householdLanguages: listing.householdLanguages,
-                                    availableSlots: listing.availableSlots,
-                                    images: listing.images,
-                                    avgRating: listing.avgRating,
-                                    reviewCount: listing.reviewCount,
-                                }}
+                                listing={listing}
                                 priority={index < 3}
+                                className="h-full border-zinc-200/50 dark:border-zinc-800"
                             />
                         </m.div>
                     ))}
                 </m.div>
 
                 <m.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 10 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ delay: 0.3 }}
-                    className="flex justify-center mt-12"
+                    transition={{ delay: 0.2 }}
+                    className="flex justify-center mt-12 md:hidden"
                 >
-                    <Link href="/search">
-                        <Button variant="outline" size="lg" className="group rounded-full px-8">
-                            View All Listings
+                    <Link href="/search" className="group w-full">
+                        <Button variant="outline" size="lg" className="w-full rounded-full border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                            Explore All Listings
                             <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                         </Button>
                     </Link>

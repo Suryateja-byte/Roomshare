@@ -1,0 +1,689 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - link "Skip to search results" [ref=e3] [cursor=pointer]:
+    - /url: "#search-results"
+  - main [ref=e7]:
+    - generic [ref=e8]:
+      - link "Skip to search results" [ref=e9] [cursor=pointer]:
+        - /url: "#search-results"
+      - navigation "Search navigation" [ref=e11]:
+        - generic [ref=e14]:
+          - link "Back to home" [ref=e15] [cursor=pointer]:
+            - /url: /
+            - img [ref=e16]
+            - generic [ref=e18]: R
+            - generic [ref=e19]: Home
+          - generic [ref=e20]:
+            - generic [ref=e737]:
+              - search [ref=e738]:
+                - generic [ref=e739]:
+                  - generic [ref=e740]: Where
+                  - generic [ref=e741]:
+                    - generic [ref=e742]:
+                      - generic [ref=e743]:
+                        - combobox "Where" [expanded] [ref=e744]: san francisco
+                        - button "Clear search" [ref=e746]:
+                          - img [ref=e747]
+                      - listbox "Location suggestions" [ref=e751]:
+                        - option "San Francisco California, United States" [ref=e752]:
+                          - button "San Francisco California, United States" [ref=e753]:
+                            - img [ref=e754]
+                            - generic [ref=e757]:
+                              - paragraph [ref=e758]: San Francisco
+                              - paragraph [ref=e759]: California, United States
+                        - option "San Francisco Bay Area San Francisco, California, United States" [ref=e760]:
+                          - button "San Francisco Bay Area San Francisco, California, United States" [ref=e761]:
+                            - img [ref=e762]
+                            - generic [ref=e765]:
+                              - paragraph [ref=e766]: San Francisco Bay Area
+                              - paragraph [ref=e767]: San Francisco, California, United States
+                        - option "San Francisco Bay California, United States" [ref=e768]:
+                          - button "San Francisco Bay California, United States" [ref=e769]:
+                            - img [ref=e770]
+                            - generic [ref=e773]:
+                              - paragraph [ref=e774]: San Francisco Bay
+                              - paragraph [ref=e775]: California, United States
+                        - option "San Francisco State University San Francisco, California, United States" [ref=e776]:
+                          - button "San Francisco State University San Francisco, California, United States" [ref=e777]:
+                            - img [ref=e778]
+                            - generic [ref=e781]:
+                              - paragraph [ref=e782]: San Francisco State University
+                              - paragraph [ref=e783]: San Francisco, California, United States
+                        - option "San Francisco International Airport South San Francisco, California, United States" [ref=e784]:
+                          - button "San Francisco International Airport South San Francisco, California, United States" [ref=e785]:
+                            - img [ref=e786]
+                            - generic [ref=e789]:
+                              - paragraph [ref=e790]: San Francisco International Airport
+                              - paragraph [ref=e791]: South San Francisco, California, United States
+                    - button "Use my current location" [ref=e792]:
+                      - img [ref=e793]
+                - generic [ref=e798]:
+                  - generic [ref=e799]: Budget
+                  - generic [ref=e800]:
+                    - spinbutton "Minimum budget" [ref=e801]
+                    - generic [ref=e802]: "-"
+                    - spinbutton "Maximum budget" [ref=e803]
+                  - generic [ref=e804]: Enter minimum and maximum monthly budget in dollars
+                - generic [ref=e808]:
+                  - button "Filter by all room types" [ref=e809]:
+                    - img [ref=e810]
+                    - generic [ref=e815]: All
+                  - button "Filter by Private room" [pressed] [ref=e816]:
+                    - img [ref=e817]
+                    - generic [ref=e820]: Private
+                  - button "Filter by Shared room" [ref=e821]:
+                    - img [ref=e822]
+                    - generic [ref=e827]: Shared
+                  - button "Filter by Entire room" [ref=e828]:
+                    - img [ref=e829]
+                    - generic [ref=e833]: Entire
+                - button "Filters (1 active)" [ref=e837]:
+                  - img [ref=e838]
+                  - generic [ref=e839]: Filters
+                  - generic [ref=e840]: "1"
+                - button "Search listings" [ref=e842]:
+                  - img [ref=e843]
+              - generic [ref=e846]:
+                - img [ref=e847]
+                - generic [ref=e849]: Select a location from the dropdown for more accurate results
+            - generic: Ctrl+K
+      - generic [ref=e93]:
+        - generic [ref=e95]:
+          - status [ref=e96]
+          - generic [ref=e98]:
+            - navigation "Category filters" [ref=e99]:
+              - generic [ref=e100]:
+                - button "Entire Place" [ref=e101]:
+                  - img [ref=e102]
+                  - generic [ref=e106]: Entire Place
+                - button "Private Room" [pressed] [ref=e107]:
+                  - img [ref=e108]
+                  - generic [ref=e111]: Private Room
+                - button "Near Transit" [ref=e112]:
+                  - img [ref=e113]
+                  - generic [ref=e117]: Near Transit
+                - button "Pet Friendly" [ref=e118]:
+                  - img [ref=e119]
+                  - generic [ref=e124]: Pet Friendly
+                - button "Furnished" [ref=e125]:
+                  - img [ref=e126]
+                  - generic [ref=e129]: Furnished
+                - button "Short Term" [ref=e130]:
+                  - img [ref=e131]
+                  - generic [ref=e135]: Short Term
+                - button "Under $1000" [ref=e136]:
+                  - img [ref=e137]
+                  - generic [ref=e139]: Under $1000
+                - button "Shared Room" [ref=e140]:
+                  - img [ref=e141]
+                  - generic [ref=e146]: Shared Room
+                - button "Wifi" [ref=e147]:
+                  - img [ref=e148]
+                  - generic [ref=e151]: Wifi
+              - button "Scroll categories right" [ref=e850]:
+                - img [ref=e851]
+            - generic [ref=e152]:
+              - generic [ref=e153]:
+                - img [ref=e154]
+                - generic [ref=e157]: "Try:"
+                - button "Furnished" [ref=e158]
+                - button "Pet Friendly" [ref=e159]
+                - button "Wifi" [ref=e160]
+                - button "Parking" [ref=e161]
+                - button "Washer" [ref=e162]
+              - region "Applied filters" [ref=e163]:
+                - generic [ref=e164]:
+                  - generic [ref=e166]:
+                    - generic [ref=e167]: Private Room
+                    - generic "Removing this filter adds +10 more results" [ref=e853]: "+10"
+                    - 'button "Remove filter: Private Room" [ref=e169]':
+                      - img [ref=e170]
+                  - button "Clear all filters" [ref=e173]:
+                    - img [ref=e174]
+                    - generic [ref=e177]: Clear all
+              - generic [ref=e178]:
+                - generic [ref=e179]:
+                  - heading "21 places in \"san francisco\"" [level=1] [ref=e180]
+                  - paragraph [ref=e181]: Book a place that fits your lifestyle.
+                - generic [ref=e182]:
+                  - button "Save Search" [ref=e183]:
+                    - img [ref=e184]
+                    - generic [ref=e186]: Save Search
+                  - generic [ref=e854]:
+                    - generic [ref=e855]: "Sort by:"
+                    - combobox [ref=e856]:
+                      - generic: Recommended
+                      - img [ref=e857]
+              - generic [ref=e191]:
+                - status [ref=e192]: Found 21 listings for "san francisco"
+                - generic [ref=e193]:
+                  - paragraph [ref=e194]: 21 places in san francisco
+                  - generic [ref=e195] [cursor=pointer]:
+                    - generic [ref=e196]: Show total price
+                    - switch "Show total price" [ref=e197]
+                - heading "Available listings" [level=2] [ref=e199]
+                - feed "Search results" [ref=e200]:
+                  - 'article "Sunny Mission Room: $1,200 per month, rated 5.0 out of 5, 1 spot available, San Francisco, CA, Wifi, Furnished, Kitchen" [ref=e201]':
+                    - generic [ref=e202]:
+                      - button "Show on map" [ref=e203]:
+                        - img [ref=e204]
+                      - button "Save listing" [ref=e207]:
+                        - img [ref=e208]
+                    - link "Image carousel for Sunny Mission Room Available Sunny Mission Room Rating 5.0 out of 5 San Francisco, CA $1,200 /mo Wifi Furnished Kitchen English" [ref=e210] [cursor=pointer]:
+                      - /url: /listings/cml14d4560003spyxz4iu4fku
+                      - generic [ref=e211]:
+                        - generic [ref=e212]:
+                          - region "Image carousel for Sunny Mission Room" [ref=e213]:
+                            - generic [ref=e215]:
+                              - group "1 of 2" [ref=e216]:
+                                - img "Sunny Mission Room - Image 1" [ref=e217]
+                              - group "2 of 2" [ref=e218]:
+                                - img "Sunny Mission Room - Image 2" [ref=e219]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e220]:
+                              - tab "Go to image 1" [selected] [ref=e221]
+                              - tab "Go to image 2" [ref=e223]
+                          - generic [ref=e226]: Available
+                        - generic [ref=e227]:
+                          - generic [ref=e228]:
+                            - heading "Sunny Mission Room" [level=3] [ref=e229]
+                            - generic "Rating 5.0 out of 5" [ref=e230]:
+                              - img [ref=e231]
+                              - generic [ref=e233]: "5.0"
+                          - paragraph [ref=e234]: San Francisco, CA
+                          - generic [ref=e235]:
+                            - generic [ref=e236]: $1,200
+                            - generic [ref=e237]: /mo
+                          - generic [ref=e238]:
+                            - generic [ref=e239]: Wifi
+                            - generic [ref=e240]: Furnished
+                            - generic [ref=e241]: Kitchen
+                          - generic [ref=e242]:
+                            - img [ref=e243]
+                            - generic [ref=e246]: English
+                  - 'article "[TEST 103] Pool + Indonesian: $1,079 per month, new listing, 1 spot available, San Francisco, CA, Pool Access" [ref=e247]':
+                    - generic [ref=e248]:
+                      - button "Show on map" [ref=e249]:
+                        - img [ref=e250]
+                      - button "Save listing" [ref=e253]:
+                        - img [ref=e254]
+                    - link "Image carousel for [TEST 103] Pool + Indonesian Available [TEST 103] Pool + Indonesian New San Francisco, CA $1,079 /mo Pool Access Indonesian" [ref=e256] [cursor=pointer]:
+                      - /url: /listings/cmjcegh4t008jspsidxyvfrcn
+                      - generic [ref=e257]:
+                        - generic [ref=e258]:
+                          - region "Image carousel for [TEST 103] Pool + Indonesian" [ref=e259]:
+                            - generic [ref=e261]:
+                              - group "1 of 2" [ref=e262]:
+                                - img "[TEST 103] Pool + Indonesian - Image 1" [ref=e263]
+                              - group "2 of 2" [ref=e264]:
+                                - img "[TEST 103] Pool + Indonesian - Image 2" [ref=e265]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e266]:
+                              - tab "Go to image 1" [selected] [ref=e267]
+                              - tab "Go to image 2" [ref=e269]
+                          - generic [ref=e272]: Available
+                        - generic [ref=e273]:
+                          - generic [ref=e274]:
+                            - heading "[TEST 103] Pool + Indonesian" [level=3] [ref=e275]
+                            - generic [ref=e276]: New
+                          - paragraph [ref=e277]: San Francisco, CA
+                          - generic [ref=e278]:
+                            - generic [ref=e279]: $1,079
+                            - generic [ref=e280]: /mo
+                          - generic [ref=e282]: Pool Access
+                          - generic [ref=e283]:
+                            - img [ref=e284]
+                            - generic [ref=e287]: Indonesian
+                  - 'article "SoMa Tech Room: $1,500 per month, new listing, 1 spot available, San Francisco, CA, Wifi, Gym, Parking" [ref=e288]':
+                    - generic [ref=e289]:
+                      - button "Show on map" [ref=e290]:
+                        - img [ref=e291]
+                      - button "Save listing" [ref=e294]:
+                        - img [ref=e295]
+                    - link "Image carousel for SoMa Tech Room Available SoMa Tech Room New San Francisco, CA $1,500 /mo Wifi Gym Parking English" [ref=e297] [cursor=pointer]:
+                      - /url: /listings/cml9w6paw0016spiwt0do77zz
+                      - generic [ref=e298]:
+                        - generic [ref=e299]:
+                          - region "Image carousel for SoMa Tech Room" [ref=e300]:
+                            - generic [ref=e302]:
+                              - group "1 of 2" [ref=e303]:
+                                - img "SoMa Tech Room - Image 1" [ref=e304]
+                              - group "2 of 2" [ref=e305]:
+                                - img "SoMa Tech Room - Image 2" [ref=e306]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e307]:
+                              - tab "Go to image 1" [selected] [ref=e308]
+                              - tab "Go to image 2" [ref=e310]
+                          - generic [ref=e313]: Available
+                        - generic [ref=e314]:
+                          - generic [ref=e315]:
+                            - heading "SoMa Tech Room" [level=3] [ref=e316]
+                            - generic [ref=e317]: New
+                          - paragraph [ref=e318]: San Francisco, CA
+                          - generic [ref=e319]:
+                            - generic [ref=e320]: $1,500
+                            - generic [ref=e321]: /mo
+                          - generic [ref=e322]:
+                            - generic [ref=e323]: Wifi
+                            - generic [ref=e324]: Gym
+                            - generic [ref=e325]: Parking
+                          - generic [ref=e326]:
+                            - img [ref=e327]
+                            - generic [ref=e330]: English
+                  - 'article "Russian Hill Room: $1,650 per month, new listing, 1 spot available, San Francisco, CA, Wifi, Furnished, AC" [ref=e331]':
+                    - generic [ref=e332]:
+                      - button "Show on map" [ref=e333]:
+                        - img [ref=e334]
+                      - button "Save listing" [ref=e337]:
+                        - img [ref=e338]
+                    - link "Image carousel for Russian Hill Room Available Russian Hill Room New San Francisco, CA $1,650 /mo Wifi Furnished AC English" [ref=e340] [cursor=pointer]:
+                      - /url: /listings/cml9w6pao0013spiwqgx560uk
+                      - generic [ref=e341]:
+                        - generic [ref=e342]:
+                          - region "Image carousel for Russian Hill Room" [ref=e343]:
+                            - generic [ref=e345]:
+                              - group "1 of 2" [ref=e346]:
+                                - img "Russian Hill Room - Image 1" [ref=e347]
+                              - group "2 of 2" [ref=e348]:
+                                - img "Russian Hill Room - Image 2" [ref=e349]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e350]:
+                              - tab "Go to image 1" [selected] [ref=e351]
+                              - tab "Go to image 2" [ref=e353]
+                          - generic [ref=e356]: Available
+                        - generic [ref=e357]:
+                          - generic [ref=e358]:
+                            - heading "Russian Hill Room" [level=3] [ref=e359]
+                            - generic [ref=e360]: New
+                          - paragraph [ref=e361]: San Francisco, CA
+                          - generic [ref=e362]:
+                            - generic [ref=e363]: $1,650
+                            - generic [ref=e364]: /mo
+                          - generic [ref=e365]:
+                            - generic [ref=e366]: Wifi
+                            - generic [ref=e367]: Furnished
+                            - generic [ref=e368]: AC
+                          - generic [ref=e369]:
+                            - img [ref=e370]
+                            - generic [ref=e373]: English
+                  - 'article "Haight-Ashbury Suite: $1,550 per month, new listing, 1 spot available, San Francisco, CA, Wifi, Furnished, Parking" [ref=e374]':
+                    - generic [ref=e375]:
+                      - button "Show on map" [ref=e376]:
+                        - img [ref=e377]
+                      - button "Save listing" [ref=e380]:
+                        - img [ref=e381]
+                    - link "Image carousel for Haight-Ashbury Suite Available Haight-Ashbury Suite New San Francisco, CA $1,550 /mo Wifi Furnished Parking English" [ref=e383] [cursor=pointer]:
+                      - /url: /listings/cml9w6pa0000uspiwllsgq54s
+                      - generic [ref=e384]:
+                        - generic [ref=e385]:
+                          - region "Image carousel for Haight-Ashbury Suite" [ref=e386]:
+                            - generic [ref=e388]:
+                              - group "1 of 2" [ref=e389]:
+                                - img "Haight-Ashbury Suite - Image 1" [ref=e390]
+                              - group "2 of 2" [ref=e391]:
+                                - img "Haight-Ashbury Suite - Image 2" [ref=e392]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e393]:
+                              - tab "Go to image 1" [selected] [ref=e394]
+                              - tab "Go to image 2" [ref=e396]
+                          - generic [ref=e399]: Available
+                        - generic [ref=e400]:
+                          - generic [ref=e401]:
+                            - heading "Haight-Ashbury Suite" [level=3] [ref=e402]
+                            - generic [ref=e403]: New
+                          - paragraph [ref=e404]: San Francisco, CA
+                          - generic [ref=e405]:
+                            - generic [ref=e406]: $1,550
+                            - generic [ref=e407]: /mo
+                          - generic [ref=e408]:
+                            - generic [ref=e409]: Wifi
+                            - generic [ref=e410]: Furnished
+                            - generic [ref=e411]: Parking
+                          - generic [ref=e412]:
+                            - img [ref=e413]
+                            - generic [ref=e416]: English
+                  - 'article "Castro Neighborhood Room: $1,350 per month, new listing, 1 spot available, San Francisco, CA, Wifi, AC, Kitchen" [ref=e417]':
+                    - generic [ref=e418]:
+                      - button "Show on map" [ref=e419]:
+                        - img [ref=e420]
+                      - button "Save listing" [ref=e423]:
+                        - img [ref=e424]
+                    - link "Image carousel for Castro Neighborhood Room Available Castro Neighborhood Room New San Francisco, CA $1,350 /mo Wifi AC Kitchen English" [ref=e426] [cursor=pointer]:
+                      - /url: /listings/cml9w6p9j000ospiwz0f6fvi9
+                      - generic [ref=e427]:
+                        - generic [ref=e428]:
+                          - region "Image carousel for Castro Neighborhood Room" [ref=e429]:
+                            - generic [ref=e431]:
+                              - group "1 of 2" [ref=e432]:
+                                - img "Castro Neighborhood Room - Image 1" [ref=e433]
+                              - group "2 of 2" [ref=e434]:
+                                - img "Castro Neighborhood Room - Image 2" [ref=e435]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e436]:
+                              - tab "Go to image 1" [selected] [ref=e437]
+                              - tab "Go to image 2" [ref=e439]
+                          - generic [ref=e442]: Available
+                        - generic [ref=e443]:
+                          - generic [ref=e444]:
+                            - heading "Castro Neighborhood Room" [level=3] [ref=e445]
+                            - generic [ref=e446]: New
+                          - paragraph [ref=e447]: San Francisco, CA
+                          - generic [ref=e448]:
+                            - generic [ref=e449]: $1,350
+                            - generic [ref=e450]: /mo
+                          - generic [ref=e451]:
+                            - generic [ref=e452]: Wifi
+                            - generic [ref=e453]: AC
+                            - generic [ref=e454]: Kitchen
+                          - generic [ref=e455]:
+                            - img [ref=e456]
+                            - generic [ref=e459]: English
+                  - 'article "Pacific Heights Room: $2,100 per month, new listing, 1 spot available, San Francisco, CA, Wifi, Furnished, AC" [ref=e460]':
+                    - generic [ref=e461]:
+                      - button "Show on map" [ref=e462]:
+                        - img [ref=e463]
+                      - button "Save listing" [ref=e466]:
+                        - img [ref=e467]
+                    - link "Image carousel for Pacific Heights Room Available Pacific Heights Room New San Francisco, CA $2,100 /mo Wifi Furnished AC English" [ref=e469] [cursor=pointer]:
+                      - /url: /listings/cml9w6p92000ispiwicjw1axz
+                      - generic [ref=e470]:
+                        - generic [ref=e471]:
+                          - region "Image carousel for Pacific Heights Room" [ref=e472]:
+                            - generic [ref=e474]:
+                              - group "1 of 2" [ref=e475]:
+                                - img "Pacific Heights Room - Image 1" [ref=e476]
+                              - group "2 of 2" [ref=e477]:
+                                - img "Pacific Heights Room - Image 2" [ref=e478]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e479]:
+                              - tab "Go to image 1" [selected] [ref=e480]
+                              - tab "Go to image 2" [ref=e482]
+                          - generic [ref=e485]: Available
+                        - generic [ref=e486]:
+                          - generic [ref=e487]:
+                            - heading "Pacific Heights Room" [level=3] [ref=e488]
+                            - generic [ref=e489]: New
+                          - paragraph [ref=e490]: San Francisco, CA
+                          - generic [ref=e491]:
+                            - generic [ref=e492]: $2,100
+                            - generic [ref=e493]: /mo
+                          - generic [ref=e494]:
+                            - generic [ref=e495]: Wifi
+                            - generic [ref=e496]: Furnished
+                            - generic [ref=e497]: AC
+                          - generic [ref=e498]:
+                            - img [ref=e499]
+                            - generic [ref=e502]: English
+                  - 'article "Noe Valley Garden Room: $1,400 per month, new listing, 1 spot available, San Francisco, CA, Wifi, Furnished, Kitchen" [ref=e503]':
+                    - generic [ref=e504]:
+                      - button "Show on map" [ref=e505]:
+                        - img [ref=e506]
+                      - button "Save listing" [ref=e509]:
+                        - img [ref=e510]
+                    - link "Image carousel for Noe Valley Garden Room Available Noe Valley Garden Room New San Francisco, CA $1,400 /mo Wifi Furnished Kitchen English" [ref=e512] [cursor=pointer]:
+                      - /url: /listings/cml9w6p850006spiwjinl1pth
+                      - generic [ref=e513]:
+                        - generic [ref=e514]:
+                          - region "Image carousel for Noe Valley Garden Room" [ref=e515]:
+                            - generic [ref=e517]:
+                              - group "1 of 2" [ref=e518]:
+                                - img "Noe Valley Garden Room - Image 1" [ref=e519]
+                              - group "2 of 2" [ref=e520]:
+                                - img "Noe Valley Garden Room - Image 2" [ref=e521]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e522]:
+                              - tab "Go to image 1" [selected] [ref=e523]
+                              - tab "Go to image 2" [ref=e525]
+                          - generic [ref=e528]: Available
+                        - generic [ref=e529]:
+                          - generic [ref=e530]:
+                            - heading "Noe Valley Garden Room" [level=3] [ref=e531]
+                            - generic [ref=e532]: New
+                          - paragraph [ref=e533]: San Francisco, CA
+                          - generic [ref=e534]:
+                            - generic [ref=e535]: $1,400
+                            - generic [ref=e536]: /mo
+                          - generic [ref=e537]:
+                            - generic [ref=e538]: Wifi
+                            - generic [ref=e539]: Furnished
+                            - generic [ref=e540]: Kitchen
+                          - generic [ref=e541]:
+                            - img [ref=e542]
+                            - generic [ref=e545]: English
+                  - 'article "Marina District Flat: $1,600 per month, new listing, 1 spot available, San Francisco, CA, Wifi, Parking, AC" [ref=e546]':
+                    - generic [ref=e547]:
+                      - button "Show on map" [ref=e548]:
+                        - img [ref=e549]
+                      - button "Save listing" [ref=e552]:
+                        - img [ref=e553]
+                    - link "Image carousel for Marina District Flat Available Marina District Flat New San Francisco, CA $1,600 /mo Wifi Parking AC English" [ref=e555] [cursor=pointer]:
+                      - /url: /listings/cml9w6p7e0003spiwnuk7jm6u
+                      - generic [ref=e556]:
+                        - generic [ref=e557]:
+                          - region "Image carousel for Marina District Flat" [ref=e558]:
+                            - generic [ref=e560]:
+                              - group "1 of 2" [ref=e561]:
+                                - img "Marina District Flat - Image 1" [ref=e562]
+                              - group "2 of 2" [ref=e563]:
+                                - img "Marina District Flat - Image 2" [ref=e564]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e565]:
+                              - tab "Go to image 1" [selected] [ref=e566]
+                              - tab "Go to image 2" [ref=e568]
+                          - generic [ref=e571]: Available
+                        - generic [ref=e572]:
+                          - generic [ref=e573]:
+                            - heading "Marina District Flat" [level=3] [ref=e574]
+                            - generic [ref=e575]: New
+                          - paragraph [ref=e576]: San Francisco, CA
+                          - generic [ref=e577]:
+                            - generic [ref=e578]: $1,600
+                            - generic [ref=e579]: /mo
+                          - generic [ref=e580]:
+                            - generic [ref=e581]: Wifi
+                            - generic [ref=e582]: Parking
+                            - generic [ref=e583]: AC
+                          - generic [ref=e584]:
+                            - img [ref=e585]
+                            - generic [ref=e588]: English
+                  - 'article "Hayes Valley Private Suite: $1,800 per month, new listing, 1 spot available, San Francisco, CA, Wifi, Furnished, AC" [ref=e589]':
+                    - generic [ref=e590]:
+                      - button "Show on map" [ref=e591]:
+                        - img [ref=e592]
+                      - button "Save listing" [ref=e595]:
+                        - img [ref=e596]
+                    - link "Image carousel for Hayes Valley Private Suite Available Hayes Valley Private Suite New San Francisco, CA $1,800 /mo Wifi Furnished AC English" [ref=e598] [cursor=pointer]:
+                      - /url: /listings/cml14d46o000cspyxy01yrt4l
+                      - generic [ref=e599]:
+                        - generic [ref=e600]:
+                          - region "Image carousel for Hayes Valley Private Suite" [ref=e601]:
+                            - generic [ref=e603]:
+                              - group "1 of 2" [ref=e604]:
+                                - img "Hayes Valley Private Suite - Image 1" [ref=e605]
+                              - group "2 of 2" [ref=e606]:
+                                - img "Hayes Valley Private Suite - Image 2" [ref=e607]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e608]:
+                              - tab "Go to image 1" [selected] [ref=e609]
+                              - tab "Go to image 2" [ref=e611]
+                          - generic [ref=e614]: Available
+                        - generic [ref=e615]:
+                          - generic [ref=e616]:
+                            - heading "Hayes Valley Private Suite" [level=3] [ref=e617]
+                            - generic [ref=e618]: New
+                          - paragraph [ref=e619]: San Francisco, CA
+                          - generic [ref=e620]:
+                            - generic [ref=e621]: $1,800
+                            - generic [ref=e622]: /mo
+                          - generic [ref=e623]:
+                            - generic [ref=e624]: Wifi
+                            - generic [ref=e625]: Furnished
+                            - generic [ref=e626]: AC
+                          - generic [ref=e627]:
+                            - img [ref=e628]
+                            - generic [ref=e631]: English
+                  - 'article "[TEST 113] Kitchen + Marathi: $2,496 per month, new listing, 1 spot available, San Francisco, CA, Kitchen Access" [ref=e632]':
+                    - generic [ref=e633]:
+                      - button "Show on map" [ref=e634]:
+                        - img [ref=e635]
+                      - button "Save listing" [ref=e638]:
+                        - img [ref=e639]
+                    - link "Image carousel for [TEST 113] Kitchen + Marathi Available [TEST 113] Kitchen + Marathi New San Francisco, CA $2,496 /mo Kitchen Access Marathi" [ref=e641] [cursor=pointer]:
+                      - /url: /listings/cmjcegh77009dspsi89m9t0ty
+                      - generic [ref=e642]:
+                        - generic [ref=e643]:
+                          - region "Image carousel for [TEST 113] Kitchen + Marathi" [ref=e644]:
+                            - generic [ref=e646]:
+                              - group "1 of 2" [ref=e647]:
+                                - img "[TEST 113] Kitchen + Marathi - Image 1" [ref=e648]
+                              - group "2 of 2" [ref=e649]:
+                                - img "[TEST 113] Kitchen + Marathi - Image 2" [ref=e650]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e651]:
+                              - tab "Go to image 1" [selected] [ref=e652]
+                              - tab "Go to image 2" [ref=e654]
+                          - generic [ref=e657]: Available
+                        - generic [ref=e658]:
+                          - generic [ref=e659]:
+                            - heading "[TEST 113] Kitchen + Marathi" [level=3] [ref=e660]
+                            - generic [ref=e661]: New
+                          - paragraph [ref=e662]: San Francisco, CA
+                          - generic [ref=e663]:
+                            - generic [ref=e664]: $2,496
+                            - generic [ref=e665]: /mo
+                          - generic [ref=e667]: Kitchen Access
+                          - generic [ref=e668]:
+                            - img [ref=e669]
+                            - generic [ref=e672]: Marathi
+                  - 'article "[TEST 93] WiFi + Serbian: $1,392 per month, new listing, 1 spot available, San Francisco, CA, WiFi" [ref=e673]':
+                    - generic [ref=e674]:
+                      - button "Show on map" [ref=e675]:
+                        - img [ref=e676]
+                      - button "Save listing" [ref=e679]:
+                        - img [ref=e680]
+                    - link "Image carousel for [TEST 93] WiFi + Serbian Available [TEST 93] WiFi + Serbian New San Francisco, CA $1,392 /mo WiFi Serbian" [ref=e682] [cursor=pointer]:
+                      - /url: /listings/cmjcegh2d007pspsi3rnk9ub5
+                      - generic [ref=e683]:
+                        - generic [ref=e684]:
+                          - region "Image carousel for [TEST 93] WiFi + Serbian" [ref=e685]:
+                            - generic [ref=e687]:
+                              - group "1 of 2" [ref=e688]:
+                                - img "[TEST 93] WiFi + Serbian - Image 1" [ref=e689]
+                              - group "2 of 2" [ref=e690]:
+                                - img "[TEST 93] WiFi + Serbian - Image 2" [ref=e691]
+                            - button:
+                              - img
+                            - button:
+                              - img
+                            - tablist "Image navigation" [ref=e692]:
+                              - tab "Go to image 1" [selected] [ref=e693]
+                              - tab "Go to image 2" [ref=e695]
+                          - generic [ref=e698]: Available
+                        - generic [ref=e699]:
+                          - generic [ref=e700]:
+                            - heading "[TEST 93] WiFi + Serbian" [level=3] [ref=e701]
+                            - generic [ref=e702]: New
+                          - paragraph [ref=e703]: San Francisco, CA
+                          - generic [ref=e704]:
+                            - generic [ref=e705]: $1,392
+                            - generic [ref=e706]: /mo
+                          - generic [ref=e708]: WiFi
+                          - generic [ref=e709]:
+                            - img [ref=e710]
+                            - generic [ref=e713]: Serbian
+                - generic [ref=e714]:
+                  - paragraph [ref=e715]: Showing 12 of ~21 listings
+                  - button "Show more places. Currently showing 12 of 21 listings" [ref=e716]: Show more places
+                - paragraph [ref=e717]: 21 stays in san francisco
+        - generic [ref=e718]:
+          - button "Hide map" [ref=e719]:
+            - img [ref=e720]
+            - generic [ref=e726]: Hide map
+          - region "Interactive map showing listing locations" [ref=e860]:
+            - status [ref=e861]
+            - generic [ref=e862]: Use arrow keys to navigate between markers based on their position on the map. Press Enter or Space to select a marker and view listing details. Press Home to jump to the first marker, End to jump to the last marker.
+            - status [ref=e863]
+            - generic [ref=e864]:
+              - generic:
+                - region "Map" [ref=e865]
+                - button "$1650/month, Russian Hill Room, 1 spots available. Use arrow keys to navigate between markers." [ref=e866] [cursor=pointer]
+                - button "$1550/month, Haight-Ashbury Suite, 1 spots available. Use arrow keys to navigate between markers." [ref=e869] [cursor=pointer]
+                - button "$1200/month, Sunny Mission Room, 1 spots available. Use arrow keys to navigate between markers." [ref=e872] [cursor=pointer]
+              - group [ref=e875]:
+                - generic [ref=e876]:
+                  - link "MapLibre" [ref=e877] [cursor=pointer]:
+                    - /url: https://maplibre.org/
+                  - text: "|"
+                  - link "OpenFreeMap" [ref=e878] [cursor=pointer]:
+                    - /url: https://openfreemap.org
+                  - link "© OpenMapTiles" [ref=e879] [cursor=pointer]:
+                    - /url: https://www.openmaptiles.org/
+                  - text: Data from
+                  - link "OpenStreetMap" [ref=e880] [cursor=pointer]:
+                    - /url: https://www.openstreetmap.org/copyright
+              - button "Drop a pin on the map" [ref=e882]:
+                - img [ref=e883]
+                - text: Drop pin
+            - switch "Search as I move" [checked] [ref=e887]: Search as I move
+            - generic [ref=e889]:
+              - button "Show all POIs" [ref=e890]:
+                - img [ref=e891]
+                - text: POIs
+              - button "Show Transit" [ref=e895]:
+                - img [ref=e896]
+                - text: Transit
+              - button "Show POIs" [ref=e900]:
+                - img [ref=e901]
+                - text: POIs
+              - button "Show Parks" [ref=e903]:
+                - img [ref=e904]
+                - text: Parks
+            - button "Fit all results in view" [ref=e907]:
+              - img [ref=e908]
+  - region "Notifications alt+T"
+  - generic [ref=e731] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e732]:
+      - img [ref=e733]
+    - generic [ref=e913]:
+      - button "Open issues overlay" [ref=e914]:
+        - generic [ref=e915]:
+          - generic [ref=e916]: "0"
+          - generic [ref=e917]: "1"
+        - generic [ref=e918]: Issue
+      - button "Collapse issues badge" [ref=e919]:
+        - img [ref=e920]
+  - alert [ref=e736]

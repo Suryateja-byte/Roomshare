@@ -184,104 +184,104 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                     isDragging && "pointer-events-none"
                 )}
             >
-                <div className="relative bg-white dark:bg-zinc-900 flex flex-col rounded-none sm:rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden transition-all duration-normal hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-800">
+                <div className="relative bg-white dark:bg-zinc-900 flex flex-col rounded-none sm:rounded-2xl border border-zinc-200/50 dark:border-white/5 overflow-hidden transition-all duration-500 ease-out group-hover:shadow-2xl group-hover:shadow-zinc-900/10 dark:group-hover:shadow-black/40 group-hover:border-zinc-300 dark:group-hover:border-white/10">
                 {/* Image Area */}
-                <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-zinc-50 dark:bg-zinc-800">
                     {/* Image Carousel or single image */}
                     <ImageCarousel
                         images={displayImages}
                         alt={displayTitle}
                         priority={priority}
-                        className="h-full w-full group-hover:scale-105 transition-transform duration-normal ease-out"
+                        className="h-full w-full group-hover:scale-110 transition-transform duration-[2s] ease-out"
                         onImageError={handleImageError}
                         onDragStateChange={setIsDragging}
                     />
 
+                    {/* Gradient Overlay for better text readability and depth */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
                     {/* Empty state overlay - Intentional waiting state */}
                     {showImagePlaceholder && (
-                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-150 dark:from-zinc-800 dark:to-zinc-850 flex flex-col items-center justify-center pointer-events-none">
-                            <div className="w-14 h-14 rounded-2xl bg-zinc-200/80 dark:bg-zinc-700/80 flex items-center justify-center mb-2">
-                                <Home className="w-7 h-7 text-zinc-400 dark:text-zinc-500" strokeWidth={1.5} fill="currentColor" fillOpacity={0.1} />
-                            </div>
-                            <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wider">No Photos</span>
+                        <div className="absolute inset-0 bg-zinc-50 dark:bg-zinc-800 flex flex-col items-center justify-center pointer-events-none">
+                            <Home className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mb-2" strokeWidth={1} />
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-[0.2em]">No Photos</span>
                         </div>
                     )}
 
                     {/* Badges — top-left stack */}
-                    <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5">
+                    <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
                         <span className={cn(
-                            "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide shadow-sm",
+                            "inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-[0.15em] shadow-sm backdrop-blur-md",
                             isAvailable
-                                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-black/5'
-                                : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                                ? 'bg-white/90 dark:bg-zinc-900/90 text-zinc-900 dark:text-white'
+                                : 'bg-zinc-900/90 dark:bg-white/90 text-white dark:text-zinc-900'
                         )}>
                             {isAvailable ? 'Available' : 'Filled'}
                         </span>
-                        <TrustBadge avgRating={listing.avgRating} reviewCount={listing.reviewCount} />
+                        {hasRating && (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-white/90 dark:bg-zinc-900/90 text-zinc-900 dark:text-white shadow-sm backdrop-blur-md">
+                                <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                                <span>{avgRating!.toFixed(1)}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* Content Area */}
-                <div className="flex flex-col flex-1 p-3 sm:p-4">
-                    {/* Title Row with Rating */}
-                    <div className="flex justify-between items-start gap-3 mb-0.5">
-                        <h3 className="font-semibold text-sm text-zinc-900 dark:text-white line-clamp-1 leading-snug" title={displayTitle}>
+                <div className="flex flex-col flex-1 p-5 sm:p-6">
+                    {/* Title and Rating Row */}
+                    <div className="flex justify-between items-start gap-4 mb-1">
+                        <h3 className="font-semibold text-base text-zinc-900 dark:text-white line-clamp-1 leading-tight tracking-tight" title={displayTitle}>
                             {displayTitle}
                         </h3>
-                        {hasRating ? (
-                            <div className="flex items-center gap-1 flex-shrink-0" aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}>
-                                <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                                <span className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">{avgRating!.toFixed(1)}</span>
-                            </div>
-                        ) : (
-                            <span className="text-xs uppercase font-bold text-zinc-500 dark:text-zinc-500 flex-shrink-0 tracking-wide">New</span>
+                        {!hasRating && (
+                            <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 flex-shrink-0 tracking-[0.1em]">New</span>
                         )}
                     </div>
 
                     {/* Location */}
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4 font-light">
                         {formatLocation(listing.location.city, listing.location.state)}
                     </p>
 
-                    {/* Price — surfaced right below location */}
-                    <div className="flex items-baseline mb-3">
+                    {/* Price — Large and prominent */}
+                    <div className="flex items-baseline mb-5">
                         {showTotalPrice && estimatedMonths > 1 ? (
                             <>
-                                <span data-testid="listing-price" className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price * estimatedMonths)}</span>
-                                <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">total</span>
-                                <span className="text-zinc-500 dark:text-zinc-500 text-xs ml-1.5">({formatPrice(listing.price)}/mo × {estimatedMonths})</span>
+                                <span data-testid="listing-price" className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price * estimatedMonths)}</span>
+                                <span className="text-zinc-400 dark:text-zinc-500 text-xs ml-1 uppercase tracking-wider font-medium">total</span>
                             </>
                         ) : (
                             <>
-                                <span data-testid="listing-price" className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
-                                {listing.price > 0 && <span className="text-zinc-500 dark:text-zinc-500 text-sm ml-0.5">/mo</span>}
+                                <span data-testid="listing-price" className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight">{formatPrice(listing.price)}</span>
+                                {listing.price > 0 && <span className="text-zinc-400 dark:text-zinc-500 text-xs ml-1 uppercase tracking-wider font-medium">/ mo</span>}
                             </>
                         )}
                     </div>
 
-                    {/* Amenities */}
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                        {listing.amenities.slice(0, 3).map((amenity) => (
-                            <span key={amenity} className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-1 rounded font-medium border border-zinc-200 dark:border-zinc-700">
-                                {amenity}
-                            </span>
-                        ))}
-                    </div>
+                    {/* Divider */}
+                    <div className="h-px w-full bg-zinc-100 dark:bg-white/5 mb-5"></div>
 
-                    {/* Languages spoken */}
-                    {listing.householdLanguages && listing.householdLanguages.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 mt-auto">
-                            <Globe className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
-                            {listing.householdLanguages.slice(0, 2).map((code) => (
-                                <span key={code} className="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded font-medium">
-                                    {getLanguageName(code)}
+                    {/* Amenities & Languages - Simplified */}
+                    <div className="flex items-center justify-between gap-2 mt-auto">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                            {listing.amenities.slice(0, 2).map((amenity) => (
+                                <span key={amenity} className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 truncate">
+                                    • {amenity}
                                 </span>
                             ))}
-                            {listing.householdLanguages.length > 2 && (
-                                <span className="text-xs text-zinc-500 dark:text-zinc-500">+{listing.householdLanguages.length - 2}</span>
-                            )}
                         </div>
-                    )}
+                        
+                        {listing.householdLanguages && listing.householdLanguages.length > 0 && (
+                            <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                                <Globe className="w-3 h-3 text-zinc-400" />
+                                <span className="text-[10px] font-medium text-zinc-400">
+                                    {getLanguageName(listing.householdLanguages[0])}
+                                    {listing.householdLanguages.length > 1 && ` +${listing.householdLanguages.length - 1}`}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 </div>
             </Link>

@@ -169,7 +169,7 @@ export function SearchResultsClient({
   const total = initialTotal;
 
   return (
-    <div id="search-results" tabIndex={-1}>
+    <div id="search-results" tabIndex={-1} className="!outline-none">
       {/* Screen reader announcement for search results */}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {hasConfirmedZeroResults
@@ -216,14 +216,9 @@ export function SearchResultsClient({
           {/* Suggested searches when browsing without a query */}
           {browseMode && !query && <SuggestedSearches />}
 
-          {/* Price toggle + result count header */}
+          {/* Price toggle */}
           {allListings.length > 0 && (
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {total !== null
-                  ? `${total} ${total === 1 ? 'place' : 'places'}${query ? ` in ${query}` : ''}`
-                  : `100+ places${query ? ` in ${query}` : ''}`}
-              </p>
+            <div className="flex items-center justify-end mb-6 pb-4 border-b border-zinc-100 dark:border-zinc-800/50">
               <TotalPriceToggle showTotal={showTotalPrice} onToggle={setShowTotalPrice} />
             </div>
           )}

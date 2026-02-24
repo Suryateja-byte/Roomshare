@@ -88,11 +88,10 @@ export function UserMarker({
             <button
                 onClick={onToggleDropMode}
                 className={cn(
-                    // P2-8 FIX: Ensure 44px minimum touch target for WCAG 2.5.5
-                    "absolute bottom-4 left-4 z-10 flex items-center justify-center gap-2 px-3 py-2 rounded-lg shadow-md border text-sm font-medium transition-all min-h-[44px]",
+                    "absolute bottom-4 left-4 z-[50] flex items-center justify-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all min-h-[44px] backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2",
                     isDropMode
-                        ? "bg-rose-500 text-white border-rose-500 ring-2 ring-rose-300"
-                        : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                        ? "bg-rose-500/90 text-white border-rose-500/90 ring-2 ring-rose-300/50"
+                        : "bg-white/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-300 border-zinc-200/50 dark:border-zinc-700/50 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 )}
                 aria-label={isDropMode ? "Cancel drop pin" : "Drop a pin on the map"}
                 title={isDropMode ? "Cancel" : "Drop a pin"}

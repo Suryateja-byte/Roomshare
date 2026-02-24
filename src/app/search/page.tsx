@@ -308,17 +308,17 @@ export default async function SearchPage({
             <RecommendedFilters />
             <AppliedFilterChips currentCount={total} />
 
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-                <div>
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 md:mb-10">
+                <div className="flex-1">
                     <h1
                         id="search-results-heading"
                         tabIndex={-1}
-                        className="text-lg sm:text-xl font-semibold text-zinc-900 dark:text-white tracking-tight outline-none"
+                        className="text-2xl md:text-3xl font-semibold tracking-tight text-zinc-900 dark:text-white !outline-none mb-2"
                     >
                         {total === null ? '100+' : total} {total === 1 ? 'place' : 'places'} {q ? `in "${q}"` : 'available'}
                     </h1>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                        Book a place that fits your lifestyle.
+                    <p className="text-sm md:text-base text-zinc-500 dark:text-zinc-400 font-light max-w-2xl">
+                        Find the perfect sanctuary. Curated spaces and compatible people.
                     </p>
                     {browseMode && (
                         <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
@@ -327,7 +327,7 @@ export default async function SearchPage({
                     )}
                 </div>
 
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-3 shrink-0 self-start">
                     <SaveSearchButton />
                     <SortSelect currentSort={sortOption} />
                 </div>

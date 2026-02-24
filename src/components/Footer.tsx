@@ -5,70 +5,73 @@ import { toast } from 'sonner';
 
 export default function Footer() {
     return (
-        <footer className="bg-zinc-100 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 pt-16 pb-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-10 md:gap-12 mb-16">
+        <footer className="bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-white/5 pt-24 pb-12 overflow-hidden">
+            <div className="max-w-7xl mx-auto px-6 sm:px-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-12 md:gap-16 mb-20">
                     {/* Brand Section */}
-                    <div className="col-span-2 sm:col-span-3 md:col-span-2 mb-4 sm:mb-0">
-                        <Link href="/" className="inline-block mb-5">
-                            <span className="font-semibold text-lg tracking-tight text-zinc-900 dark:text-white">
-                                RoomShare<span className="text-zinc-500 dark:text-zinc-400">.</span>
+                    <div className="col-span-2 sm:col-span-3 md:col-span-2">
+                        <Link href="/" className="inline-flex items-center gap-2.5 mb-6 group">
+                            <div className="w-8 h-8 bg-zinc-900 dark:bg-white rounded-lg flex items-center justify-center text-white dark:text-zinc-900 font-bold text-lg group-hover:scale-110 transition-transform shadow-lg shadow-zinc-900/10">
+                                R
+                            </div>
+                            <span className="font-semibold text-lg tracking-[-0.03em] text-zinc-900 dark:text-white">
+                                RoomShare<span className="text-indigo-600 dark:text-indigo-400">.</span>
                             </span>
                         </Link>
-                        <p className="text-zinc-500 dark:text-zinc-400 text-xs-plus leading-relaxed max-w-xs">
-                            Designed for modern living. <br className="hidden sm:block" />
-                            Connect, live, and thrive with people like you.
+                        <p className="text-zinc-500 dark:text-zinc-400 text-sm font-light leading-relaxed max-w-xs">
+                            The modern standard for shared living. Find your perfect home and compatible roommates with ease.
                         </p>
                     </div>
 
                     {/* Platform Links */}
                     <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Platform</h4>
-                        <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
-                            <li><Link href="/search" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Browse</Link></li>
-                            <li><Link href="/listings/create" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">List a Room</Link></li>
-                            <li><button onClick={() => toast.info('Trust & Safety page coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Trust & Safety</button></li>
+                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Platform</h4>
+                        <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
+                            <li><Link href="/search" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Browse</Link></li>
+                            <li><Link href="/listings/create" className="hover:text-zinc-900 dark:hover:text-white transition-colors">List a Room</Link></li>
+                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Safety</button></li>
                         </ul>
                     </div>
 
                     {/* Company Links */}
                     <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Company</h4>
-                        <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
-                            <li><Link href="/about" className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">About</Link></li>
-                            <li><button onClick={() => toast.info('Careers page coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Careers</button></li>
-                            <li><button onClick={() => toast.info('Blog coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Blog</button></li>
+                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Company</h4>
+                        <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
+                            <li><Link href="/about" className="hover:text-zinc-900 dark:hover:text-white transition-colors">About</Link></li>
+                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Careers</button></li>
+                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Blog</button></li>
                         </ul>
                     </div>
 
                     {/* Support Links */}
                     <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Support</h4>
-                        <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
-                            <li><button onClick={() => toast.info('Help Center coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Help Center</button></li>
-                            <li><button onClick={() => toast.info('Contact support coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Contact</button></li>
+                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Support</h4>
+                        <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
+                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Help Center</button></li>
+                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Contact</button></li>
                         </ul>
                     </div>
 
                     {/* Legal Links */}
                     <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-4 text-xs-plus tracking-tight">Legal</h4>
-                        <ul className="flex flex-col gap-2.5 text-xs-plus text-zinc-500 dark:text-zinc-400">
-                            <li><button onClick={() => toast.info('Privacy Policy coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Privacy</button></li>
-                            <li><button onClick={() => toast.info('Terms of Service coming soon!')} className="hover:text-zinc-900 dark:hover:text-white transition-colors inline-block text-left focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Terms</button></li>
+                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Legal</h4>
+                        <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
+                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Privacy</button></li>
+                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Terms</button></li>
                         </ul>
                     </div>
                 </div>
 
                 {/* Bottom Bar */}
-                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 order-2 sm:order-1">
+                <div className="border-t border-zinc-100 dark:border-white/5 pt-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em] order-2 sm:order-1">
                         © {new Date().getFullYear()} RoomShare Inc.
                     </p>
-                    <nav className="flex items-center gap-6 text-xs text-zinc-500 dark:text-zinc-400 order-1 sm:order-2" aria-label="Legal links">
-                        <button onClick={() => toast.info('Privacy Policy coming soon!')} className="hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Privacy</button>
-                        <button onClick={() => toast.info('Terms of Service coming soon!')} className="hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm">Terms</button>
-                    </nav>
+                    <div className="flex items-center gap-8 order-1 sm:order-2">
+                        <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">Instagram</button>
+                        <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">Twitter</button>
+                        <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">LinkedIn</button>
+                    </div>
                 </div>
             </div>
         </footer>

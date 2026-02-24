@@ -43,8 +43,8 @@ export default function SearchLayout({
           <div className="h-screen-safe flex flex-col bg-white dark:bg-zinc-950 overflow-hidden">
             <SkipLink href="#search-results">Skip to search results</SkipLink>
             {/* Search Header - Persistent across navigations, fixed position */}
-            <header className="fixed top-0 left-0 right-0 w-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800 z-[1100]">
-              <nav aria-label="Search navigation">
+            <header className="fixed top-0 left-0 right-0 w-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800 z-[1100] pointer-events-none">
+              <nav aria-label="Search navigation" className="pointer-events-auto">
                 <SearchHeaderWrapper />
               </nav>
             </header>

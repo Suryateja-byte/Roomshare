@@ -297,6 +297,16 @@ export default function MobileBottomSheet({
   const isExpanded = snapIndex === 2;
   const isCollapsed = snapIndex === 0;
 
+  // Bug #3 fix: When expanded, raise sheet above the fixed header (z-[1100])
+  // so minimize/collapse buttons receive pointer events.
+  // framer-motion freezes zIndex in the style prop at its initial value,
+  // so we set it directly on the DOM element after each state change.
+  useEffect(() => {
+    if (sheetRef.current) {
+      sheetRef.current.style.zIndex = isExpanded ? "1200" : "40";
+    }
+  }, [isExpanded]);
+
   return (
     <LazyMotion features={domAnimation}>
       {/* Dim overlay behind sheet when expanded */}
@@ -319,7 +329,7 @@ export default function MobileBottomSheet({
         ref={sheetRef}
         role="region"
         aria-label="Search results"
-        className="fixed bottom-0 left-0 right-0 z-40 flex flex-col bg-white dark:bg-zinc-900 rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.4)]"
+        className="fixed bottom-0 left-0 right-0 flex flex-col bg-white dark:bg-zinc-900 rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.4)]"
         animate={
           isDragging
             ? { height: displayHeightPx }
