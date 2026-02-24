@@ -21,6 +21,7 @@ import {
     VALID_HOUSE_RULES,
 } from '@/lib/search-params';
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
+import { useMobileSearch } from '@/contexts/MobileSearchContext';
 import { useRecentSearches, type RecentSearch, type RecentSearchFilters } from '@/hooks/useRecentSearches';
 import { useDebouncedFilterCount } from '@/hooks/useDebouncedFilterCount';
 import { useFacets } from '@/hooks/useFacets';
@@ -189,6 +190,12 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     const router = useRouter();
     const transitionContext = useSearchTransitionSafe();
+    const { registerOpenFilters } = useMobileSearch();
+
+    // Register mobile "open filters" callback for the collapsed search bar.
+    useEffect(() => {
+        registerOpenFilters(() => setShowFilters(true));
+    }, [registerOpenFilters]);
 
     const handleLocationSelect = (locationData: {
         name: string;
@@ -717,6 +724,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             <span className="text-zinc-300 text-xs">$</span>
                             <input
                                 id="search-budget-min"
+                                aria-label="Minimum budget"
                                 type="number"
                                 inputMode="numeric"
                                 value={minPrice}
@@ -732,6 +740,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             <span className="text-zinc-300 text-xs">$</span>
                             <input
                                 id="search-budget-max"
+                                aria-label="Maximum budget"
                                 type="number"
                                 inputMode="numeric"
                                 value={maxPrice}
@@ -783,6 +792,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             <button
                                 type="button"
                                 onClick={() => setShowFilters(true)}
+                                aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ''}`}
+                                aria-expanded={showFilters}
+                                aria-controls={showFilters ? 'search-filters' : undefined}
                                 className={`flex items-center gap-2 h-10 px-4 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${activeFilterCount > 0
                                     ? 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400'
                                     : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700'
@@ -805,6 +817,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                     <Button
                         type="submit"
                         disabled={isSearching}
+                        aria-label={isSearching ? 'Searching' : 'Search'}
+                        aria-busy={isSearching}
                         className={`rounded-full transition-all duration-500 hover:scale-105 active:scale-95 shadow-xl shadow-indigo-500/20 ${isCompact ? 'h-10 w-10 p-0' : 'h-12 w-full md:w-12 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600'}`}
                     >
                         {isSearching ? (

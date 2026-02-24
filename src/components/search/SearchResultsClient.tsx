@@ -46,6 +46,7 @@ export function SearchResultsClient({
   filterSuggestions,
   sortOption,
 }: SearchResultsClientProps) {
+  const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(
     initialNextCursor,
@@ -57,6 +58,7 @@ export function SearchResultsClient({
 
   // Hydrate showTotalPrice from sessionStorage after mount to avoid hydration mismatch
   useEffect(() => {
+    setIsHydrated(true);
     try {
       const stored = sessionStorage.getItem('showTotalPrice');
       if (stored) setShowTotalPrice(JSON.parse(stored));
@@ -252,7 +254,7 @@ export function SearchResultsClient({
           )}
 
           {/* Load more section with progress indicator */}
-          {nextCursor && !reachedCap && (
+          {isHydrated && nextCursor && !reachedCap && (
             <div className="flex flex-col items-center mt-8 mb-4 gap-2">
               <p className="text-xs text-zinc-500 dark:text-zinc-500">
                 Showing {allListings.length} of {total !== null ? `~${total}` : '100+'} listings
@@ -309,7 +311,7 @@ export function SearchResultsClient({
           {/* Contextual footer */}
           {allListings.length > 0 && (
             <p className="text-center text-xs text-zinc-500 dark:text-zinc-500 mt-6 pb-4">
-              {total === null ? '100+' : total} stays{query ? ` in ${query}` : ''}
+              {total === null ? '100+' : total} places{query ? ` in ${query}` : ''}
             </p>
           )}
         </>

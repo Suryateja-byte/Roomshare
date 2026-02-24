@@ -80,5 +80,6 @@ test-results/
 .windsurf/
 .zencoder/
 .claude-backup*/
+.claude/worktrees/
 .specify/
 .worktrees/

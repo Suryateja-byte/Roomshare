@@ -19,15 +19,18 @@ const customJestConfig = {
     "<rootDir>/node_modules/",
     "<rootDir>/.next/",
     "<rootDir>/.worktrees/",
+    "<rootDir>/.claude/worktrees/",
     "<rootDir>/src/__tests__/utils/",
     "<rootDir>/src/__tests__/fixtures/",
     "<rootDir>/tests/e2e/",
   ],
   modulePathIgnorePatterns: [
     "<rootDir>/.worktrees/",
+    "<rootDir>/.claude/worktrees/",
   ],
   watchPathIgnorePatterns: [
     "<rootDir>/.worktrees/",
+    "<rootDir>/.claude/worktrees/",
   ],
   collectCoverageFrom: [
     "src/**/*.{js,jsx,ts,tsx}",

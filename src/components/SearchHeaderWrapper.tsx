@@ -13,7 +13,7 @@
  * - Shows compact search pill when scrolled down
  */
 
-import { Suspense, lazy, useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, MessageSquare, Menu, User, Plus, Heart, Settings, LogOut } from "lucide-react";
 import { useScrollHeader } from "@/hooks/useScrollHeader";
@@ -28,10 +28,7 @@ import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
 import NotificationCenter from "@/components/NotificationCenter";
 import ThemeToggle from "@/components/ThemeToggle";
-
-// LCP optimization: Lazy-load SearchForm to defer its ~875-line bundle + heavy dependencies
-// This allows listing images (the LCP elements) to render before SearchForm JavaScript loads
-const SearchForm = lazy(() => import("@/components/SearchForm"));
+import SearchForm from "@/components/SearchForm";
 
 const MenuItem = ({
     icon,
@@ -130,19 +127,7 @@ export default function SearchHeaderWrapper() {
 
             {/* Search Form */}
             <div className="flex-1 min-w-0 relative">
-              <Suspense
-                fallback={
-                  /*
-                   * CLS fix: Fallback dimensions must match actual SearchForm height
-                   * Mobile: p-1.5 (12px) + button h-11 (44px) = 56px ≈ h-14
-                   * Desktop: md:p-2 (16px) + button sm:h-12 (48px) = 64px ≈ sm:h-16
-                   * Use rounded-xl to match actual form, not rounded-full
-                   */
-                  <div className="h-14 sm:h-16 w-full bg-zinc-100 dark:bg-zinc-800 animate-pulse rounded-xl border border-zinc-200/80 dark:border-zinc-700/80" />
-                }
-              >
-                <SearchForm />
-              </Suspense>
+              <SearchForm />
             </div>
 
             {/* Right Actions - User Profile / Auth */}

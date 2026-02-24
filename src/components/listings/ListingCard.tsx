@@ -219,7 +219,10 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                             {isAvailable ? 'Available' : 'Filled'}
                         </span>
                         {hasRating && (
-                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-white/90 dark:bg-zinc-900/90 text-zinc-900 dark:text-white shadow-sm backdrop-blur-md">
+                            <div
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-white/90 dark:bg-zinc-900/90 text-zinc-900 dark:text-white shadow-sm backdrop-blur-md"
+                                aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
+                            >
                                 <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
                                 <span>{avgRating!.toFixed(1)}</span>
                             </div>

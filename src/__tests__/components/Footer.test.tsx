@@ -28,7 +28,7 @@ describe('Footer', () => {
 
   it('renders tagline', () => {
     render(<Footer />)
-    expect(screen.getByText(/Designed for modern living/)).toBeInTheDocument()
+    expect(screen.getByText(/modern standard for shared living/i)).toBeInTheDocument()
   })
 
   it('renders platform links', () => {
@@ -71,10 +71,10 @@ describe('Footer', () => {
     render(<Footer />)
 
     await userEvent.click(screen.getByText('Careers'))
-    expect(mockToast.info).toHaveBeenCalledWith('Careers page coming soon!')
+    expect(mockToast.info).toHaveBeenNthCalledWith(1, 'Coming soon')
 
     await userEvent.click(screen.getByText('Blog'))
-    expect(mockToast.info).toHaveBeenCalledWith('Blog coming soon!')
+    expect(mockToast.info).toHaveBeenNthCalledWith(2, 'Coming soon')
   })
 
   it('has correct links for Browse', () => {

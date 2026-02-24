@@ -211,7 +211,7 @@ export function CategoryBar() {
       {/* Scrollable container */}
       <div
         ref={scrollRef}
-        className="flex items-center gap-8 px-6 pt-5 overflow-x-auto scrollbar-hide scroll-smooth"
+        className="flex items-center gap-8 px-6 py-2 overflow-x-auto scrollbar-hide scroll-smooth"
         style={{ cursor: 'grab' }}
       >
         {CATEGORIES.map((cat) => {
