@@ -66,6 +66,7 @@ export interface FilterParams {
   languages?: string[];
   genderPreference?: string;
   householdGender?: string;
+  zoom?: number;
   bounds?: {
     minLat: number;
     maxLat: number;

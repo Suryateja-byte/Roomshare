@@ -556,20 +556,53 @@ export async function getListings(
 
 // Maximum map markers to return (prevents UI performance issues)
 const MAX_MAP_MARKERS = 200;
+const MAP_TILE_CLUSTER_ZOOM_THRESHOLD = 11;
+const MAP_TILE_CLUSTER_GRID_SIZE = 16;
 
-/**
- * Optimized query for map markers - uses SQL-level bounds filtering
- * and returns only the fields needed for map display.
- *
- * Performance improvements over getListings():
- * - SQL-level bounds filtering with PostGIS ST_Intersects (uses spatial index)
- * - Returns only 8 fields vs 20+ fields
- * - LIMIT 200 at SQL level (not post-fetch)
- * - ~70% smaller payload per listing
- */
-export async function getMapListings(
-  params: FilterParams = {},
-): Promise<MapListingData[]> {
+export interface MapTileRequestParams extends FilterParams {
+  tile: {
+    z: number;
+    x: number;
+    y: number;
+  };
+}
+
+export interface MapTileDensityMetadata {
+  zoom: number;
+  tileKey: string;
+  listingCount: number;
+  returnedCount: number;
+  mode: "cluster" | "pins";
+  clusterCount?: number;
+  pinCount?: number;
+}
+
+export interface MapTileResult {
+  tileKey: string;
+  zoom: number;
+  mode: "cluster" | "pins";
+  listings: MapListingData[];
+  density?: MapTileDensityMetadata;
+}
+
+function tileToBounds(z: number, x: number, y: number): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+  const n = 2 ** z;
+  const lngPerTile = 360 / n;
+  const minLng = x * lngPerTile - 180;
+  const maxLng = (x + 1) * lngPerTile - 180;
+
+  const latFromTileY = (tileY: number): number => {
+    const merc = Math.PI * (1 - (2 * tileY) / n);
+    return (180 / Math.PI) * Math.atan(Math.sinh(merc));
+  };
+
+  const maxLat = latFromTileY(y);
+  const minLat = latFromTileY(y + 1);
+
+  return { minLat, maxLat, minLng, maxLng };
+}
+
+function buildMapBaseFilters(params: FilterParams = {}) {
   const {
     query,
     minPrice,
@@ -585,15 +618,6 @@ export async function getMapListings(
     householdGender,
   } = params;
 
-  // Defense in depth: block unbounded text searches
-  // This prevents full-table scans that are expensive and not useful
-  if (query && !bounds) {
-    throw new Error(
-      "Unbounded text search not allowed: geographic bounds required when query is present",
-    );
-  }
-
-  // Build WHERE conditions dynamically
   const conditions: string[] = [
     'l."availableSlots" > 0',
     "l.status = 'ACTIVE'",
@@ -606,20 +630,15 @@ export async function getMapListings(
   const queryParams: any[] = [];
   let paramIndex = 1;
 
-  // SQL-level bounds filtering using PostGIS spatial index with antimeridian support
   if (bounds) {
     if (crossesAntimeridian(bounds.minLng, bounds.maxLng)) {
-      // Split into two envelopes for antimeridian crossing
-      // Envelope 1: minLng to 180 (eastern side)
-      // Envelope 2: -180 to maxLng (western side)
       conditions.push(`(
                 ST_Intersects(loc.coords, ST_MakeEnvelope($${paramIndex++}, $${paramIndex++}, 180, $${paramIndex++}, 4326))
                 OR ST_Intersects(loc.coords, ST_MakeEnvelope(-180, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, 4326))
             )`);
-      queryParams.push(bounds.minLng, bounds.minLat, bounds.maxLat); // Eastern envelope
-      queryParams.push(bounds.minLat, bounds.maxLng, bounds.maxLat); // Western envelope
+      queryParams.push(bounds.minLng, bounds.minLat, bounds.maxLat);
+      queryParams.push(bounds.minLat, bounds.maxLng, bounds.maxLat);
     } else {
-      // Normal envelope
       conditions.push(
         `ST_Intersects(loc.coords, ST_MakeEnvelope($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, 4326))`,
       );
@@ -632,7 +651,6 @@ export async function getMapListings(
     }
   }
 
-  // SQL-level price filtering
   if (minPrice !== undefined && minPrice !== null) {
     conditions.push(`l.price >= $${paramIndex++}`);
     queryParams.push(minPrice);
@@ -642,7 +660,6 @@ export async function getMapListings(
     queryParams.push(maxPrice);
   }
 
-  // Text search filter (SQL level, case-insensitive, with sanitization)
   if (query && isValidQuery(query)) {
     const sanitizedQuery = sanitizeSearchQuery(query);
     if (sanitizedQuery) {
@@ -658,19 +675,16 @@ export async function getMapListings(
     }
   }
 
-  // Room type filter (SQL level, case-insensitive)
   if (roomType) {
     conditions.push(`LOWER(l."roomType") = LOWER($${paramIndex++})`);
     queryParams.push(roomType);
   }
 
-  // Lease duration filter (SQL level, case-insensitive)
   if (leaseDuration) {
     conditions.push(`LOWER(l."leaseDuration") = LOWER($${paramIndex++})`);
     queryParams.push(leaseDuration);
   }
 
-  // Move-in date filter (SQL level)
   if (moveInDate) {
     conditions.push(
       `(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`,
@@ -678,19 +692,16 @@ export async function getMapListings(
     queryParams.push(parseDateOnly(moveInDate));
   }
 
-  // Gender preference filter (SQL level, case-insensitive)
   if (genderPreference) {
     conditions.push(`LOWER(l."genderPreference") = LOWER($${paramIndex++})`);
     queryParams.push(genderPreference);
   }
 
-  // Household gender filter (SQL level, case-insensitive)
   if (householdGender) {
     conditions.push(`LOWER(l."householdGender") = LOWER($${paramIndex++})`);
     queryParams.push(householdGender);
   }
 
-  // Languages filter (SQL level with GIN index) - OR logic
   if (languages?.length) {
     const normalized = languages
       .map((l) => l.trim().toLowerCase())
@@ -701,8 +712,6 @@ export async function getMapListings(
     }
   }
 
-  // Amenities filter (SQL level) - AND logic: must have ALL selected amenities
-  // NULL safety: filter out NULL values from unnest to prevent LOWER(NULL) issues
   if (amenities?.length) {
     const normalizedAmenities = amenities
       .map((a) => a.trim().toLowerCase())
@@ -715,8 +724,6 @@ export async function getMapListings(
     }
   }
 
-  // House rules filter (SQL level) - AND logic: must have ALL selected house rules
-  // NULL safety: filter out NULL values from unnest to prevent LOWER(NULL) issues
   if (houseRules?.length) {
     const normalizedRules = houseRules
       .map((r) => r.trim().toLowerCase())
@@ -729,12 +736,25 @@ export async function getMapListings(
     }
   }
 
+  return { conditions, queryParams };
+}
+
+/**
+ * Optimized query for map markers - uses SQL-level bounds filtering
+ * and returns only the fields needed for map display.
+ */
+export async function getMapListings(
+  params: FilterParams = {},
+): Promise<MapListingData[]> {
+  if (params.query && !params.bounds) {
+    throw new Error(
+      "Unbounded text search not allowed: geographic bounds required when query is present",
+    );
+  }
+
+  const { conditions, queryParams } = buildMapBaseFilters(params);
   const whereClause = conditions.join(" AND ");
 
-  // SECURITY AUDIT: $queryRawUnsafe used with parameterized queries ($N placeholders).
-  // All user-supplied values are in queryParams array — no direct string interpolation
-  // of user input into the SQL template. whereClause is built from hard-coded column
-  // names with $N parameter placeholders. MAX_MAP_MARKERS is a constant.
   const sqlQuery = `
         SELECT
             l.id,
@@ -773,6 +793,154 @@ export async function getMapListings(
     dataError.log({
       operation: "getMapListings",
       hasBounds: !!params?.bounds,
+    });
+    throw dataError;
+  }
+}
+
+export async function getMapTileListings(
+  params: MapTileRequestParams,
+): Promise<MapTileResult> {
+  const { tile, zoom, ...filters } = params;
+  const effectiveZoom = zoom ?? tile.z;
+  const bounds = tileToBounds(tile.z, tile.x, tile.y);
+
+  if (filters.query && !bounds) {
+    throw new Error(
+      "Unbounded text search not allowed: geographic bounds required when query is present",
+    );
+  }
+
+  const mergedFilters: FilterParams = {
+    ...filters,
+    bounds,
+  };
+
+  const { conditions, queryParams } = buildMapBaseFilters(mergedFilters);
+  const whereClause = conditions.join(" AND ");
+  const tileKey = `${tile.z}/${tile.x}/${tile.y}`;
+
+  try {
+    if (effectiveZoom <= MAP_TILE_CLUSTER_ZOOM_THRESHOLD) {
+      const clusterSql = `
+        WITH grouped AS (
+          SELECT
+            FLOOR((((ST_X(loc.coords::geometry) + 180.0) / 360.0) * $1))::int AS gx,
+            FLOOR((((ST_Y(loc.coords::geometry) + 90.0) / 180.0) * $1))::int AS gy,
+            AVG(ST_Y(loc.coords::geometry)) AS lat,
+            AVG(ST_X(loc.coords::geometry)) AS lng,
+            MIN(l.price)::numeric AS min_price,
+            MAX(l.price)::numeric AS max_price,
+            COUNT(*)::int AS listing_count,
+            SUM(l."availableSlots")::int AS available_slots
+          FROM "Listing" l
+          JOIN "Location" loc ON l.id = loc."listingId"
+          WHERE ${whereClause}
+          GROUP BY gx, gy
+        )
+        SELECT
+          gx,
+          gy,
+          lat,
+          lng,
+          min_price,
+          max_price,
+          listing_count,
+          available_slots,
+          COUNT(*) OVER()::int AS cluster_count,
+          COALESCE(SUM(listing_count) OVER(), 0)::int AS total_listing_count
+        FROM grouped
+        ORDER BY listing_count DESC
+        LIMIT $2
+      `;
+      const rows = await prisma.$queryRawUnsafe<any[]>(
+        clusterSql,
+        MAP_TILE_CLUSTER_GRID_SIZE,
+        MAX_MAP_MARKERS,
+        ...queryParams,
+      );
+
+      const listings: MapListingData[] = rows.map((row) => ({
+        id: `cluster-${tileKey}-${row.gx}-${row.gy}`,
+        title: `${row.listing_count} listings`,
+        price: Number(row.min_price) || 0,
+        availableSlots: Number(row.available_slots) || 0,
+        images: [],
+        location: {
+          lat: Number(row.lat) || 0,
+          lng: Number(row.lng) || 0,
+        },
+      }));
+
+      const first = rows[0];
+      const listingCount = Number(first?.total_listing_count) || 0;
+      return {
+        tileKey,
+        zoom: effectiveZoom,
+        mode: "cluster",
+        listings,
+        density: {
+          zoom: effectiveZoom,
+          tileKey,
+          listingCount,
+          returnedCount: listings.length,
+          mode: "cluster",
+          clusterCount: Number(first?.cluster_count) || listings.length,
+          pinCount: listingCount,
+        },
+      };
+    }
+
+    const pinSql = `
+      SELECT
+        l.id,
+        l.title,
+        l.price,
+        l."availableSlots",
+        l.images,
+        ST_X(loc.coords::geometry) as lng,
+        ST_Y(loc.coords::geometry) as lat,
+        COUNT(*) OVER()::int AS total_listing_count
+      FROM "Listing" l
+      JOIN "Location" loc ON l.id = loc."listingId"
+      WHERE ${whereClause}
+      ORDER BY l."createdAt" DESC
+      LIMIT ${MAX_MAP_MARKERS}
+    `;
+    const rows = await prisma.$queryRawUnsafe<any[]>(pinSql, ...queryParams);
+    const listings: MapListingData[] = rows.map((l) => ({
+      id: l.id,
+      title: l.title,
+      price: Number(l.price),
+      availableSlots: l.availableSlots,
+      images: l.images || [],
+      location: {
+        lat: Number(l.lat) || 0,
+        lng: Number(l.lng) || 0,
+      },
+    }));
+
+    const listingCount = Number(rows[0]?.total_listing_count) || 0;
+    return {
+      tileKey,
+      zoom: effectiveZoom,
+      mode: "pins",
+      listings,
+      density: {
+        zoom: effectiveZoom,
+        tileKey,
+        listingCount,
+        returnedCount: listings.length,
+        mode: "pins",
+        pinCount: listings.length,
+      },
+    };
+  } catch (error) {
+    const dataError = wrapDatabaseError(error, "getMapTileListings");
+    dataError.log({
+      operation: "getMapTileListings",
+      tileKey,
+      zoom: effectiveZoom,
     });
     throw dataError;
   }
