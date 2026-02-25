@@ -92,9 +92,11 @@ interface ListingCardProps {
     showTotalPrice?: boolean;
     /** Number of months for total price calculation */
     estimatedMonths?: number;
+    /** Prefer eager media loading for visible rows; lazy for deferred rows. */
+    mediaLoading?: 'eager' | 'lazy';
 }
 
-export default function ListingCard({ listing, isSaved, className, priority = false, showTotalPrice = false, estimatedMonths = 1 }: ListingCardProps) {
+export default function ListingCard({ listing, isSaved, className, priority = false, showTotalPrice = false, estimatedMonths = 1, mediaLoading = 'lazy' }: ListingCardProps) {
     const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
     const [isDragging, setIsDragging] = useState(false);
     const { setHovered, setActive, focusSource } = useListingFocus();
@@ -141,6 +143,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
             role="article"
             aria-label={ariaLabel}
             data-testid="listing-card"
+            data-listing-card-id={listing.id}
             data-listing-id={listing.id}
             data-focus-state={isActive ? "active" : isHovered ? "hovered" : "none"}
             onMouseEnter={() => {
@@ -192,6 +195,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                         images={displayImages}
                         alt={displayTitle}
                         priority={priority}
+                        loading={mediaLoading}
                         className="h-full w-full group-hover:scale-110 transition-transform duration-[2s] ease-out"
                         onImageError={handleImageError}
                         onDragStateChange={setIsDragging}

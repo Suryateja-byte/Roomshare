@@ -9,6 +9,7 @@ interface ImageCarouselProps {
   images: string[];
   alt: string;
   priority?: boolean;
+  loading?: 'eager' | 'lazy';
   className?: string;
   onImageError?: (index: number) => void;
   /** Called when drag/swipe state changes — use to block parent click */
@@ -32,6 +33,7 @@ export function ImageCarousel({
   images,
   alt,
   priority = false,
+  loading = 'lazy',
   className = '',
   onImageError,
   onDragStateChange,
@@ -137,6 +139,7 @@ export function ImageCarousel({
           className="object-cover"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           priority={priority}
+          loading={priority ? undefined : loading}
           onError={() => onImageError?.(0)}
         />
       </div>
@@ -178,7 +181,7 @@ export function ImageCarousel({
                 className="object-cover"
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 priority={priority && index === 0}
-                loading={index === 0 ? undefined : 'lazy'}
+                loading={priority && index === 0 ? undefined : index === 0 ? loading : 'lazy'}
                 placeholder="blur"
                 blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZTRlNGU3Ii8+PC9zdmc+"
                 onError={() => onImageError?.(index)}

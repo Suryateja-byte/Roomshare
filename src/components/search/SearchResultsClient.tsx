@@ -19,6 +19,8 @@ import type { ListingData, FilterSuggestion } from "@/lib/data";
  * Prevents excessive DOM size on low-end devices.
  */
 const MAX_ACCUMULATED = 60;
+const ROW_HEIGHT = 520;
+const ROW_OVERSCAN = 2;
 
 interface SearchResultsClientProps {
   initialListings: ListingData[];
@@ -55,6 +57,11 @@ export function SearchResultsClient({
   const isLoadingRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showTotalPrice, setShowTotalPrice] = useState(false);
+  const [columnCount, setColumnCount] = useState(1);
+  const [scrollY, setScrollY] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [listTop, setListTop] = useState(0);
+  const feedRef = useRef<HTMLDivElement | null>(null);
 
   // Hydrate showTotalPrice from sessionStorage after mount to avoid hydration mismatch
   useEffect(() => {
@@ -170,6 +177,86 @@ export function SearchResultsClient({
 
   const total = initialTotal;
 
+  // Keep list columns aligned with breakpoint used by CSS grid classes.
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 640px)");
+    const update = () => setColumnCount(mql.matches ? 2 : 1);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      setScrollY(window.scrollY);
+      setViewportHeight(window.innerHeight);
+      if (feedRef.current) {
+        setListTop(feedRef.current.getBoundingClientRect().top + window.scrollY);
+      }
+    };
+
+    update();
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(update);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  const listingIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    allListings.forEach((listing, index) => map.set(listing.id, index));
+    return map;
+  }, [allListings]);
+
+  const rowCount = Math.ceil(allListings.length / columnCount);
+  const totalHeight = rowCount * ROW_HEIGHT;
+  const viewportStart = Math.max(0, scrollY - listTop);
+  const viewportEnd = Math.max(0, scrollY + viewportHeight - listTop);
+  const startRow = Math.max(0, Math.floor(viewportStart / ROW_HEIGHT) - ROW_OVERSCAN);
+  const endRow = Math.min(
+    rowCount - 1,
+    Math.ceil(viewportEnd / ROW_HEIGHT) + ROW_OVERSCAN,
+  );
+
+  const visibleListings = useMemo(() => {
+    if (rowCount === 0 || endRow < startRow) return [] as Array<{ listing: ListingData; index: number; row: number }>;
+    const rows: Array<{ listing: ListingData; index: number; row: number }> = [];
+    for (let row = startRow; row <= endRow; row += 1) {
+      const rowStart = row * columnCount;
+      const rowEnd = Math.min(rowStart + columnCount, allListings.length);
+      for (let index = rowStart; index < rowEnd; index += 1) {
+        rows.push({ listing: allListings[index], index, row });
+      }
+    }
+    return rows;
+  }, [allListings, columnCount, endRow, rowCount, startRow]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ id: string }>;
+      const id = customEvent.detail?.id;
+      if (!id) return;
+      const targetIndex = listingIndexById.get(id);
+      if (targetIndex === undefined) return;
+      const rowIndex = Math.floor(targetIndex / columnCount);
+      const top = listTop + rowIndex * ROW_HEIGHT;
+      window.scrollTo({ top: Math.max(0, top - 120), behavior: "auto" });
+    };
+
+    window.addEventListener("listing-virtual-scroll-to", handler as EventListener);
+    return () => window.removeEventListener("listing-virtual-scroll-to", handler as EventListener);
+  }, [columnCount, listTop, listingIndexById]);
+
   return (
     <div id="search-results" tabIndex={-1} className="!outline-none">
       {/* Screen reader announcement for search results */}
@@ -226,17 +313,41 @@ export function SearchResultsClient({
           )}
 
           <h2 className="sr-only">Available listings</h2>
-          <div role="feed" aria-label="Search results" className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
-            {allListings.map((listing, index) => (
-              <ListingCard
-                key={listing.id}
-                listing={listing}
-                isSaved={savedIdsSet.has(listing.id)}
-                priority={index < 4}
-                showTotalPrice={showTotalPrice}
-                estimatedMonths={estimatedMonths}
-              />
-            ))}
+          <div
+            ref={feedRef}
+            role="feed"
+            aria-label="Search results"
+            className="relative"
+            style={{ minHeight: totalHeight }}
+          >
+            {visibleListings.map(({ listing, index, row }) => {
+              const col = index % columnCount;
+              const isInViewport = row >= startRow + ROW_OVERSCAN && row <= endRow - ROW_OVERSCAN;
+
+              return (
+                <div
+                  key={listing.id}
+                  className="absolute"
+                  style={{
+                    top: row * ROW_HEIGHT,
+                    left: columnCount === 1 ? "0%" : `${col * 50}%`,
+                    width: columnCount === 1 ? "100%" : "50%",
+                    paddingLeft: columnCount === 2 && col === 1 ? "0.75rem" : undefined,
+                    paddingRight: columnCount === 2 && col === 0 ? "0.75rem" : undefined,
+                    paddingBottom: "2rem",
+                  }}
+                >
+                  <ListingCard
+                    listing={listing}
+                    isSaved={savedIdsSet.has(listing.id)}
+                    priority={isInViewport && index < 4}
+                    mediaLoading={isInViewport ? "eager" : "lazy"}
+                    showTotalPrice={showTotalPrice}
+                    estimatedMonths={estimatedMonths}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           {/* Split stay suggestions for long durations */}

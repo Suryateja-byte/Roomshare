@@ -34,29 +34,45 @@ export default function ListScrollBridge() {
         ? CSS.escape(id)
         : id.replace(/[^\w-]/g, "");
 
-    // Find target card using data-testid (preferred) with fallback to data-listing-id
-    const targetCard =
-      document.querySelector(`[data-testid="listing-card-${safeId}"]`) ??
-      document.querySelector(`[data-listing-id="${safeId}"]`);
+    // Ask virtualized list to jump row into DOM before querying card element.
+    window.dispatchEvent(
+      new CustomEvent("listing-virtual-scroll-to", { detail: { id } }),
+    );
 
-    // If element not found, do NOT ack - allow retry on next render
-    // (card may not be rendered yet due to virtualization or lazy loading)
-    if (!targetCard) {
-      return;
-    }
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 12;
 
-    // Element found - perform scroll
-    targetCard.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
+    const tryScroll = () => {
+      if (cancelled) return;
+      const targetCard =
+        document.querySelector(`[data-listing-card-id="${safeId}"]`) ??
+        document.querySelector(`[data-listing-id="${safeId}"]`);
 
-    // Track nonce AFTER successful scroll to prevent double-processing
-    // This ensures "not mounted yet" cases can retry on next render
-    lastProcessedNonce.current = nonce;
+      // If element not found, do NOT ack yet - retry over the next frames
+      // so virtualized rows can mount after the jump.
+      if (!targetCard) {
+        attempts += 1;
+        if (attempts < maxAttempts) {
+          requestAnimationFrame(tryScroll);
+        }
+        return;
+      }
 
-    // Acknowledge AFTER scroll triggers - clears scrollRequest in context
-    ackScrollTo(nonce);
+      targetCard.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      lastProcessedNonce.current = nonce;
+      ackScrollTo(nonce);
+    };
+
+    requestAnimationFrame(tryScroll);
+
+    return () => {
+      cancelled = true;
+    };
   }, [scrollRequest, ackScrollTo]);
 
   // This component renders nothing - it's purely a side-effect bridge
