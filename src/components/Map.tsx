@@ -448,6 +448,8 @@ export default function MapComponent({
     const sourcedataDebounceRef = useRef<NodeJS.Timeout | null>(null);
     // Debounce timer for marker hover scroll (300ms delay to prevent jank)
     const hoverScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // Track last meaningful bounds to ignore micro moveend churn from inertia/noise.
+    const lastUserMoveBoundsRef = useRef<MapBounds | null>(null);
 
     // Map-move auto-search tuning:
     // - 400ms debounce reduces "fetch too soon during momentum scroll"
@@ -688,10 +690,13 @@ export default function MapComponent({
     // When clustering, use unclustered listings; otherwise use all listings
     const markersSource = useClustering ? unclusteredListings : listings;
 
-    // P2-FIX (#150): Create stable ID key to avoid recalculating markerPositions
-    // when array reference changes but listing IDs remain the same
+    // Create stable geometry key so marker positions recompute when listing
+    // coordinates or tier change (not only listing IDs).
     const markersSourceKey = useMemo(() => {
-        return markersSource.map(l => l.id).sort().join(',');
+        return markersSource
+            .map((listing) => `${listing.id}:${listing.location.lat.toFixed(6)}:${listing.location.lng.toFixed(6)}:${listing.tier ?? 'none'}`)
+            .sort()
+            .join(',');
     }, [markersSource]);
 
     // M4-MAP FIX: Use markersSourceKey directly in deps instead of void trick.
@@ -1464,6 +1469,22 @@ export default function MapComponent({
             maxLat: mapBounds.getNorth()
         };
 
+        // Ignore tiny move-end churn so we don't trigger redundant fetch work.
+        const previousBounds = lastUserMoveBoundsRef.current;
+        if (previousBounds) {
+            const BOUNDS_EPSILON = 0.0002; // ~22m latitude
+            const hasMeaningfulBoundsChange =
+                Math.abs(bounds.minLat - previousBounds.minLat) > BOUNDS_EPSILON ||
+                Math.abs(bounds.maxLat - previousBounds.maxLat) > BOUNDS_EPSILON ||
+                Math.abs(bounds.minLng - previousBounds.minLng) > BOUNDS_EPSILON ||
+                Math.abs(bounds.maxLng - previousBounds.maxLng) > BOUNDS_EPSILON;
+
+            if (!hasMeaningfulBoundsChange) {
+                return;
+            }
+        }
+        lastUserMoveBoundsRef.current = bounds;
+
         // Build view state change event for callbacks
         const viewStateChangeEvent: MapViewStateChangeEvent = {
             viewState: {
@@ -1568,6 +1589,7 @@ export default function MapComponent({
         setViewportInfoMessage,
         onMoveEndProp,
         MAP_MOVE_SEARCH_DEBOUNCE_MS,
+        lastUserMoveBoundsRef,
     ]);
 
     // User pin (drop-a-pin) state — uses Nominatim reverse geocoding (no token needed)
