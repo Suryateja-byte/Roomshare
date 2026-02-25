@@ -29,7 +29,6 @@ import { MapGestureHint } from './map/MapGestureHint';
 import { MapEmptyState } from './map/MapEmptyState';
 import { hasAnyFilter, FILTER_PARAM_KEYS } from './filters/filter-chip-utils';
 import { PrivacyCircle } from './map/PrivacyCircle';
-import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
 import { UserMarker, useUserPin } from './map/UserMarker';
 import { POILayer } from './map/POILayer';
@@ -74,6 +73,14 @@ interface ClusterFeatureProperties {
     lat: number;
     lng: number;
     tier?: "primary" | "mini";
+}
+
+interface MapPinFeatureProperties {
+    id: string;
+    title: string;
+    price: number;
+    availableSlots: number;
+    tier: "primary" | "mini";
 }
 
 function parseFeatureImages(rawImages: unknown): string[] {
@@ -338,6 +345,15 @@ function getClusterCountLayerDark(textScale: number): LayerProps {
 const ZOOM_DOTS_ONLY = 12;     // Below: all pins are gray dots (no price)
 const ZOOM_TOP_N_PINS = 14;    // 12-14: primary = price pins, mini = dots. 14+: all price pins
 
+const defaultPinDotFilter = [
+    'case',
+    ['<', ['zoom'], ZOOM_DOTS_ONLY], true,
+    ['all', ['<', ['zoom'], ZOOM_TOP_N_PINS], ['==', ['coalesce', ['get', 'tier'], 'primary'], 'mini']], true,
+    false,
+] as const;
+
+const defaultPinPriceFilter = ['!', defaultPinDotFilter] as const;
+
 export default function MapComponent({
     listings,
     viewState: controlledViewState,
@@ -380,7 +396,6 @@ export default function MapComponent({
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [isWebglContextLost, setIsWebglContextLost] = useState(false);
     const [mapRemountKey, setMapRemountKey] = useState(0);
-    const [currentZoom, setCurrentZoom] = useState(12);
     const [areTilesLoading, setAreTilesLoading] = useState(false);
     // M3-MAP FIX: Debounce tile loading state to avoid visual flash on brief pans
     const tileLoadingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -389,7 +404,7 @@ export default function MapComponent({
     const { hoveredId, activeId, setHovered, setActive, requestScrollTo } = useListingFocus();
     // Keyboard navigation state for arrow key navigation between markers
     const [keyboardFocusedId, setKeyboardFocusedId] = useState<string | null>(null);
-    const markerRefs = useRef<globalThis.Map<string, HTMLDivElement>>(new globalThis.Map());
+    const markerRefs = useRef<globalThis.Map<string, HTMLButtonElement>>(new globalThis.Map());
     const router = useRouter();
     const searchParams = useSearchParams();
     const transitionContext = useSearchTransitionSafe();
@@ -507,6 +522,44 @@ export default function MapComponent({
 
     const scaledClusterCountLayer = useMemo(() => getClusterCountLayer(textScale), [textScale]);
     const scaledClusterCountLayerDark = useMemo(() => getClusterCountLayerDark(textScale), [textScale]);
+
+    const defaultPinsDotLayer = useMemo<LayerProps>(() => ({
+        id: 'default-pins-dot',
+        type: 'circle',
+        filter: ['all', ['!', ['has', 'point_count']], defaultPinDotFilter as unknown as boolean],
+        paint: {
+            'circle-color': isDarkMode ? '#71717a' : '#a1a1aa',
+            'circle-radius': ['case', ['boolean', ['feature-state', 'hovered'], false], 7, 5] as unknown as number,
+            'circle-stroke-color': isDarkMode ? '#18181b' : '#ffffff',
+            'circle-stroke-width': ['case', ['boolean', ['feature-state', 'hovered'], false], 2.5, 2] as unknown as number,
+            'circle-opacity': ['case', ['boolean', ['feature-state', 'dimmed'], false], 0.6, 1] as unknown as number,
+        },
+    }), [isDarkMode]);
+
+    const defaultPinsPriceLayer = useMemo<LayerProps>(() => ({
+        id: 'default-pins-price',
+        type: 'symbol',
+        filter: ['all', ['!', ['has', 'point_count']], defaultPinPriceFilter as unknown as boolean],
+        layout: {
+            'text-field': ['concat', '$', ['to-string', ['get', 'price']]] as unknown as string,
+            'text-font': ['Noto Sans Bold'],
+            'text-size': [
+                'case',
+                ['all', ['>=', ['zoom'], ZOOM_TOP_N_PINS], ['==', ['coalesce', ['get', 'tier'], 'primary'], 'mini']],
+                11,
+                13,
+            ] as unknown as number,
+            'text-allow-overlap': true,
+            'text-ignore-placement': true,
+            'text-padding': 8,
+        },
+        paint: {
+            'text-color': ['case', ['boolean', ['feature-state', 'hovered'], false], (isDarkMode ? '#18181b' : '#18181b'), (isDarkMode ? '#18181b' : '#ffffff')] as unknown as string,
+            'text-halo-color': ['case', ['boolean', ['feature-state', 'hovered'], false], (isDarkMode ? '#ffffff' : '#ffffff'), (isDarkMode ? '#ffffff' : '#18181b')] as unknown as string,
+            'text-halo-width': ['case', ['boolean', ['feature-state', 'hovered'], false], 4, 3] as unknown as number,
+            'text-opacity': ['case', ['boolean', ['feature-state', 'dimmed'], false], 0.6, 1] as unknown as number,
+        },
+    }), [isDarkMode]);
 
     // Always enable clustering — Mapbox handles any count gracefully.
     // With few listings clusters simply won't form and individual markers show.
@@ -753,6 +806,49 @@ export default function MapComponent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [markersSourceKey]);
 
+
+    const markerPositionsById = useMemo(() => {
+        const byId = new globalThis.Map<string, MarkerPosition>();
+        for (const position of markerPositions) {
+            byId.set(position.listing.id, position);
+        }
+        return byId;
+    }, [markerPositions]);
+
+    const defaultPinsGeoJson = useMemo(() => ({
+        type: 'FeatureCollection' as const,
+        features: markerPositions.map((position) => ({
+            type: 'Feature' as const,
+            id: position.listing.id,
+            geometry: {
+                type: 'Point' as const,
+                coordinates: [position.lng, position.lat],
+            },
+            properties: {
+                id: position.listing.id,
+                title: position.listing.title,
+                price: position.listing.price,
+                availableSlots: position.listing.availableSlots,
+                tier: position.listing.tier ?? 'primary',
+            } satisfies MapPinFeatureProperties,
+        })),
+    }), [markerPositions]);
+
+    const overlayMarkerIds = useMemo(() => {
+        const ids = new Set<string>();
+        if (activeId) ids.add(activeId);
+        if (keyboardFocusedId) ids.add(keyboardFocusedId);
+        if (hoveredId) ids.add(hoveredId);
+        if (selectedListing?.id) ids.add(selectedListing.id);
+        return ids;
+    }, [activeId, keyboardFocusedId, hoveredId, selectedListing]);
+
+    const overlayMarkers = useMemo(() => {
+        return Array.from(overlayMarkerIds)
+            .map((id) => markerPositionsById.get(id))
+            .filter((marker): marker is MarkerPosition => Boolean(marker));
+    }, [overlayMarkerIds, markerPositionsById]);
+
     // Render privacy circles from the same displayed marker positions to avoid
     // translucent "ghost clusters" when clustered/overlapping raw points split visually.
     const privacyCircleListings = useMemo(() => {
@@ -783,7 +879,7 @@ export default function MapComponent({
     }, [sortedMarkerPositions]);
 
     // Keyboard navigation handler for arrow keys
-    const handleMarkerKeyboardNavigation = useCallback((e: ReactKeyboardEvent<HTMLDivElement>, currentListingId: string) => {
+    const handleMarkerKeyboardNavigation = useCallback((e: ReactKeyboardEvent<HTMLElement>, currentListingId: string) => {
         const currentIndex = findMarkerIndex(currentListingId);
         if (currentIndex === -1 || sortedMarkerPositions.length === 0) return;
 
@@ -924,6 +1020,34 @@ export default function MapComponent({
             setKeyboardFocusedId(null);
         }
     }, [keyboardFocusedId, markerPositions]);
+
+
+    // Feature state drives hover/active/focus marker styling without rerendering all marker DOM.
+    useEffect(() => {
+        const map = mapRef.current?.getMap();
+        if (!map || !isMapLoaded || !map.getSource('default-pins')) return;
+
+        const dimmed = Boolean(hoveredId);
+        for (const position of markerPositions) {
+            const id = position.listing.id;
+            map.setFeatureState(
+                { source: 'default-pins', id },
+                {
+                    hovered: hoveredId === id,
+                    active: activeId === id,
+                    keyboardFocused: keyboardFocusedId === id,
+                    dimmed: dimmed && hoveredId !== id,
+                },
+            );
+        }
+
+        return () => {
+            if (!map.getSource('default-pins')) return;
+            for (const position of markerPositions) {
+                map.removeFeatureState({ source: 'default-pins', id: position.listing.id });
+            }
+        };
+    }, [isMapLoaded, markerPositions, hoveredId, activeId, keyboardFocusedId]);
 
     // Stabilize initial view state so it's only computed once on mount.
     // Prevents SF default from being re-applied when listings temporarily become empty.
@@ -1444,7 +1568,6 @@ export default function MapComponent({
     // Without this, the function captures state values at definition time which can become stale.
     const handleMoveEnd = useCallback((e: ViewStateChangeEvent) => {
         // Track zoom for two-tier pin display
-        setCurrentZoom(e.viewState.zoom);
         // Debounce updateUnclusteredListings to batch rapid moveEnd events (100ms)
         if (updateUnclusteredDebounceRef.current) {
             clearTimeout(updateUnclusteredDebounceRef.current);
@@ -1977,10 +2100,19 @@ export default function MapComponent({
                     </Source>
                 )}
 
-                {/* Individual price markers - shown for unclustered points or when not clustering */}
-                {markerPositions.map((position) => (
+                <Source
+                    id="default-pins"
+                    type="geojson"
+                    data={defaultPinsGeoJson}
+                >
+                    <Layer {...defaultPinsDotLayer} />
+                    <Layer {...defaultPinsPriceLayer} />
+                </Source>
+
+                {/* Keep a small DOM overlay set for interactive states only */}
+                {overlayMarkers.map((position) => (
                     <Marker
-                        key={position.listing.id}
+                        key={`overlay-${position.listing.id}`}
                         longitude={position.lng}
                         latitude={position.lat}
                         anchor="bottom"
@@ -1990,151 +2122,41 @@ export default function MapComponent({
                         }}
                     >
                         <div
-                            ref={(el) => {
-                                if (el) {
-                                    markerRefs.current.set(position.listing.id, el);
-                                    fixMarkerWrapperRole(el);
-                                } else {
-                                    markerRefs.current.delete(position.listing.id);
-                                }
-                            }}
                             className={cn(
-                                "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center",
-                                // Spring easing for scale: cubic-bezier(0.34, 1.56, 0.64, 1)
-                                "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
-                                hoveredId === position.listing.id && "scale-[1.15] z-50",
+                                "relative cursor-pointer group/marker min-w-[44px] min-h-[44px] flex items-center justify-center",
+                                hoveredId === position.listing.id && "z-50",
                                 activeId === position.listing.id && !hoveredId && "z-40",
-                                hoveredId && hoveredId !== position.listing.id && "opacity-60",
-                                // Keyboard focus styling - distinct from hover
                                 keyboardFocusedId === position.listing.id && "z-50"
                             )}
                             data-listing-id={position.listing.id}
-                            data-testid={`map-pin-${position.listing.tier || "primary"}-${position.listing.id}`}
-                            data-focus-state={hoveredId === position.listing.id ? "hovered" : activeId === position.listing.id ? "active" : hoveredId && hoveredId !== position.listing.id ? "dimmed" : "none"}
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`}
-                            aria-describedby="map-marker-instructions"
-                            onFocus={() => {
-                                // Track keyboard focus state
-                                setKeyboardFocusedId(position.listing.id);
-                            }}
-                            onBlur={() => {
-                                // Clear keyboard focus when element loses focus
-                                setKeyboardFocusedId((current) =>
-                                    current === position.listing.id ? null : current
-                                );
-                            }}
+                            data-testid={`map-pin-overlay-${position.listing.id}`}
                             onPointerEnter={(e) => {
-                                // P1-FIX (#114): Don't trigger hover on touch devices.
-                                // Touch fires pointerenter on tap, causing unintended scroll.
-                                // Let the click handler manage touch interactions instead.
                                 if (e.pointerType === 'touch') return;
-
                                 setHovered(position.listing.id, "map");
-                                // Debounce scroll request to prevent list jumping as user scans markers
-                                if (hoverScrollTimeoutRef.current) {
-                                    clearTimeout(hoverScrollTimeoutRef.current);
-                                }
-                                hoverScrollTimeoutRef.current = setTimeout(() => {
-                                    requestScrollTo(position.listing.id);
-                                }, 300);
+                                if (hoverScrollTimeoutRef.current) clearTimeout(hoverScrollTimeoutRef.current);
+                                hoverScrollTimeoutRef.current = setTimeout(() => requestScrollTo(position.listing.id), 300);
                             }}
                             onPointerLeave={(e) => {
-                                // P1-FIX (#114): Skip hover cleanup for touch - wasn't activated
                                 if (e.pointerType === 'touch') return;
-
                                 setHovered(null);
-                                // Clear pending scroll request when hover ends
                                 if (hoverScrollTimeoutRef.current) {
                                     clearTimeout(hoverScrollTimeoutRef.current);
                                     hoverScrollTimeoutRef.current = null;
                                 }
                             }}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleMarkerClick(position.listing, { lng: position.lng, lat: position.lat });
-                                } else if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
-                                    handleMarkerKeyboardNavigation(e, position.listing.id);
-                                }
-                            }}
-                            // P1-FIX (#138): Prevent double-click zoom on marker content
                             onDoubleClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
                             }}
                         >
-                            {/* Zoom-based two-tier pin rendering:
-                                - Below zoom 12: all pins are gray dots (no price)
-                                - Zoom 12-14: primary = price pills, mini = gray dots
-                                - Above zoom 14: all pins show price pills */}
-                            {(() => {
-                                const isMini = position.listing.tier === "mini";
-                                const showAsDot = currentZoom < ZOOM_DOTS_ONLY || (currentZoom < ZOOM_TOP_N_PINS && isMini);
-                                const isHovered = hoveredId === position.listing.id;
-
-                                if (showAsDot && !isHovered) {
-                                    // Gray dot marker (no price)
-                                    return (
-                                        <>
-                                            <div className={cn(
-                                                "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
-                                                "bg-zinc-400 dark:bg-zinc-500 ring-2 ring-white dark:ring-zinc-900",
-                                                "group-hover/marker:scale-125"
-                                            )} />
-                                            {/* Small shadow under dot */}
-                                            <div className="absolute left-1/2 -translate-x-1/2 -bottom-[1px] w-2 h-0.5 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[1px]" />
-                                        </>
-                                    );
-                                }
-
-                                // Price pill marker (full or mini size)
-                                return (
-                                    <>
-                                        <div className={cn(
-                                            "shadow-lg font-semibold whitespace-nowrap relative transition-all duration-200",
-                                            "group-hover/marker:scale-105",
-                                            isMini && currentZoom >= ZOOM_TOP_N_PINS
-                                                ? "px-2 py-1 rounded-lg text-xs"
-                                                : "px-3 py-1.5 rounded-xl text-sm",
-                                            isHovered
-                                                ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ring-2 ring-zinc-900 dark:ring-white scale-105"
-                                                : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
-                                        )}>
-                                            ${position.listing.price}
-                                        </div>
-                                        {/* Pin tail/pointer */}
-                                        <div className={cn(
-                                            "absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-transparent border-r-transparent transition-colors",
-                                            isMini && currentZoom >= ZOOM_TOP_N_PINS
-                                                ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"
-                                                : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",
-                                            isHovered
-                                                ? "border-t-white dark:border-t-zinc-700"
-                                                : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
-                                        )} />
-                                        {/* Shadow under pin */}
-                                        <div className={cn(
-                                            "absolute left-1/2 -translate-x-1/2 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]",
-                                            isMini && currentZoom >= ZOOM_TOP_N_PINS
-                                                ? "-bottom-[2px] w-2 h-0.5"
-                                                : "-bottom-1 w-3 h-1"
-                                        )} />
-                                    </>
-                                );
-                            })()}
-                            {/* Pulsing ring on hover/active for visibility on dense maps */}
-                            {(hoveredId === position.listing.id || activeId === position.listing.id) && (
-                                <div className={cn(
-                                    "absolute -inset-2 -top-2 rounded-full border-2 pointer-events-none motion-reduce:animate-none",
-                                    hoveredId === position.listing.id
-                                        ? "border-zinc-900 dark:border-white animate-ping opacity-40"
-                                        : "border-zinc-400 dark:border-zinc-500 animate-[pulse-ring_2s_ease-in-out_infinite] opacity-30"
-                                )} />
-                            )}
-                            {/* Keyboard focus ring - solid visible ring distinct from hover animation */}
+                            <div className={cn(
+                                "px-3 py-1.5 rounded-xl text-sm shadow-lg font-semibold whitespace-nowrap",
+                                hoveredId === position.listing.id
+                                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ring-2 ring-zinc-900 dark:ring-white"
+                                    : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
+                            )}>
+                                ${position.listing.price}
+                            </div>
                             {keyboardFocusedId === position.listing.id && (
                                 <div
                                     className="absolute -inset-3 rounded-full border-[3px] border-blue-500 dark:border-blue-400 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
@@ -2144,6 +2166,38 @@ export default function MapComponent({
                         </div>
                     </Marker>
                 ))}
+
+                {/* Hidden focusable controls keep marker keyboard accessibility while default pins render as layers. */}
+                <div className="sr-only" aria-hidden={false}>
+                    {markerPositions.map((position) => (
+                        <button
+                            key={`marker-control-${position.listing.id}`}
+                            ref={(el) => {
+                                if (el) markerRefs.current.set(position.listing.id, el);
+                                else markerRefs.current.delete(position.listing.id);
+                            }}
+                            type="button"
+                            aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`}
+                            aria-describedby="map-marker-instructions"
+                            onFocus={() => setKeyboardFocusedId(position.listing.id)}
+                            onBlur={() => setKeyboardFocusedId((current) => current === position.listing.id ? null : current)}
+                            onMouseEnter={() => setHovered(position.listing.id, "map")}
+                            onMouseLeave={() => setHovered(null)}
+                            onClick={() => handleMarkerClick(position.listing, { lng: position.lng, lat: position.lat })}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    handleMarkerClick(position.listing, { lng: position.lng, lat: position.lat });
+                                } else if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+                                    handleMarkerKeyboardNavigation(e, position.listing.id);
+                                }
+                            }}
+                        >
+                            Focus marker {position.listing.title || position.listing.id}
+                        </button>
+                    ))}
+                </div>
+
 
                 {selectedListing && (
                     <Popup
