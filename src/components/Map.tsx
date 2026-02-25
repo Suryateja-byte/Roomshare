@@ -65,6 +65,30 @@ interface MarkerPosition {
     lng: number;
 }
 
+interface CameraSnapshot {
+    timestamp: number;
+    longitude: number;
+    latitude: number;
+    zoom: number;
+    bounds: MapBounds;
+}
+
+interface CameraDeltaSample {
+    timestamp: number;
+    delta: number;
+}
+
+interface MoveSchedulerMetrics {
+    fetchCount: number;
+    canceledCount: number;
+    totalSettleLatencyMs: number;
+    avgSettleLatencyMs: number;
+    lastDebounceMs: number;
+    lastPolicy: 'fast' | 'micro' | 'balanced';
+    lastCameraDelta: number;
+    recentVelocity: number;
+}
+
 interface ClusterFeatureProperties {
     id: string;
     title: string;
@@ -448,16 +472,52 @@ export default function MapComponent({
     const sourcedataDebounceRef = useRef<NodeJS.Timeout | null>(null);
     // Debounce timer for marker hover scroll (300ms delay to prevent jank)
     const hoverScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastCameraSnapshotRef = useRef<CameraSnapshot | null>(null);
+    const cameraDeltaSamplesRef = useRef<CameraDeltaSample[]>([]);
+    const schedulerMetricsRef = useRef<MoveSchedulerMetrics>({
+        fetchCount: 0,
+        canceledCount: 0,
+        totalSettleLatencyMs: 0,
+        avgSettleLatencyMs: 0,
+        lastDebounceMs: 0,
+        lastPolicy: 'balanced',
+        lastCameraDelta: 0,
+        recentVelocity: 0,
+    });
 
     // Map-move auto-search tuning:
-    // - 400ms debounce reduces "fetch too soon during momentum scroll"
-    // - 800ms minimum interval allows more responsive intentional panning
-    const MAP_MOVE_SEARCH_DEBOUNCE_MS = 400;
+    // - Fast movement -> longer debounce to avoid fetching during momentum
+    // - Micro adjustments -> shorter debounce for responsive updates
+    const CAMERA_SAMPLE_WINDOW_MS = 2200;
+    const IGNORE_VIEWPORT_DELTA_THRESHOLD = 0.015;
+    const FAST_DELTA_THRESHOLD = 0.28;
+    const FAST_VELOCITY_THRESHOLD = 0.0009;
+    const MICRO_DELTA_THRESHOLD = 0.08;
+    const SKIP_INTERMEDIATE_DELTA_THRESHOLD = 0.045;
+    const FAST_MOVE_DEBOUNCE_MS = 700;
+    const MICRO_MOVE_DEBOUNCE_MS = 180;
+    const BALANCED_DEBOUNCE_MS = 360;
     const MIN_SEARCH_INTERVAL_MS = 800;
+
+    const publishSchedulerMetrics = useCallback(() => {
+        if (typeof window === 'undefined') return;
+        const roomshare = ((window as unknown as Record<string, unknown>).__roomshare || {}) as Record<string, unknown>;
+        (window as unknown as Record<string, unknown>).__roomshare = roomshare;
+        roomshare.mapMoveSchedulerMetrics = {
+            fetchCount: schedulerMetricsRef.current.fetchCount,
+            canceledCount: schedulerMetricsRef.current.canceledCount,
+            avgSettleLatencyMs: schedulerMetricsRef.current.avgSettleLatencyMs,
+            lastDebounceMs: schedulerMetricsRef.current.lastDebounceMs,
+            lastPolicy: schedulerMetricsRef.current.lastPolicy,
+            lastCameraDelta: schedulerMetricsRef.current.lastCameraDelta,
+            recentVelocity: schedulerMetricsRef.current.recentVelocity,
+        };
+    }, []);
 
     // E2E testing instrumentation - track map instance for persistence tests
     // Only runs when NEXT_PUBLIC_E2E=true to avoid polluting production
     useEffect(() => {
+        publishSchedulerMetrics();
         if (process.env.NEXT_PUBLIC_E2E === 'true') {
             // Namespace to avoid global collisions
             const roomshare = ((window as unknown as Record<string, unknown>).__roomshare || {}) as Record<string, unknown>;
@@ -476,7 +536,7 @@ export default function MapComponent({
                 initCount: roomshare.mapInitCount
             });
         }
-    }, []); // Empty deps = only on mount
+    }, [publishSchedulerMetrics]); // Empty deps + metric hydration on mount
 
     // Detect dark mode
     useEffect(() => {
@@ -1464,6 +1524,53 @@ export default function MapComponent({
             maxLat: mapBounds.getNorth()
         };
 
+        const normalizeLngDelta = (nextLng: number, prevLng: number) => {
+            const raw = Math.abs(nextLng - prevLng);
+            return Math.min(raw, 360 - raw);
+        };
+
+        const getLngSpan = (viewportBounds: MapBounds) => {
+            if (viewportBounds.minLng > viewportBounds.maxLng) {
+                return (180 - viewportBounds.minLng) + (viewportBounds.maxLng + 180);
+            }
+            return viewportBounds.maxLng - viewportBounds.minLng;
+        };
+
+        const now = Date.now();
+        const previousSnapshot = lastCameraSnapshotRef.current;
+        let cameraDelta = 1;
+
+        if (previousSnapshot) {
+            const previousLngSpan = Math.max(getLngSpan(previousSnapshot.bounds), 0.001);
+            const previousLatSpan = Math.max(previousSnapshot.bounds.maxLat - previousSnapshot.bounds.minLat, 0.001);
+            const centerLngDeltaNorm = normalizeLngDelta(e.viewState.longitude, previousSnapshot.longitude) / previousLngSpan;
+            const centerLatDeltaNorm = Math.abs(e.viewState.latitude - previousSnapshot.latitude) / previousLatSpan;
+            const zoomDeltaNorm = Math.abs(e.viewState.zoom - previousSnapshot.zoom);
+            const lngSpanDeltaNorm = Math.abs(getLngSpan(bounds) - previousLngSpan) / previousLngSpan;
+            const latSpan = Math.max(bounds.maxLat - bounds.minLat, 0.001);
+            const latSpanDeltaNorm = Math.abs(latSpan - previousLatSpan) / previousLatSpan;
+
+            cameraDelta = Math.max(centerLngDeltaNorm + centerLatDeltaNorm, zoomDeltaNorm * 0.75, lngSpanDeltaNorm + latSpanDeltaNorm);
+        }
+
+        lastCameraSnapshotRef.current = {
+            timestamp: now,
+            longitude: e.viewState.longitude,
+            latitude: e.viewState.latitude,
+            zoom: e.viewState.zoom,
+            bounds,
+        };
+
+        cameraDeltaSamplesRef.current = [
+            ...cameraDeltaSamplesRef.current,
+            { timestamp: now, delta: cameraDelta }
+        ].filter(sample => now - sample.timestamp <= CAMERA_SAMPLE_WINDOW_MS);
+
+        const sampleWindowStart = now - CAMERA_SAMPLE_WINDOW_MS;
+        const sampleSpanMs = Math.max(now - sampleWindowStart, 1);
+        const totalRecentDelta = cameraDeltaSamplesRef.current.reduce((sum, sample) => sum + sample.delta, 0);
+        const recentVelocity = totalRecentDelta / sampleSpanMs;
+
         // Build view state change event for callbacks
         const viewStateChangeEvent: MapViewStateChangeEvent = {
             viewState: {
@@ -1518,13 +1625,47 @@ export default function MapComponent({
             }
             setViewportInfoMessage(null);
 
-            if (debounceTimer.current) {
-                clearTimeout(debounceTimer.current);
+            if (cameraDelta < IGNORE_VIEWPORT_DELTA_THRESHOLD) {
+                return;
             }
 
+            const isFastMove = cameraDelta >= FAST_DELTA_THRESHOLD || recentVelocity >= FAST_VELOCITY_THRESHOLD;
+            const isMicroAdjustment = cameraDelta <= MICRO_DELTA_THRESHOLD && recentVelocity < FAST_VELOCITY_THRESHOLD;
+
+            if (recentVelocity >= FAST_VELOCITY_THRESHOLD && cameraDelta <= SKIP_INTERMEDIATE_DELTA_THRESHOLD) {
+                return;
+            }
+
+            const debounceMs = isFastMove
+                ? FAST_MOVE_DEBOUNCE_MS
+                : isMicroAdjustment
+                    ? MICRO_MOVE_DEBOUNCE_MS
+                    : BALANCED_DEBOUNCE_MS;
+
+            schedulerMetricsRef.current.lastDebounceMs = debounceMs;
+            schedulerMetricsRef.current.lastPolicy = isFastMove ? 'fast' : (isMicroAdjustment ? 'micro' : 'balanced');
+            schedulerMetricsRef.current.lastCameraDelta = cameraDelta;
+            schedulerMetricsRef.current.recentVelocity = recentVelocity;
+
+            if (debounceTimer.current) {
+                clearTimeout(debounceTimer.current);
+                schedulerMetricsRef.current.canceledCount += 1;
+            }
+
+            const scheduledAt = now;
             debounceTimer.current = setTimeout(() => {
-                const now = Date.now();
-                const timeSinceLastSearch = now - lastSearchTimeRef.current;
+                const executeSearch = (nextBounds: MapBounds) => {
+                    if (!executeMapSearchRef.current) return;
+                    const settleLatency = Date.now() - scheduledAt;
+                    schedulerMetricsRef.current.fetchCount += 1;
+                    schedulerMetricsRef.current.totalSettleLatencyMs += settleLatency;
+                    schedulerMetricsRef.current.avgSettleLatencyMs =
+                        schedulerMetricsRef.current.totalSettleLatencyMs / schedulerMetricsRef.current.fetchCount;
+                    publishSchedulerMetrics();
+                    executeMapSearchRef.current(nextBounds);
+                };
+
+                const timeSinceLastSearch = Date.now() - lastSearchTimeRef.current;
 
                 // If we're within the throttle window, queue the search for later
                 if (timeSinceLastSearch < MIN_SEARCH_INTERVAL_MS) {
@@ -1538,20 +1679,18 @@ export default function MapComponent({
                     // Schedule the pending search for when the throttle window expires
                     const delay = MIN_SEARCH_INTERVAL_MS - timeSinceLastSearch;
                     throttleTimeoutRef.current = setTimeout(() => {
-                        // P2-FIX (#79): Use ref to get latest executeMapSearch, preventing stale closure
-                        if (pendingBoundsRef.current && executeMapSearchRef.current) {
-                            executeMapSearchRef.current(pendingBoundsRef.current);
+                        if (pendingBoundsRef.current) {
+                            executeSearch(pendingBoundsRef.current);
                         }
                     }, delay);
                     return;
                 }
 
                 // Execute immediately if outside throttle window
-                // P2-FIX (#79): Use ref to get latest executeMapSearch
-                if (executeMapSearchRef.current) {
-                    executeMapSearchRef.current(bounds);
-                }
-            }, MAP_MOVE_SEARCH_DEBOUNCE_MS);
+                executeSearch(bounds);
+            }, debounceMs);
+
+            publishSchedulerMetrics();
         } else {
             // Search-as-move is OFF - mark bounds as dirty so banner shows
             setBoundsDirty(true);
@@ -1567,7 +1706,7 @@ export default function MapComponent({
         setBoundsDirty,
         setViewportInfoMessage,
         onMoveEndProp,
-        MAP_MOVE_SEARCH_DEBOUNCE_MS,
+        publishSchedulerMetrics,
     ]);
 
     // User pin (drop-a-pin) state — uses Nominatim reverse geocoding (no token needed)
