@@ -5,14 +5,18 @@ import fs from 'fs';
 import path from 'path';
 
 // P2-08 FIX: Generate SW version from git commit or timestamp for cache invalidation
-const SW_VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ||
-    (() => {
-        try {
-            return execSync('git rev-parse --short HEAD').toString().trim();
-        } catch {
-            return Date.now().toString();
-        }
-    })();
+// In development, use timestamp so every dev server restart busts caches.
+// In production, use git commit SHA for deterministic cache versioning.
+const SW_VERSION = process.env.NODE_ENV === 'development'
+    ? Date.now().toString()
+    : (process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ||
+        (() => {
+            try {
+                return execSync('git rev-parse --short HEAD').toString().trim();
+            } catch {
+                return Date.now().toString();
+            }
+        })());
 
 // Write version file for service worker (imported via importScripts)
 const swVersionPath = path.join(process.cwd(), 'public', 'sw-version.js');

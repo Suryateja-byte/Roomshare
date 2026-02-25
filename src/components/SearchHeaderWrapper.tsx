@@ -145,7 +145,7 @@ export default function SearchHeaderWrapper() {
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0 mr-2 md:mr-6" aria-label="RoomShare Home">
+            <Link href="/" className="hidden md:flex items-center gap-2.5 cursor-pointer group flex-shrink-0 mr-2 md:mr-6" aria-label="RoomShare Home">
               <div className="w-9 h-9 bg-zinc-900 dark:bg-white rounded-xl flex items-center justify-center text-white dark:text-zinc-900 font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-lg shadow-zinc-900/10 dark:shadow-white/5">
                 R
               </div>
