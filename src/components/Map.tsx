@@ -688,14 +688,18 @@ export default function MapComponent({
     // When clustering, use unclustered listings; otherwise use all listings
     const markersSource = useClustering ? unclusteredListings : listings;
 
-    // P2-FIX (#150): Create stable ID key to avoid recalculating markerPositions
-    // when array reference changes but listing IDs remain the same
+    // P2-FIX (#150): Create stable content key to avoid recalculating markerPositions
+    // when array reference changes but listing geometry/tier are unchanged.
+    // Include id + coordinates + tier so geometry updates invalidate the cache.
     const markersSourceKey = useMemo(() => {
-        return markersSource.map(l => l.id).sort().join(',');
+        return markersSource
+            .map((listing) => `${listing.id}:${listing.location.lat}:${listing.location.lng}:${listing.tier ?? ''}`)
+            .sort()
+            .join('|');
     }, [markersSource]);
 
     // M4-MAP FIX: Use markersSourceKey directly in deps instead of void trick.
-    // The memo recalculates when the key changes (listing IDs change),
+    // The memo recalculates when the key changes (IDs/geometry/tier change),
     // but reads actual data from markersSource via the outer scope.
     const markersSourceRef = useRef(markersSource);
     markersSourceRef.current = markersSource;
