@@ -132,11 +132,11 @@ function createMockMapListingData(
 ): MapListingData {
   return {
     id,
-    title: `Listing ${id}`,
+    compactTitle: `Listing ${id}`,
     price: 1500,
     availableSlots: 1,
 
-    images: ["img.jpg"],
+    thumbnailUrl: "img.jpg",
     location: { lat, lng },
   };
 }

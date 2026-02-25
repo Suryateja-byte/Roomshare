@@ -122,9 +122,9 @@ export function transformToGeoJSON(
     },
     properties: {
       id: listing.id,
-      title: listing.title,
+      title: listing.compactTitle,
       price: listing.price,
-      image: listing.images[0] ?? null,
+      image: listing.thumbnailUrl,
       availableSlots: listing.availableSlots,
     } satisfies SearchV2FeatureProperties,
   }));
@@ -145,10 +145,9 @@ export function transformToGeoJSON(
 function adaptToMarkerListing(listing: MapListingData): MapMarkerListing {
   return {
     id: listing.id,
-    title: listing.title,
+    title: listing.compactTitle,
     price: listing.price,
     availableSlots: listing.availableSlots,
-    images: listing.images,
     location: listing.location,
   };
 }

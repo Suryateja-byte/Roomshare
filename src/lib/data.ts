@@ -738,10 +738,17 @@ export async function getMapListings(
   const sqlQuery = `
         SELECT
             l.id,
-            l.title,
+            CASE
+                WHEN char_length(trim(coalesce(l.title, ''))) > 80
+                    THEN concat(substr(trim(l.title), 1, 77), '...')
+                ELSE trim(coalesce(l.title, ''))
+            END as "compactTitle",
             l.price,
             l."availableSlots",
-            l.images,
+            CASE
+                WHEN array_length(l.images, 1) >= 1 THEN l.images[1]
+                ELSE NULL
+            END as "thumbnailUrl",
             ST_X(loc.coords::geometry) as lng,
             ST_Y(loc.coords::geometry) as lat
         FROM "Listing" l
@@ -759,10 +766,10 @@ export async function getMapListings(
 
     return listings.map((l) => ({
       id: l.id,
-      title: l.title,
+      compactTitle: l.compactTitle || "",
       price: Number(l.price),
       availableSlots: l.availableSlots,
-      images: l.images || [],
+      thumbnailUrl: l.thumbnailUrl || null,
       location: {
         lat: Number(l.lat) || 0,
         lng: Number(l.lng) || 0,

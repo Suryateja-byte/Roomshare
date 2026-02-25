@@ -108,10 +108,10 @@ export type PaginatedResultHybrid<T> = {
 // Map-optimized listing interface (minimal fields for markers)
 export interface MapListingData {
   id: string;
-  title: string;
+  compactTitle: string;
   price: number;
   availableSlots: number;
-  images: string[];
+  thumbnailUrl: string | null;
   location: {
     lat: number;
     lng: number;

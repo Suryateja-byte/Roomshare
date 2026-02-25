@@ -47,10 +47,10 @@ function safeParseFloat(value: string, min?: number, max?: number): number | und
 
 interface Listing {
     id: string;
-    title: string;
+    compactTitle: string;
     price: number;
     availableSlots: number;
-    images?: string[];
+    thumbnailUrl: string | null;
     location: {
         lat: number;
         lng: number;
@@ -67,27 +67,13 @@ interface MarkerPosition {
 
 interface ClusterFeatureProperties {
     id: string;
-    title: string;
+    compactTitle: string;
     price: number;
     availableSlots: number;
-    images?: string;
+    thumbnailUrl?: string;
     lat: number;
     lng: number;
     tier?: "primary" | "mini";
-}
-
-function parseFeatureImages(rawImages: unknown): string[] {
-    if (typeof rawImages !== 'string' || rawImages.length === 0) {
-        return [];
-    }
-
-    try {
-        const parsed = JSON.parse(rawImages);
-        if (!Array.isArray(parsed)) return [];
-        return parsed.filter((item): item is string => typeof item === 'string');
-    } catch {
-        return [];
-    }
 }
 
 /**
@@ -523,10 +509,10 @@ export default function MapComponent({
             },
             properties: {
                 id: listing.id,
-                title: listing.title,
+                compactTitle: listing.compactTitle,
                 price: listing.price,
                 availableSlots: listing.availableSlots,
-                images: JSON.stringify(listing.images || []),
+                thumbnailUrl: listing.thumbnailUrl,
                 lat: listing.location.lat,
                 lng: listing.location.lng,
                 // P3a: Include tier for differentiated pin styling (primary = larger, mini = smaller)
@@ -534,15 +520,6 @@ export default function MapComponent({
             }
         }))
     }), [listings]);
-
-    // Avoid JSON.parse on every map move by reusing listing images keyed by listing id.
-    const imagesByListingId = useMemo(() => {
-        const imageLookup = new globalThis.Map<string, string[]>();
-        for (const listing of listings) {
-            imageLookup.set(listing.id, Array.isArray(listing.images) ? listing.images : []);
-        }
-        return imageLookup;
-    }, [listings]);
 
     // Handle cluster click to zoom in and expand
     const onClusterClick = useCallback(async (event: MapLayerMouseEvent) => {
@@ -608,15 +585,12 @@ export default function MapComponent({
             .map((f) => {
                 const properties = (f.properties ?? {}) as Partial<ClusterFeatureProperties>;
                 const listingId = properties.id ?? '';
-                const images =
-                    imagesByListingId.get(listingId) ??
-                    parseFeatureImages(properties.images);
                 return {
                     id: listingId,
-                    title: properties.title ?? '',
+                    compactTitle: properties.compactTitle ?? '',
                     price: Number(properties.price) || 0,
                     availableSlots: Number(properties.availableSlots) || 0,
-                    images,
+                    thumbnailUrl: typeof properties.thumbnailUrl === 'string' ? properties.thumbnailUrl : null,
                     location: {
                         lat: Number(properties.lat) || 0,
                         lng: Number(properties.lng) || 0
@@ -645,7 +619,7 @@ export default function MapComponent({
         }
 
         setUnclusteredListings(unique);
-    }, [imagesByListingId, useClustering]);
+    }, [useClustering]);
 
     // Defense-in-depth: retry updateUnclusteredListings when listings exist
     // but unclustered is empty (source tiles may not be ready yet)
@@ -1683,7 +1657,7 @@ export default function MapComponent({
                 aria-atomic="true"
             >
                 {selectedListing
-                    ? `Selected listing: ${selectedListing.title}, $${selectedListing.price} per month, ${selectedListing.availableSlots > 0 ? `${selectedListing.availableSlots} spots available` : 'currently filled'}`
+                    ? `Selected listing: ${selectedListing.compactTitle}, $${selectedListing.price} per month, ${selectedListing.availableSlots > 0 ? `${selectedListing.availableSlots} spots available` : 'currently filled'}`
                     : ''
                 }
             </div>
@@ -1706,7 +1680,7 @@ export default function MapComponent({
                     const focused = markerPositions.find(p => p.listing.id === keyboardFocusedId);
                     if (!focused) return '';
                     const index = sortedMarkerPositions.findIndex(p => p.listing.id === keyboardFocusedId);
-                    return `Marker ${index + 1} of ${sortedMarkerPositions.length}: ${focused.listing.title || 'Listing'}, $${focused.listing.price} per month`;
+                    return `Marker ${index + 1} of ${sortedMarkerPositions.length}: ${focused.listing.compactTitle || 'Listing'}, $${focused.listing.price} per month`;
                 })()}
             </div>
 
@@ -2013,7 +1987,7 @@ export default function MapComponent({
                             data-focus-state={hoveredId === position.listing.id ? "hovered" : activeId === position.listing.id ? "active" : hoveredId && hoveredId !== position.listing.id ? "dimmed" : "none"}
                             role="button"
                             tabIndex={0}
-                            aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`}
+                            aria-label={`$${position.listing.price}/month${position.listing.compactTitle ? `, ${position.listing.compactTitle}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`}
                             aria-describedby="map-marker-instructions"
                             onFocus={() => {
                                 // Track keyboard focus state
@@ -2165,10 +2139,10 @@ export default function MapComponent({
                             }`}>
                             {/* Image Thumbnail - optimized with next/image */}
                             <div className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
-                                {selectedListing.images && selectedListing.images[0] ? (
+                                {selectedListing.thumbnailUrl ? (
                                     <Image
-                                        src={selectedListing.images[0]}
-                                        alt={selectedListing.title}
+                                        src={selectedListing.thumbnailUrl}
+                                        alt={selectedListing.compactTitle}
                                         fill
                                         sizes="280px"
                                         className="object-cover"
@@ -2204,7 +2178,7 @@ export default function MapComponent({
                             {/* Content */}
                             <div className="p-3">
                                 <h3 className={`font-semibold text-sm line-clamp-1 mb-1 ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
-                                    {selectedListing.title}
+                                    {selectedListing.compactTitle}
                                 </h3>
                                 <p className="mb-3">
                                     <span className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>

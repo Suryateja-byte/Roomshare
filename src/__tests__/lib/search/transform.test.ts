@@ -184,9 +184,9 @@ describe("search/transform", () => {
       lng: number,
     ): MapListingData => ({
       id,
-      title: `Listing ${id}`,
+      compactTitle: `Listing ${id}`,
       price: 1000,
-      images: ["img.jpg"],
+      thumbnailUrl: "img.jpg",
       location: { lat, lng },
       availableSlots: 1,
 
@@ -228,9 +228,9 @@ describe("search/transform", () => {
       const listings: MapListingData[] = [
         {
           id: "test-id",
-          title: "Test Title",
+          compactTitle: "Test Title",
           price: 1500,
-          images: ["first.jpg", "second.jpg"],
+          thumbnailUrl: "first.jpg",
           location: { lat: 37.7749, lng: -122.4194 },
           availableSlots: 1,
 
@@ -250,9 +250,9 @@ describe("search/transform", () => {
       const listings: MapListingData[] = [
         {
           id: "1",
-          title: "No Images",
+          compactTitle: "No Images",
           price: 1000,
-          images: [],
+          thumbnailUrl: null,
           location: { lat: 37.7749, lng: -122.4194 },
           availableSlots: 1,
 
@@ -279,9 +279,9 @@ describe("search/transform", () => {
       price: number = 1000,
     ): MapListingData => ({
       id,
-      title: `Listing ${id}`,
+      compactTitle: `Listing ${id}`,
       price,
-      images: ["img.jpg"],
+      thumbnailUrl: "img.jpg",
       location: { lat, lng },
       availableSlots: 1,
 
@@ -372,9 +372,9 @@ describe("search/transform", () => {
       lng: number = -122.4194,
     ): MapListingData => ({
       id,
-      title: `Listing ${id}`,
+      compactTitle: `Listing ${id}`,
       price: 1000,
-      images: ["img.jpg"],
+      thumbnailUrl: "img.jpg",
       location: { lat, lng },
       availableSlots: 1,
 

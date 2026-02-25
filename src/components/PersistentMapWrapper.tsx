@@ -333,8 +333,8 @@ function MapDataLoadingBar() {
  * - id: for key and click handling
  * - location: for pin placement
  * - price: for pin label
- * - title: for popup/tooltip
- * - availableSlots: for "N Available" / "Filled" badge in popup
+ * - compactTitle: for popup/tooltip
+ * - thumbnailUrl: for popup image preview
  * - tier: for differentiated pin styling (primary = larger, mini = smaller)
  */
 function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
@@ -364,10 +364,10 @@ function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
       const [lng, lat] = feature.geometry.coordinates;
       return {
         id: feature.properties.id,
-        title: feature.properties.title ?? "",
+        compactTitle: feature.properties.title ?? "",
         price: feature.properties.price ?? 0,
         availableSlots: feature.properties.availableSlots,
-        images: feature.properties.image ? [feature.properties.image] : [],
+        thumbnailUrl: feature.properties.image ?? null,
         location: { lng, lat },
         // Add tier from pins lookup (defaults to undefined if not in pins mode)
         tier: pinTierMap.get(feature.properties.id),

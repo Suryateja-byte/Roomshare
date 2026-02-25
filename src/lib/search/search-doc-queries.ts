@@ -48,10 +48,10 @@ const SEARCH_QUERY_TIMEOUT_MS = 5000;
 /** Raw row shape from map listings query */
 interface MapListingRaw {
   id: string;
-  title: string;
+  compactTitle: string;
   price: number | string;
   availableSlots: number;
-  primaryImage: string | null;
+  thumbnailUrl: string | null;
   lat: number | string;
   lng: number | string;
 }
@@ -746,10 +746,14 @@ async function getSearchDocMapListingsInternal(
   const sqlQuery = `
     SELECT
       d.id,
-      d.title,
+      CASE
+        WHEN char_length(trim(coalesce(d.title, ''))) > 80
+          THEN concat(substr(trim(d.title), 1, 77), '...')
+        ELSE trim(coalesce(d.title, ''))
+      END as "compactTitle",
       d.price,
       d.available_slots as "availableSlots",
-      d.images[1] as "primaryImage",
+      d.images[1] as "thumbnailUrl",
       d.lat,
       d.lng
     FROM listing_search_docs d
@@ -770,10 +774,10 @@ async function getSearchDocMapListingsInternal(
 
     const mappedListings = trimmedListings.map((l) => ({
       id: l.id,
-      title: l.title,
+      compactTitle: l.compactTitle || "",
       price: Number(l.price),
       availableSlots: l.availableSlots,
-      images: l.primaryImage ? [l.primaryImage] : [],
+      thumbnailUrl: l.thumbnailUrl || null,
       location: {
         lat: Number(l.lat) || 0,
         lng: Number(l.lng) || 0,

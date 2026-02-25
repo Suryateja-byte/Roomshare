@@ -63,11 +63,11 @@ jest.mock('next/navigation', () => ({
 let mockQuerySourceFeaturesData: Array<{
   properties: {
     id: string;
-    title: string;
+    compactTitle: string;
     price: number;
     availableSlots: number;
     ownerId: string;
-    images: string;
+    thumbnailUrl?: string;
     lat: number;
     lng: number;
     tier?: string;
@@ -130,11 +130,11 @@ function listingsToFeatures(listings: typeof mockListings) {
   return listings.map(listing => ({
     properties: {
       id: listing.id,
-      title: listing.title,
+      compactTitle: listing.compactTitle,
       price: listing.price,
       availableSlots: listing.availableSlots,
       ownerId: listing.ownerId || '',
-      images: JSON.stringify(listing.images || []),
+      thumbnailUrl: listing.thumbnailUrl ?? undefined,
       lat: listing.location.lat,
       lng: listing.location.lng,
       tier: listing.tier,
@@ -370,31 +370,31 @@ import { triggerHaptic } from '@/lib/haptics';
 const mockListings = [
   {
     id: 'listing-1',
-    title: 'Cozy Room in SF',
+    compactTitle: 'Cozy Room in SF',
     price: 1200,
     availableSlots: 2,
     ownerId: 'owner-1',
-    images: ['https://example.com/img1.jpg'],
+    thumbnailUrl: 'https://example.com/img1.jpg',
     location: { lat: 37.7749, lng: -122.4194 },
     tier: 'primary' as const,
   },
   {
     id: 'listing-2',
-    title: 'Studio Apartment',
+    compactTitle: 'Studio Apartment',
     price: 1800,
     availableSlots: 1,
     ownerId: 'owner-2',
-    images: ['https://example.com/img2.jpg'],
+    thumbnailUrl: 'https://example.com/img2.jpg',
     location: { lat: 37.7849, lng: -122.4094 },
     tier: 'mini' as const,
   },
   {
     id: 'listing-3',
-    title: 'Shared Space',
+    compactTitle: 'Shared Space',
     price: 900,
     availableSlots: 0,
     ownerId: 'owner-3',
-    images: [],
+    thumbnailUrl: null,
     location: { lat: 37.7649, lng: -122.4294 },
   },
 ];
@@ -891,20 +891,20 @@ describe('Map Component', () => {
       const overlappingListings = [
         {
           id: 'overlap-1',
-          title: 'Overlap 1',
+          compactTitle: 'Overlap 1',
           price: 1000,
           availableSlots: 1,
           ownerId: 'owner-1',
-          images: [],
+          thumbnailUrl: null,
           location: { lat: 37.7749, lng: -122.4194 },
         },
         {
           id: 'overlap-2',
-          title: 'Overlap 2',
+          compactTitle: 'Overlap 2',
           price: 1100,
           availableSlots: 1,
           ownerId: 'owner-2',
-          images: [],
+          thumbnailUrl: null,
           location: { lat: 37.7749, lng: -122.4194 },
         },
       ];
@@ -1368,31 +1368,31 @@ describe('Map Component', () => {
     const listingsWithTiers = [
       {
         id: 'primary-1',
-        title: 'Primary Listing',
+        compactTitle: 'Primary Listing',
         price: 1200,
         availableSlots: 2,
         ownerId: 'owner-1',
-        images: ['https://example.com/img1.jpg'],
+        thumbnailUrl: 'https://example.com/img1.jpg',
         location: { lat: 37.7749, lng: -122.4194 },
         tier: 'primary' as const,
       },
       {
         id: 'mini-1',
-        title: 'Mini Listing',
+        compactTitle: 'Mini Listing',
         price: 900,
         availableSlots: 1,
         ownerId: 'owner-2',
-        images: ['https://example.com/img2.jpg'],
+        thumbnailUrl: 'https://example.com/img2.jpg',
         location: { lat: 37.7849, lng: -122.4094 },
         tier: 'mini' as const,
       },
       {
         id: 'mini-2',
-        title: 'Another Mini',
+        compactTitle: 'Another Mini',
         price: 800,
         availableSlots: 3,
         ownerId: 'owner-3',
-        images: [],
+        thumbnailUrl: null,
         location: { lat: 37.7649, lng: -122.4294 },
         tier: 'mini' as const,
       },
@@ -1403,11 +1403,11 @@ describe('Map Component', () => {
       mockQuerySourceFeaturesData = listingsWithTiers.map(listing => ({
         properties: {
           id: listing.id,
-          title: listing.title,
+          compactTitle: listing.compactTitle,
           price: listing.price,
           availableSlots: listing.availableSlots,
           ownerId: listing.ownerId || '',
-          images: JSON.stringify(listing.images || []),
+          thumbnailUrl: listing.thumbnailUrl ?? undefined,
           lat: listing.location.lat,
           lng: listing.location.lng,
           tier: listing.tier,

@@ -65,11 +65,11 @@ const onCallbacks: Record<string, ((...args: unknown[]) => void)[]> = {};
 let mockQuerySourceFeaturesData: Array<{
   properties: {
     id: string;
-    title: string;
+    compactTitle: string;
     price: number;
     availableSlots: number;
     ownerId: string;
-    images: string;
+    thumbnailUrl?: string;
     lat: number;
     lng: number;
     tier?: string;
@@ -127,11 +127,11 @@ function listingsToFeatures(listings: typeof mockListings) {
   return listings.map(listing => ({
     properties: {
       id: listing.id,
-      title: listing.title,
+      compactTitle: listing.compactTitle,
       price: listing.price,
       availableSlots: listing.availableSlots,
       ownerId: listing.ownerId || '',
-      images: JSON.stringify(listing.images || []),
+      thumbnailUrl: listing.thumbnailUrl ?? undefined,
       lat: listing.location.lat,
       lng: listing.location.lng,
       tier: listing.tier,
@@ -391,21 +391,21 @@ import MapComponent from '@/components/Map';
 const mockListings = [
   {
     id: 'listing-1',
-    title: 'Cozy Room in SF',
+    compactTitle: 'Cozy Room in SF',
     price: 1200,
     availableSlots: 2,
     ownerId: 'owner-1',
-    images: ['https://example.com/img1.jpg'],
+    thumbnailUrl: 'https://example.com/img1.jpg',
     location: { lat: 37.7749, lng: -122.4194 },
     tier: 'primary' as const,
   },
   {
     id: 'listing-2',
-    title: 'Studio Apartment',
+    compactTitle: 'Studio Apartment',
     price: 1800,
     availableSlots: 1,
     ownerId: 'owner-2',
-    images: ['https://example.com/img2.jpg'],
+    thumbnailUrl: 'https://example.com/img2.jpg',
     location: { lat: 37.7849, lng: -122.4094 },
     tier: 'mini' as const,
   },
