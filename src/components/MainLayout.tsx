@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 export default function MainLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const isHomePage = pathname === '/';
-    const isSearchPage = pathname === '/search';
+    const isSearchPage = pathname === '/search' || pathname.startsWith('/search/');
 
     const isAuthPage = pathname === '/login' ||
         pathname === '/signup' ||

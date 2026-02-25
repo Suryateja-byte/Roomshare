@@ -48,7 +48,7 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
     };
 
     return (
-        <div className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 py-6 first:pt-0 last:pb-0">
+        <div className="py-8 first:pt-0 last:pb-0">
             {/* Review Header */}
             <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">

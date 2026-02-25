@@ -1,0 +1,45 @@
+name: "Copilot Setup Steps"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 9
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+
+    # Customize this step as needed
+    - name: Build application
+      run: pnpm build
+      env:
+        DATABASE_URL: 'postgresql://dummy:dummy@localhost:5432/dummy'
+        NEXTAUTH_SECRET: 'build-secret-dummy-value-32-chars-min'
+        NEXTAUTH_URL: 'http://localhost:3000'
+        GOOGLE_CLIENT_ID: 'dummy-google-client-id'
+        GOOGLE_CLIENT_SECRET: 'dummy-google-client-secret'

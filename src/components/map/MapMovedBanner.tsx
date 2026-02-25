@@ -45,19 +45,20 @@ export function MapMovedBanner({
 
   if (variant === "map") {
     return (
-      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-white dark:bg-zinc-800 rounded-full shadow-lg px-2 py-1">
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[50] flex items-center gap-2 bg-zinc-900/90 dark:bg-white/90 backdrop-blur-md rounded-full shadow-lg px-2 py-1.5 border border-white/10">
         <button
           onClick={onSearch}
           disabled={isSearchLoading}
-          className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-3 inline-flex items-center gap-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          className="text-sm font-medium text-white dark:text-zinc-900 hover:text-indigo-400 dark:hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-4 inline-flex items-center gap-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 transition-colors"
         >
           {isSearchLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
           {label}
         </button>
+        <div className="w-[1px] h-6 bg-white/20 dark:bg-zinc-900/20" />
         <button
           onClick={onReset}
           aria-label="Reset map view"
-          className="p-1 w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          className="p-1 w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-white dark:hover:text-zinc-900 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 transition-colors"
         >
           <X className="h-4 w-4" />
         </button>

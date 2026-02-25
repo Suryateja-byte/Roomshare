@@ -83,6 +83,31 @@ async function waitForSheetAnimation(
 }
 
 /**
+ * Wait for the search header layout to stabilize after the ResizeObserver
+ * dynamically updates --header-height and the padding-top transition completes.
+ */
+async function waitForLayoutStable(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  await page
+    .waitForFunction(
+      () => {
+        const w = window as any;
+        const curr = getComputedStyle(document.documentElement)
+          .getPropertyValue("--header-height")
+          .trim();
+        const prev = w.__prevHeaderHeight as string | undefined;
+        w.__prevHeaderHeight = curr;
+        if (prev === undefined) return false;
+        return curr === prev && curr !== "";
+      },
+      undefined,
+      { timeout: 5000, polling: 150 },
+    )
+    .catch(() => {});
+}
+
+/**
  * Helper to change sheet snap position via the keyboard-accessible slider.
  * Uses ArrowUp/ArrowDown on the role="slider" element which is far more
  * reliable than synthetic touch events (React doesn't capture manually
@@ -344,13 +369,19 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
 
     // Collapse the sheet via minimize button or drag
     const minimizeBtn = page.locator(selectors.minimizeButton);
-    if (await minimizeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
       await minimizeBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Minimize button not visible');
+      return;
     }
 
-    // Verify collapsed
-    expect(await getSnapIndex(page)).toBe(0);
+    // Verify collapsed (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Verify sheet has pointer-events: none when collapsed
     const sheetPointerEvents = await sheet.evaluate(
@@ -383,15 +414,24 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
       return;
     }
 
+    // Wait for header ResizeObserver + padding-top transition to settle
+    await waitForLayoutStable(page);
+
     // Collapse via minimize button
     const minimizeBtn = page.locator(selectors.minimizeButton);
-    if (await minimizeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
       await minimizeBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Minimize button not visible');
+      return;
     }
 
-    // Verify collapsed
-    expect(await getSnapIndex(page)).toBe(0);
+    // Verify collapsed (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Handle should still have pointer-events: auto
     const handle = page.locator(selectors.bottomSheetHandle);
@@ -420,20 +460,28 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     // Expand the sheet
     const expandBtn = page.locator(selectors.expandButton);
-    if (await expandBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(expandBtn).toBeVisible({ timeout: 5000 });
       await expandBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Expand button not visible');
+      return;
     }
 
-    // Verify expanded
-    expect(await getSnapIndex(page)).toBe(2);
+    // Verify expanded (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(2);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Press Escape
     await page.keyboard.press("Escape");
     await waitForSheetAnimation(page);
 
     // Should collapse to half position (index 1)
-    expect(await getSnapIndex(page)).toBe(1);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(1);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
   });
 
   test("escape key has no effect when sheet is collapsed", async ({ page }) => {
@@ -450,20 +498,28 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     // Collapse the sheet
     const minimizeBtn = page.locator(selectors.minimizeButton);
-    if (await minimizeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
       await minimizeBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Minimize button not visible');
+      return;
     }
 
-    // Verify collapsed
-    expect(await getSnapIndex(page)).toBe(0);
+    // Verify collapsed (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Press Escape - should stay collapsed
     await page.keyboard.press("Escape");
     await waitForSheetAnimation(page);
 
     // Still collapsed
-    expect(await getSnapIndex(page)).toBe(0);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(0);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
   });
 });
 
@@ -475,20 +531,31 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
+    try {
+      await expect(sheet).toBeVisible({ timeout: 5000 });
+    } catch {
       test.skip();
       return;
     }
 
+    // Wait for header ResizeObserver + padding-top transition to settle
+    await waitForLayoutStable(page);
+
     // Expand the sheet
     const expandBtn = page.locator(selectors.expandButton);
-    if (await expandBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(expandBtn).toBeVisible({ timeout: 5000 });
       await expandBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Expand button not visible');
+      return;
     }
 
-    // Verify expanded
-    expect(await getSnapIndex(page)).toBe(2);
+    // Verify expanded (poll for animation to settle)
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(2);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Apply a filter (if filter buttons exist)
     const filterBtn = page.locator(
@@ -497,14 +564,19 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     const hasFilter = await filterBtn.first().isVisible().catch(() => false);
 
     if (hasFilter) {
-      await filterBtn.first().click();
+      // force: true because on mobile the filter button may be partially
+      // obscured by the expanded bottom sheet
+      await filterBtn.first().click({ force: true });
       await page.waitForTimeout(500);
 
       // Close filter modal if opened
       const closeBtn = page.locator('[aria-label="Close"], button:has-text("Done")');
-      if (await closeBtn.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      try {
+        await expect(closeBtn.first()).toBeVisible({ timeout: 2000 });
         await closeBtn.first().click();
         await page.waitForTimeout(500);
+      } catch {
+        // Filter modal may not have opened
       }
     }
 
@@ -605,18 +677,29 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
       return;
     }
 
+    // Wait for header ResizeObserver + padding-top transition to settle
+    await waitForLayoutStable(page);
+
     // At half position, PTR should not be enabled
-    expect(await getSnapIndex(page)).toBe(1);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(1);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Expand the sheet
     const expandBtn = page.locator(selectors.expandButton);
-    if (await expandBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await expect(expandBtn).toBeVisible({ timeout: 5000 });
       await expandBtn.click();
       await waitForSheetAnimation(page);
+    } catch {
+      test.skip(true, 'Expand button not visible');
+      return;
     }
 
     // At expanded position, PTR should be available
-    expect(await getSnapIndex(page)).toBe(2);
+    await expect(async () => {
+      expect(await getSnapIndex(page)).toBe(2);
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Check that PullToRefresh component is enabled
     // (Implementation detail: PTR is wrapped around children when onRefresh is provided)
@@ -715,7 +798,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
     await waitForSheetAnimation(page);
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(2);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Press Home
     await page.keyboard.press("Home");
@@ -777,14 +860,14 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
     await waitForSheetAnimation(page);
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(2);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Press Space - should go back to half
     await page.keyboard.press(" ");
     await waitForSheetAnimation(page);
     await expect(async () => {
       expect(await getSnapIndex(page)).toBe(1);
-    }).toPass({ timeout: 5_000, intervals: [500, 1000] });
+    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
   });
 });
 

@@ -47,7 +47,7 @@ describe('ListingCard', () => {
     it('renders formatted price', () => {
       render(<ListingCard listing={mockListing} />)
       expect(screen.getByText('$800')).toBeInTheDocument()
-      expect(screen.getByText('/mo')).toBeInTheDocument()
+      expect(screen.getByText(/\/\s*mo/i)).toBeInTheDocument()
     })
 
     it('renders location', () => {
@@ -55,13 +55,12 @@ describe('ListingCard', () => {
       expect(screen.getByText('San Francisco, CA')).toBeInTheDocument()
     })
 
-    it('renders amenities (max 3)', () => {
+    it('renders amenities (max 2)', () => {
       render(<ListingCard listing={mockListing} />)
-      expect(screen.getByText('WiFi')).toBeInTheDocument()
-      expect(screen.getByText('Parking')).toBeInTheDocument()
-      expect(screen.getByText('Laundry')).toBeInTheDocument()
-      // Fourth amenity should not be visible
-      expect(screen.queryByText('Pool')).not.toBeInTheDocument()
+      expect(screen.getByText(/wifi/i)).toBeInTheDocument()
+      expect(screen.getByText(/parking/i)).toBeInTheDocument()
+      expect(screen.queryByText(/laundry/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/pool/i)).not.toBeInTheDocument()
     })
 
     it('renders availability badge as Available', () => {

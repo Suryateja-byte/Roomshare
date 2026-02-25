@@ -184,7 +184,7 @@ export function CategoryBar() {
 
   return (
     <div
-      className="relative border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950"
+      className="relative border-b border-zinc-100 dark:border-zinc-800/50 bg-white dark:bg-zinc-950"
       role="navigation"
       aria-label="Category filters"
     >
@@ -193,22 +193,33 @@ export function CategoryBar() {
         <button
           type="button"
           onClick={() => scroll('left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 hidden md:flex items-center justify-center w-8 h-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full shadow-sm hover:shadow-md transition-shadow"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-8 h-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full shadow-sm hover:shadow-md transition-shadow ml-2"
           aria-label="Scroll categories left"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-4 h-4 text-zinc-900 dark:text-white" />
         </button>
+      )}
+
+      {/* Fade left edge */}
+      {canScrollLeft && (
+        <div
+          className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white dark:from-zinc-950 to-transparent pointer-events-none z-10"
+          aria-hidden="true"
+        />
       )}
 
       {/* Scrollable container */}
       <div
         ref={scrollRef}
-        className="flex items-center gap-2 px-4 py-3 overflow-x-auto scrollbar-hide scroll-smooth"
+        className="flex items-center gap-8 px-6 pt-6 pb-4 overflow-x-auto scrollbar-hide scroll-smooth"
         style={{ cursor: 'grab' }}
       >
         {CATEGORIES.map((cat) => {
           const Icon = cat.icon;
-          const active = isCategoryActive(cat.params, searchParams);
+          // Determine active status manually using our helper
+          const params = new URLSearchParams(searchParams.toString());
+          const isActive = isCategoryActive(cat.params, params);
+
           return (
             <button
               key={cat.id}
@@ -216,47 +227,41 @@ export function CategoryBar() {
               onClick={() => handleSelect(cat.params)}
               disabled={isPending}
               className={`
-                flex flex-col items-center gap-1 px-3 py-2.5 min-w-[84px] min-h-[44px] rounded-xl text-xs font-medium
-                transition-all duration-150 flex-shrink-0
-                ${active
-                  ? 'bg-indigo-500 text-white shadow-sm'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-indigo-50 dark:hover:bg-indigo-950 hover:text-zinc-900 dark:hover:text-white'
+                flex flex-col items-center gap-2 pt-2 pb-3 min-w-[56px] text-xs font-medium
+                transition-all duration-200 flex-shrink-0 border-b-2
+                ${isActive
+                  ? 'border-zinc-900 dark:border-white text-zinc-900 dark:text-white'
+                  : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700'
                 }
                 disabled:opacity-60 disabled:cursor-not-allowed
               `}
-              aria-pressed={active}
+              aria-pressed={isActive}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className={`w-6 h-6 overflow-visible ${isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`} strokeWidth={isActive ? 2 : 1.5} />
               <span className="whitespace-nowrap">{cat.label}</span>
             </button>
           );
         })}
       </div>
 
+      {/* Fade right edge */}
+      {canScrollRight && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white dark:from-zinc-950 to-transparent pointer-events-none z-10"
+          aria-hidden="true"
+        />
+      )}
+
       {/* Right arrow */}
       {canScrollRight && (
         <button
           type="button"
           onClick={() => scroll('right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden md:flex items-center justify-center w-8 h-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full shadow-sm hover:shadow-md transition-shadow"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-8 h-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full shadow-sm hover:shadow-md transition-shadow mr-2"
           aria-label="Scroll categories right"
         >
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-4 h-4 text-zinc-900 dark:text-white" />
         </button>
-      )}
-
-      {/* Fade edges */}
-      {canScrollLeft && (
-        <div
-          className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-zinc-950 to-transparent pointer-events-none"
-          aria-hidden="true"
-        />
-      )}
-      {canScrollRight && (
-        <div
-          className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-zinc-950 to-transparent pointer-events-none"
-          aria-hidden="true"
-        />
       )}
     </div>
   );

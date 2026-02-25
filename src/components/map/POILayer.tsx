@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useCallback, useState } from 'react';
-import { Layers, Bus, Trees, Landmark } from 'lucide-react';
+import { Bus, Trees, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface POILayerProps {
@@ -112,51 +112,23 @@ export function POILayer({ mapRef, isMapLoaded }: POILayerProps) {
     if (!isMapLoaded) return null;
 
     const categories: Array<{ id: POICategory; label: string; icon: React.ReactNode }> = [
-        { id: 'transit', label: 'Transit', icon: <Bus className="w-3.5 h-3.5" /> },
-        { id: 'landmarks', label: 'POIs', icon: <Landmark className="w-3.5 h-3.5" /> },
-        { id: 'parks', label: 'Parks', icon: <Trees className="w-3.5 h-3.5" /> },
+        { id: 'transit', label: 'Transit', icon: <Bus className="w-4 h-4" /> },
+        { id: 'landmarks', label: 'POIs', icon: <Landmark className="w-4 h-4" /> },
+        { id: 'parks', label: 'Parks', icon: <Trees className="w-4 h-4" /> },
     ];
 
     return (
-        <div className="absolute top-16 right-4 z-10 flex flex-col gap-1">
-            {/* POI toggle header */}
-            <button
-                onClick={() => {
-                    // Toggle all on/off
-                    if (activeCategories.size === categories.length) {
-                        setActiveCategories(new Set());
-                    } else {
-                        setActiveCategories(new Set(categories.map(c => c.id)));
-                    }
-                }}
-                className={cn(
-                    // P2-8 FIX: Ensure 44px minimum touch target for WCAG 2.5.5
-                    // P2-9 FIX: Add focus ring for keyboard navigation
-                    "flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg shadow-md border text-xs font-medium transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2",
-                    activeCategories.size > 0
-                        ? "bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900 dark:border-white"
-                        : "bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-                )}
-                aria-label={activeCategories.size > 0 ? "Hide all POIs" : "Show all POIs"}
-                aria-pressed={activeCategories.size > 0}
-                title="Toggle POI layers"
-            >
-                <Layers className="w-3.5 h-3.5" />
-                POIs
-            </button>
-
+        <div className="absolute top-20 right-4 z-[50] flex flex-col gap-2">
             {/* Individual category toggles */}
             {categories.map(cat => (
                 <button
                     key={cat.id}
                     onClick={() => toggleCategory(cat.id)}
                     className={cn(
-                        // P2-8 FIX: Ensure 44px minimum touch target for WCAG 2.5.5
-                        // P2-9 FIX: Add focus ring for keyboard navigation
-                        "flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg shadow-sm border text-xs transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2",
+                        "flex items-center justify-center gap-2 px-3 py-2 rounded-full shadow-md border text-sm font-medium transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 backdrop-blur-md",
                         activeCategories.has(cat.id)
-                            ? "bg-zinc-800 text-white border-zinc-800 dark:bg-zinc-200 dark:text-zinc-900 dark:border-zinc-200"
-                            : "bg-white/90 dark:bg-zinc-800/90 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                            ? "bg-zinc-900/90 text-white border-zinc-900 dark:bg-white/90 dark:text-zinc-900 dark:border-white"
+                            : "bg-white/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-300 border-zinc-200/50 dark:border-zinc-700/50 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                     )}
                     aria-label={`${activeCategories.has(cat.id) ? 'Hide' : 'Show'} ${cat.label}`}
                     aria-pressed={activeCategories.has(cat.id)}

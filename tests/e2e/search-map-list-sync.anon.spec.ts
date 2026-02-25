@@ -402,22 +402,29 @@ test.describe("Map-List Synchronization", () => {
         test.skip(true, "Need at least 2 markers");
       }
 
-      const firstId = await getMarkerListingId(page, 0);
-      const secondId = await getMarkerListingId(page, 1);
-      if (!firstId || !secondId || firstId === secondId) {
-        test.skip(true, "Could not get two distinct marker IDs");
+      // Find markers that also have corresponding listing cards in the DOM.
+      // Map markers may include listings beyond the first page of paginated
+      // results, so picking by raw index can choose a marker whose card
+      // doesn't exist — causing the highlight assertion to fail.
+      const markerIds = await getAllMarkerListingIds(page);
+      const cardIds = new Set(await getAllCardListingIds(page));
+      const matchedIds = markerIds.filter((id) => cardIds.has(id));
+      if (matchedIds.length < 2) {
+        test.skip(true, "Need at least 2 markers with matching listing cards");
       }
+      const firstId = matchedIds[0];
+      const secondId = matchedIds[1];
 
       // Click first marker
-      await clickMarkerByIndex(page, 0);
-      await waitForCardHighlight(page, firstId!);
+      await clickMarkerByListingId(page, firstId);
+      await waitForCardHighlight(page, firstId);
 
       // Click second marker
-      await clickMarkerByIndex(page, 1);
-      await waitForCardHighlight(page, secondId!);
+      await clickMarkerByListingId(page, secondId);
+      await waitForCardHighlight(page, secondId);
 
       // First card should lose highlight
-      const firstCardState = await getCardState(page, firstId!);
+      const firstCardState = await getCardState(page, firstId);
       expect(firstCardState.isActive).toBe(false);
 
       // Only one card should be active

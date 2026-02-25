@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import {
     Bell,
@@ -74,23 +74,31 @@ export default function NotificationCenter() {
     const [isLoading, setIsLoading] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    const fetchNotifications = async () => {
+    const fetchNotifications = useCallback(async () => {
         setIsLoading(true);
-        const result = await getNotifications(20);
-        setNotifications(result.notifications);
-        setUnreadCount(result.unreadCount);
+        try {
+            const result = await getNotifications(20);
+            setNotifications(result.notifications);
+            setUnreadCount(result.unreadCount);
+        } catch {
+            // Keep the widget non-blocking if notification fetch fails
+            setNotifications([]);
+            setUnreadCount(0);
+        }
         setIsLoading(false);
-    };
+    }, []);
 
     useEffect(() => {
+        if (!isOpen) return;
+
         fetchNotifications();
-        // Poll for new notifications every 30 seconds, skip when tab not visible
+        // Poll while open to avoid background server action traffic on unrelated pages.
         const interval = setInterval(() => {
             if (document.visibilityState !== 'visible') return;
             fetchNotifications();
         }, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [fetchNotifications, isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

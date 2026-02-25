@@ -7,7 +7,7 @@
  */
 
 import { test, expect, SF_BOUNDS, timeouts } from "./helpers/test-utils";
-import { waitForSheetAnimation } from "./helpers/mobile-helpers";
+import { waitForSheetAnimation, waitForLayoutStable } from "./helpers/mobile-helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -238,13 +238,18 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
     await expect(page.locator('[data-testid="listing-card"]').first()).toBeAttached({ timeout: timeouts.navigation });
 
     const bottomSheet = page.locator(toggleSelectors.bottomSheet);
-    const sheetVisible = await bottomSheet.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (!sheetVisible) {
+    try {
+      await expect(bottomSheet).toBeVisible({ timeout: 5000 });
+    } catch {
       // Bottom sheet not implemented or not visible on this viewport
       test.skip();
       return;
     }
+
+    // Wait for header ResizeObserver + padding-top transition to settle
+    // before taking baseline measurements
+    await waitForLayoutStable(page);
+    await waitForSheetAnimation(page);
 
     // Use data-snap-current attribute (0=collapsed, 1=half, 2=expanded)
     // This is more reliable than pixel measurements which race with spring animations
@@ -262,9 +267,7 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
         await expect(snapContent).toHaveAttribute("data-snap-current", "0", { timeout: 5000 });
       } else {
         // Fallback: measure bounding box if data attribute not present
-        // Wait for initial sheet to settle before comparing
         const afterBox = await bottomSheet.boundingBox();
-        // Sheet should exist and be short (collapsed = ~15vh ≈ 127px on 844px viewport)
         if (afterBox) {
           const viewportHeight = page.viewportSize()?.height ?? 844;
           expect(afterBox.height).toBeLessThan(viewportHeight * 0.3);

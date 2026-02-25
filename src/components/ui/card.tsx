@@ -7,10 +7,10 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const variantClasses = {
-    default: "bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800",
-    elevated: "bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 shadow-md",
+    default: "bg-white dark:bg-zinc-900",
+    elevated: "bg-white dark:bg-zinc-900 shadow-md",
     glass: "glass-card",
-    interactive: "bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800 hover:-translate-y-0.5 hover:shadow-lg hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-200",
+    interactive: "bg-white dark:bg-zinc-900 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200",
 }
 
 const paddingClasses = {
@@ -21,8 +21,8 @@ const paddingClasses = {
 }
 
 const radiusClasses = {
-    default: "rounded-xl",
-    lg: "rounded-2xl",
+    default: "rounded-3xl",
+    lg: "rounded-3xl",
 }
 
 const baseClasses = "overflow-hidden"

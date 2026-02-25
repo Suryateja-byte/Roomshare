@@ -34,7 +34,7 @@ export function MapGestureHint() {
 
   return (
     <div
-      className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-zinc-900/90 dark:bg-white/90 text-white dark:text-zinc-900 rounded-xl px-4 py-3 shadow-lg max-w-[260px] text-center animate-[fadeIn_300ms_ease-out]"
+      className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-zinc-900/90 dark:bg-white/90 backdrop-blur-md text-white dark:text-zinc-900 rounded-2xl px-4 py-3 shadow-xl max-w-[260px] text-center animate-[fadeIn_300ms_ease-out] border border-white/10"
       role="status"
       aria-live="polite"
     >
