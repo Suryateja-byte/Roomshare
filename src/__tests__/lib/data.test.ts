@@ -40,6 +40,8 @@ import {
   filterByBounds,
   filterByQuery,
   sortListings,
+  getMapListings,
+  getListingsPaginated,
   MIN_QUERY_LENGTH,
   MAX_QUERY_LENGTH,
   ListingWithMetadata,
@@ -1224,5 +1226,54 @@ describe('sortListings', () => {
       sortListings(listings, 'price_asc')
       expect(listings).toEqual(original)
     })
+  })
+})
+
+
+describe('shared ranking primitives', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('uses recommended ranking expression in paginated listings query', async () => {
+    ;(prisma.$queryRawUnsafe as jest.Mock)
+      .mockResolvedValueOnce([{ total: BigInt(0) }])
+      .mockResolvedValueOnce([])
+
+    await getListingsPaginated({
+      query: 'downtown',
+      bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.3 },
+      sort: 'recommended',
+      page: 1,
+      limit: 12,
+    })
+
+    const dataQuery = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[1][0] as string
+    expect(dataQuery).toContain('CASE')
+    expect(dataQuery).toContain('POSITION(')
+    expect(dataQuery).toContain('LN(1 + COUNT(r.id))')
+    expect(dataQuery).toContain('l.id ASC')
+  })
+
+  it('uses deterministic map ranking with relevance, proximity, and business score', async () => {
+    ;(prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([])
+
+    await getMapListings({
+      query: 'downtown',
+      bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.3 },
+    })
+
+    const mapQuery = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0] as string
+    const mapParams = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1)
+
+    expect(mapQuery).toContain('ORDER BY')
+    expect(mapQuery).toContain('POWER(ST_Y(loc.coords::geometry) - $')
+    expect(mapQuery).toContain('LN(1 + COUNT(r.id))')
+    expect(mapQuery).toContain('LEFT JOIN "Review" r')
+    expect(mapQuery).toContain('l.id ASC')
+
+    // last two params are deterministic viewport center coordinates
+    expect(mapParams[mapParams.length - 2]).toBeCloseTo(37.75)
+    expect(mapParams[mapParams.length - 1]).toBeCloseTo(-122.4)
   })
 })

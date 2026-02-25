@@ -291,6 +291,63 @@ export function sortListings(
   return results;
 }
 
+function buildBusinessRankingSql(): string {
+  return 'COALESCE(AVG(r.rating), 0) * 20 + LN(1 + COUNT(r.id)) * 12 + LN(1 + GREATEST(l."viewCount", 0)) * 2';
+}
+
+function buildSearchRelevanceSql(queryParamRef?: string): string {
+  if (!queryParamRef) {
+    return "0";
+  }
+
+  const normalizedQuery = `NULLIF(TRIM(BOTH '%' FROM LOWER(${queryParamRef})), '')`;
+  return `CASE
+    WHEN ${normalizedQuery} IS NULL THEN 0
+    WHEN LOWER(l.title) = ${normalizedQuery} THEN 1.0
+    WHEN LOWER(loc.city) = ${normalizedQuery} THEN 0.95
+    WHEN LOWER(loc.state) = ${normalizedQuery} THEN 0.9
+    WHEN LOWER(l.title) LIKE ${normalizedQuery} || '%' THEN 0.82
+    WHEN POSITION(${normalizedQuery} IN LOWER(l.title)) > 0 THEN 0.72
+    WHEN POSITION(${normalizedQuery} IN LOWER(loc.city)) > 0 THEN 0.62
+    WHEN POSITION(${normalizedQuery} IN LOWER(loc.state)) > 0 THEN 0.56
+    WHEN POSITION(${normalizedQuery} IN LOWER(l.description)) > 0 THEN 0.32
+    ELSE 0
+  END`;
+}
+
+function buildRecommendedOrderingSql(queryParamRef?: string): string {
+  const businessScore = buildBusinessRankingSql();
+  const relevanceScore = buildSearchRelevanceSql(queryParamRef);
+  return `(${relevanceScore}) * 100 + (${businessScore}) DESC, l."createdAt" DESC, l.id ASC`;
+}
+
+
+function buildMapOrderingSql(
+  queryParamRef: string | undefined,
+  centerLatParamRef: string,
+  centerLngParamRef: string,
+): string {
+  const relevanceScore = buildSearchRelevanceSql(queryParamRef);
+  const businessScore = buildBusinessRankingSql();
+  const proximityScore = `1 / (1 + POWER(ST_Y(loc.coords::geometry) - ${centerLatParamRef}::double precision, 2) + POWER(ST_X(loc.coords::geometry) - ${centerLngParamRef}::double precision, 2))`;
+
+  return `(${relevanceScore}) * 100 + (${proximityScore}) * 35 + (${businessScore}) DESC, l."createdAt" DESC, l.id ASC`;
+}
+
+function getViewportCenter(bounds: {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}): { lat: number; lng: number } {
+  const lat = (bounds.minLat + bounds.maxLat) / 2;
+  const lng = crossesAntimeridian(bounds.minLng, bounds.maxLng)
+    ? ((((bounds.minLng + 360 + bounds.maxLng) / 2) + 540) % 360) - 180
+    : (bounds.minLng + bounds.maxLng) / 2;
+
+  return { lat, lng };
+}
+
 // Maximum results to return for performance (prevents memory issues on wide map bounds)
 const MAX_RESULTS_CAP = 500;
 
@@ -353,11 +410,15 @@ export async function getListings(
       }
     }
 
+    // Track query parameter index so ORDER BY can reuse same ranking primitive
+    let queryParamIndexForOrdering: number | null = null;
+
     // Text search filter (SQL level)
     if (query && isValidQuery(query)) {
       const sanitizedQuery = sanitizeSearchQuery(query);
       if (sanitizedQuery) {
         const searchPattern = `%${sanitizedQuery}%`;
+        queryParamIndexForOrdering = paramIndex;
         conditions.push(`(
           LOWER(l.title) LIKE LOWER($${paramIndex}) OR
           LOWER(l.description) LIKE LOWER($${paramIndex}) OR
@@ -463,7 +524,7 @@ export async function getListings(
         break;
       case "recommended":
       default:
-        orderByClause = '(COALESCE(AVG(r.rating), 0) * 20 + l."viewCount" * 0.1 + COUNT(r.id) * 5) DESC, l."createdAt" DESC';
+        orderByClause = buildRecommendedOrderingSql(query && isValidQuery(query) ? `$${queryParamIndexForOrdering}` : undefined);
         break;
     }
 
@@ -642,11 +703,15 @@ export async function getMapListings(
     queryParams.push(maxPrice);
   }
 
+  // Track query parameter index so map ORDER BY can reuse relevance primitive
+  let queryParamIndexForOrdering: number | null = null;
+
   // Text search filter (SQL level, case-insensitive, with sanitization)
   if (query && isValidQuery(query)) {
     const sanitizedQuery = sanitizeSearchQuery(query);
     if (sanitizedQuery) {
       const searchPattern = `%${sanitizedQuery}%`;
+      queryParamIndexForOrdering = paramIndex;
       conditions.push(`(
                 LOWER(l.title) LIKE LOWER($${paramIndex}) OR
                 LOWER(l.description) LIKE LOWER($${paramIndex}) OR
@@ -731,10 +796,24 @@ export async function getMapListings(
 
   const whereClause = conditions.join(" AND ");
 
+  const center = bounds ? getViewportCenter(bounds) : { lat: 0, lng: 0 };
+  const centerLatParamIdx = paramIndex++;
+  queryParams.push(center.lat);
+  const centerLngParamIdx = paramIndex++;
+  queryParams.push(center.lng);
+
+  const mapOrderByClause = buildMapOrderingSql(
+    query && isValidQuery(query) && queryParamIndexForOrdering
+      ? `$${queryParamIndexForOrdering}`
+      : undefined,
+    `$${centerLatParamIdx}`,
+    `$${centerLngParamIdx}`,
+  );
+
   // SECURITY AUDIT: $queryRawUnsafe used with parameterized queries ($N placeholders).
   // All user-supplied values are in queryParams array — no direct string interpolation
-  // of user input into the SQL template. whereClause is built from hard-coded column
-  // names with $N parameter placeholders. MAX_MAP_MARKERS is a constant.
+  // of user input into the SQL template. whereClause/mapOrderByClause are built from
+  // hard-coded SQL fragments and placeholder references only.
   const sqlQuery = `
         SELECT
             l.id,
@@ -746,8 +825,10 @@ export async function getMapListings(
             ST_Y(loc.coords::geometry) as lat
         FROM "Listing" l
         JOIN "Location" loc ON l.id = loc."listingId"
+        LEFT JOIN "Review" r ON l.id = r."listingId"
         WHERE ${whereClause}
-        ORDER BY l."createdAt" DESC
+        GROUP BY l.id, loc.id
+        ORDER BY ${mapOrderByClause}
         LIMIT ${MAX_MAP_MARKERS}
     `;
 
@@ -880,12 +961,16 @@ export async function getListingsPaginated(
       queryParams.push(maxPrice);
     }
 
+    // Track query parameter index so ORDER BY can reuse ranking primitive
+    let queryParamIndexForOrdering: number | null = null;
+
     // Text search filter (SQL level, case-insensitive, with sanitization)
     // Only apply if query meets minimum length requirement
     if (query && isValidQuery(query)) {
       const sanitizedQuery = sanitizeSearchQuery(query);
       if (sanitizedQuery) {
         const searchPattern = `%${sanitizedQuery}%`;
+        queryParamIndexForOrdering = paramIndex;
         conditions.push(`(
                 LOWER(l.title) LIKE LOWER($${paramIndex}) OR
                 LOWER(l.description) LIKE LOWER($${paramIndex}) OR
@@ -995,8 +1080,11 @@ export async function getListingsPaginated(
         break;
       case "recommended":
       default:
-        orderByClause =
-          '(COALESCE(AVG(r.rating), 0) * 20 + l."viewCount" * 0.1 + COUNT(r.id) * 5) DESC, l."createdAt" DESC';
+        orderByClause = buildRecommendedOrderingSql(
+          query && isValidQuery(query) && queryParamIndexForOrdering
+            ? `$${queryParamIndexForOrdering}`
+            : undefined,
+        );
         break;
     }
 
