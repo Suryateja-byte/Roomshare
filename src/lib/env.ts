@@ -46,7 +46,12 @@ const serverEnvSchema = z.object({
     .min(32, "CRON_SECRET must be at least 32 characters")
     .optional()
     .refine(
-      (val) => !val || !/change-in-production|placeholder|dummy|example|test-secret|YOUR_/i.test(val),
+      (val) =>
+        process.env.NODE_ENV !== "production" ||
+        !val ||
+        !/change-in-production|placeholder|dummy|example|test-secret|YOUR_/i.test(
+          val,
+        ),
       "CRON_SECRET must not contain placeholder values",
     )
     .refine(
@@ -169,24 +174,34 @@ export type ClientEnv = z.infer<typeof clientEnvSchema>;
  * Call this at startup to fail fast on missing configuration
  */
 function validateServerEnv(): ServerEnv {
-  const result = serverEnvSchema.safeParse(process.env);
+  // Auth.js v5 accepts AUTH_URL while older code expects NEXTAUTH_URL.
+  // Normalize for validation so local dev envs using AUTH_URL don't warn.
+  const serverEnvInput = {
+    ...process.env,
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? process.env.AUTH_URL,
+  };
+
+  const result = serverEnvSchema.safeParse(serverEnvInput);
 
   if (!result.success) {
     const errors = result.error.issues
       .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
       .join("\n");
 
-    console.error("Environment validation failed:\n" + errors);
-
     // In production, fail fast. In development, warn but continue
     if (process.env.NODE_ENV === "production") {
+      console.error("Environment validation failed:\n" + errors);
       throw new Error(
         "Invalid environment configuration. Check logs for details.",
       );
     }
+
+    console.warn("Environment validation warnings:\n" + errors);
   }
 
-  return result.success ? result.data : (process.env as unknown as ServerEnv);
+  return result.success
+    ? result.data
+    : (serverEnvInput as unknown as ServerEnv);
 }
 
 /**

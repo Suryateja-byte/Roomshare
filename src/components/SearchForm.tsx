@@ -796,7 +796,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 {!isCompact && (
                     <>
                         {/* Divider */}
-                        <div className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-white/5 mx-1" aria-hidden="true"></div>
+                        <div className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-zinc-700 mx-1" aria-hidden="true"></div>
 
                         {/* Room Type Tabs */}
                         <div className={`flex items-center gap-1 px-3 py-1`}>
@@ -834,7 +834,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                 aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ''}`}
                                 aria-expanded={showFilters}
                                 aria-controls={showFilters ? 'search-filters' : undefined}
-                                className={`flex items-center gap-2 h-10 px-4 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${activeFilterCount > 0
+                                className={`relative flex items-center gap-2 h-10 px-4 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${activeFilterCount > 0
                                     ? 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400'
                                     : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700'
                                     }`}
@@ -842,7 +842,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                 <SlidersHorizontal className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">Filters</span>
                                 {activeFilterCount > 0 && (
-                                    <span className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold">
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold shadow-sm shadow-indigo-600/30">
                                         {activeFilterCount}
                                     </span>
                                 )}

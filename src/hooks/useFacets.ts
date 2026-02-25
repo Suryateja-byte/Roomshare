@@ -20,6 +20,15 @@ import { createTTLCache } from "./createTTLCache";
 const facetsCache = createTTLCache<FacetsResponse>(100);
 const CACHE_TTL_MS = 30_000;
 const DEBOUNCE_MS = 300;
+const ERROR_FALLBACK_TTL_MS = 5_000;
+
+const EMPTY_FACETS: FacetsResponse = {
+  amenities: {},
+  houseRules: {},
+  roomTypes: {},
+  priceRanges: { min: null, max: null, median: null },
+  priceHistogram: null,
+};
 
 export interface UseFacetsOptions {
   pending: BatchedFilterValues;
@@ -147,6 +156,35 @@ export function useFacets({
       });
 
       if (!response.ok) {
+        // Known/expected case: backend asks for location bounds with text query.
+        // Keep UI functional by returning empty facets instead of surfacing an error.
+        if (response.status === 400) {
+          try {
+            const errorBody = await response.json();
+            if (errorBody?.boundsRequired === true) {
+              facetsCache.set(cacheKey, EMPTY_FACETS, ERROR_FALLBACK_TTL_MS);
+              if (!abortController.signal.aborted) {
+                setFacets(EMPTY_FACETS);
+                setIsLoading(false);
+              }
+              return;
+            }
+          } catch {
+            // Ignore body parse errors and continue with generic handling below.
+          }
+        }
+
+        // Graceful degradation for transient backend failures (500/timeout/etc).
+        // Facets should not block core search/filter UI interactions.
+        if (response.status >= 500) {
+          facetsCache.set(cacheKey, EMPTY_FACETS, ERROR_FALLBACK_TTL_MS);
+          if (!abortController.signal.aborted) {
+            setFacets((prev) => prev ?? EMPTY_FACETS);
+            setIsLoading(false);
+          }
+          return;
+        }
+
         throw new Error(`Facets request failed: ${response.status}`);
       }
 

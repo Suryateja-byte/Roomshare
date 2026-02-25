@@ -19,6 +19,26 @@ export function ServiceWorkerRegistration({
       return;
     }
 
+    // In development, don't register SW — actively clean up stale ones
+    // from previous production builds to prevent cache-first serving stale assets
+    if (process.env.NODE_ENV !== 'production') {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister();
+          console.log('[SW] Unregistered stale service worker in dev mode');
+        }
+      });
+      if ('caches' in window) {
+        caches.keys().then((cacheNames) => {
+          for (const cacheName of cacheNames) {
+            caches.delete(cacheName);
+            console.log('[SW] Deleted cache in dev mode:', cacheName);
+          }
+        });
+      }
+      return;
+    }
+
     let updateInterval: ReturnType<typeof setInterval> | null = null;
 
     const registerSW = async () => {

@@ -34,21 +34,29 @@ describe("getServerEnv() validation behavior", () => {
     jest.resetModules();
   });
 
-  it("validates on explicit call (logs error or throws)", async () => {
+  it("validates on explicit call (logs error/warn or throws)", async () => {
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
-    let threw = false;
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
 
+    // Remove a required var to guarantee validation detects an issue
+    const savedDbUrl = process.env.DATABASE_URL;
+    delete process.env.DATABASE_URL;
+
+    let threw = false;
     try {
       const { getServerEnv } = await import("@/lib/env");
       getServerEnv(); // Explicitly call to trigger validation
     } catch {
       threw = true;
+    } finally {
+      if (savedDbUrl !== undefined) process.env.DATABASE_URL = savedDbUrl;
     }
 
-    // Validation must happen: either console.error was called or an exception was thrown
-    const validated = errorSpy.mock.calls.length > 0 || threw;
+    // Validation must happen: console.error (production) or console.warn (dev) or exception
+    const validated = errorSpy.mock.calls.length > 0 || warnSpy.mock.calls.length > 0 || threw;
     expect(validated).toBe(true);
 
     errorSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 });
