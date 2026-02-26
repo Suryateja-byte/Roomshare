@@ -2221,6 +2221,15 @@ export default function MapComponent({
                         return;
                     }
 
+                    // Tile fetch errors (status 0) are benign — occur when map is unmounted
+                    // while tile requests are still in-flight (e.g. hide/show map toggle)
+                    if (message.includes('AJAXError') && message.includes('Failed to fetch')) {
+                        if (process.env.NODE_ENV === 'development') {
+                            console.warn('[Map] Suppressed tile fetch error (safe during unmount):', message);
+                        }
+                        return;
+                    }
+
                     console.error('Map Error:', message, error?.stack);
                 }}
             >
