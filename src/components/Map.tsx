@@ -11,7 +11,7 @@
 
 import Map, { Marker, Popup, Source, Layer, MapLayerMouseEvent, ViewStateChangeEvent, MapRef } from 'react-map-gl/maplibre';
 import type { LayerProps, MapSourceDataEvent } from 'react-map-gl/maplibre';
-import type { GeoJSONSource } from 'maplibre-gl';
+import type { GeoJSONSource, StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useState, useMemo, useRef, useEffect, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
@@ -23,7 +23,7 @@ import { Button } from './ui/button';
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from './SearchForm';
 import { useListingFocus } from '@/contexts/ListingFocusContext';
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
-import { useMapBounds, useMapMovedBanner } from '@/contexts/MapBoundsContext';
+import { useMapBounds, useMapMovedBanner, useActivePanBounds } from '@/contexts/MapBoundsContext';
 import { MapMovedBanner } from './map/MapMovedBanner';
 import { MapGestureHint } from './map/MapGestureHint';
 import { MapEmptyState } from './map/MapEmptyState';
@@ -33,7 +33,7 @@ import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
 import { UserMarker, useUserPin } from './map/UserMarker';
 import { POILayer } from './map/POILayer';
-import { PROGRAMMATIC_MOVE_TIMEOUT_MS, USA_MAX_BOUNDS, MAP_MIN_ZOOM } from '@/lib/constants';
+import { PROGRAMMATIC_MOVE_TIMEOUT_MS, USA_MAX_BOUNDS, MAP_MIN_ZOOM, MAX_LAT_SPAN, MAX_LNG_SPAN } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 /** Parse a string to float and validate it's a finite number within an optional range. */
@@ -215,6 +215,13 @@ export interface MapComponentProps {
      * @default false
      */
     disableAutoFit?: boolean;
+
+    /**
+     * Hide the "No listings in this area" overlay.
+     * Useful when viewport is intentionally too wide and results are paused.
+     * @default false
+     */
+    suppressEmptyState?: boolean;
 }
 
 // Mapbox Layer Colors - Synced with Tailwind Zinc Palette
@@ -338,6 +345,132 @@ function getClusterCountLayerDark(textScale: number): LayerProps {
 const ZOOM_DOTS_ONLY = 12;     // Below: all pins are gray dots (no price)
 const ZOOM_TOP_N_PINS = 14;    // 12-14: primary = price pins, mini = dots. 14+: all price pins
 
+// Safe light-style fallback that avoids complex expression validation failures.
+const LIGHT_STYLE_FALLBACK: StyleSpecification = {
+    version: 8,
+    sources: {
+        osm: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: 'OpenStreetMap contributors',
+        },
+    },
+    layers: [
+        {
+            id: 'osm-raster',
+            type: 'raster',
+            source: 'osm',
+        },
+    ],
+};
+
+/**
+ * MapLibre requires `["zoom"]` to be used only as the input expression of
+ * top-level `step`/`interpolate` for layout/paint properties.
+ *
+ * Some external/legacy layers can provide invalid nested zoom expressions
+ * (e.g. in text-size), which throws during addLayer and breaks map rendering.
+ * This sanitizer patches those cases to a safe numeric fallback.
+ */
+function sanitizeLayerTextSizeExpression(layer: unknown): unknown {
+    if (!layer || typeof layer !== 'object') return layer;
+
+    const candidate = layer as {
+        id?: string;
+        type?: string;
+        layout?: Record<string, unknown>;
+    };
+
+    if (candidate.type !== 'symbol' || !candidate.layout || typeof candidate.layout !== 'object') {
+        return layer;
+    }
+
+    const textSize = candidate.layout['text-size'];
+    if (!Array.isArray(textSize)) return layer;
+
+    const hasZoomToken = (value: unknown): boolean => {
+        if (!Array.isArray(value)) return false;
+        if (value[0] === 'zoom') return true;
+        return value.some(hasZoomToken);
+    };
+
+    const hasValidTopLevelZoomInput = (value: unknown): boolean => {
+        if (!Array.isArray(value)) return false;
+        if (value[0] === 'step') {
+            return Array.isArray(value[1]) && value[1][0] === 'zoom';
+        }
+        if (value[0] === 'interpolate') {
+            return Array.isArray(value[2]) && value[2][0] === 'zoom';
+        }
+        return false;
+    };
+
+    if (!hasZoomToken(textSize) || hasValidTopLevelZoomInput(textSize)) {
+        return layer;
+    }
+
+    const sanitized = {
+        ...candidate,
+        layout: {
+            ...candidate.layout,
+            'text-size': 12,
+        },
+    };
+
+    if (process.env.NODE_ENV === 'development') {
+        console.warn('[Map] Sanitized invalid text-size zoom expression on layer:', candidate.id ?? '(unknown)');
+    }
+
+    return sanitized;
+}
+
+function sanitizeStyleSpecification(style: unknown): unknown {
+    if (!style || typeof style !== 'object') return style;
+
+    const candidate = style as { layers?: unknown[] };
+    if (!Array.isArray(candidate.layers)) return style;
+
+    let didSanitize = false;
+    const sanitizedLayers = candidate.layers.map((layer) => {
+        const sanitizedLayer = sanitizeLayerTextSizeExpression(layer);
+        if (sanitizedLayer !== layer) didSanitize = true;
+        return sanitizedLayer;
+    });
+
+    if (!didSanitize) return style;
+
+    return {
+        ...(style as Record<string, unknown>),
+        layers: sanitizedLayers,
+    };
+}
+
+/**
+ * Patch the Map prototype's addLayer to sanitize zoom expressions.
+ * Uses the map instance's actual constructor prototype to ensure we
+ * patch the correct class (pnpm/Turbopack may resolve different copies).
+ */
+function patchMapPrototypeAddLayer(mapInstance: unknown): void {
+    if (!mapInstance || typeof mapInstance !== 'object') return;
+
+    const proto = Object.getPrototypeOf(mapInstance) as {
+        addLayer?: (layer: unknown, beforeId?: string) => unknown;
+        __roomsharePatchedAddLayer?: boolean;
+    } | null;
+
+    if (!proto || proto.__roomsharePatchedAddLayer || typeof proto.addLayer !== 'function') {
+        return;
+    }
+
+    const originalAddLayer = proto.addLayer;
+    proto.addLayer = function (layer: unknown, beforeId?: string) {
+        const safeLayer = sanitizeLayerTextSizeExpression(layer);
+        return originalAddLayer.call(this, safeLayer, beforeId);
+    };
+    proto.__roomsharePatchedAddLayer = true;
+}
+
 export default function MapComponent({
     listings,
     viewState: controlledViewState,
@@ -347,6 +480,7 @@ export default function MapComponent({
     selectedListingId: controlledSelectedId,
     onSelectedListingChange,
     disableAutoFit = false,
+    suppressEmptyState = false,
 }: MapComponentProps) {
     // --- Controlled vs Uncontrolled View State ---
     // When viewState prop is provided, map runs in controlled mode
@@ -409,6 +543,8 @@ export default function MapComponent({
         isProgrammaticMoveRef,
     } = useMapBounds();
 
+    const { setActivePanBounds } = useActivePanBounds();
+
     // Banner visibility from context
     const { showBanner, showLocationConflict, onSearch, onReset, areaCount, isAreaCountLoading } = useMapMovedBanner();
 
@@ -418,6 +554,7 @@ export default function MapComponent({
     const pendingBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
     const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const searchSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const onMoveThrottleRef = useRef<NodeJS.Timeout | null>(null);
     // P2-FIX (#79): Ref to hold latest executeMapSearch to prevent stale closure in nested timeouts
     const executeMapSearchRef = useRef<((bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }) => void) | null>(null);
     // Track URL bounds for reset functionality
@@ -450,9 +587,10 @@ export default function MapComponent({
     const hoverScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Map-move auto-search tuning:
-    // - 400ms debounce reduces "fetch too soon during momentum scroll"
+    // - Reduced from 400ms to 50ms to instantly update list after drag 
+    //   due to new proactive map marker fetching.
     // - 800ms minimum interval allows more responsive intentional panning
-    const MAP_MOVE_SEARCH_DEBOUNCE_MS = 400;
+    const MAP_MOVE_SEARCH_DEBOUNCE_MS = 50;
     const MIN_SEARCH_INTERVAL_MS = 800;
 
     // E2E testing instrumentation - track map instance for persistence tests
@@ -749,8 +887,8 @@ export default function MapComponent({
         });
 
         return positions;
-    // P2-FIX (#150): Depend on stable ID key instead of array reference
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // P2-FIX (#150): Depend on stable ID key instead of array reference
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [markersSourceKey]);
 
     // Render privacy circles from the same displayed marker positions to avoid
@@ -972,11 +1110,11 @@ export default function MapComponent({
                 ? { longitude: listings[0].location.lng, latitude: listings[0].location.lat, zoom: 12 }
                 : { longitude: -122.4194, latitude: 37.7749, zoom: 12 };
         })(),
-    // M1-MAP: `listings` intentionally excluded — initialViewState must be stable after mount.
-    // The listings fallback (SF default) only applies when there are no URL bounds on mount.
-    // Adding listings to deps would re-center the map on every search result change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [defaultViewState]);
+        // M1-MAP: `listings` intentionally excluded — initialViewState must be stable after mount.
+        // The listings fallback (SF default) only applies when there are no URL bounds on mount.
+        // Adding listings to deps would re-center the map on every search result change.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [defaultViewState]);
 
     // Auto-fly to listings on search (but not on map move)
     useEffect(() => {
@@ -1486,10 +1624,14 @@ export default function MapComponent({
         // Skip search/dirty logic during programmatic moves (auto-fly, card click, cluster expand)
         if (isProgrammaticMoveRef.current) {
             setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
+            setActivePanBounds(null); // Clear active pan bounds
             // CLUSTER FIX: Don't clear isClusterExpandingRef here - wait for onIdle
             // Tiles may not be loaded yet, clearing here causes empty markers
             return;
         }
+
+        // Clear active pan bounds since move has ended
+        setActivePanBounds(null);
 
         // Skip the very first moveEnd (map settling at initialViewState)
         // This prevents search-as-move from locking URL to SF defaults
@@ -1511,7 +1653,7 @@ export default function MapComponent({
             const lngSpan = crossesAntimeridian
                 ? (180 - bounds.minLng) + (bounds.maxLng + 180)
                 : bounds.maxLng - bounds.minLng;
-            if (latSpan > 5 || lngSpan > 5) {
+            if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
                 setBoundsDirty(true);
                 setViewportInfoMessage('Zoom in further to update results');
                 return;
@@ -1560,6 +1702,7 @@ export default function MapComponent({
     }, [
         updateUnclusteredListings,
         setCurrentMapBounds,
+        setActivePanBounds,
         isProgrammaticMoveRef,
         setProgrammaticMove,
         setHasUserMoved,
@@ -1572,6 +1715,93 @@ export default function MapComponent({
 
     // User pin (drop-a-pin) state — uses Nominatim reverse geocoding (no token needed)
     const { isDropMode, toggleDropMode, pin: userPin, setPin: setUserPin, handleMapClick: handleUserPinClick } = useUserPin();
+    const [lightMapStyle, setLightMapStyle] = useState<string | StyleSpecification>(LIGHT_STYLE_FALLBACK);
+    const [darkMapStyle, setDarkMapStyle] = useState<StyleSpecification | null>(null);
+
+    // Patch the Map prototype as soon as the map instance is available.
+    // This runs before onLoad and before react-maplibre <Layer> components
+    // fire addLayer on styledata events.
+    useEffect(() => {
+        if (!mapRef.current) return;
+        patchMapPrototypeAddLayer(mapRef.current.getMap());
+    });
+
+    useEffect(() => {
+        if (isDarkMode) return;
+
+        const controller = new AbortController();
+        let cancelled = false;
+
+        const loadLightStyle = async () => {
+            try {
+                const response = await fetch('https://tiles.openfreemap.org/styles/liberty', {
+                    signal: controller.signal,
+                });
+                if (!response.ok) {
+                    throw new Error(`Style fetch failed with status ${response.status}`);
+                }
+
+                const rawStyle = await response.json();
+                if (cancelled) return;
+
+                const sanitizedStyle = sanitizeStyleSpecification(rawStyle) as StyleSpecification;
+                setLightMapStyle(sanitizedStyle);
+            } catch (error) {
+                if ((error as { name?: string }).name === 'AbortError') return;
+                if (process.env.NODE_ENV === 'development') {
+                    console.warn('[Map] Falling back to raster light style after style load failure', error);
+                }
+                if (!cancelled) setLightMapStyle(LIGHT_STYLE_FALLBACK);
+            }
+        };
+
+        loadLightStyle();
+
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
+    }, [isDarkMode]);
+
+    // Fetch and sanitize dark style as JSON object (same pattern as light style)
+    // so zoom expression sanitization is applied before MapLibre processes it.
+    useEffect(() => {
+        if (!isDarkMode) return;
+
+        const controller = new AbortController();
+        let cancelled = false;
+
+        const loadDarkStyle = async () => {
+            try {
+                const response = await fetch('/map-styles/liberty-dark.json', {
+                    signal: controller.signal,
+                });
+                if (!response.ok) {
+                    throw new Error(`Dark style fetch failed with status ${response.status}`);
+                }
+
+                const rawStyle = await response.json();
+                if (cancelled) return;
+
+                const sanitizedStyle = sanitizeStyleSpecification(rawStyle) as StyleSpecification;
+                setDarkMapStyle(sanitizedStyle);
+            } catch (error) {
+                if ((error as { name?: string }).name === 'AbortError') return;
+                if (process.env.NODE_ENV === 'development') {
+                    console.warn('[Map] Dark style fetch failed, using URL fallback', error);
+                }
+                // Fallback: let MapLibre fetch the URL directly (unsanitized but functional)
+                if (!cancelled) setDarkMapStyle(null);
+            }
+        };
+
+        loadDarkStyle();
+
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
+    }, [isDarkMode]);
 
     // Get hovered listing coords for distance display
     const hoveredListingCoords = useMemo(() => {
@@ -1581,7 +1811,7 @@ export default function MapComponent({
     }, [hoveredId, listings]);
 
     // Handler for controlled mode - fires on every move to update parent's viewState
-    const handleMove = useCallback((e: ViewStateChangeEvent) => {
+    const handleControlledMove = useCallback((e: ViewStateChangeEvent) => {
         if (!isControlledViewState || !onViewStateChange) return;
 
         const mapBounds = e.target.getBounds();
@@ -1604,6 +1834,32 @@ export default function MapComponent({
             isProgrammatic: isProgrammaticMoveRef.current,
         });
     }, [isControlledViewState, onViewStateChange, isProgrammaticMoveRef]);
+
+    // Throttled handler during actual map dragging/zooming
+    // Proactively updates context bounds which triggers client-side /api/map-listings fetch
+    const handleMove = useCallback((e: ViewStateChangeEvent) => {
+        // Fire controlled view state if provided
+        handleControlledMove(e);
+
+        if (isProgrammaticMoveRef.current || !searchAsMove) return;
+
+        if (onMoveThrottleRef.current) return; // Throttled
+
+        // 200ms throttle for proactive marker fetching
+        onMoveThrottleRef.current = setTimeout(() => {
+            onMoveThrottleRef.current = null;
+        }, 200);
+
+        const mapBounds = e.target.getBounds();
+        if (!mapBounds) return;
+
+        setActivePanBounds({
+            minLng: mapBounds.getWest(),
+            maxLng: mapBounds.getEast(),
+            minLat: mapBounds.getSouth(),
+            maxLat: mapBounds.getNorth()
+        });
+    }, [isProgrammaticMoveRef, searchAsMove, setActivePanBounds, handleControlledMove]);
 
     // P1-FIX (#83): Memoize handleMarkerClick to prevent recreation on every render
     const handleMarkerClick = useCallback((listing: Listing, coords: { lng: number; lat: number }) => {
@@ -1728,11 +1984,16 @@ export default function MapComponent({
                 keyboard={true}
                 touchZoomRotate={true}
                 mapStyle={isDarkMode
-                    ? "/map-styles/liberty-dark.json"
-                    : "https://tiles.openfreemap.org/styles/liberty"
+                    ? (darkMapStyle ?? "/map-styles/liberty-dark.json")
+                    : lightMapStyle
                 }
                 onMoveEnd={handleMoveEnd}
                 onLoad={() => {
+                    // Ensure prototype patch is applied (belt-and-suspenders with useEffect)
+                    if (mapRef.current) {
+                        patchMapPrototypeAddLayer(mapRef.current.getMap());
+                    }
+
                     // P2-FIX (#84): Clean up old sourcedata listener on style change before adding new one
                     // When mapStyleKey changes, the map style reloads and onLoad fires again.
                     // Without cleanup, we'd accumulate duplicate listeners.
@@ -1940,6 +2201,15 @@ export default function MapComponent({
                     // These occur when the mapbox-gl worker loses connection during hot reload
                     if ((message.includes('send') && message.includes('worker')) || message.includes('Actor')) {
                         console.warn('[Map] Worker communication issue (safe to ignore during HMR):', message);
+                        return;
+                    }
+
+                    // Zoom expression errors from external styles (e.g. OpenFreeMap liberty)
+                    // are non-fatal — the layer simply won't render text-size correctly
+                    if (message.includes('"zoom" expression may only be used')) {
+                        if (process.env.NODE_ENV === 'development') {
+                            console.warn('[Map] Suppressed external style zoom expression error:', message);
+                        }
                         return;
                     }
 
@@ -2247,11 +2517,10 @@ export default function MapComponent({
                     role="switch"
                     aria-checked={searchAsMove}
                     onClick={() => setSearchAsMove(!searchAsMove)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 backdrop-blur-md ${
-                        searchAsMove
-                            ? "bg-white/95 text-zinc-900 border-white/20 dark:bg-zinc-900/95 dark:text-white dark:border-zinc-800/50 ring-2 ring-green-500/50 dark:ring-green-400/30"
-                            : "bg-zinc-900/90 text-white border-white/10 dark:bg-zinc-800/90 dark:text-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-700"
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 backdrop-blur-md ${searchAsMove
+                        ? "bg-white/95 text-zinc-900 border-white/20 dark:bg-zinc-900/95 dark:text-white dark:border-zinc-800/50 ring-2 ring-green-500/50 dark:ring-green-400/30"
+                        : "bg-zinc-900/90 text-white border-white/10 dark:bg-zinc-800/90 dark:text-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-700"
+                        }`}
                 >
                     <div data-testid="search-toggle-indicator" className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-500 dark:bg-green-400 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-zinc-500 dark:bg-zinc-500"}`} />
                     Search as I move
@@ -2320,7 +2589,7 @@ export default function MapComponent({
             {isMapLoaded && <MapGestureHint />}
 
             {/* Empty state overlay - when map is loaded but no listings in viewport */}
-            {isMapLoaded && !areTilesLoading && !isSearching && listings.length === 0 && (
+            {isMapLoaded && !areTilesLoading && !isSearching && !suppressEmptyState && listings.length === 0 && (
                 <MapEmptyState
                     searchParams={searchParams}
                     onZoomOut={handleZoomOut}

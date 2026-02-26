@@ -63,6 +63,14 @@ export const MAX_LAT_SPAN = 10;
  */
 export const MAX_LNG_SPAN = 10;
 
+/**
+ * Map marker fetch max viewport spans (in degrees).
+ * Kept wider than list-query spans so map can display nationwide clusters
+ * while list updates remain bounded for query cost control.
+ */
+export const MAP_FETCH_MAX_LAT_SPAN = 60;
+export const MAP_FETCH_MAX_LNG_SPAN = 130;
+
 // ============================================
 // Coordinate Limits (Web Mercator practical)
 // ============================================

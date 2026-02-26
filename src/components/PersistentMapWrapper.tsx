@@ -31,11 +31,12 @@ import {
 import type { MapListingData } from "@/lib/data";
 import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
 import { useSearchV2Data, type V2MapData } from "@/contexts/SearchV2DataContext";
+import { useActivePanBounds } from "@/contexts/MapBoundsContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import {
-  MAX_LAT_SPAN,
-  MAX_LNG_SPAN,
+  MAP_FETCH_MAX_LAT_SPAN,
+  MAP_FETCH_MAX_LNG_SPAN,
   LAT_MIN,
   LAT_MAX,
   LNG_MIN,
@@ -99,7 +100,7 @@ function isViewportContained(inner: ViewportBounds, outer: ViewportBounds, thres
 
 /**
  * Pad viewport bounds by a percentage to pre-fetch nearby listings.
- * Clamps to LAT/LNG limits and MAX_LAT/LNG_SPAN.
+ * Clamps to LAT/LNG limits and map fetch max spans.
  */
 function padBounds(bounds: ViewportBounds, padding = FETCH_BOUNDS_PADDING): ViewportBounds {
   const latSpan = bounds.maxLat - bounds.minLat;
@@ -110,18 +111,18 @@ function padBounds(bounds: ViewportBounds, padding = FETCH_BOUNDS_PADDING): View
     minLng: Math.max(LNG_MIN, bounds.minLng - lngSpan * padding),
     maxLng: Math.min(LNG_MAX, bounds.maxLng + lngSpan * padding),
   };
-  // Clamp padded result to MAX_LAT/LNG_SPAN
+  // Clamp padded result to map fetch max spans
   const paddedLatSpan = padded.maxLat - padded.minLat;
   const paddedLngSpan = padded.maxLng - padded.minLng;
-  if (paddedLatSpan > MAX_LAT_SPAN) {
+  if (paddedLatSpan > MAP_FETCH_MAX_LAT_SPAN) {
     const center = (padded.minLat + padded.maxLat) / 2;
-    padded.minLat = center - MAX_LAT_SPAN / 2;
-    padded.maxLat = center + MAX_LAT_SPAN / 2;
+    padded.minLat = center - MAP_FETCH_MAX_LAT_SPAN / 2;
+    padded.maxLat = center + MAP_FETCH_MAX_LAT_SPAN / 2;
   }
-  if (paddedLngSpan > MAX_LNG_SPAN) {
+  if (paddedLngSpan > MAP_FETCH_MAX_LNG_SPAN) {
     const center = (padded.minLng + padded.maxLng) / 2;
-    padded.minLng = center - MAX_LNG_SPAN / 2;
-    padded.maxLng = center + MAX_LNG_SPAN / 2;
+    padded.minLng = center - MAP_FETCH_MAX_LNG_SPAN / 2;
+    padded.maxLng = center + MAP_FETCH_MAX_LNG_SPAN / 2;
   }
   return padded;
 }
@@ -227,7 +228,7 @@ function isValidViewport(params: URLSearchParams): {
     ? 180 - minLng + (maxLng + 180)
     : maxLng - minLng;
 
-  if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
+  if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
     return { valid: false, error: "Zoom in further to see listings" };
   }
 
@@ -388,6 +389,8 @@ export default function PersistentMapWrapper({
 }: PersistentMapWrapperProps) {
   const searchParams = useSearchParams();
   const [listings, setListings] = useState<MapListingData[]>([]);
+  // mapSource tracks whether the most recent data came from a client fetch ('v1') or SSR payload ('v2')
+  const [mapSource, setMapSource] = useState<'v1' | 'v2'>('v2');
   const [isFetchingMapData, setIsFetchingMapData] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Stale-while-revalidate: keep last successful fetch visible during loading
@@ -409,6 +412,9 @@ export default function PersistentMapWrapper({
   // P2-FIX (#115): Track if data path has been determined to prevent brief empty map.
   // On initial mount, we don't know if v2 or v1 will provide data. Show loading until determined.
   const [dataPathDetermined, setDataPathDetermined] = useState(false);
+
+  // Read active pan bounds to proactively fetch listings while the user is dragging the map
+  const { activePanBounds } = useActivePanBounds();
 
   // Coordinate with list transitions - show overlay when list is loading
   const transitionContext = useSearchTransitionSafe();
@@ -437,6 +443,7 @@ export default function PersistentMapWrapper({
   useEffect(() => {
     if (v2MapData) {
       setLastV2Data(v2MapData);
+      setMapSource('v2');
     } else if (!isV2Enabled) {
       // Clear stale V2 cache when v1 path is active to prevent map/list desync.
       setLastV2Data(null);
@@ -448,7 +455,8 @@ export default function PersistentMapWrapper({
   // During V1 fetch: merge cached listings from overlapping areas for instant display
   const effectiveListings = useMemo(() => {
     // P2-FIX (#124): Use lastV2Data state (not ref) so memo properly recalculates
-    const activeV2Data = isV2Enabled ? (v2MapData ?? lastV2Data) : null;
+    // We strictly use V2 data ONLY if it's the active source (not overridden by recent client fetch)
+    const activeV2Data = (isV2Enabled && mapSource === 'v2') ? (v2MapData ?? lastV2Data) : null;
     if (activeV2Data) {
       return v2MapDataToListings(activeV2Data);
     }
@@ -570,6 +578,7 @@ export default function PersistentMapWrapper({
         const fetched = data.listings || [];
         previousListingsRef.current = fetched;
         setListings(fetched);
+        setMapSource('v1'); // Set v1 as active since we just fetched client-side
 
         // Store in spatial cache for instant zoom-out/pan-back display
         if (fetchBounds) {
@@ -632,9 +641,8 @@ export default function PersistentMapWrapper({
       searchParams.has("minLat") &&
       searchParams.has("maxLat");
 
-    // Track whether we need to clamp bounds for the fetch
-    // Use URLSearchParams (writable) so we can modify if clamping is needed
-    let clampedSearchParams: URLSearchParams = new URLSearchParams(searchParams.toString());
+    // Writable copy used for request params
+    const requestSearchParams: URLSearchParams = new URLSearchParams(searchParams.toString());
 
     if (hasBounds) {
       // Client-side bounds validation - applies to both v1 and v2 paths
@@ -647,40 +655,13 @@ export default function PersistentMapWrapper({
           setIsFetchingMapData(false);
           return;
         }
-        // For "too wide" viewports, clamp to max span centered on viewport center
-        // instead of rejecting — keeps listings visible when zoomed out
-        const parsedMinLat = parseFloat(searchParams.get("minLat")!);
-        const parsedMaxLat = parseFloat(searchParams.get("maxLat")!);
-        const parsedMinLng = parseFloat(searchParams.get("minLng")!);
-        const parsedMaxLng = parseFloat(searchParams.get("maxLng")!);
-        const centerLat = (parsedMinLat + parsedMaxLat) / 2;
-        const centerLng = (parsedMinLng + parsedMaxLng) / 2;
-        const clamped = new URLSearchParams(searchParams.toString());
-        clamped.set("minLat", (centerLat - MAX_LAT_SPAN / 2).toString());
-        clamped.set("maxLat", (centerLat + MAX_LAT_SPAN / 2).toString());
-        clamped.set("minLng", (centerLng - MAX_LNG_SPAN / 2).toString());
-        clamped.set("maxLng", (centerLng + MAX_LNG_SPAN / 2).toString());
-        clampedSearchParams = clamped;
-
-        // P2-7 FIX: Guard dev logging
-        if (process.env.NODE_ENV === 'development') {
-          console.debug('[PersistentMapWrapper] Map viewport clamped to max span:', {
-            original: {
-              lat: [parsedMinLat, parsedMaxLat],
-              lng: [parsedMinLng, parsedMaxLng],
-            },
-            clamped: {
-              lat: [centerLat - MAX_LAT_SPAN / 2, centerLat + MAX_LAT_SPAN / 2],
-              lng: [centerLng - MAX_LNG_SPAN / 2, centerLng + MAX_LNG_SPAN / 2],
-            },
-            maxSpan: { lat: MAX_LAT_SPAN, lng: MAX_LNG_SPAN },
-          });
-        }
-
-        // P2-FIX (#151): Use info message instead of error - map is functional, just clamped
-        setInfoMessage("Zoomed in to show results");
+        // Oversized viewport: keep existing map data instead of fetching a tiny
+        // center-clamped box that can appear empty and wipe visible clusters.
+        setInfoMessage("Zoom in further to load listings in this area");
+        setIsFetchingMapData(false);
+        return;
       } else {
-        // Clear info message when viewport is valid (no clamping occurred)
+        // Clear informational message when viewport is valid.
         setInfoMessage(null);
       }
     }
@@ -709,7 +690,7 @@ export default function PersistentMapWrapper({
     // This prevents re-fetching when page/sort changes (which don't affect markers)
     // VERIFIED: URLSearchParams.sort() ensures consistent ordering and toString()
     // produces consistent URL-encoded strings, making string comparison reliable
-    const paramsString = getMapRelevantParams(clampedSearchParams);
+    const paramsString = getMapRelevantParams(requestSearchParams);
 
     // Skip if we've already fetched for these exact params
     if (paramsString === lastFetchedParamsRef.current) {
@@ -726,14 +707,14 @@ export default function PersistentMapWrapper({
 
     // Parse current viewport bounds for spatial cache + hysteresis
     const currentBounds: ViewportBounds = {
-      minLat: parseFloat(clampedSearchParams.get("minLat") || "0"),
-      maxLat: parseFloat(clampedSearchParams.get("maxLat") || "0"),
-      minLng: parseFloat(clampedSearchParams.get("minLng") || "0"),
-      maxLng: parseFloat(clampedSearchParams.get("maxLng") || "0"),
+      minLat: parseFloat(requestSearchParams.get("minLat") || "0"),
+      maxLat: parseFloat(requestSearchParams.get("maxLat") || "0"),
+      minLng: parseFloat(requestSearchParams.get("minLng") || "0"),
+      maxLng: parseFloat(requestSearchParams.get("maxLng") || "0"),
     };
 
     // Invalidate spatial cache when filters change
-    const currentFilterKey = getFilterKey(clampedSearchParams);
+    const currentFilterKey = getFilterKey(requestSearchParams);
     if (currentFilterKey !== lastFilterKeyRef.current) {
       spatialCacheRef.current.clear();
       lastFetchedBoundsRef.current = null;
@@ -765,7 +746,7 @@ export default function PersistentMapWrapper({
     // Only the map's /api/map-listings fetch uses padded bounds.
     // URL params (for list/page sync) continue using actual visible viewport — no conflict.
     const paddedBounds = padBounds(currentBounds);
-    const paddedParams = new URLSearchParams(clampedSearchParams.toString());
+    const paddedParams = new URLSearchParams(requestSearchParams.toString());
     paddedParams.set("minLat", paddedBounds.minLat.toString());
     paddedParams.set("maxLat", paddedBounds.maxLat.toString());
     paddedParams.set("minLng", paddedBounds.minLng.toString());
@@ -790,6 +771,52 @@ export default function PersistentMapWrapper({
       }
     };
   }, [searchParams, fetchListings, shouldRenderMap, isV2Enabled, hasV2Data]);
+
+  // Proactive fetching during map pan (triggered via activePanBounds)
+  useEffect(() => {
+    if (!activePanBounds || !shouldRenderMap) return;
+
+    // Skip fetch on overly-wide in-flight drag bounds and preserve current markers.
+    const latSpan = activePanBounds.maxLat - activePanBounds.minLat;
+    const crossesAntimeridian = activePanBounds.minLng > activePanBounds.maxLng;
+    const lngSpan = crossesAntimeridian
+      ? (180 - activePanBounds.minLng) + (activePanBounds.maxLng + 180)
+      : activePanBounds.maxLng - activePanBounds.minLng;
+    if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
+      setInfoMessage("Zoom in further to load listings in this area");
+      return;
+    }
+
+    // Viewport hysteresis: skip fetch if new viewport is mostly within last-fetched padded area
+    if (lastFetchedBoundsRef.current && isViewportContained(activePanBounds, lastFetchedBoundsRef.current)) {
+      return;
+    }
+
+    const clampedSearchParams = new URLSearchParams(searchParams.toString());
+    const paddedBounds = padBounds(activePanBounds);
+
+    clampedSearchParams.set("minLat", paddedBounds.minLat.toString());
+    clampedSearchParams.set("maxLat", paddedBounds.maxLat.toString());
+    clampedSearchParams.set("minLng", paddedBounds.minLng.toString());
+    clampedSearchParams.set("maxLng", paddedBounds.maxLng.toString());
+
+    const paddedParamsString = getMapRelevantParams(clampedSearchParams);
+
+    if (paddedParamsString === lastFetchedParamsRef.current) return;
+
+    if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Fast debounce for dragging
+    fetchTimeoutRef.current = setTimeout(() => {
+      lastFetchedParamsRef.current = paddedParamsString;
+      fetchListings(paddedParamsString, abortController.signal, paddedBounds);
+    }, 100);
+
+  }, [activePanBounds, searchParams, shouldRenderMap, isV2Enabled, fetchListings]);
 
   const handleRetry = useCallback(() => {
     // Validate viewport before retrying - prevents API call for known-invalid viewports
@@ -856,7 +883,10 @@ export default function PersistentMapWrapper({
       {isListTransitioning && <MapTransitionOverlay />}
       <MapErrorBoundary>
         <Suspense fallback={<MapLoadingPlaceholder />}>
-          <LazyDynamicMap listings={effectiveListings} />
+          <LazyDynamicMap
+            listings={effectiveListings}
+            suppressEmptyState={Boolean(infoMessage)}
+          />
         </Suspense>
       </MapErrorBoundary>
     </div>

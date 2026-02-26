@@ -222,6 +222,38 @@ describe("Unbounded Browse Protection", () => {
       expect(result.listings[0].id).toBe("listing-1");
       expect(result.truncated).toBe(false);
     });
+
+    it("applies map ordering based on the selected sort option", async () => {
+      // Arrange
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([
+        {
+          id: "listing-1",
+          title: "Test Listing",
+          price: BigInt(1000),
+          availableSlots: 2,
+          primaryImage: "/image.jpg",
+          lat: 37.7749,
+          lng: -122.4194,
+        },
+      ]);
+
+      // Act
+      await getSearchDocMapListings({
+        bounds: {
+          minLat: 37.7,
+          maxLat: 37.8,
+          minLng: -122.5,
+          maxLng: -122.4,
+        },
+        sort: "price_asc",
+      });
+
+      // Assert
+      const sql = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain("ORDER BY d.price ASC NULLS LAST");
+      expect(sql).toContain("d.listing_created_at DESC");
+      expect(sql).toContain("d.id ASC");
+    });
   });
 
   describe("getSearchDocListingsPaginated", () => {

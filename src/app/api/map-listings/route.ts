@@ -19,7 +19,11 @@ import {
   buildRawParamsFromSearchParams,
   parseSearchParams,
 } from "@/lib/search-params";
-import { LAT_OFFSET_DEGREES } from "@/lib/constants";
+import {
+  LAT_OFFSET_DEGREES,
+  MAP_FETCH_MAX_LAT_SPAN,
+  MAP_FETCH_MAX_LNG_SPAN,
+} from "@/lib/constants";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
@@ -46,6 +50,11 @@ export async function GET(request: NextRequest) {
         searchParams.get("maxLng"),
         searchParams.get("minLat"),
         searchParams.get("maxLat"),
+        {
+          maxLatSpan: MAP_FETCH_MAX_LAT_SPAN,
+          maxLngSpan: MAP_FETCH_MAX_LNG_SPAN,
+          clampOversized: true,
+        },
       );
 
       let bounds = boundsResult.valid ? boundsResult.bounds : null;

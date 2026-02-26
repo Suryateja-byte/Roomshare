@@ -33,6 +33,15 @@ export interface BoundsValidationResult {
   error?: string;
 }
 
+export interface BoundsValidationOptions {
+  /** Maximum allowed latitude span in degrees before clamping/rejecting */
+  maxLatSpan?: number;
+  /** Maximum allowed longitude span in degrees before clamping/rejecting */
+  maxLngSpan?: number;
+  /** Clamp oversized bounds instead of rejecting */
+  clampOversized?: boolean;
+}
+
 /**
  * Validates and parses bounding box parameters from URL query string.
  *
@@ -43,6 +52,7 @@ export function validateAndParseBounds(
   maxLng: string | null,
   minLat: string | null,
   maxLat: string | null,
+  options: BoundsValidationOptions = {},
 ): BoundsValidationResult {
   // Require all four bounds - no full-table scans allowed
   if (!minLng || !maxLng || !minLat || !maxLat) {
@@ -77,22 +87,41 @@ export function validateAndParseBounds(
     return { valid: false, error: "Invalid latitude range" };
   }
 
-  // P1-5: Clamp oversized bounds instead of rejecting
-  // This provides consistent behavior and better UX
-  const clampedBounds = clampBoundsToMaxSpan(parsed);
+  const maxLatSpan = options.maxLatSpan ?? MAX_LAT_SPAN;
+  const maxLngSpan = options.maxLngSpan ?? MAX_LNG_SPAN;
+  const clampOversized = options.clampOversized ?? true;
 
-  return { valid: true, bounds: clampedBounds };
+  const latSpan = parsed.maxLat - parsed.minLat;
+  const crossesAntimeridian = parsed.minLng > parsed.maxLng;
+  const lngSpan = crossesAntimeridian
+    ? (180 - parsed.minLng) + (parsed.maxLng + 180)
+    : parsed.maxLng - parsed.minLng;
+
+  if (latSpan > maxLatSpan || lngSpan > maxLngSpan) {
+    if (!clampOversized) {
+      return { valid: false, error: "Viewport too large" };
+    }
+    return {
+      valid: true,
+      bounds: clampBoundsToMaxSpan(parsed, maxLatSpan, maxLngSpan),
+    };
+  }
+
+  return { valid: true, bounds: parsed };
 }
 
 /**
  * Clamps bounds to max span (keeps center, reduces span).
- * Used for list queries where we silently reduce oversized viewports
- * instead of rejecting them (unlike map-listings which rejects).
+ * Used across search flows to silently reduce oversized viewports.
  *
  * @param bounds - The bounds to clamp
  * @returns Clamped bounds centered on original viewport center
  */
-export function clampBoundsToMaxSpan(bounds: MapBounds): MapBounds {
+export function clampBoundsToMaxSpan(
+  bounds: MapBounds,
+  maxLatSpan: number = MAX_LAT_SPAN,
+  maxLngSpan: number = MAX_LNG_SPAN,
+): MapBounds {
   const { minLat, maxLat, minLng, maxLng } = bounds;
 
   const latSpan = maxLat - minLat;
@@ -102,7 +131,7 @@ export function clampBoundsToMaxSpan(bounds: MapBounds): MapBounds {
     : maxLng - minLng;
 
   // If within limits, return unchanged (preserves antimeridian crossing)
-  if (latSpan <= MAX_LAT_SPAN && lngSpan <= MAX_LNG_SPAN) {
+  if (latSpan <= maxLatSpan && lngSpan <= maxLngSpan) {
     return bounds;
   }
 
@@ -118,8 +147,8 @@ export function clampBoundsToMaxSpan(bounds: MapBounds): MapBounds {
   }
 
   // Clamp spans
-  const clampedLatSpan = Math.min(latSpan, MAX_LAT_SPAN);
-  const clampedLngSpan = Math.min(lngSpan, MAX_LNG_SPAN);
+  const clampedLatSpan = Math.min(latSpan, maxLatSpan);
+  const clampedLngSpan = Math.min(lngSpan, maxLngSpan);
 
   const halfLat = clampedLatSpan / 2;
   const halfLng = clampedLngSpan / 2;

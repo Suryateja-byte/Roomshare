@@ -83,6 +83,8 @@ interface MapBoundsState {
   searchCurrentArea: () => void;
   /** Reset map view to URL bounds */
   resetToUrlBounds: () => void;
+  /** Active pan bounds updated continuously during map drag (for proactive fetching) */
+  activePanBounds: MapBoundsCoords | null;
 }
 
 interface MapAreaCount {
@@ -109,6 +111,8 @@ interface MapBoundsContextValue extends MapBoundsState, MapAreaCount {
   setSearchHandler: (handler: () => void) => void;
   /** Register reset handler (called by Map) */
   setResetHandler: (handler: () => void) => void;
+  /** Update active pan bounds (called by Map during drag) */
+  setActivePanBounds: (bounds: MapBoundsCoords | null) => void;
   /** Ref for synchronous programmatic move check (used in Mapbox event handlers) */
   isProgrammaticMoveRef: React.RefObject<boolean>;
 }
@@ -133,6 +137,7 @@ interface MapBoundsStateValue {
   locationConflict: boolean;
   areaCount: number | null;
   isAreaCountLoading: boolean;
+  activePanBounds: MapBoundsCoords | null;
 }
 
 /**
@@ -150,6 +155,7 @@ interface MapBoundsActionsValue {
   setCurrentMapBounds: (bounds: MapBoundsCoords | null) => void;
   setSearchHandler: (handler: () => void) => void;
   setResetHandler: (handler: () => void) => void;
+  setActivePanBounds: (bounds: MapBoundsCoords | null) => void;
   isProgrammaticMoveRef: React.RefObject<boolean>;
 }
 
@@ -169,22 +175,24 @@ const SSR_STATE_FALLBACK: MapBoundsStateValue = {
   locationConflict: false,
   areaCount: null,
   isAreaCountLoading: false,
+  activePanBounds: null,
 };
 
 /**
  * Module-level SSR fallback for actions context.
  */
 const SSR_ACTIONS_FALLBACK: MapBoundsActionsValue = {
-  searchCurrentArea: () => {},
-  resetToUrlBounds: () => {},
-  setHasUserMoved: () => {},
-  setBoundsDirty: () => {},
-  setSearchAsMove: () => {},
-  setProgrammaticMove: () => {},
-  setSearchLocation: () => {},
-  setCurrentMapBounds: () => {},
-  setSearchHandler: () => {},
-  setResetHandler: () => {},
+  searchCurrentArea: () => { },
+  resetToUrlBounds: () => { },
+  setHasUserMoved: () => { },
+  setBoundsDirty: () => { },
+  setSearchAsMove: () => { },
+  setProgrammaticMove: () => { },
+  setSearchLocation: () => { },
+  setCurrentMapBounds: () => { },
+  setSearchHandler: () => { },
+  setResetHandler: () => { },
+  setActivePanBounds: () => { },
   isProgrammaticMoveRef: { current: false },
 };
 
@@ -202,16 +210,18 @@ const SSR_FALLBACK: MapBoundsContextValue = {
   locationConflict: false,
   areaCount: null,
   isAreaCountLoading: false,
-  searchCurrentArea: () => {},
-  resetToUrlBounds: () => {},
-  setHasUserMoved: () => {},
-  setBoundsDirty: () => {},
-  setSearchAsMove: () => {},
-  setProgrammaticMove: () => {},
-  setSearchLocation: () => {},
-  setCurrentMapBounds: () => {},
-  setSearchHandler: () => {},
-  setResetHandler: () => {},
+  activePanBounds: null,
+  searchCurrentArea: () => { },
+  resetToUrlBounds: () => { },
+  setHasUserMoved: () => { },
+  setBoundsDirty: () => { },
+  setSearchAsMove: () => { },
+  setProgrammaticMove: () => { },
+  setSearchLocation: () => { },
+  setCurrentMapBounds: () => { },
+  setSearchHandler: () => { },
+  setResetHandler: () => { },
+  setActivePanBounds: () => { },
   isProgrammaticMoveRef: { current: false },
 };
 
@@ -249,6 +259,8 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   const [searchLocationCenter, setSearchLocationCenter] =
     useState<PointCoords | null>(null);
   const [currentMapBounds, setCurrentMapBoundsState] =
+    useState<MapBoundsCoords | null>(null);
+  const [activePanBoundsState, setActivePanBoundsState] =
     useState<MapBoundsCoords | null>(null);
   // P1-FIX (#68): Use refs instead of state for handler storage.
   // Refs don't cause re-renders when updated and always hold the current handler.
@@ -383,6 +395,10 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
 
   const setCurrentMapBounds = useCallback((bounds: MapBoundsCoords | null) => {
     setCurrentMapBoundsState(bounds);
+  }, []);
+
+  const setActivePanBounds = useCallback((bounds: MapBoundsCoords | null) => {
+    setActivePanBoundsState(bounds);
   }, []);
 
   // Compute whether there's a location conflict
@@ -536,6 +552,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       locationConflict,
       areaCount,
       isAreaCountLoading,
+      activePanBounds: activePanBoundsState,
     }),
     [
       hasUserMoved,
@@ -547,6 +564,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       locationConflict,
       areaCount,
       isAreaCountLoading,
+      activePanBoundsState,
     ]
   );
 
@@ -564,6 +582,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       setCurrentMapBounds,
       setSearchHandler,
       setResetHandler,
+      setActivePanBounds,
       isProgrammaticMoveRef,
     }),
     [
@@ -577,6 +596,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       setCurrentMapBounds,
       setSearchHandler,
       setResetHandler,
+      setActivePanBounds,
       isProgrammaticMoveRef,
     ]
   );
@@ -735,5 +755,21 @@ export function useSearchLocation(): {
   return useMemo(
     () => ({ searchLocationName, searchLocationCenter, setSearchLocation }),
     [searchLocationName, searchLocationCenter, setSearchLocation]
+  );
+}
+
+/**
+ * Selector hook for active pan bounds.
+ * Use for proactive fetching during dragging.
+ */
+export function useActivePanBounds(): {
+  activePanBounds: MapBoundsCoords | null;
+  setActivePanBounds: (bounds: MapBoundsCoords | null) => void;
+} {
+  const { activePanBounds } = useMapBoundsState();
+  const { setActivePanBounds } = useMapBoundsActions();
+  return useMemo(
+    () => ({ activePanBounds, setActivePanBounds }),
+    [activePanBounds, setActivePanBounds]
   );
 }

@@ -78,9 +78,9 @@ interface SearchV2DataContextValue {
 
 const SearchV2DataContext = createContext<SearchV2DataContextValue>({
   v2MapData: null,
-  setV2MapData: () => {},
+  setV2MapData: () => { },
   isV2Enabled: false,
-  setIsV2Enabled: () => {},
+  setIsV2Enabled: () => { },
   dataVersion: 0,
 });
 
@@ -98,8 +98,6 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
   const prevBoundsRef = useRef<string | null>(null);
   const dataVersionRef = useRef(0);
 
-  // P1-FIX (#129): Combined effect to clear stale v2MapData when filter OR bounds change.
-  // Previously two separate effects could double-increment version if both changed in same render.
   useEffect(() => {
     const currentParams = getFilterRelevantParams(searchParams);
     const currentBounds = getBoundsParams(searchParams);
@@ -111,9 +109,12 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
       prevBoundsRef.current !== null &&
       prevBoundsRef.current !== currentBounds;
 
-    // Only increment version once, even if both filter AND bounds changed
+    // We no longer setV2MapDataInternal(null) here!
+    // Next.js searchParams ONLY update after the RSC transition commits.
+    // By the time this runs, V2MapDataSetter has ALREADY injected the *new* data.
+    // Clearing it here causes a fatal race condition that destroys the new map data.
+    // Only increment version to ensure strictly sequential data updates.
     if (filterChanged || boundsChanged) {
-      setV2MapDataInternal(null);
       const newVersion = dataVersionRef.current + 1;
       dataVersionRef.current = newVersion;
       setDataVersion(newVersion);

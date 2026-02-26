@@ -182,7 +182,11 @@ function createSearchDocListCacheKey(params: FilterParams): string {
 }
 
 function createSearchDocMapCacheKey(params: FilterParams): string {
-  return JSON.stringify(buildBaseCacheFields(params));
+  return JSON.stringify({
+    ...buildBaseCacheFields(params),
+    sort: params.sort || "recommended",
+    nearMatches: params.nearMatches ?? false,
+  });
 }
 
 function createSearchDocCountCacheKey(params: FilterParams): string {
@@ -735,8 +739,11 @@ async function getSearchDocMapListingsInternal(
     conditions,
     params: queryParams,
     paramIndex,
+    ftsQueryParamIndex,
   } = buildSearchDocWhereConditions(effectiveParams);
   const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+  const sortOption = (effectiveParams.sort || "recommended") as SortOption;
+  const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex);
 
   // Query with minimal fields for map markers
   // Uses precomputed lat/lng from SearchDoc (no ST_X/ST_Y needed)
@@ -754,7 +761,7 @@ async function getSearchDocMapListingsInternal(
       d.lng
     FROM listing_search_docs d
     WHERE ${whereClause}
-    ORDER BY d.listing_created_at DESC
+    ORDER BY ${orderByClause}
     LIMIT $${paramIndex}
   `;
 
