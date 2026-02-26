@@ -29,6 +29,7 @@ interface SortSelectProps {
 export default function SortSelect({ currentSort }: SortSelectProps) {
     const [mounted, setMounted] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [desktopOpen, setDesktopOpen] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
     const transitionContext = useSearchTransitionSafe();
@@ -50,6 +51,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
 
     // P2-3: Memoize handler to improve INP by preventing function recreation on each render
     const handleSortChange = useCallback((newSort: string) => {
+        setDesktopOpen(false);
         const params = new URLSearchParams(searchParams.toString());
         if (newSort === 'recommended') {
             params.delete('sort');
@@ -164,8 +166,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
             {/* Desktop sort dropdown */}
             <div className="hidden md:flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
                 <span>Sort by:</span>
-                {/* @ts-ignore - modal prop exists on Select but TS might not pick it up correctly */}
-                <Select value={currentSort} onValueChange={handleSortChange} modal={false}>
+                <Select value={currentSort} onValueChange={handleSortChange} open={desktopOpen} onOpenChange={setDesktopOpen}>
                     <SelectTrigger className={`h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 px-3 py-1.5 font-semibold text-xs focus:ring-0 ${
                         isNonDefault ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400'
                     }`}>

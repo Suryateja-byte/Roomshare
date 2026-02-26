@@ -15,6 +15,7 @@ export default function ForgotPasswordPage() {
     const [success, setSuccess] = useState(false);
     const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
     const [turnstileToken, setTurnstileToken] = useState<string>('');
+    const [turnstileError, setTurnstileError] = useState(false);
     const turnstileRef = useRef<TurnstileWidgetRef>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -144,14 +145,15 @@ export default function ForgotPasswordPage() {
                         {/* Turnstile Bot Protection */}
                         <TurnstileWidget
                             ref={turnstileRef}
-                            onToken={setTurnstileToken}
+                            onToken={(token) => { setTurnstileToken(token); setTurnstileError(false); }}
                             onExpire={() => setTurnstileToken('')}
+                            onError={() => setTurnstileError(true)}
                         />
 
                         <Button
                             type="submit"
                             className="w-full"
-                            disabled={isLoading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
+                            disabled={isLoading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken && !turnstileError)}
                         >
                             {isLoading ? (
                                 <>

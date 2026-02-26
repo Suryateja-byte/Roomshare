@@ -22,6 +22,7 @@ function LoginForm() {
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [turnstileToken, setTurnstileToken] = useState<string>('');
+    const [turnstileError, setTurnstileError] = useState(false);
     const turnstileRef = useRef<TurnstileWidgetRef>(null);
 
     // Focus email input when OAuth error suggests using email form
@@ -240,13 +241,14 @@ function LoginForm() {
                         {/* Turnstile Bot Protection */}
                         <TurnstileWidget
                             ref={turnstileRef}
-                            onToken={setTurnstileToken}
+                            onToken={(token) => { setTurnstileToken(token); setTurnstileError(false); }}
                             onExpire={() => setTurnstileToken('')}
+                            onError={() => setTurnstileError(true)}
                         />
 
                         <Button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken && !turnstileError)}
                             className="w-full h-11 sm:h-12 rounded-lg shadow-sm hover:shadow-md transition-all"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Sign in <ArrowRight className="w-4 h-4 ml-2" /></>}

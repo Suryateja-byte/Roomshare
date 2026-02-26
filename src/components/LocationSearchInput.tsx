@@ -70,6 +70,7 @@ export default function LocationSearchInput({
   const abortRef = useRef<AbortController | null>(null);
   const pendingQueryRef = useRef<string | null>(null);
   const isComposingRef = useRef(false);
+  const justSelectedRef = useRef(false);
 
   const listboxId = useId();
 
@@ -271,11 +272,14 @@ export default function LocationSearchInput({
   }, [showSuggestions, suggestions, selectedIndex]);
 
   const handleSelectSuggestion = useCallback((suggestion: LocationSuggestion) => {
+    justSelectedRef.current = true;
     const [lng, lat] = suggestion.center;
     onChange(suggestion.place_name);
     setShowSuggestions(false);
     setSuggestions([]);
     setSelectedIndex(-1);
+    // Reset flag after React's event cycle completes
+    requestAnimationFrame(() => { justSelectedRef.current = false; });
 
     if (onLocationSelect) {
       onLocationSelect({
@@ -290,7 +294,9 @@ export default function LocationSearchInput({
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     onChange(newValue);
-    setShowSuggestions(true);
+    if (!justSelectedRef.current) {
+      setShowSuggestions(true);
+    }
     // Note: actual fetch is triggered by debouncedValue effect
     // unless IME composition is in progress
   }, [onChange]);
