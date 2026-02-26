@@ -33,7 +33,7 @@ import { fixMarkerWrapperRole } from './map/fixMarkerA11y';
 import { BoundaryLayer } from './map/BoundaryLayer';
 import { UserMarker, useUserPin } from './map/UserMarker';
 import { POILayer } from './map/POILayer';
-import { PROGRAMMATIC_MOVE_TIMEOUT_MS, USA_MAX_BOUNDS, MAP_MIN_ZOOM, MAX_LAT_SPAN, MAX_LNG_SPAN } from '@/lib/constants';
+import { PROGRAMMATIC_MOVE_TIMEOUT_MS, USA_MAX_BOUNDS, MAP_MIN_ZOOM, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 /** Parse a string to float and validate it's a finite number within an optional range. */
@@ -557,6 +557,8 @@ export default function MapComponent({
     const onMoveThrottleRef = useRef<NodeJS.Timeout | null>(null);
     // P2-FIX (#79): Ref to hold latest executeMapSearch to prevent stale closure in nested timeouts
     const executeMapSearchRef = useRef<((bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }) => void) | null>(null);
+    // Track pending search after zoom-out (user-initiated zoom that should trigger search)
+    const pendingSearchAfterZoomRef = useRef(false);
     // Track URL bounds for reset functionality
     const urlBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
     // P2-FIX (#154): Store numeric bounds for deduplication instead of string
@@ -1178,6 +1180,7 @@ export default function MapComponent({
         const map = mapRef.current.getMap();
         if (!map) return;
         const currentZoom = map.getZoom();
+        pendingSearchAfterZoomRef.current = true;
         setProgrammaticMove(true);
         if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
         programmaticClearTimeoutRef.current = setTimeout(() => {
@@ -1627,7 +1630,12 @@ export default function MapComponent({
             setActivePanBounds(null); // Clear active pan bounds
             // CLUSTER FIX: Don't clear isClusterExpandingRef here - wait for onIdle
             // Tiles may not be loaded yet, clearing here causes empty markers
-            return;
+            // Zoom-out button is user-initiated — allow search to proceed
+            if (!pendingSearchAfterZoomRef.current) {
+                return;
+            }
+            pendingSearchAfterZoomRef.current = false;
+            // Fall through to search logic below
         }
 
         // Clear active pan bounds since move has ended
@@ -1653,7 +1661,7 @@ export default function MapComponent({
             const lngSpan = crossesAntimeridian
                 ? (180 - bounds.minLng) + (bounds.maxLng + 180)
                 : bounds.maxLng - bounds.minLng;
-            if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
+            if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
                 setBoundsDirty(true);
                 setViewportInfoMessage('Zoom in further to update results');
                 return;
