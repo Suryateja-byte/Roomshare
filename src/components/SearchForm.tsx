@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { flushSync } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, Clock, Loader2, SlidersHorizontal, Home, Users, Building2, LayoutGrid, LocateFixed } from 'lucide-react';
+import { Search, Clock, Loader2, SlidersHorizontal, LocateFixed } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
@@ -47,13 +47,6 @@ const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<FilterSuggestion['type'], Array<ke
     leaseDuration: ['leaseDuration'],
 };
 
-// Room type options for inline filter tabs
-const ROOM_TYPE_TABS = [
-    { value: 'any', label: 'All', icon: LayoutGrid },
-    { value: 'Private Room', label: 'Private', icon: Home },
-    { value: 'Shared Room', label: 'Shared', icon: Users },
-    { value: 'Entire Place', label: 'Entire', icon: Building2 },
-] as const;
 
 
 /**
@@ -485,31 +478,6 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         });
     }, [setPending]);
 
-    // Room type selection — updates state and navigates directly (matches CategoryBar pattern)
-    const handleRoomTypeSelect = useCallback((value: string) => {
-        const resolved = value === 'any' ? '' : value;
-        setPending({ roomType: resolved });
-
-        const params = new URLSearchParams(searchParams.toString());
-        params.delete('cursor');
-        params.delete('page');
-
-        if (resolved) {
-            params.set('roomType', resolved);
-        } else {
-            params.delete('roomType');
-        }
-
-        const searchUrl = `/search?${params.toString()}`;
-        startTransition(() => {
-            if (transitionContext) {
-                transitionContext.navigateWithTransition(searchUrl);
-            } else {
-                router.push(searchUrl);
-            }
-        });
-    }, [setPending, searchParams, transitionContext, router]);
-
     // Clear all filters and reset to defaults
     // INP optimization: Batch state updates in startTransition
     const handleClearAllFilters = useCallback(() => {
@@ -661,7 +629,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 role="search"
             >
                 {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
-                <div className={`w-full md:flex-[1.2] flex flex-col relative group/input ${isCompact ? 'px-4 py-2' : 'px-6 py-2.5'}`}>
+                <div className={`w-full md:flex-[1.5] flex flex-col relative group/input ${isCompact ? 'px-4 py-2' : 'px-6 py-2.5'}`}>
                     {!isCompact && (
                         <label htmlFor="search-location" className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.15em] mb-1">
                             Where
@@ -792,41 +760,10 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                     </div>
                 </div>
 
-                {/* Inline Filters - Room Type Tabs + Filters Button */}
+                {/* Filters Button */}
                 {!isCompact && (
                     <>
-                        {/* Divider */}
                         <div className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-zinc-700 mx-1" aria-hidden="true"></div>
-
-                        {/* Room Type Tabs */}
-                        <div className={`flex items-center gap-1 px-3 py-1`}>
-                            <div className="flex items-center gap-0.5 p-1 bg-zinc-50 dark:bg-white/[0.02] rounded-xl border border-zinc-100 dark:border-white/5">
-                                {ROOM_TYPE_TABS.map(({ value, label, icon: Icon }) => {
-                                    const isSelected = roomType === value || (!roomType && value === 'any');
-                                    return (
-                                        <button
-                                            key={value}
-                                            type="button"
-                                            onClick={() => handleRoomTypeSelect(value)}
-                                            className={`flex items-center justify-center gap-1.5 px-3 h-8 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isSelected
-                                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm border border-zinc-200/50 dark:border-white/10'
-                                                : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
-                                                }`}
-                                            aria-pressed={isSelected}
-                                            aria-label={label}
-                                        >
-                                            <Icon className="w-3 h-3" />
-                                            <span className="hidden xl:inline">{label}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Divider */}
-                        <div className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-zinc-700 mx-1" aria-hidden="true"></div>
-
-                        {/* Filters Button */}
                         <div className="flex items-center px-3">
                             <button
                                 type="button"
