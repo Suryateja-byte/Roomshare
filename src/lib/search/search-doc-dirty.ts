@@ -13,6 +13,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { features } from "@/lib/env";
 
 type DirtyReason =
   | "listing_created"
@@ -32,6 +33,8 @@ export async function markListingDirty(
   listingId: string,
   reason: DirtyReason,
 ): Promise<void> {
+  if (!features.searchDoc) return;
+
   try {
     await prisma.$executeRaw`
       INSERT INTO listing_search_doc_dirty (listing_id, reason, marked_at)
@@ -60,6 +63,7 @@ export async function markListingsDirty(
   reason: DirtyReason,
 ): Promise<void> {
   if (listingIds.length === 0) return;
+  if (!features.searchDoc) return;
 
   try {
     await prisma.$executeRaw`
