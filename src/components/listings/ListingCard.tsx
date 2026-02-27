@@ -180,7 +180,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                 href={`/listings/${listing.id}`}
                 onClick={isDragging ? (e) => e.preventDefault() : undefined}
                 className={cn(
-                    "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 rounded-none sm:rounded-xl",
+                    "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 rounded-none sm:rounded-xl",
                     isDragging && "pointer-events-none"
                 )}
             >

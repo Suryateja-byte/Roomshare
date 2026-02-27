@@ -34,7 +34,7 @@ export function TotalPriceToggle({ showTotal, onToggle }: TotalPriceToggleProps)
         onClick={handleToggle}
         className={`
           relative inline-flex h-5 w-9 shrink-0 items-center rounded-full
-          transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2
+          transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
           ${showTotal
             ? 'bg-zinc-900 dark:bg-white'
             : 'bg-zinc-300 dark:bg-zinc-600'

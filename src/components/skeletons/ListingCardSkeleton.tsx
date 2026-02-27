@@ -4,7 +4,7 @@ import { Skeleton } from "./Skeleton";
  * Skeleton for ListingCard - dimensions must match ListingCard.tsx exactly to prevent CLS.
  *
  * CLS-critical dimensions (sync with ListingCard.tsx):
- * - Image: aspect-[4/3]
+ * - Image: aspect-[16/10] sm:aspect-[4/3]
  * - Content padding: p-3 sm:p-4
  * - Title row: mb-0.5
  * - Location: mb-3
@@ -15,8 +15,8 @@ import { Skeleton } from "./Skeleton";
 export function ListingCardSkeleton() {
     return (
         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden">
-            {/* Image placeholder - matches ListingCard aspect-[4/3] */}
-            <Skeleton variant="rectangular" className="aspect-[4/3] w-full" />
+            {/* Image placeholder - matches ListingCard aspect-[16/10] sm:aspect-[4/3] */}
+            <Skeleton variant="rectangular" className="aspect-[16/10] sm:aspect-[4/3] w-full" />
 
             {/* Content - CLS fix: p-3 sm:p-4 matches ListingCard */}
             <div className="p-3 sm:p-4 flex flex-col min-h-[156px]">

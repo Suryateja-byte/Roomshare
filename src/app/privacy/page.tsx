@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Shield, Lock, Eye, FileText, Mail, MapPin } from 'lucide-react';
 
 // --- Table of Contents Data ---
@@ -42,16 +42,6 @@ export default function PrivacyPage() {
 
     return (
         <div className="min-h-screen bg-white dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black">
-
-            {/* Header */}
-            <header className="fixed top-0 w-full bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800 z-50 h-16 flex items-center px-6">
-                <div className="container mx-auto max-w-6xl flex items-center justify-between">
-                    <a href="/" className="flex items-center gap-2 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
-                        <ArrowLeft className="w-4 h-4" /> Back to Home
-                    </a>
-                    <span className="font-semibold tracking-tight">RoomShare<span className="text-zinc-400 dark:text-zinc-500">.</span> Privacy</span>
-                </div>
-            </header>
 
             {/* Hero */}
             <div className="pt-32 pb-16 px-6 bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800">

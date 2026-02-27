@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { Shield, Heart, Sparkles } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -163,11 +162,6 @@ export default function AboutPage() {
                         </div>
                     </div>
                 </section>
-
-                {/* Minimal Footer */}
-                <footer className="py-8 px-6 bg-zinc-900 border-t border-zinc-800 text-center">
-                    <p className="text-xs text-zinc-400">© {new Date().getFullYear()} RoomShare Inc. Crafted with care.</p>
-                </footer>
 
             </div>
         </div>

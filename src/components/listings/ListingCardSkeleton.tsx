@@ -5,8 +5,8 @@
 export function ListingCardSkeleton() {
   return (
     <div className="rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900 animate-pulse">
-      {/* Image area — 4:3 aspect ratio */}
-      <div className="relative aspect-[4/3] bg-zinc-200 dark:bg-zinc-800">
+      {/* Image area — matches ListingCard aspect-[16/10] sm:aspect-[4/3] */}
+      <div className="relative aspect-[16/10] sm:aspect-[4/3] bg-zinc-200 dark:bg-zinc-800">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-300/50 dark:via-zinc-700/50 to-transparent bg-[length:200%_100%] animate-shimmer" />
         {/* Badge placeholder */}
         <div className="absolute top-3 left-3 w-16 h-5 rounded-md bg-zinc-300 dark:bg-zinc-700" />

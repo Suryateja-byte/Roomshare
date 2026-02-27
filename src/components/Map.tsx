@@ -2110,11 +2110,12 @@ export default function MapComponent({
                             // MapLibre v5 provides sourceDataType on GeoJSON source events;
                             // the old !e.tile guard filtered out the events we need.
                             const sourceDataType = (e as Record<string, unknown>).sourceDataType as string | undefined;
+                            const mapInstance = mapRef.current?.getMap();
                             if (
                                 sourceDataType === 'content' ||
                                 sourceDataType === 'idle' ||
                                 e.isSourceLoaded ||
-                                mapRef.current?.getMap().isSourceLoaded('listings')
+                                (mapInstance?.getSource('listings') && mapInstance.isSourceLoaded('listings'))
                             ) {
                                 // Debounce: sourcedata fires dozens of times/sec during tile loads
                                 if (sourcedataDebounceRef.current) {
@@ -2534,7 +2535,7 @@ export default function MapComponent({
                     role="switch"
                     aria-checked={searchAsMove}
                     onClick={() => setSearchAsMove(!searchAsMove)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 backdrop-blur-md ${searchAsMove
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 backdrop-blur-md ${searchAsMove
                         ? "bg-white/95 text-zinc-900 border-white/20 dark:bg-zinc-900/95 dark:text-white dark:border-zinc-800/50 ring-2 ring-green-500/50 dark:ring-green-400/30"
                         : "bg-zinc-900/90 text-white border-white/10 dark:bg-zinc-800/90 dark:text-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-700"
                         }`}
@@ -2568,7 +2569,7 @@ export default function MapComponent({
                             { padding: 50, duration: 1000 }
                         );
                     }}
-                    className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                    className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2"
                     aria-label="Fit all results in view"
                     title="Fit all results"
                 >

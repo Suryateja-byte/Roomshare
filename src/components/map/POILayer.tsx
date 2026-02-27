@@ -125,7 +125,7 @@ export function POILayer({ mapRef, isMapLoaded }: POILayerProps) {
                     key={cat.id}
                     onClick={() => toggleCategory(cat.id)}
                     className={cn(
-                        "flex items-center justify-center gap-2 px-3 py-2 rounded-full shadow-md border text-sm font-medium transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 backdrop-blur-md",
+                        "flex items-center justify-center gap-2 px-3 py-2 rounded-full shadow-md border text-sm font-medium transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 backdrop-blur-md",
                         activeCategories.has(cat.id)
                             ? "bg-zinc-900/90 text-white border-zinc-900 dark:bg-white/90 dark:text-zinc-900 dark:border-white"
                             : "bg-white/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-300 border-zinc-200/50 dark:border-zinc-700/50 hover:bg-zinc-50 dark:hover:bg-zinc-800"

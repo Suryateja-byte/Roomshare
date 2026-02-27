@@ -2,6 +2,8 @@
 
 import { Component, type ReactNode, type ErrorInfo } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -81,22 +83,11 @@ export function ErrorFallback({
       aria-live="assertive"
       className="flex min-h-[400px] flex-col items-center justify-center p-8 text-center"
     >
-      {/* Error icon */}
       <div className="mb-4 rounded-full bg-red-100 dark:bg-red-900/30 p-3">
-        <svg
+        <AlertTriangle
           className="h-8 w-8 text-red-600 dark:text-red-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
           aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-          />
-        </svg>
+        />
       </div>
 
       <h2 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-white">
@@ -121,33 +112,17 @@ export function ErrorFallback({
 
       <div className="flex gap-3">
         {onRetry && (
-          <button
-            onClick={onRetry}
-            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-sm font-medium text-white dark:text-zinc-900 transition-colors hover:bg-zinc-800 dark:hover:bg-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900"
-          >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+          <Button onClick={onRetry} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
             Try again
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          variant="outline"
           onClick={() => window.location.reload()}
-          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900"
         >
           Reload page
-        </button>
+        </Button>
       </div>
     </div>
   );

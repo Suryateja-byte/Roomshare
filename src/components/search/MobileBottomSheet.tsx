@@ -408,7 +408,7 @@ export default function MobileBottomSheet({
                 setSnapIndex(2);
               }
             }}
-            className="w-12 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 mx-auto mb-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="w-12 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 mx-auto mb-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2"
           />
 
           {/* Header content */}
@@ -427,7 +427,7 @@ export default function MobileBottomSheet({
                   onClick={() =>
                     setSnapIndex((prev) => (prev === 2 ? 1 : 2))
                   }
-                  className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 px-2 py-1 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 px-2 py-1 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40"
                   aria-label={
                     isExpanded ? "Collapse results" : "Expand results"
                   }
@@ -437,7 +437,7 @@ export default function MobileBottomSheet({
                 {/* P2-FIX (#123): Visible close button to dismiss sheet */}
                 <button
                   onClick={() => setSnapIndex(0)}
-                  className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40"
                   aria-label="Minimize results panel"
                 >
                   <X className="w-4 h-4" />
