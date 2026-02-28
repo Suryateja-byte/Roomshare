@@ -34,6 +34,11 @@ import { logger } from "@/lib/logger";
 describe("search-doc-dirty", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.ENABLE_SEARCH_DOC = 'true';
+  });
+
+  afterEach(() => {
+    delete process.env.ENABLE_SEARCH_DOC;
   });
 
   describe("markListingDirty", () => {

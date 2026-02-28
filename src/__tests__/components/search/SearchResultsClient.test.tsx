@@ -620,7 +620,7 @@ describe('SearchResultsClient', () => {
     it('hydrates showTotalPrice from sessionStorage after mount', async () => {
       mockSessionStorage['showTotalPrice'] = 'true';
 
-      render(<SearchResultsClient {...defaultProps} />);
+      render(<SearchResultsClient {...defaultProps} searchParamsString="q=test&leaseDuration=3 months" />);
 
       // After useEffect runs, it should show "Show Monthly" (meaning showTotalPrice is true)
       await waitFor(() => {
@@ -633,7 +633,7 @@ describe('SearchResultsClient', () => {
       // Clear sessionStorage
       delete mockSessionStorage['showTotalPrice'];
 
-      render(<SearchResultsClient {...defaultProps} />);
+      render(<SearchResultsClient {...defaultProps} searchParamsString="q=test&leaseDuration=3 months" />);
 
       // Should show "Show Total" (meaning showTotalPrice is false)
       const toggle = screen.getByTestId('total-price-toggle');
@@ -643,7 +643,7 @@ describe('SearchResultsClient', () => {
     it('handles invalid JSON in sessionStorage gracefully', async () => {
       mockSessionStorage['showTotalPrice'] = 'not-valid-json';
 
-      render(<SearchResultsClient {...defaultProps} />);
+      render(<SearchResultsClient {...defaultProps} searchParamsString="q=test&leaseDuration=3 months" />);
 
       // Should default to false when JSON parsing fails
       const toggle = screen.getByTestId('total-price-toggle');

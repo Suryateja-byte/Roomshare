@@ -528,28 +528,28 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
   });
 
   describe("Viewport Validation", () => {
-    it("clamps oversized viewport and still fetches (P1-5 client-side check)", async () => {
-      // Set oversized bounds (> MAX_LAT_SPAN/MAX_LNG_SPAN of 10)
-      mockSearchParams.set("minLng", "-135.0");
-      mockSearchParams.set("maxLng", "-120.0"); // 15 degree span
-      mockSearchParams.set("minLat", "28.0");
-      mockSearchParams.set("maxLat", "43.0"); // 15 degree span
+    it("shows info banner and skips fetch for oversized viewport (P1-5 client-side check)", async () => {
+      // Set oversized bounds (> MAP_FETCH_MAX_LNG_SPAN=130 / MAP_FETCH_MAX_LAT_SPAN=60)
+      mockSearchParams.set("minLng", "-170.0");
+      mockSearchParams.set("maxLng", "170.0"); // 340 degree span > 130 limit
+      mockSearchParams.set("minLat", "-80.0");
+      mockSearchParams.set("maxLat", "80.0"); // 160 degree span > 60 limit
 
       const { queryByRole } = render(
         <PersistentMapWrapper shouldRenderMap={true} />
       );
 
-      // Informational banner shows that bounds were clamped
+      // Informational banner shows that viewport is too large
       // P2-FIX (#151): Changed from alert to status role since this is informational, not an error
       const infoBanner = queryByRole("status");
       expect(infoBanner).toBeInTheDocument();
-      expect(infoBanner?.textContent).toContain("Zoomed in to show results");
+      expect(infoBanner?.textContent).toContain("Zoom in further to load listings in this area");
 
-      // Fetch should proceed with clamped bounds
+      // Should NOT fetch when viewport exceeds max span — early return preserves existing map data
       await act(async () => {
         jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
       });
-      expect(mockFetch).toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("does not show error for valid viewport bounds", async () => {

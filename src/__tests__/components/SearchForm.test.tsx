@@ -91,6 +91,15 @@ jest.mock('sonner', () => ({
 import SearchForm from '@/components/SearchForm'
 import { MAP_FLY_TO_EVENT } from '@/components/SearchForm'
 
+// Polyfill requestSubmit for JSDOM
+beforeAll(() => {
+  if (!HTMLFormElement.prototype.requestSubmit) {
+    HTMLFormElement.prototype.requestSubmit = function () {
+      this.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    };
+  }
+});
+
 describe('SearchForm', () => {
   const user = userEvent.setup({ delay: null })
 
@@ -535,11 +544,8 @@ describe('SearchForm', () => {
       const locationInput = screen.getByTestId('location-input')
       await user.type(locationInput, 'downtown')
 
-      // Select location to set coords
+      // Select location to set coords — handleLocationSelect calls requestSubmit() automatically
       await user.click(screen.getByTestId('select-location'))
-
-      const form = screen.getByRole('search')
-      fireEvent.submit(form)
 
       jest.advanceTimersByTime(500)
 
@@ -552,11 +558,8 @@ describe('SearchForm', () => {
       const locationInput = screen.getByTestId('location-input')
       await user.type(locationInput, '  downtown  ')
 
-      // Select location
+      // Select location — handleLocationSelect calls requestSubmit() automatically
       await user.click(screen.getByTestId('select-location'))
-
-      const form = screen.getByRole('search')
-      fireEvent.submit(form)
 
       jest.advanceTimersByTime(500)
 

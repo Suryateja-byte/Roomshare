@@ -10,7 +10,7 @@ import { FetchTimeoutError } from '@/lib/fetch-with-timeout';
 describe('Photon adapter timeout', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('uses fetchWithTimeout with 5000ms', async () => {
+  it('uses fetchWithTimeout with 8000ms', async () => {
     mockFetchWithTimeout.mockResolvedValue({
       ok: true,
       json: async () => ({ type: 'FeatureCollection', features: [] }),
@@ -18,7 +18,7 @@ describe('Photon adapter timeout', () => {
     await searchPhoton('test');
     expect(mockFetchWithTimeout).toHaveBeenCalledWith(
       expect.stringContaining('photon.komoot.io/api'),
-      expect.objectContaining({ timeout: 5000 }),
+      expect.objectContaining({ timeout: 8000 }),
     );
   });
 
@@ -37,7 +37,7 @@ describe('Photon adapter timeout', () => {
 
   it('propagates FetchTimeoutError', async () => {
     mockFetchWithTimeout.mockRejectedValue(
-      new FetchTimeoutError('https://photon.komoot.io/api?q=test', 5000),
+      new FetchTimeoutError('https://photon.komoot.io/api?q=test', 8000),
     );
     await expect(searchPhoton('test')).rejects.toThrow(FetchTimeoutError);
   });
