@@ -109,6 +109,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         return { lat: parsedLat, lng: parsedLng };
     };
     const [location, setLocation] = useState(searchParams.get('q') || '');
+    // Track when user is actively typing in location input to prevent URL sync from clearing their text.
+    // The chain: typing 3 chars → warning banner renders → header resize → map moveEnd → URL change → sync effect clears input.
+    const isUserTypingLocationRef = useRef(false);
     // Batched filter state — single hook manages pending vs committed
     const [showFilters, setShowFilters] = useState(false);
 
@@ -190,7 +193,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         if (coords) {
             setSelectedCoords(coords);
         }
-        setLocation(searchParams.get('q') || '');
+        // Don't overwrite user's in-progress typing with URL state.
+        // Resize-triggered map moveEnd can delete `q` from URL while user is still typing.
+        if (!isUserTypingLocationRef.current) {
+            setLocation(searchParams.get('q') || '');
+        }
     }, [searchParams]);
 
     const router = useRouter();
@@ -208,7 +215,10 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         lng: number;
         bbox?: [number, number, number, number];
     }) => {
-        setSelectedCoords({ lat: locationData.lat, lng: locationData.lng, bbox: locationData.bbox });
+        // flushSync ensures selectedCoords is committed before requestSubmit reads it
+        flushSync(() => {
+            setSelectedCoords({ lat: locationData.lat, lng: locationData.lng, bbox: locationData.bbox });
+        });
 
         // Dispatch custom event for map to fly to location
         const event = new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
@@ -220,6 +230,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             }
         });
         window.dispatchEvent(event);
+
+        // Submit the form to trigger search with new coords
+        formRef.current?.requestSubmit();
     };
 
     // Stale closure note: geoLoading is captured at callback creation time, but
@@ -593,6 +606,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     // Show warning when user has typed location but not selected from dropdown
     const showLocationWarning = location.trim().length > 2 && !selectedCoords;
+    const [locationInputFocused, setLocationInputFocused] = useState(false);
 
     // Handle Escape key to close filter drawer (via shared hook for consistency)
     useKeyboardShortcuts([
@@ -621,7 +635,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     // CLS fix: min-h matches Suspense fallback in SearchHeaderWrapper.tsx
     return (
-        <div className={`w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? 'max-w-2xl' : 'max-w-4xl'}`}>
+        <div className={`relative w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? 'max-w-2xl' : 'max-w-4xl'}`}>
             <form
                 ref={formRef}
                 onSubmit={handleSearch}
@@ -640,22 +654,28 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             id="search-location"
                             value={location}
                             onChange={(value) => {
+                                isUserTypingLocationRef.current = true;
                                 setLocation(value);
                                 if (selectedCoords) setSelectedCoords(null);
                                 setShowRecentSearches(false);
                             }}
                             onLocationSelect={(data) => {
+                                isUserTypingLocationRef.current = false;
                                 handleLocationSelect(data);
                                 setShowRecentSearches(false);
                             }}
                             onFocus={() => {
+                                setLocationInputFocused(true);
                                 if (recentSearches.length > 0 && !location) {
                                     setShowRecentSearches(true);
                                 }
                             }}
                             onBlur={() => {
+                                setLocationInputFocused(false);
                                 // Delay hiding to allow click on recent search
                                 setTimeout(() => setShowRecentSearches(false), 200);
+                                // Allow pending URL syncs to settle before re-enabling location sync
+                                setTimeout(() => { isUserTypingLocationRef.current = false; }, 500);
                             }}
                             placeholder="Search destinations"
                             className={isCompact ? "text-sm flex-1" : "text-sm font-medium flex-1 bg-transparent border-none p-0 focus:ring-0"}
@@ -811,9 +831,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 </div>
             </form>
 
-            {/* Location warning when user hasn't selected from dropdown */}
-            {showLocationWarning && !isCompact && (
-                <div id="location-warning" className="mt-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2 pointer-events-none">
+            {/* Location warning when user hasn't selected from dropdown.
+                Uses absolute positioning so it doesn't change the header height —
+                a height change triggers ResizeObserver → map moveEnd → search-as-move → URL update → clears input. */}
+            {showLocationWarning && !isCompact && !locationInputFocused && (
+                <div id="location-warning" className="absolute left-0 right-0 top-full mt-2 mx-auto max-w-4xl px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2 pointer-events-none z-40 shadow-lg">
                     <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>

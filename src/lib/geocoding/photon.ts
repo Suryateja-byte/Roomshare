@@ -11,7 +11,7 @@ import type { GeocodingResult } from '../geocoding-cache';
 import { fetchWithTimeout } from '../fetch-with-timeout';
 
 const PHOTON_BASE_URL = 'https://photon.komoot.io/api';
-const GEOCODING_TIMEOUT_MS = 5000;
+const GEOCODING_TIMEOUT_MS = 8000;
 
 /** Max query length (reasonable limit; Photon has no documented cap) */
 export const PHOTON_QUERY_MAX_LENGTH = 500;

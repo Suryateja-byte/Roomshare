@@ -5,6 +5,7 @@ import { MapPin, Loader2, X, AlertCircle, SearchX } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import { getCachedResults, setCachedResults, type GeocodingResult } from '@/lib/geocoding-cache';
 import { searchPhoton, PHOTON_QUERY_MAX_LENGTH } from '@/lib/geocoding/photon';
+import { FetchTimeoutError } from '@/lib/fetch-with-timeout';
 
 const MIN_QUERY_LENGTH = 2;
 
@@ -163,6 +164,17 @@ export default function LocationSearchInput({
           setSuggestions([]);
           setError('Network error. Check your connection.');
           setShowSuggestions(true); // Show error in dropdown
+        }
+        return;
+      }
+
+      // Handle timeout errors with user-friendly message
+      if (err instanceof FetchTimeoutError) {
+        console.warn('Location search timed out:', err.url);
+        if (requestId === requestIdRef.current) {
+          setSuggestions([]);
+          setError('Location search timed out. Please try again.');
+          setShowSuggestions(true);
         }
         return;
       }
