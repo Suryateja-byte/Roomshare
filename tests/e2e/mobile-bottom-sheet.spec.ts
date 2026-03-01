@@ -465,22 +465,17 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     try {
       await expect(expandBtn).toBeVisible({ timeout: 5000 });
       await expandBtn.click();
-      await waitForSheetAnimation(page);
     } catch {
       test.skip(true, 'Expand button not visible');
       return;
     }
 
-    // Verify expanded (poll for animation to settle)
-    await expect(async () => {
-      expect(await getSnapIndex(page)).toBe(2);
-    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
+    // Wait for expanded state via DOM attribute (not timing-based)
+    await expect(page.locator('[data-snap-current="2"]')).toBeAttached({ timeout: 10_000 });
 
     // Press Escape — should collapse to half position (index 1)
     await page.keyboard.press("Escape");
     await expect(page.locator('[data-snap-current="1"]')).toBeAttached({ timeout: 10_000 });
-    await waitForSheetAnimation(page);
-    expect(await getSnapIndex(page)).toBe(1);
   });
 
   test("escape key has no effect when sheet is collapsed", async ({ page }) => {
@@ -500,20 +495,18 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     try {
       await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
       await minimizeBtn.click();
-      await waitForSheetAnimation(page);
     } catch {
       test.skip(true, 'Minimize button not visible');
       return;
     }
 
-    // Verify collapsed (poll for animation to settle)
-    await expect(async () => {
-      expect(await getSnapIndex(page)).toBe(0);
-    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
+    // Wait for collapsed state via DOM attribute
+    await expect(page.locator('[data-snap-current="0"]')).toBeAttached({ timeout: 10_000 });
 
     // Press Escape - should stay collapsed (handler skips when snapIndex === 0)
     await page.keyboard.press("Escape");
     await waitForSheetAnimation(page);
+    // Still collapsed — Escape handler ignores when snap is already 0
     expect(await getSnapIndex(page)).toBe(0);
   });
 });

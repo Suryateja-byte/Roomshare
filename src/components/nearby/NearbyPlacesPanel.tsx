@@ -135,8 +135,8 @@ export default function NearbyPlacesPanel({
       // Check if still mounted before updating state
       if (isMountedRef.current) {
         setIsLoading(false);
-        // Restore focus to search input after search completes (WCAG focus management)
-        searchInputRef.current?.focus();
+        // Defer focus until after React commits the re-render (removing disabled attr)
+        setTimeout(() => searchInputRef.current?.focus(), 0);
       }
     }
   }, [listingLat, listingLng, selectedRadius, onPlacesChange]);
