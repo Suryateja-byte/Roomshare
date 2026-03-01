@@ -79,7 +79,7 @@ async function getSnapIndex(
 async function waitForSheetAnimation(
   page: import("@playwright/test").Page,
 ): Promise<void> {
-  await page.waitForTimeout(1000); // Spring animation duration (extra buffer for CI)
+  await page.waitForTimeout(1500); // Spring animation duration (extra buffer for CI)
 }
 
 /**

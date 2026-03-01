@@ -968,38 +968,6 @@ describe("NearbyPlacesPanel", () => {
     });
   });
 
-  describe("View mode toggle (mobile)", () => {
-    it("renders view toggle button when onViewModeChange is provided", () => {
-      const onViewModeChange = jest.fn();
-      render(
-        <NearbyPlacesPanel
-          {...defaultProps}
-          onViewModeChange={onViewModeChange}
-          viewMode="list"
-        />,
-      );
-
-      // Should show toggle button - when in list mode, button says "Map"
-      const toggleButton = screen.getByRole("button", { name: /map/i });
-      expect(toggleButton).toBeInTheDocument();
-    });
-
-    it("calls onViewModeChange when toggle clicked", async () => {
-      const onViewModeChange = jest.fn();
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
-
-      render(
-        <NearbyPlacesPanel
-          {...defaultProps}
-          viewMode="list"
-          onViewModeChange={onViewModeChange}
-        />,
-      );
-
-      const mapButton = screen.getByRole("button", { name: /map/i });
-      await user.click(mapButton);
-
-      expect(onViewModeChange).toHaveBeenCalledWith("map");
-    });
-  });
+  // View mode toggle button moved to NearbyPlacesSection for correct z-index stacking.
+  // Toggle is tested via E2E tests (nearby-functional F-021, nearby-cross-platform X-004).
 });

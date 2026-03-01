@@ -28,8 +28,6 @@ import {
   Pill,
   Footprints,
   Car,
-  Map as MapIcon,
-  List as ListIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -64,8 +62,6 @@ export default function NearbyPlacesPanel({
   listingLng,
   onPlacesChange,
   onPlaceHover,
-  viewMode = 'list',
-  onViewModeChange,
 }: NearbyPlacesPanelProps) {
   const { data: session, status } = useSession();
   const [searchQuery, setSearchQuery] = useState('');
@@ -388,6 +384,8 @@ export default function NearbyPlacesPanel({
       {/* Results Area - Scrollable */}
       <div
         className="flex-1 overflow-y-auto hide-scrollbar p-4 sm:px-6 space-y-3 bg-zinc-50/50 dark:bg-zinc-900/50 pb-24 lg:pb-4"
+        tabIndex={0}
+        role="region"
         aria-busy={isLoading}
         aria-label="Nearby places results"
         data-testid="results-area"
@@ -521,34 +519,7 @@ export default function NearbyPlacesPanel({
         )}
       </div>
 
-      {/* Mobile Floating Toggle Button */}
-      {
-        onViewModeChange && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 lg:hidden">
-            <button
-              onClick={() => onViewModeChange(viewMode === 'list' ? 'map' : 'list')}
-              className="
-              flex items-center gap-2
-              px-5 py-2.5
-              bg-zinc-900 dark:bg-white
-              text-white dark:text-zinc-900
-              rounded-full
-              shadow-xl shadow-zinc-900/20
-              font-semibold text-sm
-              transform transition-transform
-              active:scale-95 hover:scale-105
-            "
-            >
-              <span>{viewMode === 'list' ? 'Map' : 'List'}</span>
-              {viewMode === 'list' ? (
-                <MapIcon className="w-4 h-4" />
-              ) : (
-                <ListIcon className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-        )
-      }
+      {/* Mobile toggle button moved to NearbyPlacesSection for correct z-index stacking */}
     </div >
   );
 }

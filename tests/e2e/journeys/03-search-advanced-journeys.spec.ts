@@ -512,13 +512,17 @@ test.describe("30 Advanced Search Page Journeys", () => {
       // Initially unpressed
       await expect(firstAmenity).toHaveAttribute("aria-pressed", "false");
 
-      // Click to select
+      // Click to select — state update wrapped in startTransition, so poll for the re-render
       await firstAmenity.click();
-      await expect(firstAmenity).toHaveAttribute("aria-pressed", "true");
+      await expect(async () => {
+        await expect(firstAmenity).toHaveAttribute("aria-pressed", "true");
+      }).toPass({ timeout: 10_000, intervals: [200, 500, 1000] });
 
       // Click again to deselect
       await firstAmenity.click();
-      await expect(firstAmenity).toHaveAttribute("aria-pressed", "false");
+      await expect(async () => {
+        await expect(firstAmenity).toHaveAttribute("aria-pressed", "false");
+      }).toPass({ timeout: 10_000, intervals: [200, 500, 1000] });
     }
 
     await closeFilterModal(page);

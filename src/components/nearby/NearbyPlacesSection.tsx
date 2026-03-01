@@ -10,8 +10,8 @@
  * Features: Mobile list/map toggle, taller container, view mode switching.
  */
 
-import React, { useState } from 'react';
-import { MapPin } from 'lucide-react';
+import { useState } from 'react';
+import { MapPin, Map as MapIcon, List as ListIcon } from 'lucide-react';
 import NearbyPlacesPanel from './NearbyPlacesPanel';
 import NearbyPlacesMap from './NearbyPlacesMap';
 import type { NearbyPlace } from '@/types/nearby';
@@ -43,15 +43,6 @@ export default function NearbyPlacesSection({
           </p>
         </div>
 
-        {/* Desktop View Toggle */}
-        <div className="hidden lg:flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <button className="px-3 py-1 rounded-md bg-white dark:bg-zinc-700 shadow-sm text-sm font-medium text-zinc-900 dark:text-white transition-all">
-            Map
-          </button>
-          <button className="px-3 py-1 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
-            Satellite
-          </button>
-        </div>
       </div>
 
       {/* Main Container - Clean Border */}
@@ -61,7 +52,8 @@ export default function NearbyPlacesSection({
           h-[60vh] sm:h-[550px] lg:h-[600px]
           bg-white dark:bg-zinc-900
           rounded-2xl
-          border border-zinc-200 dark:border-zinc-800
+          border border-zinc-200/80 dark:border-zinc-800/80
+          shadow-2xl
           overflow-hidden
           lg:flex lg:flex-row
         "
@@ -87,8 +79,6 @@ export default function NearbyPlacesSection({
             listingLng={listingLng}
             onPlacesChange={setPlaces}
             onPlaceHover={setHoveredPlaceId}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
           />
         </div>
 
@@ -101,6 +91,21 @@ export default function NearbyPlacesSection({
             highlightedPlaceId={hoveredPlaceId}
             className="h-full"
           />
+        </div>
+
+        {/* Mobile Floating Toggle Button — rendered at container level for correct z-index stacking */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 lg:hidden">
+          <button
+            onClick={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
+            className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full shadow-xl shadow-zinc-900/20 font-semibold text-sm transform transition-transform active:scale-95 hover:scale-105"
+          >
+            <span>{viewMode === 'list' ? 'Map' : 'List'}</span>
+            {viewMode === 'list' ? (
+              <MapIcon className="w-4 h-4" />
+            ) : (
+              <ListIcon className="w-4 h-4" />
+            )}
+          </button>
         </div>
       </div>
     </section>
