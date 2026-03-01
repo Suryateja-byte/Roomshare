@@ -322,6 +322,10 @@ jest.mock('@/contexts/MapBoundsContext', () => ({
     areaCount: null,
     isAreaCountLoading: false,
   }),
+  useActivePanBounds: () => ({
+    activePanBounds: null,
+    setActivePanBounds: jest.fn(),
+  }),
 }));
 
 // Mock child components
@@ -743,16 +747,16 @@ describe('Map Component', () => {
         });
       });
 
-      // Oversized viewport (> 5 degrees lat/lng span)
+      // Oversized viewport (> MAP_FETCH_MAX_LAT_SPAN=60 / MAP_FETCH_MAX_LNG_SPAN=130)
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 4 },
           target: {
             getBounds: () => ({
-              getWest: () => -130,
-              getEast: () => -110,
-              getSouth: () => 25,
-              getNorth: () => 45,
+              getWest: () => -100,
+              getEast: () => 50,
+              getSouth: () => -10,
+              getNorth: () => 60,
             }),
           },
         });

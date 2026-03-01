@@ -85,15 +85,15 @@ test.describe("Map Error Handling", () => {
     test(`${tags.anon} - Shows info banner when viewport is clamped`, async ({
       page,
     }) => {
-      // Navigate to search with very wide bounds (beyond 5 degree limit)
-      // lat span = 45 - 30 = 15 degrees (exceeds MAX_LAT_SPAN of 5)
-      // lng span = -120 - (-130) = 10 degrees (exceeds MAX_LNG_SPAN of 5)
+      // Navigate to search with very wide bounds (beyond MAX spans)
+      // lng span = 50 - (-100) = 150 degrees (exceeds MAX_LNG_SPAN of 130)
+      // lat span = 60 - (-10) = 70 degrees (exceeds MAX_LAT_SPAN of 60)
       // PersistentMapWrapper clamps to max span and shows an info banner
-      await page.goto("/search?minLng=-130&maxLng=-120&minLat=30&maxLat=45");
+      await page.goto("/search?minLng=-100&maxLng=50&minLat=-10&maxLat=60");
 
-      // The component clamps the viewport and shows "Zoomed in to show results"
+      // The component clamps the viewport and shows zoom-in message
       // as a role="status" info banner (not an error alert)
-      await waitForMapBanner(page, /Zoomed in to show results/i, {
+      await waitForMapBanner(page, /Zoom in further to load listings in this area/i, {
         role: "status",
       });
     });
@@ -102,20 +102,20 @@ test.describe("Map Error Handling", () => {
       page,
     }) => {
       // Start with too-large viewport (clamped by PersistentMapWrapper)
-      await page.goto("/search?minLng=-130&maxLng=-120&minLat=30&maxLat=45");
+      await page.goto("/search?minLng=-100&maxLng=50&minLat=-10&maxLat=60");
 
       // Should show info banner initially
-      await waitForMapBanner(page, /Zoomed in to show results/i, {
+      await waitForMapBanner(page, /Zoom in further to load listings in this area/i, {
         role: "status",
       });
 
-      // Navigate to valid viewport (within 2 degree limits)
+      // Navigate to valid viewport (within max span limits)
       await page.goto(
         "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
       );
 
       // Check that info message is no longer visible
-      const infoBanner = page.getByText(/Zoomed in to show results/i);
+      const infoBanner = page.getByText(/Zoom in further to load listings in this area/i);
       await expect(infoBanner).not.toBeVisible({ timeout: timeouts.action });
     });
   });

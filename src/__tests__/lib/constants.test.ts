@@ -77,13 +77,13 @@ describe('Search Constants', () => {
   });
 
   describe('Geographic constants', () => {
-    it('LAT_OFFSET_KM is approximately 10km', () => {
-      expect(LAT_OFFSET_KM).toBeCloseTo(10, 0);
+    it('LAT_OFFSET_KM is approximately 30km', () => {
+      expect(LAT_OFFSET_KM).toBeCloseTo(30, 0);
     });
 
     it('LAT_OFFSET_DEGREES converts correctly from km', () => {
-      // 1 degree latitude ≈ 111km, so 10km ≈ 0.09 degrees
-      expect(LAT_OFFSET_DEGREES).toBeCloseTo(0.09, 2);
+      // 1 degree latitude ≈ 111km, so 30km ≈ 0.27 degrees
+      expect(LAT_OFFSET_DEGREES).toBeCloseTo(0.27, 2);
     });
 
     it('MAX_LAT_SPAN and MAX_LNG_SPAN are positive', () => {

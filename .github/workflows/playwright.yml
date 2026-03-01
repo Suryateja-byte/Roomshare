@@ -85,6 +85,7 @@ jobs:
       # verification is bypassed (isTurnstileEnabled() → false).
       # See: https://developers.cloudflare.com/turnstile/tutorials/excluding-turnstile-from-e2e-tests/
       TURNSTILE_ENABLED: 'false'
+      NEXT_PUBLIC_NEARBY_ENABLED: 'true'
 
     steps:
       - uses: actions/checkout@v4

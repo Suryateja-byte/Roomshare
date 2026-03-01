@@ -95,7 +95,7 @@ describe("Unbounded Browse Protection", () => {
       expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
     });
 
-    it("returns null when only filters are set (no bounds)", async () => {
+    it("executes count query when filters are active (no bounds)", async () => {
       // Arrange
       (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([{ count: BigInt(30) }]);
 
@@ -106,9 +106,9 @@ describe("Unbounded Browse Protection", () => {
         roomType: "private room",
       });
 
-      // Assert: Should still return null (unbounded browse with filters)
-      expect(result).toBeNull();
-      expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
+      // Assert: Active filters are enough to proceed with count query
+      expect(result).toBe(30);
+      expect(prisma.$queryRawUnsafe).toHaveBeenCalled();
     });
 
     it("executes query when bounds are provided", async () => {
