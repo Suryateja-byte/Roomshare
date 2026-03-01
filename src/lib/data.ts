@@ -9,12 +9,12 @@ import {
 import { hasActiveFilters } from "@/lib/search-params";
 import {
   clampBoundsToMaxSpan,
-  MAX_LAT_SPAN,
-  MAX_LNG_SPAN,
 } from "@/lib/validation";
 import {
   MIN_QUERY_LENGTH,
   MAX_QUERY_LENGTH,
+  MAP_FETCH_MAX_LAT_SPAN,
+  MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
 
 // Re-export types and utilities from search-types for backward compatibility.
@@ -809,8 +809,8 @@ export async function getListingsPaginated(
       ? 180 - rawBounds.minLng + (rawBounds.maxLng + 180)
       : rawBounds.maxLng - rawBounds.minLng;
 
-    if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
-      bounds = clampBoundsToMaxSpan(rawBounds);
+    if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
+      bounds = clampBoundsToMaxSpan(rawBounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN);
     }
   }
 

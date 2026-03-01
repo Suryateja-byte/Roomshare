@@ -34,9 +34,11 @@ import {
 } from "@/lib/data";
 import {
   clampBoundsToMaxSpan,
-  MAX_LAT_SPAN,
-  MAX_LNG_SPAN,
 } from "@/lib/validation";
+import {
+  MAP_FETCH_MAX_LAT_SPAN,
+  MAP_FETCH_MAX_LNG_SPAN,
+} from "@/lib/constants";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { parseLocalDate } from "@/lib/utils";
@@ -681,9 +683,9 @@ export async function GET(request: NextRequest) {
           ? 180 - bounds.minLng + (bounds.maxLng + 180)
           : bounds.maxLng - bounds.minLng;
 
-        if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
+        if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
           // Clamp bounds silently (user preference: silent clamp over rejection)
-          const clampedBounds = clampBoundsToMaxSpan(bounds);
+          const clampedBounds = clampBoundsToMaxSpan(bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN);
           filterParams.bounds = clampedBounds;
           logger.debug("[search/facets] Oversized bounds clamped", {
             original: { latSpan: latSpan.toFixed(2), lngSpan: lngSpan.toFixed(2) },

@@ -88,8 +88,6 @@ jest.mock("@/lib/search-params", () => ({
 // Mock validation
 jest.mock("@/lib/validation", () => ({
   clampBoundsToMaxSpan: jest.fn(),
-  MAX_LAT_SPAN: 10,
-  MAX_LNG_SPAN: 10,
 }));
 
 // Mock env
@@ -657,14 +655,14 @@ describe("search-v2-service", () => {
       expect(result.unboundedSearch).toBe(true);
     });
 
-    it("clamps oversized bounds before querying", async () => {
+    it("passes bounds through unclamped for list query; clamps only for map query", async () => {
       const oversizedBounds = {
         minLat: 30,
         maxLat: 45,
         minLng: -130,
         maxLng: -110,
       };
-      const clampedBounds = {
+      const mapClampedBounds = {
         minLat: 35,
         maxLat: 40,
         minLng: -125,
@@ -676,7 +674,8 @@ describe("search-v2-service", () => {
           filterParams: { bounds: oversizedBounds },
         }),
       );
-      mockClampBoundsToMaxSpan.mockReturnValue(clampedBounds);
+      // clampBoundsToMaxSpan is only called for the map query (with MAP_FETCH_MAX params)
+      mockClampBoundsToMaxSpan.mockReturnValue(mapClampedBounds);
 
       // Set up remaining mocks
       mockIsSearchDocEnabled.mockReturnValue(false);
@@ -707,8 +706,19 @@ describe("search-v2-service", () => {
         },
       });
 
-      // clampBoundsToMaxSpan should have been called
-      expect(mockClampBoundsToMaxSpan).toHaveBeenCalledWith(oversizedBounds);
+      // clampBoundsToMaxSpan called once for map query with MAP_FETCH_MAX params
+      expect(mockClampBoundsToMaxSpan).toHaveBeenCalledTimes(1);
+      expect(mockClampBoundsToMaxSpan).toHaveBeenCalledWith(oversizedBounds, 60, 130);
+
+      // List query receives original unclamped bounds
+      expect(mockGetListingsPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({ bounds: oversizedBounds }),
+      );
+
+      // Map query receives clamped bounds
+      expect(mockGetMapListings).toHaveBeenCalledWith(
+        expect.objectContaining({ bounds: mapClampedBounds }),
+      );
     });
 
     it("uses SearchDoc path when enabled", async () => {

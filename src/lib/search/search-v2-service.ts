@@ -44,9 +44,11 @@ import type { SearchV2Response } from "@/lib/search/types";
 import type { PaginatedResultHybrid, ListingData, MapListingData } from "@/lib/data";
 import {
   clampBoundsToMaxSpan,
-  MAX_LAT_SPAN,
-  MAX_LNG_SPAN,
 } from "@/lib/validation";
+import {
+  MAP_FETCH_MAX_LAT_SPAN,
+  MAP_FETCH_MAX_LNG_SPAN,
+} from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 
@@ -104,21 +106,6 @@ export async function executeSearchV2(
 
     // Parse and validate search params
     const parsed = parseSearchParams(params.rawParams);
-
-    // Clamp bounds if they exceed max span (security: prevent expensive wide-area queries)
-    // Unlike map-listings which rejects oversized bounds, we silently clamp for list queries
-    if (parsed.filterParams.bounds) {
-      const { minLat, maxLat, minLng, maxLng } = parsed.filterParams.bounds;
-      const latSpan = maxLat - minLat;
-      const crossesAntimeridian = minLng > maxLng;
-      const lngSpan = crossesAntimeridian
-        ? (180 - minLng) + (maxLng + 180)
-        : maxLng - minLng;
-
-      if (latSpan > MAX_LAT_SPAN || lngSpan > MAX_LNG_SPAN) {
-        parsed.filterParams.bounds = clampBoundsToMaxSpan(parsed.filterParams.bounds);
-      }
-    }
 
     // Block unbounded searches: text query without geographic bounds
     // This prevents full-table scans that are expensive and not useful
@@ -216,11 +203,19 @@ export async function executeSearchV2(
       }
     })();
 
+    // Map query uses bounds clamped to 60°/130° (wider than list needs, covers full viewport)
+    const mapBounds = parsed.filterParams.bounds
+      ? clampBoundsToMaxSpan(parsed.filterParams.bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN)
+      : null;
+    const mapFilterParams = mapBounds
+      ? { ...filterParams, bounds: mapBounds }
+      : filterParams;
+
     // Map query runs in parallel with list query
     // SearchDoc returns { listings, truncated, totalCandidates }, legacy returns plain array
     const mapPromise: Promise<MapListingsResult | MapListingData[]> = useSearchDoc
-      ? getSearchDocMapListings(filterParams)
-      : getMapListings(filterParams);
+      ? getSearchDocMapListings(mapFilterParams)
+      : getMapListings(mapFilterParams);
 
     // Execute both queries concurrently with partial failure tolerance
     // P1-7 FIX: Wrap each promise with independent timeout to prevent indefinite hangs
