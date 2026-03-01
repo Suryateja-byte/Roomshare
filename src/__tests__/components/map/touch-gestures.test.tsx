@@ -347,6 +347,10 @@ jest.mock('@/contexts/MapBoundsContext', () => ({
     areaCount: null,
     isAreaCountLoading: false,
   }),
+  useActivePanBounds: () => ({
+    activePanBounds: null,
+    setActivePanBounds: jest.fn(),
+  }),
 }));
 
 // Mock child components

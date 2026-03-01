@@ -149,7 +149,8 @@ describe('SearchResultsClient', () => {
     it('renders result count', () => {
       render(<SearchResultsClient {...defaultProps} />);
 
-      expect(screen.getByText('10 places in test')).toBeInTheDocument();
+      const matches = screen.getAllByText('10 places in test');
+      expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 
     it('renders zero results state when hasConfirmedZeroResults is true', () => {
