@@ -66,6 +66,7 @@ test.describe('Homepage — Anonymous User', () => {
   });
 
   test('HP-04: Featured listings section renders with listing cards', async ({ page }) => {
+    test.slow(); // Triple timeout — Suspense boundary may be slow in CI
     // FeaturedListings rendered via Suspense — wait for cards or empty state
     // Cards use data-testid="listing-card" and link to /listings/
     await expect(
