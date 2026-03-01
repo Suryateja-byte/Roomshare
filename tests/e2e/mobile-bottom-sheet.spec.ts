@@ -74,12 +74,14 @@ async function getSnapIndex(
 }
 
 /**
- * Helper to wait for sheet animation to complete
+ * Helper to wait for sheet animation to complete.
+ * Uses a short base delay (enough for React state + animation start), then
+ * callers rely on toPass() polling to detect final snap state.
  */
 async function waitForSheetAnimation(
   page: import("@playwright/test").Page,
 ): Promise<void> {
-  await page.waitForTimeout(1500); // Spring animation duration (extra buffer for CI)
+  await page.waitForTimeout(500);
 }
 
 /**
@@ -474,14 +476,11 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
       expect(await getSnapIndex(page)).toBe(2);
     }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
-    // Press Escape
+    // Press Escape — should collapse to half position (index 1)
     await page.keyboard.press("Escape");
+    await expect(page.locator('[data-snap-current="1"]')).toBeAttached({ timeout: 10_000 });
     await waitForSheetAnimation(page);
-
-    // Should collapse to half position (index 1)
-    await expect(async () => {
-      expect(await getSnapIndex(page)).toBe(1);
-    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
+    expect(await getSnapIndex(page)).toBe(1);
   });
 
   test("escape key has no effect when sheet is collapsed", async ({ page }) => {
@@ -512,14 +511,10 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
       expect(await getSnapIndex(page)).toBe(0);
     }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
-    // Press Escape - should stay collapsed
+    // Press Escape - should stay collapsed (handler skips when snapIndex === 0)
     await page.keyboard.press("Escape");
     await waitForSheetAnimation(page);
-
-    // Still collapsed
-    await expect(async () => {
-      expect(await getSnapIndex(page)).toBe(0);
-    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
+    expect(await getSnapIndex(page)).toBe(0);
   });
 });
 

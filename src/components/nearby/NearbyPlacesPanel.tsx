@@ -75,6 +75,7 @@ export default function NearbyPlacesPanel({
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const isMountedRef = useRef(true);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch places from API with "latest request wins" pattern
   const fetchPlaces = useCallback(async (
@@ -134,6 +135,8 @@ export default function NearbyPlacesPanel({
       // Check if still mounted before updating state
       if (isMountedRef.current) {
         setIsLoading(false);
+        // Restore focus to search input after search completes (WCAG focus management)
+        searchInputRef.current?.focus();
       }
     }
   }, [listingLat, listingLng, selectedRadius, onPlacesChange]);
@@ -260,6 +263,7 @@ export default function NearbyPlacesPanel({
               "
             />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search e.g. 'Coffee', 'Gym'"
               value={searchQuery}

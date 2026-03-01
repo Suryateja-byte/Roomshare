@@ -458,37 +458,30 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         };
     }, []);
 
-    // INP optimization: Wrap toggle functions in startTransition
-    // This marks state updates as non-urgent, allowing React to prioritize
-    // visual feedback (button press) over state computation
+    // Toggle functions use direct state updates for immediate aria-pressed feedback.
+    // These are simple array toggles — no INP benefit from startTransition deferral.
     const toggleAmenity = useCallback((amenity: string) => {
-        startTransition(() => {
-            setPending((prev) => ({
-                amenities: prev.amenities.includes(amenity)
-                    ? prev.amenities.filter(a => a !== amenity)
-                    : [...prev.amenities, amenity],
-            }));
-        });
+        setPending((prev) => ({
+            amenities: prev.amenities.includes(amenity)
+                ? prev.amenities.filter(a => a !== amenity)
+                : [...prev.amenities, amenity],
+        }));
     }, [setPending]);
 
     const toggleHouseRule = useCallback((rule: string) => {
-        startTransition(() => {
-            setPending((prev) => ({
-                houseRules: prev.houseRules.includes(rule)
-                    ? prev.houseRules.filter(r => r !== rule)
-                    : [...prev.houseRules, rule],
-            }));
-        });
+        setPending((prev) => ({
+            houseRules: prev.houseRules.includes(rule)
+                ? prev.houseRules.filter(r => r !== rule)
+                : [...prev.houseRules, rule],
+        }));
     }, [setPending]);
 
     const toggleLanguage = useCallback((lang: string) => {
-        startTransition(() => {
-            setPending((prev) => ({
-                languages: prev.languages.includes(lang)
-                    ? prev.languages.filter(l => l !== lang)
-                    : [...prev.languages, lang],
-            }));
-        });
+        setPending((prev) => ({
+            languages: prev.languages.includes(lang)
+                ? prev.languages.filter(l => l !== lang)
+                : [...prev.languages, lang],
+        }));
     }, [setPending]);
 
     // Clear all filters and reset to defaults
