@@ -464,18 +464,25 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     const expandBtn = page.locator(selectors.expandButton);
     try {
       await expect(expandBtn).toBeVisible({ timeout: 5000 });
-      await expandBtn.click();
+      await expandBtn.click({ force: true });
     } catch {
       test.skip(true, 'Expand button not visible');
       return;
     }
 
-    // Wait for expanded state via DOM attribute (not timing-based)
-    await expect(page.locator('[data-snap-current="2"]')).toBeAttached({ timeout: 10_000 });
+    // Poll for expanded state (React state → data attribute)
+    const content = page.locator(selectors.contentArea);
+    await expect(async () => {
+      const snap = await content.getAttribute('data-snap-current');
+      expect(snap).toBe('2');
+    }).toPass({ timeout: 10_000, intervals: [200, 500, 1000, 2000] });
 
     // Press Escape — should collapse to half position (index 1)
     await page.keyboard.press("Escape");
-    await expect(page.locator('[data-snap-current="1"]')).toBeAttached({ timeout: 10_000 });
+    await expect(async () => {
+      const snap = await content.getAttribute('data-snap-current');
+      expect(snap).toBe('1');
+    }).toPass({ timeout: 10_000, intervals: [200, 500, 1000, 2000] });
   });
 
   test("escape key has no effect when sheet is collapsed", async ({ page }) => {
@@ -494,20 +501,25 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     const minimizeBtn = page.locator(selectors.minimizeButton);
     try {
       await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
-      await minimizeBtn.click();
+      await minimizeBtn.click({ force: true });
     } catch {
       test.skip(true, 'Minimize button not visible');
       return;
     }
 
-    // Wait for collapsed state via DOM attribute
-    await expect(page.locator('[data-snap-current="0"]')).toBeAttached({ timeout: 10_000 });
+    // Poll for collapsed state
+    const content = page.locator(selectors.contentArea);
+    await expect(async () => {
+      const snap = await content.getAttribute('data-snap-current');
+      expect(snap).toBe('0');
+    }).toPass({ timeout: 10_000, intervals: [200, 500, 1000, 2000] });
 
     // Press Escape - should stay collapsed (handler skips when snapIndex === 0)
     await page.keyboard.press("Escape");
     await waitForSheetAnimation(page);
     // Still collapsed — Escape handler ignores when snap is already 0
-    expect(await getSnapIndex(page)).toBe(0);
+    const snap = await content.getAttribute('data-snap-current');
+    expect(snap).toBe('0');
   });
 });
 

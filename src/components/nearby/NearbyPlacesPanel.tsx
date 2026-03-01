@@ -76,6 +76,7 @@ export default function NearbyPlacesPanel({
   const abortControllerRef = useRef<AbortController | null>(null);
   const isMountedRef = useRef(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const shouldRestoreFocusRef = useRef(false);
 
   // Fetch places from API with "latest request wins" pattern
   const fetchPlaces = useCallback(async (
@@ -132,11 +133,9 @@ export default function NearbyPlacesPanel({
       setErrorDetails(null);
       setPlaces([]);
     } finally {
-      // Check if still mounted before updating state
       if (isMountedRef.current) {
+        shouldRestoreFocusRef.current = true;
         setIsLoading(false);
-        // Defer focus until after React commits the re-render (removing disabled attr)
-        setTimeout(() => searchInputRef.current?.focus(), 0);
       }
     }
   }, [listingLat, listingLng, selectedRadius, onPlacesChange]);
@@ -173,6 +172,15 @@ export default function NearbyPlacesPanel({
       fetchPlaces(undefined, trimmedQuery, newRadius);
     }
   }, [selectedChip, searchQuery, fetchPlaces]);
+
+  // Restore focus to search input after loading completes (WCAG focus management).
+  // Runs as a useEffect so React has committed the render (input no longer disabled).
+  useEffect(() => {
+    if (!isLoading && shouldRestoreFocusRef.current) {
+      shouldRestoreFocusRef.current = false;
+      searchInputRef.current?.focus();
+    }
+  }, [isLoading]);
 
   // Cleanup abort controller on unmount
   useEffect(() => {

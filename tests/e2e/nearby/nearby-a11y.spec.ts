@@ -191,11 +191,14 @@ test.describe('Nearby Places — Accessibility @nearby @a11y', () => {
     await page.keyboard.press('Enter');
     await nearby.waitForResults();
 
-    // Focus should still be within the nearby section (not lost to document body)
-    const isInSection = await nearby.section.locator(':focus').count();
-    const isOnInput = await nearby.searchInput.evaluate(
-      (el) => el === document.activeElement,
-    );
-    expect(isInSection > 0 || isOnInput).toBe(true);
+    // Focus should still be within the nearby section (not lost to document body).
+    // Poll briefly — useEffect focus restoration runs after React commit.
+    await expect(async () => {
+      const isInSection = await nearby.section.locator(':focus').count();
+      const isOnInput = await nearby.searchInput.evaluate(
+        (el) => el === document.activeElement,
+      );
+      expect(isInSection > 0 || isOnInput).toBe(true);
+    }).toPass({ timeout: 5_000, intervals: [100, 200, 500] });
   });
 });
