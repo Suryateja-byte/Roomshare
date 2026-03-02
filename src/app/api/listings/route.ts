@@ -193,17 +193,6 @@ export async function POST(request: Request) {
 
         // 9. householdLanguages already validated by createListingApiSchema (includes householdLanguagesSchema)
 
-        // 10. Max listings per user check (2F)
-        const activeListingCount = await prisma.listing.count({
-            where: {
-                ownerId: userId,
-                status: { in: ['ACTIVE', 'PAUSED'] },
-            },
-        });
-        if (activeListingCount >= 10) {
-            return NextResponse.json({ error: 'Maximum 10 active listings per user' }, { status: 400 });
-        }
-
         // Geocode address (log only city/state, not full address)
         const fullAddress = `${address}, ${city}, ${state} ${zip}`;
         const coords = await geocodeAddress(fullAddress);
@@ -239,8 +228,18 @@ export async function POST(request: Request) {
             ownerId: userId,
         };
 
-        // Transaction logic: create listing + location + PostGIS update
+        // Transaction logic: count check (FOR UPDATE) + create listing + location + PostGIS update
         const createListingInTx = async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
+            // 10. Max listings per user check inside tx with row locks to prevent TOCTOU race
+            const countResult = await tx.$queryRaw<[{ count: number }]>`
+                SELECT COUNT(*)::int as count FROM "Listing"
+                WHERE "ownerId" = ${userId} AND status IN ('ACTIVE', 'PAUSED')
+                FOR UPDATE
+            `;
+            if (countResult[0].count >= 10) {
+                throw new Error('MAX_LISTINGS_EXCEEDED');
+            }
+
             const listing = await tx.listing.create({ data: listingCreateData });
 
             const location = await tx.location.create({
@@ -266,7 +265,20 @@ export async function POST(request: Request) {
         // Side effects: search sync + instant alerts + dirty marker (fire AFTER transaction)
         const fireSideEffects = async (listing: { id: string; title: string; description: string | null; price: number; roomType: string | null; leaseDuration: string | null; amenities: string[]; houseRules: string[] }) => {
             // 15. Synchronous upsert search doc for immediate visibility (1D)
-            await upsertSearchDocSync(listing.id);
+            // Isolated: sync failure must not bubble up and mask a successful listing creation
+            try {
+                const synced = await upsertSearchDocSync(listing.id);
+                if (!synced) {
+                    logger.sync.warn('Search sync returned false — cron will pick up', {
+                        listingId: listing.id,
+                    });
+                }
+            } catch (syncErr) {
+                logger.sync.error('upsertSearchDocSync failed unexpectedly', {
+                    listingId: listing.id,
+                    error: syncErr instanceof Error ? syncErr.message : String(syncErr),
+                });
+            }
 
             // 16. Fire-and-forget: trigger instant alerts (1E)
             triggerInstantAlerts({
@@ -304,33 +316,40 @@ export async function POST(request: Request) {
         let result: Awaited<ReturnType<typeof createListingInTx>>;
         let cached = false;
 
-        if (idempotencyKey) {
-            // 12. Idempotent path: wrap transaction in withIdempotency()
-            const idempResult = await withIdempotency(
-                idempotencyKey,
-                userId,
-                'createListing',
-                validatedFields.data, // request body for hash
-                createListingInTx,
-            );
+        try {
+            if (idempotencyKey) {
+                // 12. Idempotent path: wrap transaction in withIdempotency()
+                const idempResult = await withIdempotency(
+                    idempotencyKey,
+                    userId,
+                    'createListing',
+                    validatedFields.data, // request body for hash
+                    createListingInTx,
+                );
 
-            if (!idempResult.success) {
-                return NextResponse.json({ error: idempResult.error }, { status: idempResult.status });
-            }
+                if (!idempResult.success) {
+                    return NextResponse.json({ error: idempResult.error }, { status: idempResult.status });
+                }
 
-            result = idempResult.result;
-            cached = idempResult.cached;
+                result = idempResult.result;
+                cached = idempResult.cached;
 
-            // Side effects only for non-cached results
-            if (!cached) {
+                // Side effects only for non-cached results
+                if (!cached) {
+                    await fireSideEffects({ ...result, price: Number(result.price) });
+                }
+            } else {
+                // 13. Non-idempotent path: regular prisma.$transaction
+                result = await prisma.$transaction(createListingInTx);
+
+                // Side effects
                 await fireSideEffects({ ...result, price: Number(result.price) });
             }
-        } else {
-            // 13. Non-idempotent path: regular prisma.$transaction
-            result = await prisma.$transaction(createListingInTx);
-
-            // Side effects
-            await fireSideEffects({ ...result, price: Number(result.price) });
+        } catch (txError) {
+            if (txError instanceof Error && txError.message === 'MAX_LISTINGS_EXCEEDED') {
+                return NextResponse.json({ error: 'Maximum 10 active listings per user' }, { status: 400 });
+            }
+            throw txError;
         }
 
         await logger.info('Listing created successfully', {

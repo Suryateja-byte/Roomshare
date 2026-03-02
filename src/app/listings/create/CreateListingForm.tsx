@@ -18,6 +18,7 @@ import { Loader2, Home, MapPin, List, Camera, FileText, X, AlertTriangle, CheckC
 import { toast } from 'sonner';
 import ImageUploader from '@/components/listings/ImageUploader';
 import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
+import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -76,7 +77,10 @@ export default function CreateListingForm() {
     const [draftRestored, setDraftRestored] = useState(false);
     const [showPartialUploadDialog, setShowPartialUploadDialog] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
+    const errorBannerRef = useRef<HTMLDivElement>(null);
     const isSubmittingRef = useRef(false);
+    const submitAbortRef = useRef<AbortController | null>(null);
+    const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Form field states for premium components
     const [description, setDescription] = useState('');
@@ -126,35 +130,17 @@ export default function CreateListingForm() {
         );
     }, [languageSearch]);
 
-    // Warn user when navigating away during active submission or with unsaved form data
-    useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            // Warn if submitting
-            if (loading) {
-                e.preventDefault();
-                e.returnValue = 'Your listing is still being created. Are you sure you want to leave?';
-                return e.returnValue;
-            }
+    // Guard against all navigation vectors (beforeunload, pushState, popstate)
+    const hasUnsavedWork = loading
+        || uploadedImages.some(img => img.uploadedUrl)
+        || !!(title || description || price || address || city || state || zip);
 
-            // Warn if there are uploaded images (significant data loss potential)
-            if (uploadedImages.some(img => img.uploadedUrl)) {
-                e.preventDefault();
-                e.returnValue = 'You have unsaved changes. Your uploaded images will be lost if you leave.';
-                return e.returnValue;
-            }
-
-            // Warn if any text fields have content
-            const hasContent = title || description || price || address || city || state || zip;
-            if (hasContent) {
-                e.preventDefault();
-                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-                return e.returnValue;
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [loading, uploadedImages, title, description, price, address, city, state, zip]);
+    useNavigationGuard(
+        hasUnsavedWork,
+        loading
+            ? 'Your listing is still being created. Are you sure you want to leave?'
+            : 'You have unsaved changes. Your uploaded images and data will be lost if you leave.'
+    );
 
     // Show draft banner when we have a draft and haven't restored yet
     useEffect(() => {
@@ -167,37 +153,43 @@ export default function CreateListingForm() {
     const restoreDraft = () => {
         if (!persistedData) return;
 
-        // Restore controlled component states
-        setTitle(persistedData.title || '');
-        setDescription(persistedData.description || '');
-        setPrice(persistedData.price || '');
-        setTotalSlots(persistedData.totalSlots || '1');
-        setAddress(persistedData.address || '');
-        setCity(persistedData.city || '');
-        setState(persistedData.state || '');
-        setZip(persistedData.zip || '');
-        setMoveInDate(persistedData.moveInDate || '');
-        setLeaseDuration(persistedData.leaseDuration || '');
-        setRoomType(persistedData.roomType || '');
-        setGenderPreference(persistedData.genderPreference || '');
-        setHouseholdGender(persistedData.householdGender || '');
-        setSelectedLanguages(persistedData.selectedLanguages || []);
-        setAmenitiesValue(persistedData.amenities || '');
-        setHouseRulesValue(persistedData.houseRules || '');
+        try {
+            // Restore controlled component states
+            setTitle(persistedData.title || '');
+            setDescription(persistedData.description || '');
+            setPrice(persistedData.price || '');
+            setTotalSlots(persistedData.totalSlots || '1');
+            setAddress(persistedData.address || '');
+            setCity(persistedData.city || '');
+            setState(persistedData.state || '');
+            setZip(persistedData.zip || '');
+            setMoveInDate(persistedData.moveInDate || '');
+            setLeaseDuration(persistedData.leaseDuration || '');
+            setRoomType(persistedData.roomType || '');
+            setGenderPreference(persistedData.genderPreference || '');
+            setHouseholdGender(persistedData.householdGender || '');
+            setSelectedLanguages(persistedData.selectedLanguages || []);
+            setAmenitiesValue(persistedData.amenities || '');
+            setHouseRulesValue(persistedData.houseRules || '');
 
-        // Restore images (they're already uploaded to Supabase)
-        if (persistedData.images && persistedData.images.length > 0) {
-            const restoredImages: ImageObject[] = persistedData.images.map(img => ({
-                id: img.id,
-                previewUrl: img.uploadedUrl, // Use the uploaded URL as preview
-                uploadedUrl: img.uploadedUrl,
-                isUploading: false
-            }));
-            setUploadedImages(restoredImages);
+            // Restore images (they're already uploaded to Supabase)
+            if (persistedData.images && persistedData.images.length > 0) {
+                const restoredImages: ImageObject[] = persistedData.images.map(img => ({
+                    id: img.id,
+                    previewUrl: img.uploadedUrl, // Use the uploaded URL as preview
+                    uploadedUrl: img.uploadedUrl,
+                    isUploading: false
+                }));
+                setUploadedImages(restoredImages);
+            }
+
+            setDraftRestored(true);
+            setShowDraftBanner(false);
+        } catch {
+            toast.error('Could not restore draft. Starting fresh.');
+            clearPersistedData();
+            setShowDraftBanner(false);
         }
-
-        setDraftRestored(true);
-        setShowDraftBanner(false);
     };
 
     // Discard draft and start fresh
@@ -245,12 +237,27 @@ export default function CreateListingForm() {
         handleFormChange();
     }, [title, description, price, totalSlots, address, city, state, zip, amenitiesValue, houseRulesValue, moveInDate, leaseDuration, roomType, genderPreference, householdGender, selectedLanguages, uploadedImages]);
 
+    // Cleanup: abort in-flight submission and clear redirect timeout on unmount
+    useEffect(() => {
+        return () => {
+            submitAbortRef.current?.abort();
+            if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
+        };
+    }, []);
+
     const toggleLanguage = (lang: string) => {
         setSelectedLanguages(prev =>
             prev.includes(lang)
                 ? prev.filter(l => l !== lang)
                 : [...prev, lang]
         );
+    };
+
+    // Show a non-field error in the banner and focus it for screen readers
+    const showError = (message: string) => {
+        setError(message);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        requestAnimationFrame(() => errorBannerRef.current?.focus());
     };
 
     // Calculate image counts
@@ -275,8 +282,7 @@ export default function CreateListingForm() {
 
         // Require at least 1 successful image
         if (successfulImages.length === 0) {
-            setError('At least one photo is required to publish your listing');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            showError('At least one photo is required to publish your listing');
             return;
         }
 
@@ -288,6 +294,11 @@ export default function CreateListingForm() {
 
         isSubmittingRef.current = true;
         setLoading(true);
+
+        // Abort any in-flight submission before starting a new one
+        if (submitAbortRef.current) submitAbortRef.current.abort();
+        const abortController = new AbortController();
+        submitAbortRef.current = abortController;
 
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
@@ -317,7 +328,11 @@ export default function CreateListingForm() {
                     genderPreference: genderPreference || undefined,
                     householdGender: householdGender || undefined,
                 }),
+                signal: abortController.signal,
             });
+
+            // Guard post-success callbacks — skip if component unmounted / navigated away
+            if (abortController.signal.aborted) return;
 
             if (!res.ok) {
                 const json = await res.json();
@@ -335,6 +350,9 @@ export default function CreateListingForm() {
             }
 
             const result = await res.json();
+
+            if (abortController.signal.aborted) return;
+
             // Cancel pending debounced save to prevent it re-writing the draft
             cancelSave();
             // Clear draft on successful submission
@@ -345,12 +363,15 @@ export default function CreateListingForm() {
                 duration: 5000,
             });
             // Slight delay so user sees the success toast before redirect
-            setTimeout(() => {
-                router.push(`/listings/${result.id}`);
+            redirectTimeoutRef.current = setTimeout(() => {
+                if (!abortController.signal.aborted) {
+                    router.push(`/listings/${result.id}`);
+                }
             }, 1000);
-        } catch (err: any) {
-            setError(err.message);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (err: unknown) {
+            if (err instanceof Error && err.name === 'AbortError') return;
+            const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+            showError(message);
         } finally {
             setLoading(false);
             isSubmittingRef.current = false;
@@ -400,13 +421,14 @@ export default function CreateListingForm() {
     return (
         <>
             {/* Step Progress Indicator */}
-            <div data-testid="progress-steps" className="mb-8">
+            <div data-testid="progress-steps" className="mb-8" role="group" aria-label="Form completion progress">
                 <div className="flex items-center justify-between">
                     {FORM_SECTIONS.map((section, index) => {
                         const Icon = section.icon;
                         const isComplete = sectionCompletion[section.id as keyof typeof sectionCompletion];
                         return (
-                            <div key={section.id} className="flex items-center flex-1">
+                            <div key={section.id} className="flex items-center flex-1"
+                                 aria-label={`${section.label}: ${isComplete ? 'complete' : 'incomplete'}`}>
                                 {/* Step Circle */}
                                 <div className="flex flex-col items-center">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${isComplete
@@ -439,7 +461,7 @@ export default function CreateListingForm() {
                         );
                     })}
                 </div>
-                <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-4">
+                <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-4" aria-live="polite">
                     {Object.values(sectionCompletion).filter(Boolean).length === 4
                         ? '✓ All sections complete! Ready to publish.'
                         : `Fill out all sections below to publish your listing (${Object.values(sectionCompletion).filter(Boolean).length}/4 complete)`
@@ -449,7 +471,7 @@ export default function CreateListingForm() {
 
             {/* Draft Resume Banner */}
             {showDraftBanner && savedAt && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4">
+                <div role="status" className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                         <div>
@@ -484,7 +506,7 @@ export default function CreateListingForm() {
             )}
 
             {error && (
-                <div role="alert" data-testid="form-error-banner" className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-4 rounded-xl mb-8 text-sm">
+                <div ref={errorBannerRef} tabIndex={-1} role="alert" data-testid="form-error-banner" className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-4 rounded-xl mb-8 text-sm outline-none">
                     {error}
                 </div>
             )}
@@ -550,6 +572,8 @@ export default function CreateListingForm() {
                                 id="price"
                                 name="price"
                                 type="number"
+                                min="0"
+                                step="1"
                                 required
                                 value={price}
                                 onChange={(e) => setPrice(e.target.value)}
@@ -567,6 +591,9 @@ export default function CreateListingForm() {
                                 id="totalSlots"
                                 name="totalSlots"
                                 type="number"
+                                min="1"
+                                max="20"
+                                step="1"
                                 required
                                 value={totalSlots}
                                 onChange={(e) => setTotalSlots(e.target.value)}
@@ -756,6 +783,8 @@ export default function CreateListingForm() {
                                     <button
                                         key={code}
                                         type="button"
+                                        aria-pressed="true"
+                                        aria-label={`${getLanguageName(code)}, selected`}
                                         onClick={() => toggleLanguage(code)}
                                         disabled={loading}
                                         className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
@@ -784,6 +813,7 @@ export default function CreateListingForm() {
                                 <button
                                     key={code}
                                     type="button"
+                                    aria-pressed="false"
                                     onClick={() => toggleLanguage(code)}
                                     disabled={loading}
                                     className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"

@@ -34,7 +34,10 @@ export default function ImageUploader({
         }))
     );
     const [isDragging, setIsDragging] = useState(false);
+    const [sizeError, setSizeError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const sizeErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const uploadControllerRef = useRef<AbortController | null>(null);
 
     // Handle standard file input
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,14 +66,15 @@ export default function ImageUploader({
     };
 
     // Upload a single file to the server
-    const uploadFile = async (file: File): Promise<string> => {
+    const uploadFile = async (file: File, signal?: AbortSignal): Promise<string> => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('type', 'listing');
 
         const response = await fetch('/api/upload', {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal,
         });
 
         if (!response.ok) {
@@ -83,13 +87,27 @@ export default function ImageUploader({
     };
 
     // Process files: Create preview URLs and optionally upload
+    const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
     const processFiles = async (newFiles: File[]) => {
         // Filter for images only
         const validImageFiles = newFiles.filter(file => file.type.startsWith('image/'));
 
+        // Filter out oversized files
+        const oversized = validImageFiles.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+        const withinLimit = validImageFiles.filter(f => f.size <= MAX_FILE_SIZE_BYTES);
+
+        if (oversized.length > 0) {
+            const names = oversized.map(f => f.name).join(', ');
+            setSizeError(`${oversized.length} file(s) exceeded 5MB and were skipped: ${names}`);
+            // Auto-clear after 5 seconds
+            if (sizeErrorTimerRef.current) clearTimeout(sizeErrorTimerRef.current);
+            sizeErrorTimerRef.current = setTimeout(() => setSizeError(null), 5000);
+        }
+
         // Check max limit
         const remainingSlots = maxImages - images.length;
-        const filesToProcess = validImageFiles.slice(0, remainingSlots);
+        const filesToProcess = withinLimit.slice(0, remainingSlots);
 
         if (filesToProcess.length === 0) return;
 
@@ -107,15 +125,24 @@ export default function ImageUploader({
 
         // If uploading to cloud, process uploads
         if (uploadToCloud) {
+            const controller = new AbortController();
+            uploadControllerRef.current = controller;
+
             for (const imgObj of newImageObjects) {
+                if (controller.signal.aborted) break;
                 try {
-                    const url = await uploadFile(imgObj.file!);
+                    const url = await uploadFile(imgObj.file!, controller.signal);
                     setImages(prev => prev.map(img =>
                         img.id === imgObj.id
                             ? { ...img, uploadedUrl: url, isUploading: false }
                             : img
                     ));
                 } catch (error) {
+                    if (error instanceof Error && error.name === 'AbortError') {
+                        // Remove all still-uploading images on cancel
+                        setImages(prev => prev.filter(img => !img.isUploading));
+                        break;
+                    }
                     setImages(prev => prev.map(img =>
                         img.id === imgObj.id
                             ? { ...img, error: (error as Error).message, isUploading: false }
@@ -123,6 +150,7 @@ export default function ImageUploader({
                     ));
                 }
             }
+            uploadControllerRef.current = null;
         }
     };
 
@@ -154,19 +182,32 @@ export default function ImageUploader({
                 : i
         ));
 
+        const controller = new AbortController();
+        uploadControllerRef.current = controller;
+
         try {
-            const url = await uploadFile(img.file);
+            const url = await uploadFile(img.file, controller.signal);
             setImages(prev => prev.map(i =>
                 i.id === imageId
                     ? { ...i, uploadedUrl: url, isUploading: false, error: undefined }
                     : i
             ));
         } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+                setImages(prev => prev.map(i =>
+                    i.id === imageId
+                        ? { ...i, isUploading: false }
+                        : i
+                ));
+                return;
+            }
             setImages(prev => prev.map(i =>
                 i.id === imageId
                     ? { ...i, error: (error as Error).message, isUploading: false }
                     : i
             ));
+        } finally {
+            uploadControllerRef.current = null;
         }
     };
 
@@ -184,14 +225,21 @@ export default function ImageUploader({
         imageUrlsRef.current = images.map(img => img.previewUrl).filter(Boolean);
     }, [images]);
 
-    // Cleanup ObjectURLs to avoid memory leaks
+    // Cancel uploads helper
+    const cancelUploads = () => {
+        uploadControllerRef.current?.abort();
+    };
+
+    // Cleanup ObjectURLs, timers, and abort in-flight uploads to avoid memory leaks
     useEffect(() => {
         return () => {
+            uploadControllerRef.current?.abort();
             imageUrlsRef.current.forEach(url => {
                 if (url.startsWith('blob:')) {
                     URL.revokeObjectURL(url);
                 }
             });
+            if (sizeErrorTimerRef.current) clearTimeout(sizeErrorTimerRef.current);
         };
     }, []);
 
@@ -238,6 +286,14 @@ export default function ImageUploader({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Size error message */}
+            {sizeError && (
+                <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {sizeError}
+                </p>
             )}
 
             {/* 2. Image Preview Grid */}
@@ -323,10 +379,21 @@ export default function ImageUploader({
             {images.length > 0 && (
                 <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between">
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {images.length} of {maxImages} images
-                            {isAnyUploading && ' (uploading...)'}
-                        </p>
+                        <div className="flex items-center gap-3">
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                {images.length} of {maxImages} images
+                                {isAnyUploading && ' (uploading...)'}
+                            </p>
+                            {isAnyUploading && (
+                                <button
+                                    type="button"
+                                    onClick={cancelUploads}
+                                    className="text-xs text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 font-medium"
+                                >
+                                    Cancel uploads
+                                </button>
+                            )}
+                        </div>
                         {hasMultipleFailures && (
                             <Button
                                 type="button"
