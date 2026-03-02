@@ -57,6 +57,9 @@ jest.mock('@/lib/logger', () => ({
       warn: jest.fn(),
     },
   },
+  sanitizeErrorMessage: jest.fn((e: unknown) =>
+    e instanceof Error ? e.message : typeof e === 'string' ? e : 'Unknown error'
+  ),
 }))
 
 jest.mock('@/app/actions/suspension', () => ({
@@ -141,7 +144,7 @@ const validBody = {
   roomType: 'Private Room',
   totalSlots: '1',
   images: [
-    'https://abc123.supabase.co/storage/v1/object/public/images/listings/user-123/test.jpg',
+    'https://test-project.supabase.co/storage/v1/object/public/images/listings/user-123/test.jpg',
   ],
 }
 
@@ -174,6 +177,7 @@ function mockSuccessfulTransaction() {
       listing: { create: jest.fn().mockResolvedValue(mockListing) },
       location: { create: jest.fn().mockResolvedValue({ id: 'loc-123' }) },
       $executeRaw: jest.fn().mockResolvedValue(1),
+      $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
     }
     return callback(tx)
   })
@@ -364,7 +368,7 @@ describe('POST /api/listings — extended edge cases', () => {
       const images = Array.from(
         { length: 11 },
         (_, i) =>
-          `https://abc123.supabase.co/storage/v1/object/public/images/listings/user-123/img${i}.jpg`,
+          `https://test-project.supabase.co/storage/v1/object/public/images/listings/user-123/img${i}.jpg`,
       )
       const response = await POST(makeRequest({ ...validBody, images }))
       expect(response.status).toBe(400)
@@ -388,7 +392,7 @@ describe('POST /api/listings — extended edge cases', () => {
         makeRequest({
           ...validBody,
           images: [
-            'https://abc123.supabase.co/storage/v1/object/public/images/listings/user-123/photo.png',
+            'https://test-project.supabase.co/storage/v1/object/public/images/listings/user-123/photo.png',
           ],
         }),
       )
@@ -400,7 +404,7 @@ describe('POST /api/listings — extended edge cases', () => {
       const images = Array.from(
         { length: 10 },
         (_, i) =>
-          `https://abc123.supabase.co/storage/v1/object/public/images/listings/user-123/img${i}.jpg`,
+          `https://test-project.supabase.co/storage/v1/object/public/images/listings/user-123/img${i}.jpg`,
       )
       const response = await POST(makeRequest({ ...validBody, images }))
       expect(response.status).toBe(201)

@@ -188,10 +188,13 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
                     // search_tsv column is available on the Listing table. Currently uses
                     // Prisma `contains` which generates ILIKE — acceptable for alert volumes
                     // but not scalable for large datasets.
+                    // M-D2: Also search city+state via location to match instant alert behavior
                     if (filters.query) {
                         whereClause.OR = [
                             { title: { contains: filters.query, mode: 'insensitive' } },
-                            { description: { contains: filters.query, mode: 'insensitive' } }
+                            { description: { contains: filters.query, mode: 'insensitive' } },
+                            { location: { city: { contains: filters.query, mode: 'insensitive' } } },
+                            { location: { state: { contains: filters.query, mode: 'insensitive' } } },
                         ];
                     }
 

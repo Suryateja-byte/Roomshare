@@ -77,7 +77,7 @@ const validBase = {
 }
 
 const SUPABASE_IMG =
-  'https://abc123.supabase.co/storage/v1/object/public/images/listings/user/test.jpg'
+  'https://test-project.supabase.co/storage/v1/object/public/images/listings/user/test.jpg'
 
 const validApi = {
   ...validBase,
@@ -603,35 +603,35 @@ describe('listingImagesSchema', () => {
 
   it('accepts .jpeg extension', () => {
     const url =
-      'https://abc123.supabase.co/storage/v1/object/public/images/listings/user/photo.jpeg'
+      'https://test-project.supabase.co/storage/v1/object/public/images/listings/user/photo.jpeg'
     const r = listingImagesSchema.safeParse([url])
     expect(r.success).toBe(true)
   })
 
   it('accepts .png extension', () => {
     const url =
-      'https://abc123.supabase.co/storage/v1/object/public/images/listings/user/photo.png'
+      'https://test-project.supabase.co/storage/v1/object/public/images/listings/user/photo.png'
     const r = listingImagesSchema.safeParse([url])
     expect(r.success).toBe(true)
   })
 
   it('accepts .gif extension', () => {
     const url =
-      'https://abc123.supabase.co/storage/v1/object/public/images/listings/user/photo.gif'
+      'https://test-project.supabase.co/storage/v1/object/public/images/listings/user/photo.gif'
     const r = listingImagesSchema.safeParse([url])
     expect(r.success).toBe(true)
   })
 
   it('accepts .webp extension', () => {
     const url =
-      'https://abc123.supabase.co/storage/v1/object/public/images/listings/user/photo.webp'
+      'https://test-project.supabase.co/storage/v1/object/public/images/listings/user/photo.webp'
     const r = listingImagesSchema.safeParse([url])
     expect(r.success).toBe(true)
   })
 
   it('accepts case-insensitive extension (.JPG)', () => {
     const url =
-      'https://abc123.supabase.co/storage/v1/object/public/images/listings/user/photo.JPG'
+      'https://test-project.supabase.co/storage/v1/object/public/images/listings/user/photo.JPG'
     const r = listingImagesSchema.safeParse([url])
     expect(r.success).toBe(true)
   })
@@ -640,7 +640,7 @@ describe('listingImagesSchema', () => {
     const urls = Array.from(
       { length: 10 },
       (_, i) =>
-        `https://abc123.supabase.co/storage/v1/object/public/images/listings/user/img${i}.jpg`
+        `https://test-project.supabase.co/storage/v1/object/public/images/listings/user/img${i}.jpg`
     )
     const r = listingImagesSchema.safeParse(urls)
     expect(r.success).toBe(true)
@@ -650,7 +650,7 @@ describe('listingImagesSchema', () => {
     const urls = Array.from(
       { length: 11 },
       (_, i) =>
-        `https://abc123.supabase.co/storage/v1/object/public/images/listings/user/img${i}.jpg`
+        `https://test-project.supabase.co/storage/v1/object/public/images/listings/user/img${i}.jpg`
     )
     const r = listingImagesSchema.safeParse(urls)
     expect(r.success).toBe(false)
@@ -670,28 +670,28 @@ describe('listingImagesSchema', () => {
 
   it('rejects HTTP (non-HTTPS) URL', () => {
     const url =
-      'http://abc123.supabase.co/storage/v1/object/public/images/listings/user/photo.jpg'
+      'http://test-project.supabase.co/storage/v1/object/public/images/listings/user/photo.jpg'
     const r = listingImagesSchema.safeParse([url])
     expect(r.success).toBe(false)
   })
 
   it('rejects URL missing file extension', () => {
     const url =
-      'https://abc123.supabase.co/storage/v1/object/public/images/listings/user/photo'
+      'https://test-project.supabase.co/storage/v1/object/public/images/listings/user/photo'
     const r = listingImagesSchema.safeParse([url])
     expect(r.success).toBe(false)
   })
 
   it('rejects URL with wrong extension (.bmp)', () => {
     const url =
-      'https://abc123.supabase.co/storage/v1/object/public/images/listings/user/photo.bmp'
+      'https://test-project.supabase.co/storage/v1/object/public/images/listings/user/photo.bmp'
     const r = listingImagesSchema.safeParse([url])
     expect(r.success).toBe(false)
   })
 
   it('rejects URL with wrong storage path', () => {
     const url =
-      'https://abc123.supabase.co/storage/v1/object/public/other-bucket/photo.jpg'
+      'https://test-project.supabase.co/storage/v1/object/public/other-bucket/photo.jpg'
     const r = listingImagesSchema.safeParse([url])
     expect(r.success).toBe(false)
   })
@@ -807,7 +807,7 @@ describe('createListingApiSchema', () => {
       const urls = Array.from(
         { length: 10 },
         (_, i) =>
-          `https://abc123.supabase.co/storage/v1/object/public/images/listings/user/img${i}.jpg`
+          `https://test-project.supabase.co/storage/v1/object/public/images/listings/user/img${i}.jpg`
       )
       const r = createListingApiSchema.safeParse({
         ...validApi,
@@ -820,7 +820,7 @@ describe('createListingApiSchema', () => {
       const urls = Array.from(
         { length: 11 },
         (_, i) =>
-          `https://abc123.supabase.co/storage/v1/object/public/images/listings/user/img${i}.jpg`
+          `https://test-project.supabase.co/storage/v1/object/public/images/listings/user/img${i}.jpg`
       )
       const r = createListingApiSchema.safeParse({
         ...validApi,

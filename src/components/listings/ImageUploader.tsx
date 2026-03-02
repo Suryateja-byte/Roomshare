@@ -254,6 +254,9 @@ export default function ImageUploader({
             {/* 1. Upload Area */}
             {canAddMore && (
                 <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Upload photos. Click or drag and drop."
                     className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${isDragging
                         ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800 scale-[1.01]'
                         : 'border-zinc-300 dark:border-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900'
@@ -262,6 +265,7 @@ export default function ImageUploader({
                     onDragLeave={onDragLeave}
                     onDrop={onDrop}
                     onClick={() => fileInputRef.current?.click()}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
                 >
                     <input
                         type="file"
@@ -270,6 +274,7 @@ export default function ImageUploader({
                         className="hidden"
                         ref={fileInputRef}
                         onChange={handleFileSelect}
+                        aria-label="Select images to upload"
                     />
 
                     <div className="flex flex-col items-center justify-center space-y-3 pointer-events-none">
@@ -351,7 +356,7 @@ export default function ImageUploader({
                                             e.stopPropagation();
                                             removeImage(image.id);
                                         }}
-                                        className="bg-white/90 hover:bg-red-500 hover:text-white text-zinc-600 rounded-full p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm transition-all opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
+                                        className="bg-white/90 hover:bg-red-500 hover:text-white text-zinc-600 rounded-full p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:translate-y-2 sm:group-hover:translate-y-0"
                                         aria-label="Remove image"
                                     >
                                         <X size={14} />

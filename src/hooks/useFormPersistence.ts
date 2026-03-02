@@ -78,7 +78,7 @@ export function useFormPersistence<T>(
             setIsHydrated(true);
         } catch (error) {
             console.error('Error loading persisted form data:', error);
-            localStorage.removeItem(key);
+            try { localStorage.removeItem(key); } catch { /* storage entirely unavailable */ }
             setIsHydrated(true);
         }
     }, [key, expirationMs]);
@@ -95,6 +95,7 @@ export function useFormPersistence<T>(
             setPersistedData(data);
         } catch (error) {
             console.error('Error saving form data:', error);
+            setSavedAt(null); // Clear stale "Draft saved" indicator
         }
     }, debounceMs);
 
@@ -105,13 +106,9 @@ export function useFormPersistence<T>(
 
     // Clear persisted data (call on successful submission)
     const clearPersistedData = useCallback(() => {
-        try {
-            localStorage.removeItem(key);
-            setPersistedData(null);
-            setSavedAt(null);
-        } catch (error) {
-            console.error('Error clearing persisted data:', error);
-        }
+        try { localStorage.removeItem(key); } catch { /* ok */ }
+        setPersistedData(null);
+        setSavedAt(null);
     }, [key]);
 
     // Cancel any pending debounced save (call before clearPersistedData on submit)

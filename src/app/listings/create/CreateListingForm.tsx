@@ -66,6 +66,16 @@ interface ListingFormData {
 
 const FORM_STORAGE_KEY = 'listing-draft';
 
+// Static data moved to module scope to avoid re-creation every render (M-U3)
+const FORM_SECTIONS = [
+    { id: 'basics', label: 'The Basics', icon: Home },
+    { id: 'location', label: 'Location', icon: MapPin },
+    { id: 'photos', label: 'Photos', icon: Camera },
+    { id: 'details', label: 'Finer Details', icon: List },
+] as const;
+
+const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
+
 export default function CreateListingForm() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
@@ -116,9 +126,6 @@ export default function CreateListingForm() {
 
     // Language search filter state
     const [languageSearch, setLanguageSearch] = useState('');
-
-    // Get all language codes from canonical list
-    const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
 
     // Filter languages based on search
     const filteredLanguages = useMemo(() => {
@@ -224,18 +231,15 @@ export default function CreateListingForm() {
         };
     };
 
-    // Auto-save form data on changes
-    const handleFormChange = () => {
-        if (!isHydrated) return;
-        const formData = collectFormData();
-        saveData(formData);
-    };
-
-    // Save when controlled states change
+    // Save when controlled states change (M-U1: fix operator precedence, M-U2: fix deps)
     useEffect(() => {
-        if (!isHydrated || !draftRestored && hasDraft) return;
-        handleFormChange();
-    }, [title, description, price, totalSlots, address, city, state, zip, amenitiesValue, houseRulesValue, moveInDate, leaseDuration, roomType, genderPreference, householdGender, selectedLanguages, uploadedImages]);
+        if (!isHydrated || (!draftRestored && hasDraft)) return;
+        saveData(collectFormData());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isHydrated, draftRestored, hasDraft, title, description, price, totalSlots,
+        address, city, state, zip, amenitiesValue, houseRulesValue, moveInDate,
+        leaseDuration, roomType, genderPreference, householdGender,
+        selectedLanguages, uploadedImages]);
 
     // Cleanup: abort in-flight submission and clear redirect timeout on unmount
     useEffect(() => {
@@ -265,28 +269,23 @@ export default function CreateListingForm() {
     const failedImages = uploadedImages.filter(img => img.error);
     const stillUploading = uploadedImages.some(img => img.isUploading);
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, forceSubmit = false) => {
-        e.preventDefault();
-
-        // Synchronous double-submit guard
+    // Core submit logic extracted to avoid fake event creation (M-U5)
+    const executeSubmit = async (forceSubmit = false) => {
         if (isSubmittingRef.current) return;
 
         setError('');
         setFieldErrors({});
 
-        // Check if any images are still uploading
         if (stillUploading) {
             setError('Please wait for all images to finish uploading');
             return;
         }
 
-        // Require at least 1 successful image
         if (successfulImages.length === 0) {
             showError('At least one photo is required to publish your listing');
             return;
         }
 
-        // If some images failed but we have at least 1 success, show confirmation
         if (failedImages.length > 0 && !forceSubmit) {
             setShowPartialUploadDialog(true);
             return;
@@ -295,18 +294,15 @@ export default function CreateListingForm() {
         isSubmittingRef.current = true;
         setLoading(true);
 
-        // Abort any in-flight submission before starting a new one
         if (submitAbortRef.current) submitAbortRef.current.abort();
         const abortController = new AbortController();
         submitAbortRef.current = abortController;
 
-        const formData = new FormData(e.currentTarget);
+        // Read form data from the form ref instead of the event target
+        const formData = formRef.current ? new FormData(formRef.current) : new FormData();
         const data = Object.fromEntries(formData.entries());
 
-        // Get uploaded URLs (filter out any that failed to upload)
         const imageUrls = successfulImages.map(img => img.uploadedUrl as string);
-
-        // Generate idempotency key for this submission attempt
         const idempotencyKey = crypto.randomUUID();
 
         try {
@@ -331,7 +327,6 @@ export default function CreateListingForm() {
                 signal: abortController.signal,
             });
 
-            // Guard post-success callbacks — skip if component unmounted / navigated away
             if (abortController.signal.aborted) return;
 
             if (!res.ok) {
@@ -339,7 +334,6 @@ export default function CreateListingForm() {
                 if (json.fields) {
                     const newFieldErrors = json.fields as Record<string, string>;
                     setFieldErrors(newFieldErrors);
-                    // Focus the first field with an error
                     const firstErrorKey = Object.keys(newFieldErrors)[0];
                     if (firstErrorKey) {
                         const element = document.getElementById(firstErrorKey);
@@ -353,16 +347,12 @@ export default function CreateListingForm() {
 
             if (abortController.signal.aborted) return;
 
-            // Cancel pending debounced save to prevent it re-writing the draft
             cancelSave();
-            // Clear draft on successful submission
             clearPersistedData();
-            // Show success toast with enough time to read before redirect
             toast.success('Listing published successfully!', {
                 description: 'Your listing is now live and visible to potential roommates.',
                 duration: 5000,
             });
-            // Slight delay so user sees the success toast before redirect
             redirectTimeoutRef.current = setTimeout(() => {
                 if (!abortController.signal.aborted) {
                     router.push(`/listings/${result.id}`);
@@ -378,17 +368,14 @@ export default function CreateListingForm() {
         }
     };
 
-    // Handle confirmation to submit with partial images
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        executeSubmit(false);
+    };
+
     const handleConfirmPartialSubmit = () => {
         setShowPartialUploadDialog(false);
-        if (formRef.current) {
-            // Create a synthetic event and call handleSubmit with forceSubmit=true
-            const syntheticEvent = {
-                preventDefault: () => { },
-                currentTarget: formRef.current
-            } as React.FormEvent<HTMLFormElement>;
-            handleSubmit(syntheticEvent, true);
-        }
+        executeSubmit(true);
     };
 
     const isAnyUploading = uploadedImages.some(img => img.isUploading);
@@ -403,20 +390,19 @@ export default function CreateListingForm() {
         );
     };
 
-    // Form sections for progress indicator with completion tracking
-    const sectionCompletion = {
+    // Memoize section completion to avoid re-creation every render (M-U3)
+    const sectionCompletion = useMemo(() => ({
         basics: title.trim() !== '' && description.trim().length >= 10 && price.trim() !== '' && totalSlots.trim() !== '',
         location: address.trim() !== '' && city.trim() !== '' && state.trim() !== '' && zip.trim() !== '',
         photos: successfulImages.length > 0,
-        details: true, // Details section is optional, always considered complete
-    };
+        details: true,
+    }), [title, description, price, totalSlots, address, city, state, zip, successfulImages.length]);
 
-    const FORM_SECTIONS = [
-        { id: 'basics', label: 'The Basics', icon: Home },
-        { id: 'location', label: 'Location', icon: MapPin },
-        { id: 'photos', label: 'Photos', icon: Camera },
-        { id: 'details', label: 'Finer Details', icon: List },
-    ];
+    // Memoize unselected language list to avoid double .filter() (M-U3)
+    const unselectedLanguages = useMemo(
+        () => filteredLanguages.filter(code => !selectedLanguages.includes(code)),
+        [filteredLanguages, selectedLanguages]
+    );
 
     return (
         <>
@@ -519,7 +505,7 @@ export default function CreateListingForm() {
                 </div>
             )}
 
-            <form ref={formRef} onSubmit={handleSubmit} onChange={handleFormChange} className="space-y-12">
+            <form ref={formRef} onSubmit={handleSubmit} onChange={() => saveData(collectFormData())} className="space-y-12">
                 {/* Section 1: The Basics */}
                 <div className="space-y-6">
                     <h3 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
@@ -632,7 +618,7 @@ export default function CreateListingForm() {
                         />
                         <FieldError field="address" />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] md:grid-cols-[2fr_1fr_1fr] gap-4">
                         <div>
                             <Label htmlFor="city">City</Label>
                             <Input
@@ -787,7 +773,7 @@ export default function CreateListingForm() {
                                         aria-label={`${getLanguageName(code)}, selected`}
                                         onClick={() => toggleLanguage(code)}
                                         disabled={loading}
-                                        className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="flex items-center gap-1 px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {getLanguageName(code)}
                                         <X className="w-3.5 h-3.5" />
@@ -809,19 +795,19 @@ export default function CreateListingForm() {
 
                         {/* Language chips */}
                         <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
-                            {filteredLanguages.filter(code => !selectedLanguages.includes(code)).map((code) => (
+                            {unselectedLanguages.map((code) => (
                                 <button
                                     key={code}
                                     type="button"
                                     aria-pressed="false"
                                     onClick={() => toggleLanguage(code)}
                                     disabled={loading}
-                                    className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium transition-all duration-200 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     {getLanguageName(code)}
                                 </button>
                             ))}
-                            {filteredLanguages.filter(code => !selectedLanguages.includes(code)).length === 0 && (
+                            {unselectedLanguages.length === 0 && (
                                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                                     {languageSearch ? 'No languages found' : 'All languages selected'}
                                 </p>

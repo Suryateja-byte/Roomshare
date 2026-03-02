@@ -19,7 +19,7 @@ export default function CharacterCounter({
     const isNearLimit = percentage >= 95 && percentage <= 100;
 
     return (
-        <div data-testid="char-counter" className={cn('flex items-center justify-end gap-1 text-xs', className)}>
+        <div data-testid="char-counter" className={cn('flex items-center justify-end gap-1 text-xs', className)} aria-live="polite">
             <span
                 className={cn(
                     'tabular-nums transition-colors',
@@ -36,6 +36,7 @@ export default function CharacterCounter({
             </span>
             <span className="text-zinc-300 dark:text-zinc-600">/</span>
             <span className="text-zinc-400 dark:text-zinc-500">{max}</span>
+            {isOver && <span className="sr-only">Character limit exceeded</span>}
         </div>
     );
 }

@@ -3,15 +3,15 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 
-export async function checkSuspension(): Promise<{ suspended: boolean; error?: string }> {
-    const session = await auth();
-    if (!session?.user?.id) {
+export async function checkSuspension(userId?: string): Promise<{ suspended: boolean; error?: string }> {
+    const uid = userId ?? (await auth())?.user?.id;
+    if (!uid) {
         return { suspended: false }; // Let auth checks handle this
     }
 
     try {
         const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: uid },
             select: { isSuspended: true }
         });
 
@@ -26,15 +26,15 @@ export async function checkSuspension(): Promise<{ suspended: boolean; error?: s
     }
 }
 
-export async function checkEmailVerified(): Promise<{ verified: boolean; error?: string }> {
-    const session = await auth();
-    if (!session?.user?.id) {
+export async function checkEmailVerified(userId?: string): Promise<{ verified: boolean; error?: string }> {
+    const uid = userId ?? (await auth())?.user?.id;
+    if (!uid) {
         return { verified: false }; // Let auth checks handle this
     }
 
     try {
         const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: uid },
             select: { emailVerified: true }
         });
 

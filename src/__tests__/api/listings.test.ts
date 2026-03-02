@@ -261,7 +261,7 @@ describe('Listings API', () => {
       roomType: 'Private Room',
       totalSlots: '1',
       images: [
-        'https://abc123.supabase.co/storage/v1/object/public/images/listings/user-123/test.jpg',
+        'https://test-project.supabase.co/storage/v1/object/public/images/listings/user-123/test.jpg',
       ],
     }
 
@@ -336,6 +336,7 @@ describe('Listings API', () => {
           listing: { create: jest.fn().mockResolvedValue(mockListing) },
           location: { create: jest.fn().mockResolvedValue({ id: 'loc-123' }) },
           $executeRaw: jest.fn().mockResolvedValue(1),
+          $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
         }
         return callback(tx)
       })
@@ -407,7 +408,16 @@ describe('Listings API', () => {
     })
 
     it('returns 400 when max listings exceeded', async () => {
-      ;(prisma.listing.count as jest.Mock).mockResolvedValue(10)
+      ;(geocodeAddress as jest.Mock).mockResolvedValue({ lat: 37.7749, lng: -122.4194 })
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          listing: { create: jest.fn() },
+          location: { create: jest.fn() },
+          $executeRaw: jest.fn(),
+          $queryRaw: jest.fn().mockResolvedValue([{ count: 10 }]),
+        }
+        return callback(tx)
+      })
 
       const request = new Request('http://localhost/api/listings', {
         method: 'POST',

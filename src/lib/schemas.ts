@@ -55,12 +55,30 @@ export const listingHouseholdGenderSchema = z.enum(LISTING_HOUSEHOLD_GENDERS as 
 // ============================================
 // Image URL Validation Schema
 // ============================================
-// Supabase storage URL pattern: https://{project}.supabase.co/storage/v1/object/public/images/listings/...
-const SUPABASE_IMAGE_URL_PATTERN = /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/images\/listings\/.+\.(jpg|jpeg|png|gif|webp)$/i;
+// Structural regex: validates URL shape + path + extension. Tighten path to [\w./-]+ (M-S3)
+const SUPABASE_IMAGE_URL_PATTERN = /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/images\/listings\/[\w./-]+\.(jpg|jpeg|png|gif|webp)$/i;
 
-export const listingImagesSchema = z.array(
-  z.string().url("Invalid image URL").regex(SUPABASE_IMAGE_URL_PATTERN, "Image must be from Supabase storage")
-).min(1, "At least one image is required").max(10, "Maximum 10 images");
+// Pin Supabase project ref from env to prevent cross-project image injection (M-S3)
+function getExpectedSupabaseHost(): string | null {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const match = url.match(/^https:\/\/([a-z0-9-]+\.supabase\.co)/);
+    return match?.[1] || null;
+}
+
+const supabaseImageUrlSchema = z.string()
+  .url("Invalid image URL")
+  .regex(SUPABASE_IMAGE_URL_PATTERN, "Image must be from Supabase storage")
+  .refine((url) => {
+    const expectedHost = getExpectedSupabaseHost();
+    if (!expectedHost) return true; // Skip host pin if env not configured
+    try {
+      const parsed = new URL(url);
+      return parsed.host === expectedHost;
+    } catch { return false; }
+  }, "Image must be from this project's Supabase storage");
+
+export const listingImagesSchema = z.array(supabaseImageUrlSchema)
+  .min(1, "At least one image is required").max(10, "Maximum 10 images");
 
 // ============================================
 // Move-in Date Validation Schema
@@ -86,17 +104,21 @@ export const moveInDateSchema = z.string()
   .optional()
   .nullable();
 
+// Defense-in-depth: reject HTML tags in user-facing text fields (M-D4)
+const noHtmlTags = (val: string) => !/<[^>]*>/.test(val);
+const NO_HTML_MSG = "HTML tags are not allowed";
+
 export const createListingSchema = z.object({
-    title: z.string().min(1, "Title is required").max(100, "Title must be 100 characters or less"),
-    description: z.string().min(10, "Description must be at least 10 characters").max(1000, "Description must be 1000 characters or less"),
+    title: z.string().trim().min(1, "Title is required").max(100, "Title must be 100 characters or less").refine(noHtmlTags, NO_HTML_MSG),
+    description: z.string().trim().min(10, "Description must be at least 10 characters").max(1000, "Description must be 1000 characters or less").refine(noHtmlTags, NO_HTML_MSG),
     price: z.coerce.number().positive("Price must be a positive number").max(50000, "Maximum $50,000/month").refine(Number.isFinite, "Must be a valid number"),
     amenities: z.string().transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)).pipe(z.array(z.string().max(50, "Each amenity max 50 chars")).max(20, "Maximum 20 amenities")),
     houseRules: z.string().optional().default("").transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)).pipe(z.array(z.string().max(50, "Each house rule max 50 chars")).max(20, "Maximum 20 house rules")),
     totalSlots: z.coerce.number().int().positive("Total slots must be a positive integer").max(20, "Maximum 20 roommates"),
-    address: z.string().min(1, "Address is required").max(200, "Address must be 200 characters or less"),
-    city: z.string().min(1, "City is required").max(100, "City must be 100 characters or less"),
-    state: z.string().min(1, "State is required").max(50, "State must be 50 characters or less"),
-    zip: z.string().min(1, "Zip code is required").regex(/^\d{5}(-\d{4})?$/, "Must be a valid US zip code (e.g., 12345 or 12345-6789)"),
+    address: z.string().trim().min(1, "Address is required").max(200, "Address must be 200 characters or less"),
+    city: z.string().trim().min(1, "City is required").max(100, "City must be 100 characters or less"),
+    state: z.string().trim().min(1, "State is required").max(50, "State must be 50 characters or less"),
+    zip: z.string().trim().min(1, "Zip code is required").regex(/^\d{5}(-\d{4})?$/, "Must be a valid US zip code (e.g., 12345 or 12345-6789)"),
 });
 
 export type CreateListingInput = z.infer<typeof createListingSchema>;

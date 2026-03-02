@@ -89,15 +89,7 @@ export async function POST(request: Request) {
 
     const startTime = Date.now();
     try {
-        // 2. Parse JSON body with error handling (2H)
-        let body: Record<string, unknown>;
-        try {
-            body = await request.json();
-        } catch {
-            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-        }
-
-        // 3. Auth check
+        // 2. Auth check — BEFORE parsing body (M-S4)
         const session = await auth();
         if (!session || !session.user || !session.user.id) {
             await logger.warn('Unauthorized listing creation attempt', {
@@ -108,14 +100,22 @@ export async function POST(request: Request) {
         }
         const userId = session.user.id;
 
-        // 4. Suspension check (1B)
-        const suspension = await checkSuspension();
+        // 3. Parse JSON body with error handling (only for authenticated users)
+        let body: Record<string, unknown>;
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+        }
+
+        // 4. Suspension check — pass userId to avoid redundant auth() call (M-S1)
+        const suspension = await checkSuspension(userId);
         if (suspension.suspended) {
             return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
-        // 5. Email verification check (1B)
-        const emailCheck = await checkEmailVerified();
+        // 5. Email verification check — pass userId to avoid redundant auth() call (M-S1)
+        const emailCheck = await checkEmailVerified(userId);
         if (!emailCheck.verified) {
             return NextResponse.json({ error: emailCheck.error || 'Please verify your email' }, { status: 403 });
         }
@@ -311,8 +311,11 @@ export async function POST(request: Request) {
             });
         };
 
-        // 11. Check for idempotency key header (1F)
+        // 11. Check for idempotency key header (1F) — validate format (M-S6)
         const idempotencyKey = request.headers.get('X-Idempotency-Key');
+        if (idempotencyKey && (idempotencyKey.length > 128 || !/^[\w-]+$/.test(idempotencyKey))) {
+            return NextResponse.json({ error: 'Invalid idempotency key format' }, { status: 400 });
+        }
         let result: Awaited<ReturnType<typeof createListingInTx>>;
         let cached = false;
 
@@ -361,8 +364,8 @@ export async function POST(request: Request) {
             durationMs: Date.now() - startTime,
         });
 
-        // 18. Return 201 with no-cache headers
-        const response = NextResponse.json({ ...result, price: Number(result.price) }, { status: 201 });
+        // 18. Return 201 with only the fields the client needs (M-S5)
+        const response = NextResponse.json({ id: result.id }, { status: 201 });
         response.headers.set('Cache-Control', 'no-store');
         if (cached) {
             response.headers.set('X-Idempotency-Replayed', 'true');
