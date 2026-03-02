@@ -55,10 +55,10 @@ export default function SearchViewToggle({
   const renderMapInMobile = isDesktop === false;
   const renderMapInDesktop = isDesktop !== false && shouldShowMap;
 
-  // Prevent dual children mount: render children in exactly one container.
-  // Before mount: render in desktop container only (CSS `hidden md:flex` hides on mobile)
-  // After mount: render in exactly one container based on actual viewport
-  const showChildrenInMobile = hasMounted && isDesktop === false;
+  // Render children in BOTH containers before mount so SSR HTML matches
+  // client hydration regardless of viewport (CSS md:hidden / hidden md:flex
+  // hides the inactive one). After mount, render in exactly one container.
+  const showChildrenInMobile = !hasMounted || isDesktop === false;
   const showChildrenInDesktop = !hasMounted || isDesktop !== false;
 
   return (

@@ -5,7 +5,6 @@ import { useRef, useState, useEffect, useCallback, useTransition } from 'react';
 import {
   Home,
   Building2,
-  Train,
   PawPrint,
   Sofa,
   CalendarClock,
@@ -32,12 +31,6 @@ const CATEGORIES = [
     label: 'Private Room',
     icon: Home,
     params: { roomType: 'Private Room' },
-  },
-  {
-    id: 'transit',
-    label: 'Near Transit',
-    icon: Train,
-    params: { amenities: 'Near Transit' },
   },
   {
     id: 'pet',
