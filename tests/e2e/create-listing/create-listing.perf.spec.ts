@@ -47,7 +47,7 @@ test.describe('Create Listing — Performance Tests', () => {
     });
 
     expect(lcp, 'LCP should be recorded').toBeGreaterThan(0);
-    const lcpBudget = process.env.CI ? 7500 : 2500;
+    const lcpBudget = process.env.CI ? 4000 : 2500;
     expect(lcp, `LCP was ${lcp.toFixed(0)}ms, budget is ${lcpBudget}ms`).toBeLessThan(lcpBudget);
   });
 
@@ -79,7 +79,7 @@ test.describe('Create Listing — Performance Tests', () => {
     // hydration, and Suspense boundaries cause unavoidable layout shifts that
     // don't reproduce in real browsers.  The CWV "good" threshold is 0.1 but
     // synthetic CI environments routinely measure 0.25-0.40.
-    const clsBudget = process.env.CI ? 1.5 : 0.5;
+    const clsBudget = process.env.CI ? 0.25 : 0.5;
     expect(cls, `CLS was ${cls.toFixed(4)}, budget is ${clsBudget}`).toBeLessThan(clsBudget);
   });
 
@@ -103,7 +103,7 @@ test.describe('Create Listing — Performance Tests', () => {
     expect(value).toBe('TTI test');
 
     const tti = Date.now() - navStart;
-    const ttiBudget = process.env.CI ? 15000 : 5000;
+    const ttiBudget = process.env.CI ? 8000 : 5000;
     expect(tti, `TTI was ${tti}ms, budget is ${ttiBudget}ms`).toBeLessThan(ttiBudget);
   });
 
@@ -119,7 +119,7 @@ test.describe('Create Listing — Performance Tests', () => {
     });
 
     expect(loadTime, 'Navigation timing should be available').toBeGreaterThan(0);
-    const loadBudget = process.env.CI ? 15000 : 5000;
+    const loadBudget = process.env.CI ? 8000 : 5000;
     expect(loadTime, `Load time was ${loadTime.toFixed(0)}ms, budget is ${loadBudget}ms`).toBeLessThan(loadBudget);
   });
 });

@@ -247,6 +247,79 @@ describe('useFormPersistence', () => {
       expect(result.current.isHydrated).toBe(true)
     })
   })
+
+  // =========================================================================
+  // localStorage error edge cases
+  // =========================================================================
+
+  describe('localStorage error edge cases', () => {
+    it('handles QuotaExceededError on setItem gracefully (no throw)', async () => {
+      const { result } = renderHook(() =>
+        useFormPersistence<{ name: string }>({ key: 'test-form' })
+      )
+
+      await waitFor(() => {
+        expect(result.current.isHydrated).toBe(true)
+      })
+
+      // Make setItem throw QuotaExceededError
+      const quotaError = new DOMException('Quota exceeded', 'QuotaExceededError')
+      ;(window.localStorage.setItem as jest.Mock).mockImplementation(() => {
+        throw quotaError
+      })
+
+      // Should not throw — hook catches the error
+      act(() => {
+        result.current.saveData({ name: 'Overflow Data' })
+      })
+
+      // savedAt should be cleared (stale indicator removed)
+      expect(result.current.savedAt).toBeNull()
+    })
+
+    it('handles SecurityError on getItem gracefully (private browsing)', async () => {
+      // Make getItem throw SecurityError (simulates private browsing)
+      ;(window.localStorage.getItem as jest.Mock).mockImplementation(() => {
+        throw new DOMException('Access denied', 'SecurityError')
+      })
+
+      // removeItem may also throw in this scenario
+      ;(window.localStorage.removeItem as jest.Mock).mockImplementation(() => {
+        throw new DOMException('Access denied', 'SecurityError')
+      })
+
+      // Should not crash the hook
+      const { result } = renderHook(() =>
+        useFormPersistence<{ name: string }>({ key: 'test-form' })
+      )
+
+      await waitFor(() => {
+        expect(result.current.isHydrated).toBe(true)
+      })
+
+      // Should fall back to null state
+      expect(result.current.persistedData).toBeNull()
+      expect(result.current.hasDraft).toBe(false)
+    })
+
+    it('handles corrupted JSON with missing data field', async () => {
+      // Valid JSON but missing expected "data" field — hook sets persistedData
+      // to parsed.data (which is undefined). Since undefined !== null, hasDraft
+      // is true. This test verifies the hook doesn't crash on unexpected shapes.
+      mockStorage['test-form'] = JSON.stringify({ notData: true, savedAt: Date.now() })
+
+      const { result } = renderHook(() =>
+        useFormPersistence<{ name: string }>({ key: 'test-form' })
+      )
+
+      await waitFor(() => {
+        expect(result.current.isHydrated).toBe(true)
+      })
+
+      // Hook loads without crashing — persistedData is undefined (not null)
+      expect(result.current.persistedData).toBeUndefined()
+    })
+  })
 })
 
 describe('formatTimeSince', () => {

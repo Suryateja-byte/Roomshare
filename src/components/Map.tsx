@@ -559,6 +559,8 @@ export default function MapComponent({
     const executeMapSearchRef = useRef<((bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }) => void) | null>(null);
     // Track pending search after zoom-out (user-initiated zoom that should trigger search)
     const pendingSearchAfterZoomRef = useRef(false);
+    // Track last map center to detect resize-triggered moveEnd events (center barely moves)
+    const lastCenterRef = useRef<{ lat: number; lng: number } | null>(null);
     // Track URL bounds for reset functionality
     const urlBoundsRef = useRef<{ minLng: number; maxLng: number; minLat: number; maxLat: number } | null>(null);
     // P2-FIX (#154): Store numeric bounds for deduplication instead of string
@@ -707,6 +709,7 @@ export default function MapComponent({
             // Mark as programmatic move to prevent banner showing
             setProgrammaticMove(true);
             isClusterExpandingRef.current = true;
+            pendingSearchAfterZoomRef.current = true;
             // P1-FIX (#109): Safety timeout to clear BOTH flags if moveEnd/onIdle don't fire.
             // This prevents isClusterExpandingRef from getting stuck if animation is interrupted.
             if (programmaticClearTimeoutRef.current) clearTimeout(programmaticClearTimeoutRef.current);
@@ -1624,7 +1627,11 @@ export default function MapComponent({
         // Always update current bounds in context for location conflict detection
         setCurrentMapBounds(bounds);
 
+        // Track center for resize-triggered moveEnd detection
+        const center = { lat: e.viewState.latitude, lng: e.viewState.longitude };
+
         // Skip search/dirty logic during programmatic moves (auto-fly, card click, cluster expand)
+        let skipCenterDedup = false;
         if (isProgrammaticMoveRef.current) {
             setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
             setActivePanBounds(null); // Clear active pan bounds
@@ -1632,9 +1639,11 @@ export default function MapComponent({
             // Tiles may not be loaded yet, clearing here causes empty markers
             // Zoom-out button is user-initiated — allow search to proceed
             if (!pendingSearchAfterZoomRef.current) {
+                lastCenterRef.current = center;
                 return;
             }
             pendingSearchAfterZoomRef.current = false;
+            skipCenterDedup = true;
             // Fall through to search logic below
         }
 
@@ -1646,6 +1655,19 @@ export default function MapComponent({
         // before the auto-fly effect has a chance to run
         if (isInitialMoveRef.current) {
             isInitialMoveRef.current = false;
+            lastCenterRef.current = center;
+            return;
+        }
+
+        // Skip resize-triggered moveEnd events where center barely changed.
+        // Container resize (e.g., header height change from warning banner) triggers moveEnd
+        // but doesn't actually move the map center — no reason to re-search.
+        const CENTER_THRESHOLD = 0.0001; // ~11 meters
+        const prevCenter = lastCenterRef.current;
+        lastCenterRef.current = center;
+        if (!skipCenterDedup && prevCenter &&
+            Math.abs(center.lat - prevCenter.lat) < CENTER_THRESHOLD &&
+            Math.abs(center.lng - prevCenter.lng) < CENTER_THRESHOLD) {
             return;
         }
 

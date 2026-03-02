@@ -243,6 +243,7 @@ export const RATE_LIMITS = {
   savedListings: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
   notifications: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   savedSearchMutations: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
+  canDeleteCheck: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
 } as const;
 
 function getFirstForwardedIp(forwardedFor: string | null): string | null {

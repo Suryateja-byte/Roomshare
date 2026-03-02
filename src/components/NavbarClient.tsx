@@ -192,10 +192,19 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     }, [user, scheduleNextPoll]);
 
     // Handle scroll effect for glassmorphism
+    // The actual scroll container is CustomScrollContainer (.custom-scroll-hide),
+    // not window (html/body have overflow:hidden).
     useEffect(() => {
-        const handleScroll = () => setIsScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+        const scrollContainer = document.querySelector('.custom-scroll-hide') ?? window;
+        const handleScroll = () => {
+            const scrollTop = scrollContainer instanceof HTMLElement
+                ? scrollContainer.scrollTop
+                : window.scrollY;
+            setIsScrolled(scrollTop > 20);
+        };
+        scrollContainer.addEventListener('scroll', handleScroll);
+        handleScroll(); // Check initial scroll position
+        return () => scrollContainer.removeEventListener('scroll', handleScroll);
     }, []);
 
     // Close dropdown when clicking outside
@@ -251,7 +260,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
         <nav
             aria-label="Main navigation"
             className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-500 ease-in-out ${isScrolled
-                ? 'py-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl shadow-sm'
+                ? 'py-4 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md shadow-sm border-b border-zinc-200/50 dark:border-zinc-800/50'
                 : 'py-6 bg-transparent'
                 }`}
         >

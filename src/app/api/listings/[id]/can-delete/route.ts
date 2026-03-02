@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { logger, sanitizeErrorMessage } from '@/lib/logger';
+import { withRateLimit } from '@/lib/with-rate-limit';
 import * as Sentry from '@sentry/nextjs';
 
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const rateLimitResponse = await withRateLimit(request, { type: 'canDeleteCheck' });
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const session = await auth();
         if (!session || !session.user || !session.user.id) {

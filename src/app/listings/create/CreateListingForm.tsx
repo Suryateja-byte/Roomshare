@@ -44,6 +44,15 @@ interface PersistedImageData {
     uploadedUrl: string;
 }
 
+function FieldError({ field, fieldErrors }: { field: string; fieldErrors: Record<string, string> }) {
+    if (!fieldErrors[field]) return null;
+    return (
+        <p id={`${field}-error`} role="alert" className="text-red-500 dark:text-red-400 text-xs mt-1">
+            {fieldErrors[field]}
+        </p>
+    );
+}
+
 interface ListingFormData {
     title: string;
     description: string;
@@ -91,6 +100,7 @@ export default function CreateListingForm() {
     const isSubmittingRef = useRef(false);
     const submitAbortRef = useRef<AbortController | null>(null);
     const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const submitSucceededRef = useRef(false);
 
     // Form field states for premium components
     const [description, setDescription] = useState('');
@@ -138,11 +148,11 @@ export default function CreateListingForm() {
     }, [languageSearch]);
 
     // Guard against all navigation vectors (beforeunload, pushState, popstate)
-    const hasUnsavedWork = loading
+    const hasUnsavedWork = !submitSucceededRef.current && (loading
         || uploadedImages.some(img => img.uploadedUrl)
-        || !!(title || description || price || address || city || state || zip);
+        || !!(title || description || price || address || city || state || zip));
 
-    useNavigationGuard(
+    const navGuard = useNavigationGuard(
         hasUnsavedWork,
         loading
             ? 'Your listing is still being created. Are you sure you want to leave?'
@@ -349,6 +359,7 @@ export default function CreateListingForm() {
 
             cancelSave();
             clearPersistedData();
+            submitSucceededRef.current = true;
             toast.success('Listing published successfully!', {
                 description: 'Your listing is now live and visible to potential roommates.',
                 duration: 5000,
@@ -380,15 +391,7 @@ export default function CreateListingForm() {
 
     const isAnyUploading = uploadedImages.some(img => img.isUploading);
 
-    // Helper component for field-level errors
-    const FieldError = ({ field }: { field: string }) => {
-        if (!fieldErrors[field]) return null;
-        return (
-            <p id={`${field}-error`} role="alert" className="text-red-500 dark:text-red-400 text-xs mt-1">
-                {fieldErrors[field]}
-            </p>
-        );
-    };
+    // FieldError is now a module-level component (UI-H1)
 
     // Memoize section completion to avoid re-creation every render (M-U3)
     const sectionCompletion = useMemo(() => ({
@@ -462,7 +465,7 @@ export default function CreateListingForm() {
                         <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                         <div>
                             <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                You have an unsaved draft
+                                You have a saved draft
                             </p>
                             <p className="text-xs text-blue-600 dark:text-blue-400">
                                 Last saved {formatTimeSince(savedAt)}
@@ -526,7 +529,7 @@ export default function CreateListingForm() {
                             aria-describedby={fieldErrors.title ? 'title-error' : undefined}
                             className={fieldErrors.title ? 'border-red-500 dark:border-red-500' : ''}
                         />
-                        <FieldError field="title" />
+                        <FieldError field="title" fieldErrors={fieldErrors} />
                     </div>
 
                     <div>
@@ -546,7 +549,7 @@ export default function CreateListingForm() {
                             disabled={loading}
                         />
                         <div className="flex items-center justify-between mt-1">
-                            <FieldError field="description" />
+                            <FieldError field="description" fieldErrors={fieldErrors} />
                             <CharacterCounter current={description.length} max={DESCRIPTION_MAX_LENGTH} />
                         </div>
                     </div>
@@ -569,7 +572,7 @@ export default function CreateListingForm() {
                                 aria-describedby={fieldErrors.price ? 'price-error' : undefined}
                                 className={fieldErrors.price ? 'border-red-500 dark:border-red-500' : ''}
                             />
-                            <FieldError field="price" />
+                            <FieldError field="price" fieldErrors={fieldErrors} />
                         </div>
                         <div>
                             <Label htmlFor="totalSlots">Total Roommates</Label>
@@ -589,7 +592,7 @@ export default function CreateListingForm() {
                                 aria-describedby={fieldErrors.totalSlots ? 'totalSlots-error' : undefined}
                                 className={fieldErrors.totalSlots ? 'border-red-500 dark:border-red-500' : ''}
                             />
-                            <FieldError field="totalSlots" />
+                            <FieldError field="totalSlots" fieldErrors={fieldErrors} />
                         </div>
                     </div>
                 </div>
@@ -616,7 +619,7 @@ export default function CreateListingForm() {
                             aria-describedby={fieldErrors.address ? 'address-error' : undefined}
                             className={fieldErrors.address ? 'border-red-500 dark:border-red-500' : ''}
                         />
-                        <FieldError field="address" />
+                        <FieldError field="address" fieldErrors={fieldErrors} />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] md:grid-cols-[2fr_1fr_1fr] gap-4">
                         <div>
@@ -633,7 +636,7 @@ export default function CreateListingForm() {
                                 aria-describedby={fieldErrors.city ? 'city-error' : undefined}
                                 className={fieldErrors.city ? 'border-red-500 dark:border-red-500' : ''}
                             />
-                            <FieldError field="city" />
+                            <FieldError field="city" fieldErrors={fieldErrors} />
                         </div>
                         <div>
                             <Label htmlFor="state">State</Label>
@@ -649,7 +652,7 @@ export default function CreateListingForm() {
                                 aria-describedby={fieldErrors.state ? 'state-error' : undefined}
                                 className={fieldErrors.state ? 'border-red-500 dark:border-red-500' : ''}
                             />
-                            <FieldError field="state" />
+                            <FieldError field="state" fieldErrors={fieldErrors} />
                         </div>
                         <div>
                             <Label htmlFor="zip">Zip Code</Label>
@@ -665,7 +668,7 @@ export default function CreateListingForm() {
                                 aria-describedby={fieldErrors.zip ? 'zip-error' : undefined}
                                 className={fieldErrors.zip ? 'border-red-500 dark:border-red-500' : ''}
                             />
-                            <FieldError field="zip" />
+                            <FieldError field="zip" fieldErrors={fieldErrors} />
                         </div>
                     </div>
                 </div>
@@ -711,7 +714,7 @@ export default function CreateListingForm() {
                             aria-describedby={fieldErrors.amenities ? 'amenities-error' : undefined}
                             className={fieldErrors.amenities ? 'border-red-500 dark:border-red-500' : ''}
                         />
-                        <FieldError field="amenities" />
+                        <FieldError field="amenities" fieldErrors={fieldErrors} />
                         <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">Separate amenities with commas</p>
                     </div>
 
@@ -859,7 +862,7 @@ export default function CreateListingForm() {
                             aria-describedby={fieldErrors.houseRules ? 'houseRules-error' : undefined}
                             className={fieldErrors.houseRules ? 'border-red-500 dark:border-red-500' : ''}
                         />
-                        <FieldError field="houseRules" />
+                        <FieldError field="houseRules" fieldErrors={fieldErrors} />
                         <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">Separate rules with commas</p>
                     </div>
                 </div>
@@ -888,8 +891,12 @@ export default function CreateListingForm() {
                             'Publish Listing'
                         )}
                     </Button>
+                    {/* TODO: Create /terms and /community-guidelines pages */}
                     <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-4">
-                        By publishing, you agree to our Terms of Service and Community Guidelines.
+                        By publishing, you agree to our{' '}
+                        <a href="/terms" className="underline hover:text-primary-700">Terms of Service</a>
+                        {' '}and{' '}
+                        <a href="/community-guidelines" className="underline hover:text-primary-700">Community Guidelines</a>.
                     </p>
                 </div>
             </form>
@@ -913,6 +920,20 @@ export default function CreateListingForm() {
                         <AlertDialogAction onClick={handleConfirmPartialSubmit}>
                             Publish with {successfulImages.length} Photo{successfulImages.length !== 1 ? 's' : ''}
                         </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Navigation Guard Dialog */}
+            <AlertDialog open={navGuard.showDialog} onOpenChange={(open) => { if (!open) navGuard.onStay(); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                        <AlertDialogDescription>{navGuard.message}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={navGuard.onStay}>Stay on Page</AlertDialogCancel>
+                        <AlertDialogAction onClick={navGuard.onLeave}>Leave Page</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

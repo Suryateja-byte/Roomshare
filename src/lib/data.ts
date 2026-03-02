@@ -331,7 +331,7 @@ export async function getListings(
       "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
       "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
     ];
-    const queryParams: any[] = [];
+    const queryParams: (string | number | boolean | null | Date | string[])[] = [];
     let paramIndex = 1;
 
     // Geographic bounds filter (SQL level)
@@ -604,7 +604,7 @@ export async function getMapListings(
     "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
     "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
   ];
-  const queryParams: any[] = [];
+  const queryParams: (string | number | boolean | null | Date | string[])[] = [];
   let paramIndex = 1;
 
   // SQL-level bounds filtering using PostGIS spatial index with antimeridian support
@@ -703,15 +703,20 @@ export async function getMapListings(
   }
 
   // Amenities filter (SQL level) - AND logic: must have ALL selected amenities
-  // NULL safety: filter out NULL values from unnest to prevent LOWER(NULL) issues
+  // Uses partial matching: UI sends 'Pool' but DB has 'Pool Access'
+  // Checks that every search term matches at least one amenity via LIKE
   if (amenities?.length) {
     const normalizedAmenities = amenities
       .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
-      conditions.push(
-        `ARRAY(SELECT LOWER(x) FROM unnest(l.amenities) AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`,
-      );
+      conditions.push(`NOT EXISTS (
+              SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM unnest(l.amenities) AS la
+                  WHERE LOWER(la) LIKE '%' || search_term || '%'
+              )
+          )`);
       queryParams.push(normalizedAmenities);
     }
   }
@@ -843,7 +848,7 @@ export async function getListingsPaginated(
       "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
       "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
     ];
-    const queryParams: any[] = [];
+    const queryParams: (string | number | boolean | null | Date | string[])[] = [];
     let paramIndex = 1;
 
     // Geographic bounds filter (SQL level) with antimeridian support
@@ -1164,7 +1169,7 @@ async function getListingsCountEfficient(
     "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
     "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
   ];
-  const queryParams: any[] = [];
+  const queryParams: (string | number | boolean | null | Date | string[])[] = [];
   let paramIndex = 1;
 
   // Geographic bounds filter with antimeridian support

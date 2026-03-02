@@ -5,8 +5,8 @@ describe('createListingSchema', () => {
     title: 'Cozy Room',
     description: 'A beautiful cozy room in the heart of downtown area.',
     price: '800',
-    amenities: 'WiFi, Parking, Laundry',
-    houseRules: 'No Smoking, No Pets',
+    amenities: 'Wifi, Parking, Kitchen',
+    houseRules: 'Pets allowed, Smoking allowed',
     totalSlots: '3',
     address: '123 Main St',
     city: 'San Francisco',
@@ -29,7 +29,7 @@ describe('createListingSchema', () => {
       const result = createListingSchema.safeParse(validListing)
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.amenities).toEqual(['WiFi', 'Parking', 'Laundry'])
+        expect(result.data.amenities).toEqual(['Wifi', 'Parking', 'Kitchen'])
       }
     })
 
@@ -37,7 +37,7 @@ describe('createListingSchema', () => {
       const result = createListingSchema.safeParse(validListing)
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.houseRules).toEqual(['No Smoking', 'No Pets'])
+        expect(result.data.houseRules).toEqual(['Pets allowed', 'Smoking allowed'])
       }
     })
 
@@ -69,29 +69,29 @@ describe('createListingSchema', () => {
     })
 
     it('should handle single amenity', () => {
-      const listing = { ...validListing, amenities: 'WiFi' }
+      const listing = { ...validListing, amenities: 'Wifi' }
       const result = createListingSchema.safeParse(listing)
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.amenities).toEqual(['WiFi'])
+        expect(result.data.amenities).toEqual(['Wifi'])
       }
     })
 
     it('should trim whitespace from amenities', () => {
-      const listing = { ...validListing, amenities: '  WiFi  ,  Parking  ' }
+      const listing = { ...validListing, amenities: '  Wifi  ,  Parking  ' }
       const result = createListingSchema.safeParse(listing)
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.amenities).toEqual(['WiFi', 'Parking'])
+        expect(result.data.amenities).toEqual(['Wifi', 'Parking'])
       }
     })
 
     it('should filter empty amenities', () => {
-      const listing = { ...validListing, amenities: 'WiFi,,Parking,,' }
+      const listing = { ...validListing, amenities: 'Wifi,,Parking,,' }
       const result = createListingSchema.safeParse(listing)
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.amenities).toEqual(['WiFi', 'Parking'])
+        expect(result.data.amenities).toEqual(['Wifi', 'Parking'])
       }
     })
   })

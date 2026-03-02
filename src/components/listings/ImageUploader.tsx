@@ -105,23 +105,30 @@ export default function ImageUploader({
             sizeErrorTimerRef.current = setTimeout(() => setSizeError(null), 5000);
         }
 
-        // Check max limit
-        const remainingSlots = maxImages - images.length;
-        const filesToProcess = withinLimit.slice(0, remainingSlots);
+        // Check max limit — use functional update to read current state (avoids stale closure)
+        let newImageObjects: ImageObject[] = [];
+        let updatedImages: ImageObject[] = [];
 
-        if (filesToProcess.length === 0) return;
+        setImages(prev => {
+            const remainingSlots = maxImages - prev.length;
+            const filesToProcess = withinLimit.slice(0, remainingSlots);
 
-        // Create initial image objects with loading state
-        const newImageObjects: ImageObject[] = filesToProcess.map(file => ({
-            file,
-            id: Math.random().toString(36).substr(2, 9),
-            previewUrl: URL.createObjectURL(file),
-            isUploading: uploadToCloud,
-            uploadedUrl: undefined
-        }));
+            if (filesToProcess.length === 0) return prev;
 
-        const updatedImages = [...images, ...newImageObjects];
-        setImages(updatedImages);
+            // Create initial image objects with loading state
+            newImageObjects = filesToProcess.map(file => ({
+                file,
+                id: Math.random().toString(36).substr(2, 9),
+                previewUrl: URL.createObjectURL(file),
+                isUploading: uploadToCloud,
+                uploadedUrl: undefined
+            }));
+
+            updatedImages = [...prev, ...newImageObjects];
+            return updatedImages;
+        });
+
+        if (newImageObjects.length === 0) return;
 
         // If uploading to cloud, process uploads
         if (uploadToCloud) {
@@ -215,6 +222,7 @@ export default function ImageUploader({
     const retryAllFailed = async () => {
         const failedImages = images.filter(img => img.error && img.file);
         for (const img of failedImages) {
+            if (uploadControllerRef.current?.signal.aborted) break;
             await retryUpload(img.id);
         }
     };

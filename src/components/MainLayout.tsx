@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 function pathShouldRemovePadding(pathname: string): boolean {
     if (!pathname) return false;
@@ -16,49 +16,21 @@ function pathShouldRemovePadding(pathname: string): boolean {
     return isHomePage || isSearchPage || isAuthPage;
 }
 
+function PaddingOverride() {
+    const pathname = usePathname();
+    if (!pathShouldRemovePadding(pathname)) return null;
+    // Specificity: main#main-content (0-1-1) > Tailwind .pt-16 (0-1-0, layered)
+    return <style>{`main#main-content{padding-top:0}`}</style>;
+}
+
 export default function MainLayout({ children }: { children: React.ReactNode }) {
-    // Start with a deterministic server/client value to avoid hydration mismatch.
-    const [pathname, setPathname] = useState('');
-
-    useEffect(() => {
-        const updatePathname = () => setPathname(window.location.pathname);
-        updatePathname();
-
-        const originalPushState = window.history.pushState;
-        const originalReplaceState = window.history.replaceState;
-
-        window.history.pushState = function (...args) {
-            const result = originalPushState.apply(this, args);
-            updatePathname();
-            return result;
-        };
-
-        window.history.replaceState = function (...args) {
-            const result = originalReplaceState.apply(this, args);
-            updatePathname();
-            return result;
-        };
-
-        window.addEventListener('popstate', updatePathname);
-
-        return () => {
-            window.history.pushState = originalPushState;
-            window.history.replaceState = originalReplaceState;
-            window.removeEventListener('popstate', updatePathname);
-        };
-    }, []);
-
-    // Search page handles its own padding/layout.
-    // Home page handles its own hero padding.
-    // Auth pages are full screen.
-    const shouldRemovePadding = pathShouldRemovePadding(pathname);
-
     return (
         <main
             id="main-content"
-            className={`flex-grow ${shouldRemovePadding ? '' : 'pt-16 md:pt-20'}`}
+            className="flex-grow pt-16 md:pt-20"
             role="main"
         >
+            <PaddingOverride />
             {children}
         </main>
     );

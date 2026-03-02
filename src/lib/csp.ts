@@ -11,6 +11,7 @@ const CONNECT_SRC_ORIGINS = [
   "https://api.radar.io",
   "https://tiles.stadiamaps.com",
   "https://api.stadiamaps.com",
+  "https://challenges.cloudflare.com",
 ];
 
 export function buildCspHeader(nonce?: string): string {
@@ -22,7 +23,7 @@ export function buildCspHeader(nonce?: string): string {
   } else if (nonce) {
     scriptSrcTokens.push(`'nonce-${nonce}'`, "'strict-dynamic'");
   }
-  scriptSrcTokens.push("https://maps.googleapis.com");
+  scriptSrcTokens.push("https://maps.googleapis.com", "https://challenges.cloudflare.com");
 
   const directives: string[] = [
     "default-src 'self'",
@@ -34,7 +35,7 @@ export function buildCspHeader(nonce?: string): string {
     `connect-src ${CONNECT_SRC_ORIGINS.join(" ")}`,
     "worker-src 'self' blob:",
     "child-src blob:",
-    "frame-src 'self' https://accounts.google.com",
+    "frame-src 'self' https://accounts.google.com https://challenges.cloudflare.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

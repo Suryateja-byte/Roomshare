@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
 import { createClient } from '@supabase/supabase-js';
-import { householdLanguagesSchema } from '@/lib/schemas';
+import { householdLanguagesSchema, supabaseImageUrlSchema } from '@/lib/schemas';
+import { VALID_AMENITIES, VALID_HOUSE_RULES } from '@/lib/filter-schema';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
@@ -24,12 +25,12 @@ function extractStoragePath(publicUrl: string): string | null {
 }
 
 const updateListingSchema = z.object({
-    title: z.string().trim().min(1).max(150),
-    description: z.string().trim().min(1).max(5000),
+    title: z.string().trim().min(1).max(100),
+    description: z.string().trim().min(1).max(1000),
     price: z.coerce.number().positive(),
-    amenities: z.union([z.array(z.string()), z.string()]).optional().default([]),
-    houseRules: z.union([z.array(z.string()), z.string()]).optional().default([]),
-    totalSlots: z.coerce.number().int().min(1).max(100),
+    amenities: z.union([z.array(z.string().max(50)).max(20), z.string()]).optional().default([]),
+    houseRules: z.union([z.array(z.string().max(50)).max(20), z.string()]).optional().default([]),
+    totalSlots: z.coerce.number().int().min(1).max(20),
     address: z.string().trim().min(1).max(200),
     city: z.string().trim().min(1).max(100),
     state: z.string().trim().min(1).max(100),
@@ -43,7 +44,8 @@ const updateListingSchema = z.object({
     householdLanguages: z.array(z.string().trim().toLowerCase()).max(20).optional(),
     genderPreference: z.string().trim().max(50).nullable().optional(),
     householdGender: z.string().trim().max(50).nullable().optional(),
-    images: z.array(z.string().trim().url().max(2048)).max(20).optional(),
+    primaryHomeLanguage: z.string().refine(isValidLanguageCode, { message: 'Invalid language code' }).nullable().optional(),
+    images: z.array(supabaseImageUrlSchema).max(10).optional(),
 });
 
 export async function DELETE(
@@ -231,6 +233,7 @@ export async function PATCH(
             householdLanguages,
             genderPreference,
             householdGender,
+            primaryHomeLanguage,
             images,
         } = parsed.data;
 
@@ -253,6 +256,14 @@ export async function PATCH(
             const langResult = householdLanguagesSchema.safeParse(householdLanguages);
             if (!langResult.success) {
                 return NextResponse.json({ error: 'Invalid language codes' }, { status: 400 });
+            }
+        }
+
+        // Check title for discriminatory language patterns (BE-H2)
+        if (title) {
+            const titleCheck = checkListingLanguageCompliance(title);
+            if (!titleCheck.allowed) {
+                return NextResponse.json({ error: titleCheck.message }, { status: 400 });
             }
         }
 
@@ -284,6 +295,20 @@ export async function PATCH(
 
         const normalizedAmenities = normalizeStringList(amenities);
         const normalizedHouseRules = normalizeStringList(houseRules);
+
+        // Allowlist validation for amenities and houseRules
+        const invalidAmenity = normalizedAmenities.find(
+            item => !VALID_AMENITIES.some(v => v.toLowerCase() === item.toLowerCase())
+        );
+        if (invalidAmenity) {
+            return NextResponse.json({ error: 'Invalid amenity value' }, { status: 400 });
+        }
+        const invalidRule = normalizedHouseRules.find(
+            item => !VALID_HOUSE_RULES.some(v => v.toLowerCase() === item.toLowerCase())
+        );
+        if (invalidRule) {
+            return NextResponse.json({ error: 'Invalid house rule value' }, { status: 400 });
+        }
 
         let result;
         try {
@@ -322,6 +347,7 @@ export async function PATCH(
                             : [],
                         genderPreference: genderPreference || null,
                         householdGender: householdGender || null,
+                        ...(primaryHomeLanguage !== undefined && { primaryHomeLanguage: primaryHomeLanguage || null }),
                         leaseDuration: leaseDuration || null,
                         roomType: roomType || null,
                         totalSlots,

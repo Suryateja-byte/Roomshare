@@ -18,6 +18,7 @@ import { upsertSearchDocSync } from '@/lib/search/search-doc-sync';
 import { triggerInstantAlerts } from '@/lib/search-alerts';
 import { captureApiError } from '@/lib/api-error-handler';
 import { normalizeStringList } from '@/lib/utils';
+import { calculateProfileCompletion, PROFILE_REQUIREMENTS } from '@/lib/profile-completion';
 
 export async function GET(request: Request) {
     // Use Redis-backed limiter for high-volume read path consistency.
@@ -121,15 +122,23 @@ export async function POST(request: Request) {
         }
 
         // 6. User existence check (1C)
-        const userExists = await prisma.user.findUnique({
+        const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true },
+            select: { id: true, name: true, email: true, emailVerified: true, bio: true, image: true, countryOfOrigin: true, languages: true, isVerified: true },
         });
-        if (!userExists) {
+        if (!user) {
             return NextResponse.json(
                 { error: 'User account not found. Please sign out and sign in again.' },
                 { status: 401 },
             );
+        }
+
+        // 6b. Profile completion check (BE-M2)
+        const completion = calculateProfileCompletion(user as any);
+        if (completion.percentage < PROFILE_REQUIREMENTS.createListing) {
+            return NextResponse.json({
+                error: `Profile must be at least ${PROFILE_REQUIREMENTS.createListing}% complete to create a listing. Current: ${completion.percentage}%. Missing: ${completion.missing.join(', ')}.`
+            }, { status: 403 });
         }
 
         // Log only non-sensitive metadata, NOT the full request body
@@ -167,7 +176,7 @@ export async function POST(request: Request) {
             title, description, price, amenities, houseRules, totalSlots,
             address, city, state, zip,
             images, leaseDuration, roomType, genderPreference, householdGender,
-            householdLanguages, moveInDate,
+            householdLanguages, primaryHomeLanguage, moveInDate,
         } = validatedFields.data;
 
         // 8. Language compliance check on title AND description (2G)
@@ -220,6 +229,7 @@ export async function POST(request: Request) {
                 .filter(isValidLanguageCode),
             genderPreference: genderPreference || null,
             householdGender: householdGender || null,
+            primaryHomeLanguage: primaryHomeLanguage || null,
             leaseDuration: leaseDuration || null,
             roomType: roomType || null,
             totalSlots,

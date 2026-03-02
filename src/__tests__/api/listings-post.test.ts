@@ -96,6 +96,21 @@ jest.mock('@/lib/schemas', () => {
   return actual
 })
 
+jest.mock('@/lib/profile-completion', () => ({
+  calculateProfileCompletion: jest.fn().mockReturnValue({
+    percentage: 100,
+    missing: [],
+    canCreateListing: true,
+    canSendMessages: true,
+    canBookRooms: true,
+  }),
+  PROFILE_REQUIREMENTS: {
+    createListing: 60,
+    sendMessages: 40,
+    bookRooms: 80,
+  },
+}))
+
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (data: unknown, init?: { status?: number; headers?: Record<string, string> }) => {
@@ -595,6 +610,79 @@ describe('POST /api/listings — extended edge cases', () => {
       expect(upsertSearchDocSync).not.toHaveBeenCalled()
       expect(triggerInstantAlerts).not.toHaveBeenCalled()
       expect(markListingDirty).not.toHaveBeenCalled()
+    })
+  })
+
+  // =========================================================================
+  // 8. Concurrent listing cap (10-listing limit)
+  // =========================================================================
+
+  describe('concurrent listing cap', () => {
+    it('rejects listing creation when user already has 10 active listings', async () => {
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{ count: 10 }]),
+          listing: { create: jest.fn() },
+          location: { create: jest.fn() },
+          $executeRaw: jest.fn(),
+        }
+        return callback(tx)
+      })
+
+      const response = await POST(makeRequest(validBody))
+      expect(response.status).toBe(400)
+      const data = await response.json()
+      expect(data.error).toContain('Maximum 10')
+    })
+
+    it('allows listing creation when user has 9 active listings', async () => {
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{ count: 9 }]),
+          listing: { create: jest.fn().mockResolvedValue(mockListing) },
+          location: { create: jest.fn().mockResolvedValue({ id: 'loc-123' }) },
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        }
+        return callback(tx)
+      })
+
+      const response = await POST(makeRequest(validBody))
+      expect(response.status).toBe(201)
+    })
+
+    it('only one of two concurrent requests succeeds at the cap boundary', async () => {
+      let callCount = 0
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        callCount++
+        if (callCount === 1) {
+          // First request: count is 9, succeeds
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([{ count: 9 }]),
+            listing: { create: jest.fn().mockResolvedValue(mockListing) },
+            location: { create: jest.fn().mockResolvedValue({ id: 'loc-123' }) },
+            $executeRaw: jest.fn().mockResolvedValue(1),
+          }
+          return callback(tx)
+        } else {
+          // Second request: count is now 10 (first request committed), throws
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([{ count: 10 }]),
+            listing: { create: jest.fn() },
+            location: { create: jest.fn() },
+            $executeRaw: jest.fn(),
+          }
+          return callback(tx)
+        }
+      })
+
+      const [response1, response2] = await Promise.all([
+        POST(makeRequest(validBody)),
+        POST(makeRequest(validBody)),
+      ])
+
+      const statuses = [response1.status, response2.status].sort()
+      // One should be 201 (success) and one should be 400 (cap exceeded)
+      expect(statuses).toEqual([201, 400])
     })
   })
 })

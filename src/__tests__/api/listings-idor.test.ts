@@ -515,21 +515,96 @@ describe('Listings API IDOR Protection', () => {
 });
 
 describe('Suspension + IDOR Combined', () => {
-  it('suspended owner cannot update their own listing', async () => {
-    // This test documents expected behavior:
-    // Suspension check should happen BEFORE IDOR check
-    // A suspended user should get 403 for suspension, not allowed to proceed
+  const mockListing = {
+    id: 'listing-abc',
+    ownerId: 'owner-123',
+    title: 'Test Listing',
+    description: 'A test listing',
+    price: 1000,
+    amenities: [],
+    houseRules: [],
+    householdLanguages: [],
+    totalSlots: 2,
+    availableSlots: 2,
+    images: [],
+    location: {
+      id: 'loc-123',
+      address: '123 Main St',
+      city: 'San Francisco',
+      state: 'CA',
+      zip: '94102',
+    },
+  };
 
-    const suspendedOwnerSession = {
-      user: { id: 'owner-123', email: 'owner@example.com', isSuspended: true },
-    };
+  const validPatchPayload = {
+    title: 'Updated Title',
+    description: 'Updated description',
+    price: '1200',
+    totalSlots: '2',
+    address: '123 Main St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94102',
+  };
 
-    // When we implement the middleware, this should return 403 for suspension
-    // For now, document the expected behavior
-    expect(suspendedOwnerSession.user.isSuspended).toBe(true);
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-    // TODO: After middleware implementation, verify:
-    // - Middleware returns 403 with code: 'ACCOUNT_SUSPENDED'
-    // - Route handler never reached
+  it('suspended owner gets 403 for suspension, not allowed to proceed', async () => {
+    const { checkSuspension } = jest.requireMock('@/app/actions/suspension');
+    (auth as jest.Mock).mockResolvedValue({
+      user: { id: 'owner-123', email: 'owner@example.com' },
+    });
+    (checkSuspension as jest.Mock).mockResolvedValue({
+      suspended: true,
+      error: 'Account suspended',
+    });
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+
+    const request = new Request('http://localhost/api/listings/listing-abc', {
+      method: 'PATCH',
+      body: JSON.stringify(validPatchPayload),
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ id: 'listing-abc' }),
+    });
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toContain('suspended');
+    // Listing should NOT be updated
+    expect(prisma.listing.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('suspended non-owner gets 403 for suspension, not 404', async () => {
+    const { checkSuspension } = jest.requireMock('@/app/actions/suspension');
+    (auth as jest.Mock).mockResolvedValue({
+      user: { id: 'attacker-456', email: 'attacker@example.com' },
+    });
+    (checkSuspension as jest.Mock).mockResolvedValue({
+      suspended: true,
+      error: 'Account suspended',
+    });
+    // Even though attacker doesn't own the listing, suspension check fires first
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+
+    const request = new Request('http://localhost/api/listings/listing-abc', {
+      method: 'PATCH',
+      body: JSON.stringify(validPatchPayload),
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ id: 'listing-abc' }),
+    });
+
+    // Should get 403 for suspension, NOT 404 for "not found" or 403 for "forbidden" (IDOR)
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toContain('suspended');
+    // Listing lookup should NOT have been reached
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

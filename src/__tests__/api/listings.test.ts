@@ -104,6 +104,11 @@ jest.mock('@/lib/schemas', () => {
   return actual
 })
 
+jest.mock('@/lib/profile-completion', () => ({
+  calculateProfileCompletion: jest.fn().mockReturnValue({ percentage: 100, missing: [] }),
+  PROFILE_REQUIREMENTS: { createListing: 50 },
+}))
+
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (data: unknown, init?: { status?: number; headers?: Record<string, string> }) => {

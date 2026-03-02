@@ -95,6 +95,8 @@ const MOCK_NOMINATIM_REVERSE_RESPONSE = JSON.stringify({
  * Safe to call on every test — routes only match external map domains
  * and the local dark-mode style path. App API routes (`/api/*`) are
  * never intercepted.
+ *
+ * Covers: OpenFreeMap, Stadia Maps, Photon, Nominatim
  */
 export async function mockMapTileRequests(page: Page): Promise<void> {
   // --- OpenFreeMap style JSON (light mode) ---
@@ -188,5 +190,57 @@ export async function mockMapTileRequests(page: Page): Promise<void> {
         body: MOCK_NOMINATIM_SEARCH_RESPONSE,
       });
     }
+  });
+
+  // --- Stadia Maps style JSON (light + dark) ---
+  await page.route('**/tiles.stadiamaps.com/styles/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: MINIMAL_STYLE_JSON,
+    });
+  });
+
+  // --- Stadia Maps vector tiles (.pbf) + glyphs ---
+  await page.route('**/tiles.stadiamaps.com/**/*.pbf', async (route) => {
+    await route.fulfill({ status: 204, body: '' });
+  });
+
+  // --- Stadia Maps raster tiles (.png) ---
+  await page.route('**/tiles.stadiamaps.com/**/*.png', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: TRANSPARENT_1X1_PNG,
+    });
+  });
+
+  // --- Stadia Maps sprites ---
+  await page.route('**/tiles.stadiamaps.com/sprites/**', async (route) => {
+    const url = route.request().url();
+    if (url.endsWith('.json')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: EMPTY_SPRITE_JSON,
+      });
+    } else if (url.endsWith('.png')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: TRANSPARENT_1X1_PNG,
+      });
+    } else {
+      await route.fulfill({ status: 204, body: '' });
+    }
+  });
+
+  // --- Stadia Maps API (style metadata, etc.) ---
+  await page.route('**/api.stadiamaps.com/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: MINIMAL_STYLE_JSON,
+    });
   });
 }

@@ -17,6 +17,8 @@ jest.mock('@/lib/filter-schema', () => ({
   ],
   VALID_GENDER_PREFERENCES: ['any', 'MALE_ONLY', 'FEMALE_ONLY', 'NO_PREFERENCE'],
   VALID_HOUSEHOLD_GENDERS: ['any', 'ALL_MALE', 'ALL_FEMALE', 'MIXED'],
+  VALID_AMENITIES: ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool', 'Furnished'],
+  VALID_HOUSE_RULES: ['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'],
 }))
 
 import {
@@ -275,8 +277,8 @@ describe('createListingSchema', () => {
       if (r.success) expect(r.data.amenities).toEqual(['Wifi'])
     })
 
-    it('accepts 20 amenities (max boundary)', () => {
-      const items = Array.from({ length: 20 }, (_, i) => `a${i}`)
+    it('accepts all valid amenities', () => {
+      const items = ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool', 'Furnished']
       const r = createListingSchema.safeParse({
         ...validBase,
         amenities: items.join(','),
@@ -293,12 +295,12 @@ describe('createListingSchema', () => {
       expect(r.success).toBe(false)
     })
 
-    it('accepts an amenity with exactly 50 chars', () => {
+    it('rejects an invalid amenity value', () => {
       const r = createListingSchema.safeParse({
         ...validBase,
-        amenities: 'x'.repeat(50),
+        amenities: 'InvalidAmenity',
       })
-      expect(r.success).toBe(true)
+      expect(r.success).toBe(false)
     })
 
     it('rejects an amenity with 51 chars', () => {
@@ -324,10 +326,10 @@ describe('createListingSchema', () => {
     it('transforms comma-separated rules into array', () => {
       const r = createListingSchema.safeParse({
         ...validBase,
-        houseRules: 'No Smoking,No Pets',
+        houseRules: 'Smoking allowed,Pets allowed',
       })
       expect(r.success).toBe(true)
-      if (r.success) expect(r.data.houseRules).toEqual(['No Smoking', 'No Pets'])
+      if (r.success) expect(r.data.houseRules).toEqual(['Smoking allowed', 'Pets allowed'])
     })
 
     it('returns empty array for empty string', () => {
@@ -336,8 +338,8 @@ describe('createListingSchema', () => {
       if (r.success) expect(r.data.houseRules).toEqual([])
     })
 
-    it('accepts 20 house rules (max boundary)', () => {
-      const items = Array.from({ length: 20 }, (_, i) => `rule${i}`)
+    it('accepts all valid house rules', () => {
+      const items = ['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed']
       const r = createListingSchema.safeParse({
         ...validBase,
         houseRules: items.join(','),
@@ -354,12 +356,12 @@ describe('createListingSchema', () => {
       expect(r.success).toBe(false)
     })
 
-    it('accepts a house rule with exactly 50 chars', () => {
+    it('rejects an invalid house rule value', () => {
       const r = createListingSchema.safeParse({
         ...validBase,
-        houseRules: 'x'.repeat(50),
+        houseRules: 'InvalidRule',
       })
-      expect(r.success).toBe(true)
+      expect(r.success).toBe(false)
     })
 
     it('rejects a house rule with 51 chars', () => {

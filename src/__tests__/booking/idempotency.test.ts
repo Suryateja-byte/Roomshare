@@ -156,9 +156,8 @@ describe('Idempotency Wrapper', () => {
       expect(operation).not.toHaveBeenCalled();
     });
 
-    it('allows legacy placeholder hash to proceed', async () => {
-      const operationResult = { bookingId: 'new-booking' };
-      const operation = jest.fn().mockResolvedValue(operationResult);
+    it('rejects legacy placeholder hash (bypass removed 2026-03-02)', async () => {
+      const operation = jest.fn();
 
       (mockPrisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
         const tx = {
@@ -183,8 +182,12 @@ describe('Idempotency Wrapper', () => {
         operation
       );
 
-      expect(result.success).toBe(true);
-      expect(operation).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.status).toBe(400);
+        expect(result.error).toBe('Idempotency key reused with different request body');
+      }
+      expect(operation).not.toHaveBeenCalled();
     });
   });
 

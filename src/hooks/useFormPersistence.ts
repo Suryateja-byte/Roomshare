@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 
 interface PersistedData<T> {
@@ -47,18 +47,16 @@ export function useFormPersistence<T>(
     const [persistedData, setPersistedData] = useState<T | null>(null);
     const [savedAt, setSavedAt] = useState<Date | null>(null);
     const [isHydrated, setIsHydrated] = useState(false);
-    const initialLoadDone = useRef(false);
 
     // Load persisted data on mount (client-side only)
     useEffect(() => {
-        if (initialLoadDone.current) return;
-        initialLoadDone.current = true;
+        let isMounted = true;
 
         try {
             const stored = localStorage.getItem(key);
             if (!stored) {
-                setIsHydrated(true);
-                return;
+                if (isMounted) setIsHydrated(true);
+                return () => { isMounted = false; };
             }
 
             const parsed: PersistedData<T> = JSON.parse(stored);
@@ -68,19 +66,23 @@ export function useFormPersistence<T>(
             if (now - parsed.savedAt > expirationMs) {
                 // Data expired, clear it
                 localStorage.removeItem(key);
-                setIsHydrated(true);
-                return;
+                if (isMounted) setIsHydrated(true);
+                return () => { isMounted = false; };
             }
 
             // Data is valid
-            setPersistedData(parsed.data);
-            setSavedAt(new Date(parsed.savedAt));
-            setIsHydrated(true);
+            if (isMounted) {
+                setPersistedData(parsed.data);
+                setSavedAt(new Date(parsed.savedAt));
+                setIsHydrated(true);
+            }
         } catch (error) {
             console.error('Error loading persisted form data:', error);
             try { localStorage.removeItem(key); } catch { /* storage entirely unavailable */ }
-            setIsHydrated(true);
+            if (isMounted) setIsHydrated(true);
         }
+
+        return () => { isMounted = false; };
     }, [key, expirationMs]);
 
     // Debounced save function

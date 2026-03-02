@@ -1,35 +1,21 @@
 /**
  * RadarAttribution Component
  *
- * Shows Radar branding for the Places API. Stadia Maps and OpenStreetMap
- * attribution is handled by MapLibre's built-in attributionControl which
- * reads from the style JSON.
+ * Shows Radar branding for the Places API. Map tile attribution (OpenFreeMap/OSM)
+ * is handled by MapLibre's built-in attributionControl which reads from the style JSON.
  *
  * Design: Refined glass badge with subtle hover effect.
  *
- * COMPLIANCE:
- * - Radar: Shows "Powered by Radar" for Places API
- * - Stadia/OSM: Handled automatically by MapLibre attributionControl
- *
  * @see https://radar.com/terms
- * @see https://stadiamaps.com/attribution/
  */
-
-import type { TileSource } from './NearbyPlacesMap';
 
 interface RadarAttributionProps {
   className?: string;
-  tileSource?: TileSource;
 }
 
 export default function RadarAttribution({
   className = '',
-  tileSource = 'radar',
 }: RadarAttributionProps) {
-  // For 'stadia' tileSource, Stadia/OSM attribution is handled by MapLibre's
-  // built-in attributionControl. This component just shows Radar branding.
-  const isStadia = tileSource === 'stadia';
-
   return (
     <a
       href="https://radar.com"
@@ -53,11 +39,10 @@ export default function RadarAttribution({
         ${className}
       `}
       style={{
-        // Ensure visibility with safe area insets for mobile
         paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
         marginLeft: 'max(12px, env(safe-area-inset-left))',
       }}
-      aria-label={isStadia ? 'Places data by Radar' : 'Powered by Radar'}
+      aria-label="Places data by Radar"
     >
       {/* Radar logo SVG */}
       <svg

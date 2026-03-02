@@ -179,17 +179,13 @@ export async function withIdempotency<T>(
           // ─────────────────────────────────────────────────────────────
           // This MUST happen before returning cached results to prevent
           // key reuse attacks where attacker replays with different payload
+          // Removed legacy-migration-placeholder bypass (2026-03-02) — stale idempotency keys should fail hash check
           if (row.requestHash !== requestHash) {
-            // Exception: allow legacy placeholder from migration
-            if (row.requestHash !== "legacy-migration-placeholder") {
-              return {
-                success: false,
-                error: "Idempotency key reused with different request body",
-                status: 400,
-              };
-            }
-            // Legacy row - allow this request to proceed
-            // The hash will be updated when we complete
+            return {
+              success: false,
+              error: "Idempotency key reused with different request body",
+              status: 400,
+            };
           }
 
           // ─────────────────────────────────────────────────────────────
@@ -213,7 +209,7 @@ export async function withIdempotency<T>(
           // ─────────────────────────────────────────────────────────────
           // Step 6: Mark as completed with cached result
           // ─────────────────────────────────────────────────────────────
-          // Update hash in case this was a legacy migration entry
+          // Store result and mark completed
           await tx.$executeRaw`
         UPDATE "IdempotencyKey"
         SET status = 'completed',

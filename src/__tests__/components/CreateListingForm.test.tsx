@@ -35,7 +35,12 @@ jest.mock('@/hooks/useFormPersistence', () => ({
 }))
 
 jest.mock('@/hooks/useNavigationGuard', () => ({
-  useNavigationGuard: jest.fn(),
+  useNavigationGuard: jest.fn().mockReturnValue({
+    showDialog: false,
+    message: '',
+    onStay: jest.fn(),
+    onLeave: jest.fn(),
+  }),
 }))
 
 jest.mock('@/components/listings/ImageUploader', () => ({
@@ -180,7 +185,7 @@ describe('CreateListingForm', () => {
 
       render(<CreateListingForm />)
 
-      expect(screen.getByText(/you have an unsaved draft/i)).toBeInTheDocument()
+      expect(screen.getByText(/you have a saved draft/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /resume draft/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /start fresh/i })).toBeInTheDocument()
     })

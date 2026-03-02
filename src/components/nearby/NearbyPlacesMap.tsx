@@ -3,24 +3,18 @@
 /**
  * NearbyPlacesMap Component
  *
- * MapLibre GL JS map with Stadia Maps Alidade Smooth basemap for displaying nearby places.
- * Includes listing marker and POI markers with category-specific colors.
+ * MapLibre GL JS map with OpenFreeMap Liberty tiles for displaying nearby places.
+ * Visually consistent with the search page map (Map.tsx).
  *
  * DESIGN DECISIONS:
- * - Uses Stadia Maps Alidade Smooth (vector tiles, dark mode support, clean design)
+ * - Uses OpenFreeMap Liberty tiles (same as search map for visual consistency)
  * - Radar is used for Places API only (server-side, not for map tiles)
- * - Custom floating controls for premium look
+ * - Glass-pill floating controls matching search map aesthetic
  * - Category-colored markers for visual distinction
  * - Attribution handled by MapLibre's built-in control (reads from style JSON)
- *
- * AUTHENTICATION:
- * - localhost: No API key required
- * - Production: Domain auth preferred, API key fallback
- *
- * @see https://docs.stadiamaps.com/map-styles/alidade-smooth/
  */
 
-import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useTheme } from 'next-themes';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -28,7 +22,7 @@ import '@/styles/nearby-map.css';
 import { Plus, Minus, Navigation, Maximize2 } from 'lucide-react';
 import RadarAttribution from './RadarAttribution';
 import { getCategoryColors } from '@/types/nearby';
-import { getStadiaStyle } from '@/lib/maps/stadia';
+import { escapeHtml } from '@/lib/maps/mapAdapter';
 import type { NearbyPlace } from '@/types/nearby';
 
 // SVG icon paths for category markers (14x14 viewBox, stroke-width 2)
@@ -66,15 +60,9 @@ function getCategoryIconPath(category: string): string {
   return CATEGORY_ICON_PATHS['default'];
 }
 
-// Tile source type for attribution
-export type TileSource = 'radar' | 'stadia';
-
-// Escape HTML to prevent XSS in popup content
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+// OpenFreeMap tile style URLs (matching search map)
+const OPENFREEMAP_STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
+const OPENFREEMAP_STYLE_DARK = '/map-styles/liberty-dark.json';
 
 /**
  * Create a custom home marker element using safe DOM methods
@@ -192,15 +180,12 @@ export default function NearbyPlacesMap({
   const { resolvedTheme } = useTheme();
   const isDarkMode = resolvedTheme === 'dark';
 
-  // Initialize map with Stadia Maps Alidade Smooth basemap
+  // Initialize map with OpenFreeMap Liberty tiles (matching search map)
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Get Stadia style URL (optional API key for non-domain-auth production)
-    const styleUrl = getStadiaStyle(isDarkMode, process.env.NEXT_PUBLIC_STADIA_API_KEY);
+    const styleUrl = isDarkMode ? OPENFREEMAP_STYLE_DARK : OPENFREEMAP_STYLE_LIGHT;
 
-    // Create map with Stadia Maps style
-    // Attribution is shown by default - MapLibre reads it from Stadia's style JSON
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: styleUrl,
@@ -281,9 +266,17 @@ export default function NearbyPlacesMap({
           .setPopup(
             new maplibregl.Popup({ offset: 25, closeButton: false, className: 'nearby-popup' }).setHTML(`
               <div class="nearby-popup-content">
+                <div class="nearby-popup-category">
+                  <span class="nearby-popup-category-dot" style="background-color: ${getCategoryColors(place.category).markerBorder}"></span>
+                  ${escapeHtml(place.category.replace(/-/g, ' '))}
+                </div>
                 <div class="nearby-popup-name">${escapeHtml(place.name)}</div>
                 <div class="nearby-popup-address">${escapeHtml(place.address)}</div>
                 <div class="nearby-popup-distance">${place.distanceMiles.toFixed(1)} mi away</div>
+                <a class="nearby-popup-directions" href="https://www.google.com/maps/dir/?api=1&destination=${place.location.lat},${place.location.lng}" target="_blank" rel="noopener noreferrer">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+                  Get directions
+                </a>
               </div>
             `)
           )
@@ -372,27 +365,20 @@ export default function NearbyPlacesMap({
         style={{ minHeight: '400px' }}
       />
 
-      {/* Inner shadow overlay for depth */}
-      <div
-        className="
-          absolute inset-0 pointer-events-none
-          shadow-[inset_0_2px_20px_rgba(0,0,0,0.05)]
-          dark:shadow-[inset_0_2px_20px_rgba(0,0,0,0.2)]
-        "
-      />
-
-      {/* Custom Floating Controls */}
-      <div className="absolute bottom-24 lg:bottom-6 right-4 lg:right-6 z-[400] flex flex-col gap-2">
+      {/* Custom Floating Controls — glass-pill style matching search map */}
+      <div className="absolute bottom-24 lg:bottom-6 right-4 z-[400] flex flex-col gap-2">
         <button
           onClick={handleZoomIn}
           className="
-            min-w-[44px] min-h-[44px] bg-white dark:bg-zinc-800
-            rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700
+            min-w-[44px] min-h-[44px]
+            bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md
+            rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50
             flex items-center justify-center
             text-zinc-700 dark:text-zinc-200
-            hover:bg-zinc-50 dark:hover:bg-zinc-700
+            hover:bg-white dark:hover:bg-zinc-800
             active:scale-95
             transition-all duration-200
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
           "
           aria-label="Zoom in"
         >
@@ -401,13 +387,15 @@ export default function NearbyPlacesMap({
         <button
           onClick={handleZoomOut}
           className="
-            min-w-[44px] min-h-[44px] bg-white dark:bg-zinc-800
-            rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700
+            min-w-[44px] min-h-[44px]
+            bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md
+            rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50
             flex items-center justify-center
             text-zinc-700 dark:text-zinc-200
-            hover:bg-zinc-50 dark:hover:bg-zinc-700
+            hover:bg-white dark:hover:bg-zinc-800
             active:scale-95
             transition-all duration-200
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
           "
           aria-label="Zoom out"
         >
@@ -416,14 +404,16 @@ export default function NearbyPlacesMap({
         <button
           onClick={handleResetView}
           className="
-            min-w-[44px] min-h-[44px] bg-zinc-900 dark:bg-white
-            rounded-lg shadow-md
+            min-w-[44px] min-h-[44px]
+            bg-zinc-900/90 dark:bg-white/90 backdrop-blur-md
+            rounded-full shadow-lg
             flex items-center justify-center
             text-white dark:text-zinc-900
-            hover:bg-zinc-800 dark:hover:bg-zinc-100
+            hover:bg-zinc-900 dark:hover:bg-white
             active:scale-95
             transition-all duration-200
             mt-1
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
           "
           aria-label="Reset to listing location"
         >
@@ -433,14 +423,16 @@ export default function NearbyPlacesMap({
           <button
             onClick={handleFitAllMarkers}
             className="
-              w-9 h-9 bg-white dark:bg-zinc-800
-              rounded-lg shadow-md border border-zinc-200 dark:border-zinc-700
+              min-w-[44px] min-h-[44px]
+              bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md
+              rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50
               flex items-center justify-center
               text-zinc-700 dark:text-zinc-200
-              hover:bg-zinc-50 dark:hover:bg-zinc-700
+              hover:bg-white dark:hover:bg-zinc-800
               active:scale-95
               transition-all duration-200
               mt-1
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
             "
             aria-label="Fit all markers in view"
           >
@@ -449,8 +441,8 @@ export default function NearbyPlacesMap({
         )}
       </div>
 
-      {/* Radar branding - Stadia/OSM attribution handled by MapLibre attributionControl */}
-      <RadarAttribution tileSource="stadia" />
+      {/* Radar branding — OpenFreeMap/OSM attribution handled by MapLibre attributionControl */}
+      <RadarAttribution />
 
     </div>
   );

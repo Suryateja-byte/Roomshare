@@ -13,10 +13,14 @@ export function applySecurityHeaders(request: { headers: Headers }) {
   const responseHeaders = new Headers();
   responseHeaders.set("Content-Security-Policy", cspHeader);
   responseHeaders.set("X-Frame-Options", "DENY");
-  responseHeaders.set(
-    "Strict-Transport-Security",
-    "max-age=31536000; includeSubDomains; preload",
-  );
+  // HSTS is production-only. Setting it on local HTTP can cause browsers
+  // to force HTTPS for localhost/127.0.0.1 and break dev access.
+  if (!isDev) {
+    responseHeaders.set(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains; preload",
+    );
+  }
   responseHeaders.set(
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=(self), interest-cohort=()",

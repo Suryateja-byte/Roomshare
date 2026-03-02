@@ -5,6 +5,8 @@ import {
   VALID_LEASE_DURATIONS,
   VALID_GENDER_PREFERENCES,
   VALID_HOUSEHOLD_GENDERS,
+  VALID_AMENITIES,
+  VALID_HOUSE_RULES,
 } from './filter-schema';
 
 /**
@@ -65,7 +67,7 @@ function getExpectedSupabaseHost(): string | null {
     return match?.[1] || null;
 }
 
-const supabaseImageUrlSchema = z.string()
+export const supabaseImageUrlSchema = z.string()
   .url("Invalid image URL")
   .regex(SUPABASE_IMAGE_URL_PATTERN, "Image must be from Supabase storage")
   .refine((url) => {
@@ -92,7 +94,7 @@ export const moveInDateSchema = z.string()
   .refine((dateStr) => {
     const date = new Date(dateStr + 'T00:00:00Z');
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
     return date >= today;
   }, "Move-in date cannot be in the past")
   .refine((dateStr) => {
@@ -112,8 +114,8 @@ export const createListingSchema = z.object({
     title: z.string().trim().min(1, "Title is required").max(100, "Title must be 100 characters or less").refine(noHtmlTags, NO_HTML_MSG),
     description: z.string().trim().min(10, "Description must be at least 10 characters").max(1000, "Description must be 1000 characters or less").refine(noHtmlTags, NO_HTML_MSG),
     price: z.coerce.number().positive("Price must be a positive number").max(50000, "Maximum $50,000/month").refine(Number.isFinite, "Must be a valid number"),
-    amenities: z.string().transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)).pipe(z.array(z.string().max(50, "Each amenity max 50 chars")).max(20, "Maximum 20 amenities")),
-    houseRules: z.string().optional().default("").transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)).pipe(z.array(z.string().max(50, "Each house rule max 50 chars")).max(20, "Maximum 20 house rules")),
+    amenities: z.string().transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)).pipe(z.array(z.string().max(50, "Each amenity max 50 chars")).max(20, "Maximum 20 amenities").refine(items => items.every(item => VALID_AMENITIES.some(v => v.toLowerCase() === item.toLowerCase())), { message: "Invalid amenity value" })),
+    houseRules: z.string().optional().default("").transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)).pipe(z.array(z.string().max(50, "Each house rule max 50 chars")).max(20, "Maximum 20 house rules").refine(items => items.every(item => VALID_HOUSE_RULES.some(v => v.toLowerCase() === item.toLowerCase())), { message: "Invalid house rule value" })),
     totalSlots: z.coerce.number().int().positive("Total slots must be a positive integer").max(20, "Maximum 20 roommates"),
     address: z.string().trim().min(1, "Address is required").max(200, "Address must be 200 characters or less"),
     city: z.string().trim().min(1, "City is required").max(100, "City must be 100 characters or less"),
@@ -135,6 +137,7 @@ export const createListingApiSchema = createListingSchema.extend({
   genderPreference: listingGenderPreferenceSchema,
   householdGender: listingHouseholdGenderSchema,
   householdLanguages: householdLanguagesSchema.optional().default([]),
+  primaryHomeLanguage: primaryHomeLanguageSchema,
   moveInDate: moveInDateSchema,
 });
 
