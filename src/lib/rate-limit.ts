@@ -102,6 +102,10 @@ export async function checkRateLimit(
     });
 
     // Atomic: increment count only if within window AND under limit
+    // NOTE: The UPDATE-then-findUnique pattern has a ±1 request tolerance
+    // under extreme concurrent burst. This is an acceptable tradeoff —
+    // wrapping in a serializable transaction would add latency to every
+    // rate-limited request for negligible accuracy gain.
     const updated = await prisma.$queryRaw<
       Array<{ id: string; count: number; windowStart: Date; expiresAt: Date }>
     >`

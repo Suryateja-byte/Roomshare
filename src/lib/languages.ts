@@ -2,7 +2,7 @@
  * Canonical Language List
  *
  * Single source of truth for supported languages in RoomShare.
- * Stores ISO 639-1 language codes with display names.
+ * Stores ISO 639-1 language codes (ISO 639-3 where no 639-1 code exists) with display names.
  *
  * Used for:
  * - "Languages spoken in the house" (lister selection)
@@ -11,7 +11,7 @@
  */
 
 /**
- * Supported languages with ISO 639-1 codes and display names.
+ * Supported languages with ISO 639-1 codes (ISO 639-3 where no 639-1 code exists) and display names.
  * Approximately 50 languages covering major world languages,
  * South Asian, East Asian, Middle Eastern, African, and European languages.
  */
@@ -49,7 +49,7 @@ export const SUPPORTED_LANGUAGES = {
   si: 'Sinhala',
 
   // East Asian / Southeast Asian
-  yue: 'Cantonese',
+  yue: 'Cantonese', // ISO 639-3 (no ISO 639-1 code for Cantonese)
   tl: 'Tagalog',
   id: 'Indonesian',
   ms: 'Malay',
@@ -157,6 +157,34 @@ export const LEGACY_NAME_TO_CODE: Record<string, LanguageCode> = {
   Kannada: 'kn',
   Malayalam: 'ml',
   Urdu: 'ur',
+  Nepali: 'ne',
+  Sinhala: 'si',
+  Cantonese: 'yue',
+  Tagalog: 'tl',
+  Indonesian: 'id',
+  Malay: 'ms',
+  Burmese: 'my',
+  Khmer: 'km',
+  Persian: 'fa',
+  Hebrew: 'he',
+  Swahili: 'sw',
+  Amharic: 'am',
+  Yoruba: 'yo',
+  Hausa: 'ha',
+  Igbo: 'ig',
+  Ukrainian: 'uk',
+  Czech: 'cs',
+  Romanian: 'ro',
+  Greek: 'el',
+  Hungarian: 'hu',
+  Swedish: 'sv',
+  Danish: 'da',
+  Norwegian: 'no',
+  Finnish: 'fi',
+  Slovak: 'sk',
+  Bulgarian: 'bg',
+  Serbian: 'sr',
+  Croatian: 'hr',
 };
 
 const LEGACY_NAME_TO_CODE_LOWER: Record<string, LanguageCode> = Object.fromEntries(

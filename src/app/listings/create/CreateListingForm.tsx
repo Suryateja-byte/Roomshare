@@ -417,7 +417,7 @@ export default function CreateListingForm() {
                         const isComplete = sectionCompletion[section.id as keyof typeof sectionCompletion];
                         return (
                             <div key={section.id} className="flex items-center flex-1"
-                                 aria-label={`${section.label}: ${isComplete ? 'complete' : 'incomplete'}`}>
+                                 aria-label={`Step ${index + 1} of ${FORM_SECTIONS.length}: ${section.label}, ${isComplete ? 'complete' : 'incomplete'}`}>
                                 {/* Step Circle */}
                                 <div className="flex flex-col items-center">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${isComplete
@@ -441,7 +441,7 @@ export default function CreateListingForm() {
                                 </div>
                                 {/* Connector Line */}
                                 {index < FORM_SECTIONS.length - 1 && (
-                                    <div className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors duration-300 ${isComplete && sectionCompletion[FORM_SECTIONS[index + 1].id as keyof typeof sectionCompletion]
+                                    <div className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors duration-300 ${isComplete
                                         ? 'bg-green-500 dark:bg-green-400'
                                         : 'bg-zinc-200 dark:bg-zinc-700'
                                         }`} />
@@ -510,8 +510,8 @@ export default function CreateListingForm() {
 
             <form ref={formRef} onSubmit={handleSubmit} onChange={() => saveData(collectFormData())} className="space-y-12">
                 {/* Section 1: The Basics */}
-                <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                <section className="space-y-6" aria-labelledby="section-basics">
+                    <h3 id="section-basics" className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                         <Home className="w-4 h-4 flex-shrink-0" /> The Basics
                     </h3>
 
@@ -595,13 +595,13 @@ export default function CreateListingForm() {
                             <FieldError field="totalSlots" fieldErrors={fieldErrors} />
                         </div>
                     </div>
-                </div>
+                </section>
 
                 <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
 
                 {/* Section 2: Location */}
-                <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                <section className="space-y-6" aria-labelledby="section-location">
+                    <h3 id="section-location" className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                         <MapPin className="w-4 h-4 flex-shrink-0" /> Location
                     </h3>
 
@@ -671,13 +671,13 @@ export default function CreateListingForm() {
                             <FieldError field="zip" fieldErrors={fieldErrors} />
                         </div>
                     </div>
-                </div>
+                </section>
 
                 <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
 
                 {/* Section 2.5: Photos */}
-                <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                <section className="space-y-6" aria-labelledby="section-photos">
+                    <h3 id="section-photos" className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                         <Camera className="w-4 h-4 flex-shrink-0" /> Photos
                     </h3>
                     <div>
@@ -691,13 +691,13 @@ export default function CreateListingForm() {
                             key={draftRestored ? 'restored' : 'initial'}
                         />
                     </div>
-                </div>
+                </section>
 
                 <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
 
                 {/* Section 3: Details */}
-                <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                <section className="space-y-6" aria-labelledby="section-details">
+                    <h3 id="section-details" className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                         <List className="w-4 h-4 flex-shrink-0" /> Finer Details
                     </h3>
 
@@ -795,6 +795,11 @@ export default function CreateListingForm() {
                             className="mb-3"
                             disabled={loading}
                         />
+                        <span className="sr-only" aria-live="polite" role="status">
+                            {languageSearch
+                                ? `${unselectedLanguages.length} languages found`
+                                : `${unselectedLanguages.length} languages available`}
+                        </span>
 
                         {/* Language chips */}
                         <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
@@ -865,7 +870,7 @@ export default function CreateListingForm() {
                         <FieldError field="houseRules" fieldErrors={fieldErrors} />
                         <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">Separate rules with commas</p>
                     </div>
-                </div>
+                </section>
 
                 {/* Actions */}
                 <div className="pt-6">

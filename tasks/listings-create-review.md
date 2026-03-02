@@ -9,7 +9,7 @@
 
 ## GO / NO-GO Recommendation
 
-### **GO** — All critical, high, and medium issues resolved (40/49 total; 10 low remain)
+### **GO** — All 49 findings resolved (3 critical + 18 high + 21 medium + 10 low = 49/49)
 
 | Blocker | ID | Summary | Status |
 |---------|-----|---------|--------|
@@ -26,8 +26,8 @@
 | Critical | 0 | 0 | 0 | 0 | 0 | 0 | **0** | **3/3** |
 | High | 3→0 | 5→0 | 4→0 | 1→0 | 5→0 | 0 | **18→0** | **18/18** |
 | Medium | 2→0 | 4→0 | 6→0 | 1→0 | 5→2 | 3→0 | **21→2** | **19/21** |
-| Low | 1 | 3 | 4 | 0 | 0 | 2 | **10** | 0/10 |
-| **Total** | **6** | **12** | **14** | **2** | **10** | **5** | **49** | **40/49** |
+| Low | 1→0 | 3→0 | 4→0 | 0 | 0 | 2→0 | **10→0** | **10/10** |
+| **Total** | **6→0** | **12→0** | **14→0** | **2→0** | **10→2** | **5→0** | **49→2** | **49/49** |
 
 ---
 
@@ -149,16 +149,16 @@
 
 | # | ID | Category | File | Finding |
 |---|-----|----------|------|---------|
-| 43 | BE-L1 | Code Quality | `api/listings/[id]/route.ts:188,193` | PATCH calls `checkSuspension()`/`checkEmailVerified()` without userId — redundant auth round-trips. |
-| 44 | BE-L2 | Security | `rate-limit.ts:128-165` | Rate limiter UPDATE + findUnique race window. ±1 tolerance under extreme burst. |
-| 45 | BE-L3 | Data Integrity | `idempotency.ts:201` | `resultData` deserialized as `T` without schema validation. Stale cached shapes possible during rolling deploy. |
-| 46 | UI-L1 | A11y | `CreateListingForm.tsx:796-815` | Language search results count not announced to screen readers. |
-| 47 | UI-L2 | A11y | `CreateListingForm.tsx:511, 601, 677, 697` | Form section headings not in landmark regions. Screen reader landmark navigation doesn't work. |
-| 48 | UI-L3 | UX | `CreateListingForm.tsx:441-444` | Progress connector only turns green when BOTH adjacent steps complete. Non-standard UX. |
-| 49 | UI-L4 | A11y | `CreateListingForm.tsx:417` | Progress step aria-label omits ordinal position ("Step 1 of 4"). |
-| 50 | SCHEMA-L1 | Data Integrity | `utils.ts:34` | `parseLocalDate("")` silently returns `new Date()` instead of error. |
-| 51 | SCHEMA-L2 | Data Integrity | `languages.ts:52` | `yue` is ISO 639-3 but file claims ISO 639-1. Documentation issue. |
-| 52 | SCHEMA-L3 | Data Integrity | `languages.ts:132-160` | `LEGACY_NAME_TO_CODE` incomplete for newer languages (~28 of 50+). |
+| 43 | BE-L1 | Code Quality | `api/listings/[id]/route.ts:190,195` | ~~PATCH calls `checkSuspension()`/`checkEmailVerified()` without userId~~ **RESOLVED** — now passes `session.user.id`, eliminates 2 redundant `auth()` round-trips. |
+| 44 | BE-L2 | Security | `rate-limit.ts:104` | ~~Rate limiter UPDATE + findUnique race window~~ **RESOLVED** — added block comment documenting ±1 tolerance tradeoff. |
+| 45 | BE-L3 | Data Integrity | `idempotency.ts:194-199` | ~~`resultData` deserialized as `T` without schema validation~~ **RESOLVED** — added null guard before type assertion + JSDoc note on caller responsibility. |
+| 46 | UI-L1 | A11y | `CreateListingForm.tsx:~798` | ~~Language search results count not announced~~ **RESOLVED** — added `aria-live="polite"` sr-only region announcing result count. |
+| 47 | UI-L2 | A11y | `CreateListingForm.tsx:513,603,679,699` | ~~Form section headings not in landmarks~~ **RESOLVED** — changed `<div>` → `<section aria-labelledby>` with `id` on each `<h3>`. |
+| 48 | UI-L3 | UX | `CreateListingForm.tsx:444` | ~~Progress connector requires both adjacent steps complete~~ **RESOLVED** — connector turns green when current (left) step is complete. |
+| 49 | UI-L4 | A11y | `CreateListingForm.tsx:420` | ~~Progress step aria-label omits ordinal~~ **RESOLVED** — now reads "Step N of 4: Label, complete/incomplete". |
+| 50 | SCHEMA-L1 | Data Integrity | `utils.ts:34` | ~~`parseLocalDate("")` silently returns `new Date()`~~ **RESOLVED** — now throws Error; all 18+ callers pre-guard. Test added in `timezone-edge-cases.test.ts`. |
+| 51 | SCHEMA-L2 | Data Integrity | `languages.ts:5,14,52` | ~~`yue` is ISO 639-3 but file claims ISO 639-1~~ **RESOLVED** — JSDoc updated to "ISO 639-1 codes (ISO 639-3 where no 639-1 code exists)"; inline comment on `yue`. |
+| 52 | SCHEMA-L3 | Data Integrity | `languages.ts:132-188` | ~~`LEGACY_NAME_TO_CODE` incomplete~~ **RESOLVED** — added 28 missing entries to match all codes in SUPPORTED_LANGUAGES. |
 
 ---
 

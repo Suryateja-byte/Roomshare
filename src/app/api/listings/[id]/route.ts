@@ -187,12 +187,12 @@ export async function PATCH(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const suspension = await checkSuspension();
+        const suspension = await checkSuspension(session.user.id);
         if (suspension.suspended) {
             return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
-        const emailCheck = await checkEmailVerified();
+        const emailCheck = await checkEmailVerified(session.user.id);
         if (!emailCheck.verified) {
             return NextResponse.json({ error: emailCheck.error || 'Email verification required' }, { status: 403 });
         }

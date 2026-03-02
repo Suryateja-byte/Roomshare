@@ -88,6 +88,9 @@ function computeRequestHash(requestBody: unknown): string {
  *
  * @returns IdempotencySuccess with result, or IdempotencyError
  *
+ * @note resultData is type-asserted (as T), not schema-validated.
+ * Callers should handle unexpected shapes defensively.
+ *
  * Error codes:
  * - 400: Key reused with different request body
  * - 409: Request already in progress (concurrent duplicate)
@@ -192,6 +195,9 @@ export async function withIdempotency<T>(
           // Step 4: If completed → return cached response
           // ─────────────────────────────────────────────────────────────
           if (row.status === "completed") {
+            if (row.resultData == null) {
+              return { success: false, status: 500, error: 'Cached result data missing' };
+            }
             return {
               success: true,
               result: row.resultData as T,

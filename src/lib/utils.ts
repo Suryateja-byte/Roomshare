@@ -31,7 +31,7 @@ export const normalizeStringList = (value: unknown): string[] => {
  * which can appear as the previous day in timezones behind UTC
  */
 export function parseLocalDate(dateStr: string): Date {
-    if (!dateStr) return new Date();
+    if (!dateStr) throw new Error('parseLocalDate: dateStr must be a non-empty string');
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
 }

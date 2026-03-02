@@ -80,6 +80,12 @@ describe("Timezone edge cases", () => {
       expect(leapDay.getDate()).toBe(29);
     });
 
+    it("throws on empty string input", () => {
+      expect(() => parseLocalDate("")).toThrow(
+        "parseLocalDate: dateStr must be a non-empty string"
+      );
+    });
+
     it("handles end-of-month boundaries correctly", () => {
       const jan31 = parseLocalDate("2025-01-31");
       const mar31 = parseLocalDate("2025-03-31");
