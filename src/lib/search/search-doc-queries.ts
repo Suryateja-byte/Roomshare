@@ -120,7 +120,7 @@ const HYBRID_COUNT_THRESHOLD = 100;
 // 48 = 4 pages of 12 items - enough for initial exploration
 export const MAX_UNBOUNDED_RESULTS = 48;
 
-const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english"]);
+const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%"]);
 
 function assertParameterizedWhereClause(whereClause: string): void {
   const literalPattern = /'([^']*)'/g;
@@ -508,14 +508,16 @@ function buildSearchDocWhereConditions(
     }
   }
 
-  // Amenities filter (AND logic) - uses @> containment with GIN index
+  // Amenities filter (AND logic) - uses partial matching (LIKE) for consistency
+  // UI sends 'Pool' but DB may have 'Pool Access'; GIN index not used here
   if (amenities?.length) {
     const normalizedAmenities = amenities
       .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
-      // Exact match containment using @> operator (GIN-indexed)
-      conditions.push(`d.amenities_lower @> $${paramIndex++}::text[]`);
+      conditions.push(
+        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(d.amenities_lower) AS la WHERE la LIKE '%' || search_term || '%'))`,
+      );
       params.push(normalizedAmenities);
     }
   }

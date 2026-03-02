@@ -50,7 +50,7 @@ const FACET_QUERY_TIMEOUT_MS = 5000;
 // Maximum results per facet to prevent expensive aggregations
 const MAX_FACET_RESULTS = 100;
 
-const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english"]);
+const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%"]);
 
 function assertParameterizedWhereClause(whereClause: string): void {
   const literalPattern = /'([^']*)'/g;
@@ -254,13 +254,15 @@ function buildFacetWhereConditions(
   }
 
   // Amenities filter (AND logic) - exclude when aggregating amenities facet
+  // Uses partial matching (LIKE) for consistency with V1 paginated query
   if (excludeFilter !== "amenities" && amenities?.length) {
     const normalizedAmenities = amenities
       .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
-      // Use @> (array contains) operator - GIN indexed
-      conditions.push(`d.amenities_lower @> $${paramIndex++}::text[]`);
+      conditions.push(
+        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(d.amenities_lower) AS la WHERE la LIKE '%' || search_term || '%'))`,
+      );
       params.push(normalizedAmenities);
     }
   }

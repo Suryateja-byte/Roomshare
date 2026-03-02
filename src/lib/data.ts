@@ -1257,14 +1257,15 @@ async function getListingsCountEfficient(
     }
   }
 
-  // Amenities filter (AND logic)
+  // Amenities filter (AND logic) - uses partial matching (LIKE) for consistency
+  // UI sends 'Pool' but DB may have 'Pool Access'; validated against VALID_AMENITIES allowlist
   if (amenities?.length) {
     const normalizedAmenities = amenities
       .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
       conditions.push(
-        `ARRAY(SELECT LOWER(x) FROM unnest(l.amenities) AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`,
+        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(l.amenities) AS la WHERE LOWER(la) LIKE '%' || search_term || '%'))`,
       );
       queryParams.push(normalizedAmenities);
     }
