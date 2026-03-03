@@ -115,7 +115,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // Batched filter state — single hook manages pending vs committed
     const [showFilters, setShowFilters] = useState(false);
 
-    const { pending, isDirty: filtersDirty, setPending, commit: commitFilters } = useBatchedFilters({ isDrawerOpen: showFilters });
+    const { pending, isDirty: filtersDirty, setPending, commit: commitFilters, committed } = useBatchedFilters({ isDrawerOpen: showFilters });
     // Destructure for convenient access (read-only aliases)
     const { minPrice, maxPrice, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender } = pending;
 
@@ -362,8 +362,9 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
 
         // Price validation with auto-swap if inverted
-        let finalMinPrice = minPrice ? parseFloat(minPrice) : null;
-        let finalMaxPrice = maxPrice ? parseFloat(maxPrice) : null;
+        // Use committed (URL-derived) values so chip removals aren't reverted by stale pending state
+        let finalMinPrice = committed.minPrice ? parseFloat(committed.minPrice) : null;
+        let finalMaxPrice = committed.maxPrice ? parseFloat(committed.maxPrice) : null;
 
         // Enforce non-negative values
         if (finalMinPrice !== null && finalMinPrice < 0) finalMinPrice = 0;
@@ -384,14 +385,14 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             params.set('lng', selectedCoords.lng.toString());
         }
 
-        if (moveInDate) params.set('moveInDate', moveInDate);
-        if (leaseDuration) params.set('leaseDuration', leaseDuration);
-        if (roomType) params.set('roomType', roomType);
-        amenities.forEach(a => params.append('amenities', a));
-        houseRules.forEach(r => params.append('houseRules', r));
-        languages.forEach(l => params.append('languages', l));
-        if (genderPreference) params.set('genderPreference', genderPreference);
-        if (householdGender) params.set('householdGender', householdGender);
+        if (committed.moveInDate) params.set('moveInDate', committed.moveInDate);
+        if (committed.leaseDuration) params.set('leaseDuration', committed.leaseDuration);
+        if (committed.roomType) params.set('roomType', committed.roomType);
+        committed.amenities.forEach(a => params.append('amenities', a));
+        committed.houseRules.forEach(r => params.append('houseRules', r));
+        committed.languages.forEach(l => params.append('languages', l));
+        if (committed.genderPreference) params.set('genderPreference', committed.genderPreference);
+        if (committed.householdGender) params.set('householdGender', committed.householdGender);
 
         const searchUrl = `/search?${params.toString()}`;
 
@@ -408,12 +409,12 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         // Save to recent searches when navigating (with filters for enhanced format)
         if (trimmedLocation) {
             const activeFilters: Partial<RecentSearchFilters> = {};
-            if (minPrice) activeFilters.minPrice = minPrice;
-            if (maxPrice) activeFilters.maxPrice = maxPrice;
-            if (roomType) activeFilters.roomType = roomType;
-            if (leaseDuration) activeFilters.leaseDuration = leaseDuration;
-            if (amenities.length > 0) activeFilters.amenities = amenities;
-            if (houseRules.length > 0) activeFilters.houseRules = houseRules;
+            if (committed.minPrice) activeFilters.minPrice = committed.minPrice;
+            if (committed.maxPrice) activeFilters.maxPrice = committed.maxPrice;
+            if (committed.roomType) activeFilters.roomType = committed.roomType;
+            if (committed.leaseDuration) activeFilters.leaseDuration = committed.leaseDuration;
+            if (committed.amenities.length > 0) activeFilters.amenities = committed.amenities;
+            if (committed.houseRules.length > 0) activeFilters.houseRules = committed.houseRules;
 
             saveRecentSearch(
                 trimmedLocation,
@@ -444,7 +445,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             if (resetSearchingTimeoutRef.current) clearTimeout(resetSearchingTimeoutRef.current);
             resetSearchingTimeoutRef.current = setTimeout(() => setIsSearching(false), 500);
         }, SEARCH_DEBOUNCE_MS);
-    }, [location, minPrice, maxPrice, selectedCoords, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, router, isSearching, saveRecentSearch, searchParams]);
+    }, [location, committed, selectedCoords, router, isSearching, saveRecentSearch, searchParams, transitionContext]);
 
     // Cleanup timeouts on unmount
     useEffect(() => {
@@ -504,34 +505,35 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
     }, [transitionContext, router, setPending]);
 
-    // Count active filters for badge - split into two parts to avoid hydration mismatch
+    // Count active filters for badge - use COMMITTED (URL) state, not pending
+    // This ensures the badge updates instantly when chips are removed
     // Base count excludes moveInDate (no Date() calls, safe for SSR)
     const baseFilterCount = [
-        leaseDuration && leaseDuration !== 'any',
-        roomType && roomType !== 'any',
-        ...amenities,
-        ...houseRules,
-        ...languages,
-        genderPreference && genderPreference !== 'any',
-        householdGender && householdGender !== 'any',
+        committed.leaseDuration && committed.leaseDuration !== 'any',
+        committed.roomType && committed.roomType !== 'any',
+        ...committed.amenities,
+        ...committed.houseRules,
+        ...committed.languages,
+        committed.genderPreference && committed.genderPreference !== 'any',
+        committed.householdGender && committed.householdGender !== 'any',
     ].filter(Boolean).length;
 
     // moveInDate count only calculated after mount (uses Date() which differs server/client)
     // IMPORTANT: Only call validateMoveInDate when hasMounted is true to avoid hydration mismatch
     // The Date() comparison inside validateMoveInDate can produce different results on server vs client
-    const moveInDateCount = hasMounted ? (validateMoveInDate(moveInDate) ? 1 : 0) : 0;
+    const moveInDateCount = hasMounted ? (validateMoveInDate(committed.moveInDate) ? 1 : 0) : 0;
     const activeFilterCount = baseFilterCount + moveInDateCount;
 
     // Check if any filters are active (for "Clear all" button visibility)
     // Cast to boolean to satisfy TypeScript (|| chain returns first truthy value)
     const hasActiveFilters = Boolean(
-        location || minPrice || maxPrice ||
-        (leaseDuration && leaseDuration !== 'any') ||
-        (roomType && roomType !== 'any') ||
-        amenities.length > 0 || houseRules.length > 0 ||
-        languages.length > 0 ||
-        (genderPreference && genderPreference !== 'any') ||
-        (householdGender && householdGender !== 'any') ||
+        location || committed.minPrice || committed.maxPrice ||
+        (committed.leaseDuration && committed.leaseDuration !== 'any') ||
+        (committed.roomType && committed.roomType !== 'any') ||
+        committed.amenities.length > 0 || committed.houseRules.length > 0 ||
+        committed.languages.length > 0 ||
+        (committed.genderPreference && committed.genderPreference !== 'any') ||
+        (committed.householdGender && committed.householdGender !== 'any') ||
         moveInDateCount > 0
     );
 
