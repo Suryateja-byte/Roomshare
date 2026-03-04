@@ -1,0 +1,218 @@
+/**
+ * POI Layer Hydration Safety Tests
+ *
+ * Verifies that the POI toggle layer renders without hydration mismatches
+ * and functions correctly. The POILayer component defers sessionStorage reads
+ * to useEffect to avoid SSR/hydration mismatches.
+ *
+ * Run:
+ *   pnpm playwright test tests/search-stability/poi-hydration.anon.spec.ts --project=chromium-anon
+ */
+
+import { test, expect } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const SF_BOUNDS = {
+  minLat: 37.7,
+  maxLat: 37.85,
+  minLng: -122.52,
+  maxLng: -122.35,
+};
+
+const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
+const SEARCH_URL = `/search?${boundsQS}`;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Check if the map canvas is visible (WebGL initialized) */
+async function isMapAvailable(page: Page): Promise<boolean> {
+  try {
+    await page.locator(".maplibregl-canvas:visible").first().waitFor({
+      state: "visible",
+      timeout: 5_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Wait for the E2E map ref to be exposed */
+async function waitForMapRef(page: Page, timeout = 30_000): Promise<boolean> {
+  try {
+    await page.waitForFunction(
+      () => !!(window as any).__e2eMapRef,
+      { timeout },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Locate POI toggle buttons.
+ * POILayer renders buttons with aria-label like "Show Transit", "Hide Transit", etc.
+ * and aria-pressed="true"/"false".
+ */
+function poiButtons(page: Page) {
+  return page.locator('button[aria-pressed]').filter({
+    has: page.locator('text=/Transit|POIs|Parks/'),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+test.describe("POI Layer Hydration Safety", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test.beforeEach(async () => {
+    test.slow();
+  });
+
+  test("POI toggle buttons render after map loads", async ({ page }) => {
+    await page.goto(SEARCH_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    if (!(await isMapAvailable(page))) {
+      test.skip(true, "Map not available (WebGL unavailable in headless)");
+      return;
+    }
+
+    const hasMapRef = await waitForMapRef(page);
+    if (!hasMapRef) {
+      test.skip(true, "Map E2E ref not available");
+      return;
+    }
+
+    // POI buttons should be rendered (Transit, POIs, Parks)
+    const buttons = poiButtons(page);
+    await expect(buttons.first()).toBeVisible({ timeout: 15_000 });
+
+    // Should have exactly 3 category buttons
+    const count = await buttons.count();
+    expect(count).toBe(3);
+
+    // All should start unpressed (default state, no sessionStorage)
+    for (let i = 0; i < count; i++) {
+      const pressed = await buttons.nth(i).getAttribute("aria-pressed");
+      expect(pressed).toBe("false");
+    }
+  });
+
+  test("toggling a POI button activates it (aria-pressed=true)", async ({ page }) => {
+    await page.goto(SEARCH_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    if (!(await isMapAvailable(page))) {
+      test.skip(true, "Map not available (WebGL unavailable in headless)");
+      return;
+    }
+
+    const hasMapRef = await waitForMapRef(page);
+    if (!hasMapRef) {
+      test.skip(true, "Map E2E ref not available");
+      return;
+    }
+
+    // Wait for POI buttons
+    const buttons = poiButtons(page);
+    await expect(buttons.first()).toBeVisible({ timeout: 15_000 });
+
+    // Click the first POI button (Transit)
+    const transitButton = buttons.first();
+    await transitButton.click();
+
+    // Should now be pressed
+    await expect(transitButton).toHaveAttribute("aria-pressed", "true");
+
+    // Click again to toggle off
+    await transitButton.click();
+
+    // Should be unpressed again
+    await expect(transitButton).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("no hydration mismatch warnings in console", async ({ page }) => {
+    const consoleMessages: { type: string; text: string }[] = [];
+
+    page.on("console", (msg) => {
+      consoleMessages.push({
+        type: msg.type(),
+        text: msg.text(),
+      });
+    });
+
+    await page.goto(SEARCH_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    if (!(await isMapAvailable(page))) {
+      test.skip(true, "Map not available (WebGL unavailable in headless)");
+      return;
+    }
+
+    // Wait for map and POI layer to fully render
+    await waitForMapRef(page);
+    await page.waitForTimeout(3_000);
+
+    // Check for hydration-related warnings/errors
+    const hydrationIssues = consoleMessages.filter(({ text }) => {
+      const lower = text.toLowerCase();
+      return (
+        lower.includes("hydration") ||
+        lower.includes("text content does not match") ||
+        lower.includes("did not match") ||
+        lower.includes("server-rendered") ||
+        lower.includes("hydrate")
+      );
+    });
+
+    // Filter out known non-critical messages
+    const criticalHydrationIssues = hydrationIssues.filter(({ text }) => {
+      // React hydration errors are always critical
+      return (
+        text.includes("Hydration failed") ||
+        text.includes("Text content does not match") ||
+        text.includes("did not match. Server:") ||
+        text.includes("There was an error while hydrating")
+      );
+    });
+
+    expect(criticalHydrationIssues).toHaveLength(0);
+  });
+
+  test("POI button aria-labels are correct for accessibility", async ({ page }) => {
+    await page.goto(SEARCH_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    if (!(await isMapAvailable(page))) {
+      test.skip(true, "Map not available (WebGL unavailable in headless)");
+      return;
+    }
+
+    const hasMapRef = await waitForMapRef(page);
+    if (!hasMapRef) {
+      test.skip(true, "Map E2E ref not available");
+      return;
+    }
+
+    const buttons = poiButtons(page);
+    await expect(buttons.first()).toBeVisible({ timeout: 15_000 });
+
+    const count = await buttons.count();
+    for (let i = 0; i < count; i++) {
+      const ariaLabel = await buttons.nth(i).getAttribute("aria-label");
+      expect(ariaLabel).toBeTruthy();
+      // Should contain "Show" or "Hide" prefix
+      expect(ariaLabel).toMatch(/^(Show|Hide) /);
+    }
+  });
+});

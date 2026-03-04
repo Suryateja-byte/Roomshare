@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { useRef, useState, useEffect, useCallback, useTransition } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo, useTransition } from 'react';
 import {
   Home,
   Building2,
@@ -94,6 +94,15 @@ export function CategoryBar() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+
+  // Compute active category set once per URL change (not 8x per render)
+  const searchParamsString = searchParams.toString();
+  const activeCategoryIds = useMemo(() => {
+    const params = new URLSearchParams(searchParamsString);
+    return new Set(
+      CATEGORIES.filter((cat) => isCategoryActive(cat.params, params)).map((cat) => cat.id)
+    );
+  }, [searchParamsString]);
 
   const checkOverflow = useCallback(() => {
     const el = scrollRef.current;
@@ -209,9 +218,7 @@ export function CategoryBar() {
       >
         {CATEGORIES.map((cat) => {
           const Icon = cat.icon;
-          // Determine active status manually using our helper
-          const params = new URLSearchParams(searchParams.toString());
-          const isActive = isCategoryActive(cat.params, params);
+          const isActive = activeCategoryIds.has(cat.id);
 
           return (
             <button

@@ -9,7 +9,7 @@
  */
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useTransition } from "react";
+import { useMemo, useTransition } from "react";
 import { X } from "lucide-react";
 import { FilterChipWithImpact } from "./FilterChipWithImpact";
 import {
@@ -32,7 +32,11 @@ export function AppliedFilterChips({
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
 
-  const chips = urlToFilterChips(searchParams);
+  const searchParamsString = searchParams.toString();
+  const chips = useMemo(
+    () => urlToFilterChips(new URLSearchParams(searchParamsString)),
+    [searchParamsString],
+  );
 
   // Don't render if no chips
   if (chips.length === 0) {

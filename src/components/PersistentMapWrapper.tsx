@@ -458,7 +458,7 @@ export default function PersistentMapWrapper({
     // We strictly use V2 data ONLY if it's the active source (not overridden by recent client fetch)
     const activeV2Data = (isV2Enabled && mapSource === 'v2') ? (v2MapData ?? lastV2Data) : null;
     if (activeV2Data) {
-      return v2MapDataToListings(activeV2Data);
+      return v2MapDataToListings(activeV2Data).slice(0, MAX_MAP_MARKERS);
     }
     // During V1 fetch, merge previous data + cached spatial data so markers never disappear
     if (isFetchingMapData && previousListingsRef.current.length > 0) {
@@ -492,8 +492,8 @@ export default function PersistentMapWrapper({
       }
       return merged;
     }
-    return listings;
-  }, [isV2Enabled, v2MapData, lastV2Data, listings, isFetchingMapData]);
+    return listings.slice(0, MAX_MAP_MARKERS);
+  }, [isV2Enabled, mapSource, v2MapData, lastV2Data, listings, isFetchingMapData]);
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);

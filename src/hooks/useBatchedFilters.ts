@@ -212,20 +212,33 @@ export function useBatchedFilters(
   const transitionContext = useSearchTransitionSafe();
   const router = useRouter();
 
-  // Committed state derived from URL
+  // Committed state derived from URL (keyed on string value, not object reference)
+  const searchParamsString = searchParams.toString();
   const committed = useMemo(
-    () => readFiltersFromURL(searchParams),
-    [searchParams],
+    () => readFiltersFromURL(new URLSearchParams(searchParamsString)),
+    [searchParamsString],
   );
 
   // Pending state — initialized from URL, updated locally
   const [pending, setPendingState] = useState<BatchedFilterValues>(committed);
   const previousCommittedRef = useRef(committed);
   const forceSyncUntilRef = useRef(0);
+  const prevDrawerOpenRef = useRef(false);
 
   // Sync pending with URL when URL filter values change.
   // If only non-filter params change (for example map bounds), preserve unsaved edits.
   useEffect(() => {
+    const drawerJustOpened = isDrawerOpen && !prevDrawerOpenRef.current;
+    prevDrawerOpenRef.current = isDrawerOpen;
+
+    if (drawerJustOpened) {
+      // Force sync when drawer opens — external changes (chip removal,
+      // category bar, browser back/forward) must always be reflected.
+      setPendingState(committed);
+      previousCommittedRef.current = committed;
+      return;
+    }
+
     setPendingState((prevPending) => {
       const previousCommitted = previousCommittedRef.current;
       const committedFiltersChanged = !filtersEqual(committed, previousCommitted);

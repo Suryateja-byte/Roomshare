@@ -63,7 +63,15 @@ function saveActiveCategories(categories: Set<POICategory>): void {
 }
 
 export function POILayer({ mapRef, isMapLoaded }: POILayerProps) {
-    const [activeCategories, setActiveCategories] = useState<Set<POICategory>>(loadActiveCategories);
+    const [activeCategories, setActiveCategories] = useState<Set<POICategory>>(() => new Set());
+
+    // Restore persisted POI state after mount (avoids SSR/hydration mismatch from sessionStorage)
+    useEffect(() => {
+        const stored = loadActiveCategories();
+        if (stored.size > 0) {
+            setActiveCategories(stored);
+        }
+    }, []);
 
     const toggleCategory = useCallback((category: POICategory) => {
         setActiveCategories(prev => {

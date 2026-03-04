@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useSearchParams } from "next/navigation";
@@ -28,9 +28,17 @@ export function SearchResultsLoadingWrapper({
   const isPending = transitionContext?.isPending ?? false;
   const isSlowTransition = transitionContext?.isSlowTransition ?? false;
 
-  // Focus #search-results-heading when search params change (skip initial mount)
+  // Focus #search-results-heading when FILTER params change (skip initial mount & bounds-only changes)
   const searchParams = useSearchParams();
-  const paramsKey = searchParams.toString();
+  const filterParamsKey = useMemo(() => {
+    const filterOnly = new URLSearchParams(searchParams.toString());
+    // Strip geographic/viewport params — focus should not move on map pan
+    for (const k of ['minLat', 'maxLat', 'minLng', 'maxLng', 'lat', 'lng', 'zoom']) {
+      filterOnly.delete(k);
+    }
+    filterOnly.sort();
+    return filterOnly.toString();
+  }, [searchParams]);
   const isInitialMount = useRef(true);
 
   useEffect(() => {
@@ -39,7 +47,7 @@ export function SearchResultsLoadingWrapper({
       return;
     }
     document.getElementById("search-results-heading")?.focus();
-  }, [paramsKey]);
+  }, [filterParamsKey]);
 
   // Announce result count to screen readers when transition completes
   const prevPendingRef = useRef(false);
