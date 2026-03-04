@@ -385,7 +385,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             params.set('lng', selectedCoords.lng.toString());
         }
 
-        if (committed.moveInDate) params.set('moveInDate', committed.moveInDate);
+        const validatedMoveInDate = validateMoveInDate(committed.moveInDate);
+        if (validatedMoveInDate) params.set('moveInDate', validatedMoveInDate);
         if (committed.leaseDuration) params.set('leaseDuration', committed.leaseDuration);
         if (committed.roomType) params.set('roomType', committed.roomType);
         committed.amenities.forEach(a => params.append('amenities', a));

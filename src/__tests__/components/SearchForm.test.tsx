@@ -117,6 +117,9 @@ describe('SearchForm', () => {
     mockSearchParams.delete('lng')
     mockSearchParams.delete('genderPreference')
     mockSearchParams.delete('householdGender')
+    mockSearchParams.delete('amenities')
+    mockSearchParams.delete('houseRules')
+    mockSearchParams.delete('languages')
   })
 
   afterEach(() => {
@@ -500,29 +503,28 @@ describe('SearchForm', () => {
   // ============================================
 
   describe('clear all filters', () => {
-    it('clear button only shows when filters active', async () => {
+    it('clear button does not show when no filters active', async () => {
       render(<SearchForm />)
       await user.click(screen.getByRole('button', { name: /filters/i }))
       jest.runAllTimers()
 
-      // Initially no clear button
       expect(screen.queryByText('Clear all')).not.toBeInTheDocument()
+    })
 
-      // Add a filter
-      await user.click(screen.getByRole('button', { name: 'Wifi' }))
+    it('clear button shows when committed filters are active', async () => {
+      mockSearchParams.set('amenities', 'Wifi')
+      render(<SearchForm />)
+      await user.click(screen.getByRole('button', { name: /filters/i }))
+      jest.runAllTimers()
 
-      // Now clear button should appear
       expect(screen.getByText('Clear all')).toBeInTheDocument()
     })
 
     it('clear button resets all filter states', async () => {
+      mockSearchParams.set('amenities', 'Wifi')
       render(<SearchForm />)
       await user.click(screen.getByRole('button', { name: /filters/i }))
       jest.runAllTimers()
-
-      // Add filters
-      await user.click(screen.getByRole('button', { name: 'Wifi' }))
-      expect(screen.getByRole('button', { name: 'Wifi' })).toHaveAttribute('aria-pressed', 'true')
 
       // Clear all
       await user.click(screen.getByText('Clear all'))
