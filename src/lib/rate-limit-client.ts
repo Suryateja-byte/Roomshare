@@ -4,7 +4,13 @@
  * All hooks that hit search-related endpoints should use `rateLimitedFetch`
  * instead of raw `fetch`. When any endpoint returns 429, *every* consumer
  * backs off for the duration specified by `Retry-After`.
+ *
+ * Includes built-in timeout protection (default 15s) to prevent hanging requests
+ * from keeping loading spinners stuck indefinitely. Throws FetchTimeoutError
+ * (not AbortError) on timeout so callers that swallow AbortError still see the error.
  */
+
+import { FetchTimeoutError } from "./fetch-with-timeout";
 
 // ── Module-level state (shared across all consumers) ────────────────────────
 
@@ -39,31 +45,98 @@ export class RateLimitError extends Error {
   }
 }
 
+// ── Timeout defaults ────────────────────────────────────────────────────────
+
+const DEFAULT_TIMEOUT_MS = 15_000;
+
+// ── Extended init type ──────────────────────────────────────────────────────
+
+export interface RateLimitedFetchInit extends RequestInit {
+  /** Timeout in milliseconds. Default: 15000 (15 seconds). Set 0 to disable. */
+  timeout?: number;
+}
+
 // ── Core fetch wrapper ──────────────────────────────────────────────────────
 
 /**
  * Drop-in replacement for `fetch` that:
  * 1. Rejects immediately with `RateLimitError` when globally throttled.
  * 2. On a 429 response, parses `Retry-After`, sets the shared backoff, and throws.
- * 3. Otherwise returns the `Response` as-is.
+ * 3. Throws `FetchTimeoutError` if the request exceeds `timeout` ms.
+ * 4. Otherwise returns the `Response` as-is.
+ *
+ * IMPORTANT: Timeout throws `FetchTimeoutError` (NOT `AbortError`) so that
+ * callers with `if (err.name === "AbortError") return;` still see the error
+ * and can reset loading state.
  */
 export async function rateLimitedFetch(
   input: RequestInfo | URL,
-  init?: RequestInit,
+  init?: RateLimitedFetchInit,
 ): Promise<Response> {
   if (isThrottled()) {
     throw new RateLimitError(getRetryAfterMs());
   }
 
-  const res = await fetch(input, init);
+  const { timeout = DEFAULT_TIMEOUT_MS, signal: callerSignal, ...restInit } = init ?? {};
 
-  if (res.status === 429) {
-    const retryAfterMs = parseRetryAfter(res.headers.get("Retry-After"));
-    throttledUntil = Date.now() + retryAfterMs;
-    throw new RateLimitError(retryAfterMs);
+  // Set up timeout via internal AbortController + didTimeout flag
+  let didTimeout = false;
+  const timeoutController = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  if (timeout > 0) {
+    timeoutId = setTimeout(() => {
+      didTimeout = true;
+      timeoutController.abort();
+    }, timeout);
   }
 
-  return res;
+  // Link caller's signal to internal controller so caller abort still works
+  if (callerSignal) {
+    if (callerSignal.aborted) {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      timeoutController.abort();
+    } else {
+      callerSignal.addEventListener(
+        "abort",
+        () => {
+          if (timeoutId !== undefined) clearTimeout(timeoutId);
+          timeoutController.abort();
+        },
+        { once: true },
+      );
+    }
+  }
+
+  try {
+    const res = await fetch(input, {
+      ...restInit,
+      signal: timeoutController.signal,
+    });
+
+    if (res.status === 429) {
+      const retryAfterMs = parseRetryAfter(res.headers.get("Retry-After"));
+      throttledUntil = Date.now() + retryAfterMs;
+      throw new RateLimitError(retryAfterMs);
+    }
+
+    return res;
+  } catch (err) {
+    // Timeout-triggered abort → throw FetchTimeoutError (not AbortError)
+    if (didTimeout && err instanceof Error && err.name === "AbortError") {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : String(input);
+      throw new FetchTimeoutError(url, timeout);
+    }
+    // Caller-initiated abort or other errors → re-throw as-is
+    throw err;
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────────

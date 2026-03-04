@@ -19,6 +19,7 @@ import { preload } from 'react-dom';
 import { withTimeout, DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import { sanitizeErrorMessage } from '@/lib/logger';
+import * as Sentry from '@sentry/nextjs';
 import type { Metadata } from 'next';
 
 type SearchPageSearchParams = {
@@ -227,12 +228,22 @@ export default async function SearchPage({
                 };
             } else if (v2Result.error) {
                 // V2 returned error without throwing - log it before falling through to V1
-                console.warn('[search/page] V2 returned error:', sanitizeErrorMessage(v2Result.error));
+                const sanitized = sanitizeErrorMessage(v2Result.error);
+                console.warn('[search/page] V2 returned error:', sanitized);
+                Sentry.captureMessage(`V2 search error: ${sanitized}`, {
+                    level: 'warning',
+                    tags: { component: 'search-ssr', fallback: 'v2-to-v1' },
+                });
             }
         } catch (err) {
             // V2 failed - will fall back to v1 below
+            const sanitized = sanitizeErrorMessage(err);
             console.warn('[search/page] V2 orchestration failed, falling back to v1:', {
-                error: sanitizeErrorMessage(err),
+                error: sanitized,
+            });
+            Sentry.captureMessage(`V2 orchestration failed: ${sanitized}`, {
+                level: 'warning',
+                tags: { component: 'search-ssr', fallback: 'v2-to-v1' },
             });
         }
     }

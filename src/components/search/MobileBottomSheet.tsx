@@ -11,6 +11,7 @@ import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import PullToRefresh from "./PullToRefresh";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 /**
  * Snap points as fractions of viewport height (from bottom).
@@ -290,9 +291,14 @@ export default function MobileBottomSheet({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [snapIndex, setSnapIndex]);
 
-  // Prevent body scroll when sheet is expanded or during drag
-  // P2-FIX (#117): Also lock body scroll during drag transitions to prevent background scrolling
-  useBodyScrollLock(snapIndex === 2 || isDragging);
+  // Prevent body scroll when sheet is expanded or during drag.
+  // P2-FIX (#117): Also lock body scroll during drag transitions to prevent background scrolling.
+  // P2-FIX (#6-statesync): Guard with isDesktop === false to prevent scroll lock persisting
+  // when the mobile container is CSS-hidden on desktop (e.g., tablet rotation).
+  // useMediaQuery returns undefined during SSR — strict equality with false ensures
+  // no lock fires during SSR/hydration (safe because sheet starts at snapIndex 1).
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  useBodyScrollLock((snapIndex === 2 || isDragging) && isDesktop === false);
 
   const isExpanded = snapIndex === 2;
   const isCollapsed = snapIndex === 0;

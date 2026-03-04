@@ -49,6 +49,7 @@ import {
 const LazyDynamicMap = lazy(() => import("./DynamicMap"));
 
 const MAP_FETCH_DEBOUNCE_MS = 250;
+const MAP_FETCH_TIMEOUT_MS = 15_000;
 
 // Spatial cache constants
 const SPATIAL_CACHE_MAX_ENTRIES = 20;
@@ -507,9 +508,35 @@ export default function PersistentMapWrapper({
       setIsFetchingMapData(true);
       setError(null);
 
+      // Timeout protection: prevents loading overlay from staying stuck
+      // if TCP socket hangs (up to 5 min browser timeout without this).
+      let didTimeout = false;
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        didTimeout = true;
+        timeoutController.abort();
+      }, MAP_FETCH_TIMEOUT_MS);
+
+      // Link caller's signal to internal controller
+      if (signal) {
+        if (signal.aborted) {
+          clearTimeout(timeoutId);
+          timeoutController.abort();
+        } else {
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timeoutId);
+              timeoutController.abort();
+            },
+            { once: true },
+          );
+        }
+      }
+
       try {
         const response = await fetch(`/api/map-listings?${paramsString}`, {
-          signal,
+          signal: timeoutController.signal,
         });
 
         if (!response.ok) {
@@ -609,11 +636,15 @@ export default function PersistentMapWrapper({
         // Reset retry counter on successful fetch
         retryCountRef.current = 0;
       } catch (err) {
-        if ((err as Error).name !== "AbortError") {
+        if (didTimeout && (err as Error).name === "AbortError") {
+          // Timeout-triggered abort — show user-friendly error
+          setError("Map data request timed out. Please try again.");
+        } else if ((err as Error).name !== "AbortError") {
           console.error("Failed to fetch map listings:", err);
           setError((err as Error).message || "Failed to load map data");
         }
       } finally {
+        clearTimeout(timeoutId);
         setIsFetchingMapData(false);
       }
     },

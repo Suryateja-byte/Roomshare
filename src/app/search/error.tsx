@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertCircle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import * as Sentry from '@sentry/nextjs';
 
 export default function SearchError({
     error,
@@ -13,6 +14,7 @@ export default function SearchError({
     reset: () => void;
 }) {
     useEffect(() => {
+        Sentry.captureException(error, { tags: { errorBoundary: 'search' } });
         if (process.env.NODE_ENV === 'development') {
             console.error('Search page error:', error);
         }
