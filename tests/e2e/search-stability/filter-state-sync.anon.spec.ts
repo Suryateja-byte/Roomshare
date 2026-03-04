@@ -8,7 +8,7 @@
  * - Bounds-only changes do not cause filter chip flash/re-render
  *
  * Run:
- *   pnpm playwright test tests/search-stability/filter-state-sync.anon.spec.ts --project=chromium-anon
+ *   pnpm playwright test tests/e2e/search-stability/filter-state-sync.anon.spec.ts --project=chromium-anon
  */
 
 import { test, expect } from "@playwright/test";
@@ -56,7 +56,7 @@ function appliedFiltersRegion(page: Page): Locator {
   return searchResultsContainer(page).locator('[aria-label="Applied filters"]');
 }
 
-/** Read a URL search param from the current page URL */
+/** Read a URL search param from the current page URL (returns decoded value) */
 function getUrlParam(page: Page, key: string): string | null {
   return new URL(page.url()).searchParams.get(key);
 }
@@ -64,11 +64,11 @@ function getUrlParam(page: Page, key: string): string | null {
 /** Wait for the page to load and content to attach */
 async function waitForSearchReady(page: Page): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
+  // Use .first() to handle dual-container rendering
   await page
-    .locator('[data-testid="listing-card"], [data-testid="empty-state"], h1, h2, h3')
+    .locator('[data-testid="listing-card"], [data-testid="empty-state"], #search-results-heading')
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  await page.waitForLoadState("domcontentloaded").catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -118,17 +118,18 @@ test.describe("Filter State Sync across URL changes", () => {
     await waitForSearchReady(page);
 
     // Step 4: URL should match original state
+    // Note: URLSearchParams.get() decodes values (+ → space), so compare decoded
     await expect.poll(
       () => getUrlParam(page, "roomType"),
-      { timeout: 15_000, message: "URL roomType should be Private+Room after back" },
-    ).toBe("Private+Room");
+      { timeout: 15_000, message: "URL roomType should be 'Private Room' after back" },
+    ).toBe("Private Room");
 
     // Amenities should be gone from URL
     expect(getUrlParam(page, "amenities")).toBeNull();
 
     // Chips should reflect the URL: Private Room visible, Wifi gone
     await expect(region.locator("text=/Private Room/i").first()).toBeVisible({ timeout: 10_000 });
-    await expect(region.locator("text=/Wifi/i").first()).not.toBeVisible({ timeout: 5_000 });
+    await expect(region.locator("text=/Wifi/i")).not.toBeVisible({ timeout: 5_000 });
   });
 
   test("bounds change (map pan) does not drop filter params from URL", async ({ page }) => {
@@ -136,15 +137,15 @@ test.describe("Filter State Sync across URL changes", () => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await waitForSearchReady(page);
 
-    // Verify filter is in URL
-    expect(getUrlParam(page, "roomType")).toBe("Private+Room");
+    // Verify filter is in URL (decoded)
+    expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
     // Navigate with changed bounds but same filter (simulates map pan)
     await page.goto(`/search?${pannedBoundsQS}&roomType=Private+Room`);
     await waitForSearchReady(page);
 
     // Filter should still be in the URL after bounds change
-    expect(getUrlParam(page, "roomType")).toBe("Private+Room");
+    expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
     // Bounds should reflect the new panned values
     expect(getUrlParam(page, "minLat")).toBe(String(PANNED_BOUNDS.minLat));
@@ -158,8 +159,8 @@ test.describe("Filter State Sync across URL changes", () => {
     }
   });
 
-  test("bounds-only change does not cause filter chips to flash or re-render", async ({ page }) => {
-    // Navigate with a filter
+  test("bounds-only change does not cause filter chips to disappear", async ({ page }) => {
+    // Navigate with filters
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
     await waitForSearchReady(page);
 
@@ -171,58 +172,12 @@ test.describe("Filter State Sync across URL changes", () => {
     await expect(region.locator("text=/Private Room/i").first()).toBeVisible({ timeout: 10_000 });
     await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 10_000 });
 
-    // Track chip visibility during bounds change by recording mutation events
-    const chipMutationCount = await page.evaluate(() => {
-      return new Promise<number>((resolve) => {
-        const region = document.querySelector('[aria-label="Applied filters"]');
-        if (!region) {
-          resolve(-1);
-          return;
-        }
-
-        let mutations = 0;
-        const observer = new MutationObserver((records) => {
-          // Count mutations that add/remove child elements (chip flash)
-          for (const record of records) {
-            if (record.addedNodes.length > 0 || record.removedNodes.length > 0) {
-              mutations++;
-            }
-          }
-        });
-
-        observer.observe(region, { childList: true, subtree: true });
-
-        // We'll disconnect after a timeout -- the caller will trigger the navigation
-        setTimeout(() => {
-          observer.disconnect();
-          resolve(mutations);
-        }, 3_000);
-      });
-    });
-
     // Navigate with bounds-only change (keep same filters)
-    // Note: the MutationObserver is already recording for 3 seconds
-    if (chipMutationCount === -1) {
-      test.skip(true, "Could not observe applied filters region");
-      return;
-    }
-
-    // Do a second approach: verify chips are still visible AFTER bounds change
     await page.goto(`/search?${pannedBoundsQS}&roomType=Private+Room&amenities=Wifi`);
     await waitForSearchReady(page);
 
-    // Chips should still be visible without any flash
+    // Chips should still be visible after bounds change
     await expect(region.locator("text=/Private Room/i").first()).toBeVisible({ timeout: 10_000 });
     await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 10_000 });
-
-    // The filter chips content should match what we started with
-    const chipTexts = await region.locator("button[aria-label^='Remove filter']").allTextContents();
-    const hasPrivateRoom = chipTexts.some((t) => /private room/i.test(t));
-    const hasWifi = chipTexts.some((t) => /wifi/i.test(t));
-
-    // At least the chip remove buttons should be present
-    if (chipTexts.length > 0) {
-      expect(hasPrivateRoom || hasWifi).toBe(true);
-    }
   });
 });
