@@ -82,6 +82,11 @@ export function FilterChip({
             impactDelta ? "opacity-100" : "opacity-0 group-hover/chip:opacity-100",
             "transition-opacity duration-150",
           )}
+          title={
+            impactDelta
+              ? `${impactDelta.replace('+', '')} more results without this filter`
+              : undefined
+          }
           aria-label={
             impactDelta
               ? `Removing this filter adds ${impactDelta} more results`

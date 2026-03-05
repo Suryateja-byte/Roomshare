@@ -22,6 +22,8 @@ interface UseFormPersistenceResult<T> {
     cancelSave: () => void;
     clearPersistedData: () => void;
     isHydrated: boolean;
+    crossTabConflict: boolean;
+    dismissCrossTabConflict: () => void;
 }
 
 const DEFAULT_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -47,6 +49,7 @@ export function useFormPersistence<T>(
     const [persistedData, setPersistedData] = useState<T | null>(null);
     const [savedAt, setSavedAt] = useState<Date | null>(null);
     const [isHydrated, setIsHydrated] = useState(false);
+    const [crossTabConflict, setCrossTabConflict] = useState(false);
 
     // Load persisted data on mount (client-side only)
     useEffect(() => {
@@ -99,7 +102,7 @@ export function useFormPersistence<T>(
             console.error('Error saving form data:', error);
             setSavedAt(null); // Clear stale "Draft saved" indicator
         }
-    }, debounceMs);
+    }, debounceMs, { flushOnExit: true });
 
     // Save data with debouncing
     const saveData = useCallback((data: T) => {
@@ -118,6 +121,21 @@ export function useFormPersistence<T>(
         debouncedSave.cancel();
     }, [debouncedSave]);
 
+    // Cross-tab collision detection via storage event
+    useEffect(() => {
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === key && e.newValue !== null) {
+                setCrossTabConflict(true);
+            }
+        };
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
+    }, [key]);
+
+    const dismissCrossTabConflict = useCallback(() => {
+        setCrossTabConflict(false);
+    }, []);
+
     return {
         persistedData,
         hasDraft: persistedData !== null,
@@ -125,7 +143,9 @@ export function useFormPersistence<T>(
         saveData,
         cancelSave,
         clearPersistedData,
-        isHydrated
+        isHydrated,
+        crossTabConflict,
+        dismissCrossTabConflict,
     };
 }
 

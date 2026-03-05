@@ -17,6 +17,7 @@ import { withIdempotency } from '@/lib/idempotency';
 import { upsertSearchDocSync } from '@/lib/search/search-doc-sync';
 import { triggerInstantAlerts } from '@/lib/search-alerts';
 import { captureApiError } from '@/lib/api-error-handler';
+import { isCircuitOpenError } from '@/lib/circuit-breaker';
 import { normalizeStringList } from '@/lib/utils';
 import { calculateProfileCompletion, PROFILE_REQUIREMENTS } from '@/lib/profile-completion';
 
@@ -101,6 +102,14 @@ export async function POST(request: Request) {
         }
         const userId = session.user.id;
 
+        // 2b. Per-user rate limit (supplements IP-based limit at line 89)
+        const userRateLimitResponse = await withRateLimit(request, {
+            type: 'createListing',
+            getIdentifier: () => `user:${userId}`,
+            endpoint: '/api/listings/user',
+        });
+        if (userRateLimitResponse) return userRateLimitResponse;
+
         // 3. Parse JSON body with error handling (only for authenticated users)
         let body: Record<string, unknown>;
         try {
@@ -112,12 +121,20 @@ export async function POST(request: Request) {
         // 4. Suspension check — pass userId to avoid redundant auth() call (M-S1)
         const suspension = await checkSuspension(userId);
         if (suspension.suspended) {
+            await logger.warn('Listing create blocked: account suspended', {
+                route: '/api/listings', method: 'POST',
+                userId: userId.slice(0, 8) + '...',
+            });
             return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
         // 5. Email verification check — pass userId to avoid redundant auth() call (M-S1)
         const emailCheck = await checkEmailVerified(userId);
         if (!emailCheck.verified) {
+            await logger.warn('Listing create blocked: email unverified', {
+                route: '/api/listings', method: 'POST',
+                userId: userId.slice(0, 8) + '...',
+            });
             return NextResponse.json({ error: emailCheck.error || 'Please verify your email' }, { status: 403 });
         }
 
@@ -136,6 +153,11 @@ export async function POST(request: Request) {
         // 6b. Profile completion check (BE-M2)
         const completion = calculateProfileCompletion(user as any);
         if (completion.percentage < PROFILE_REQUIREMENTS.createListing) {
+            await logger.warn('Listing create blocked: incomplete profile', {
+                route: '/api/listings', method: 'POST',
+                userId: userId.slice(0, 8) + '...',
+                completionPct: completion.percentage,
+            });
             return NextResponse.json({
                 error: `Profile must be at least ${PROFILE_REQUIREMENTS.createListing}% complete to create a listing. Current: ${completion.percentage}%. Missing: ${completion.missing.join(', ')}.`
             }, { status: 403 });
@@ -186,7 +208,10 @@ export async function POST(request: Request) {
                 route: '/api/listings',
                 method: 'POST',
             });
-            return NextResponse.json({ error: titleCheck.message }, { status: 400 });
+            return NextResponse.json(
+                { error: titleCheck.message ?? 'Content policy violation', field: 'title' },
+                { status: 400 },
+            );
         }
 
         if (description) {
@@ -196,7 +221,10 @@ export async function POST(request: Request) {
                     route: '/api/listings',
                     method: 'POST',
                 });
-                return NextResponse.json({ error: descriptionCheck.message }, { status: 400 });
+                return NextResponse.json(
+                    { error: descriptionCheck.message ?? 'Content policy violation', field: 'description' },
+                    { status: 400 },
+                );
             }
         }
 
@@ -204,16 +232,49 @@ export async function POST(request: Request) {
 
         // Geocode address (log only city/state, not full address)
         const fullAddress = `${address}, ${city}, ${state} ${zip}`;
-        const coords = await geocodeAddress(fullAddress);
+        let coords: { lat: number; lng: number };
+        try {
+            const geoResult = await geocodeAddress(fullAddress);
+            if (geoResult.status === 'not_found') {
+                await logger.warn('Geocoding failed for listing', {
+                    route: '/api/listings', method: 'POST', city, state,
+                });
+                return NextResponse.json(
+                    { error: 'Could not find this address. Please check and try again.' },
+                    { status: 400 }
+                );
+            }
+            if (geoResult.status === 'error') {
+                return NextResponse.json(
+                    { error: 'Address verification temporarily unavailable. Please try again.' },
+                    { status: 503, headers: { 'Retry-After': '10' } }
+                );
+            }
+            coords = { lat: geoResult.lat, lng: geoResult.lng };
+        } catch (geoError) {
+            if (isCircuitOpenError(geoError)) {
+                return NextResponse.json(
+                    { error: 'Address verification service temporarily unavailable. Please try again shortly.' },
+                    { status: 503, headers: { 'Retry-After': '30' } }
+                );
+            }
+            throw geoError;
+        }
 
-        if (!coords) {
-            await logger.warn('Geocoding failed for listing', {
-                route: '/api/listings',
-                method: 'POST',
-                city,
-                state,
+        // Validate image URL ownership (prevent cross-user URL injection)
+        if (images && images.length > 0) {
+            const expectedPrefix = `listings/${userId}/`;
+            const hasInvalidImage = images.some(url => {
+                const match = url.match(/\/storage\/v1\/object\/public\/images\/(.+)$/);
+                const storagePath = match ? match[1] : null;
+                return !storagePath || !storagePath.startsWith(expectedPrefix);
             });
-            return NextResponse.json({ error: 'Could not geocode address' }, { status: 400 });
+            if (hasInvalidImage) {
+                return NextResponse.json(
+                    { error: 'One or more image URLs are invalid' },
+                    { status: 400 }
+                );
+            }
         }
 
         // Build listing create data from validated fields
@@ -240,11 +301,13 @@ export async function POST(request: Request) {
 
         // Transaction logic: count check (FOR UPDATE) + create listing + location + PostGIS update
         const createListingInTx = async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
-            // 10. Max listings per user check inside tx with row locks to prevent TOCTOU race
+            // Serialize concurrent listing creates for same user (prevents TOCTOU on empty result set)
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+
+            // 10. Max listings per user check inside tx
             const countResult = await tx.$queryRaw<[{ count: number }]>`
                 SELECT COUNT(*)::int as count FROM "Listing"
                 WHERE "ownerId" = ${userId} AND status IN ('ACTIVE', 'PAUSED')
-                FOR UPDATE
             `;
             if (countResult[0].count >= 10) {
                 throw new Error('MAX_LISTINGS_EXCEEDED');
@@ -353,13 +416,17 @@ export async function POST(request: Request) {
                 }
             } else {
                 // 13. Non-idempotent path: regular prisma.$transaction
-                result = await prisma.$transaction(createListingInTx);
+                result = await prisma.$transaction(createListingInTx, { timeout: 15000 });
 
                 // Side effects
                 await fireSideEffects({ ...result, price: Number(result.price) });
             }
         } catch (txError) {
             if (txError instanceof Error && txError.message === 'MAX_LISTINGS_EXCEEDED') {
+                await logger.warn('Listing create blocked: max listings exceeded', {
+                    route: '/api/listings', method: 'POST',
+                    userId: userId.slice(0, 8) + '...',
+                });
                 return NextResponse.json({ error: 'Maximum 10 active listings per user' }, { status: 400 });
             }
             throw txError;

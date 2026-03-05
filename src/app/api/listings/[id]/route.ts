@@ -3,13 +3,14 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
 import { createClient } from '@supabase/supabase-js';
-import { householdLanguagesSchema, supabaseImageUrlSchema } from '@/lib/schemas';
+import { householdLanguagesSchema, supabaseImageUrlSchema, sanitizeUnicode } from '@/lib/schemas';
 import { VALID_AMENITIES, VALID_HOUSE_RULES } from '@/lib/filter-schema';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
 import { withRateLimit } from '@/lib/with-rate-limit';
 import { captureApiError } from '@/lib/api-error-handler';
+import { isCircuitOpenError } from '@/lib/circuit-breaker';
 import { logger } from '@/lib/logger';
 import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension';
 import { normalizeStringList } from '@/lib/utils';
@@ -25,9 +26,9 @@ function extractStoragePath(publicUrl: string): string | null {
 }
 
 const updateListingSchema = z.object({
-    title: z.string().trim().min(1).max(100),
-    description: z.string().trim().min(1).max(1000),
-    price: z.coerce.number().positive(),
+    title: z.string().trim().min(1).max(100).transform(sanitizeUnicode),
+    description: z.string().trim().min(1).max(1000).transform(sanitizeUnicode),
+    price: z.coerce.number().positive().multipleOf(0.01),
     amenities: z.union([z.array(z.string().max(50)).max(20), z.string()]).optional().default([]),
     houseRules: z.union([z.array(z.string().max(50)).max(20), z.string()]).optional().default([]),
     totalSlots: z.coerce.number().int().min(1).max(20),
@@ -144,6 +145,9 @@ export async function DELETE(
             throw error;
         }
 
+        // Fire-and-forget: mark listing dirty for search doc removal
+        markListingDirty(id, 'listing_deleted').catch(() => {});
+
         // Clean up images from Supabase storage (outside transaction — best-effort)
         if (listingImages.length > 0 && supabaseUrl && supabaseServiceKey) {
             try {
@@ -187,13 +191,23 @@ export async function PATCH(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const suspension = await checkSuspension(session.user.id);
+        const userId = session.user.id;
+
+        const suspension = await checkSuspension(userId);
         if (suspension.suspended) {
+            await logger.warn('Listing update blocked: account suspended', {
+                route: '/api/listings/[id]', method: 'PATCH',
+                userId: userId.slice(0, 8) + '...',
+            });
             return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
         }
 
-        const emailCheck = await checkEmailVerified(session.user.id);
+        const emailCheck = await checkEmailVerified(userId);
         if (!emailCheck.verified) {
+            await logger.warn('Listing update blocked: email unverified', {
+                route: '/api/listings/[id]', method: 'PATCH',
+                userId: userId.slice(0, 8) + '...',
+            });
             return NextResponse.json({ error: emailCheck.error || 'Email verification required' }, { status: 403 });
         }
 
@@ -209,8 +223,8 @@ export async function PATCH(
         if (!parsed.success) {
             return NextResponse.json(
                 {
-                    error: 'Invalid request payload',
-                    details: parsed.error.flatten().fieldErrors,
+                    error: 'Validation failed',
+                    fields: parsed.error.flatten().fieldErrors,
                 },
                 { status: 400 }
             );
@@ -247,7 +261,7 @@ export async function PATCH(
             return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
         }
 
-        if (listing.ownerId !== session.user.id) {
+        if (listing.ownerId !== userId) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
@@ -259,11 +273,34 @@ export async function PATCH(
             }
         }
 
+        // Validate image URL ownership (prevent cross-user URL injection)
+        if (Array.isArray(images) && images.length > 0) {
+            const expectedPrefix = `listings/${userId}/`;
+            const hasInvalidImage = images.some(url => {
+                const storagePath = extractStoragePath(url);
+                return !storagePath || !storagePath.startsWith(expectedPrefix);
+            });
+            if (hasInvalidImage) {
+                return NextResponse.json(
+                    { error: 'One or more image URLs are invalid' },
+                    { status: 400 }
+                );
+            }
+        }
+
         // Check title for discriminatory language patterns (BE-H2)
         if (title) {
             const titleCheck = checkListingLanguageCompliance(title);
             if (!titleCheck.allowed) {
-                return NextResponse.json({ error: titleCheck.message }, { status: 400 });
+                await logger.warn('Listing title failed compliance check', {
+                    route: '/api/listings/[id]', method: 'PATCH',
+                    userId: userId.slice(0, 8) + '...',
+                    field: 'title',
+                });
+                return NextResponse.json(
+                    { error: titleCheck.message ?? 'Content policy violation', field: 'title' },
+                    { status: 400 },
+                );
             }
         }
 
@@ -271,7 +308,15 @@ export async function PATCH(
         if (description) {
             const complianceCheck = checkListingLanguageCompliance(description);
             if (!complianceCheck.allowed) {
-                return NextResponse.json({ error: complianceCheck.message }, { status: 400 });
+                await logger.warn('Listing description failed compliance check', {
+                    route: '/api/listings/[id]', method: 'PATCH',
+                    userId: userId.slice(0, 8) + '...',
+                    field: 'description',
+                });
+                return NextResponse.json(
+                    { error: complianceCheck.message ?? 'Content policy violation', field: 'description' },
+                    { status: 400 },
+                );
             }
         }
 
@@ -283,13 +328,37 @@ export async function PATCH(
                 listing.location.zip !== zip);
 
         // Geocode BEFORE transaction if address changed
-        let coords = null;
+        let coords: { lat: number; lng: number } | null = null;
         if (addressChanged && listing.location) {
             const fullAddress = `${address}, ${city}, ${state} ${zip}`;
-            coords = await geocodeAddress(fullAddress);
-
-            if (!coords) {
-                return NextResponse.json({ error: 'Could not geocode new address' }, { status: 400 });
+            try {
+                const geoResult = await geocodeAddress(fullAddress);
+                if (geoResult.status === 'not_found') {
+                    await logger.warn('Geocoding failed for listing update', {
+                        route: '/api/listings/[id]', method: 'PATCH',
+                        userId: userId.slice(0, 8) + '...',
+                        city, state,
+                    });
+                    return NextResponse.json(
+                        { error: 'Could not find this address. Please check and try again.' },
+                        { status: 400 }
+                    );
+                }
+                if (geoResult.status === 'error') {
+                    return NextResponse.json(
+                        { error: 'Address verification temporarily unavailable. Please try again.' },
+                        { status: 503, headers: { 'Retry-After': '10' } }
+                    );
+                }
+                coords = { lat: geoResult.lat, lng: geoResult.lng };
+            } catch (geoError) {
+                if (isCircuitOpenError(geoError)) {
+                    return NextResponse.json(
+                        { error: 'Address verification service temporarily unavailable. Please try again shortly.' },
+                        { status: 503, headers: { 'Retry-After': '30' } }
+                    );
+                }
+                throw geoError;
             }
         }
 
@@ -330,7 +399,7 @@ export async function PATCH(
                     throw new Error('NOT_FOUND');
                 }
 
-                if (lockedListing.ownerId !== session.user.id) {
+                if (lockedListing.ownerId !== userId) {
                     throw new Error('FORBIDDEN');
                 }
 
@@ -394,6 +463,31 @@ export async function PATCH(
                 }
             }
             throw error;
+        }
+
+        // Clean up removed images from storage (outside transaction — best-effort)
+        if (Array.isArray(images) && listing.images && supabaseUrl && supabaseServiceKey) {
+            const oldSet = new Set(listing.images as string[]);
+            const newSet = new Set(images);
+            const removedUrls = [...oldSet].filter(url => !newSet.has(url));
+
+            if (removedUrls.length > 0) {
+                try {
+                    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+                    const paths = removedUrls
+                        .map(extractStoragePath)
+                        .filter((p): p is string => p !== null);
+                    if (paths.length > 0) {
+                        await supabase.storage.from('images').remove(paths);
+                    }
+                } catch (storageError) {
+                    logger.sync.warn('Failed to clean up removed images on edit', {
+                        error: storageError instanceof Error ? storageError.message : 'Unknown',
+                        route: '/api/listings/[id]',
+                        method: 'PATCH',
+                    });
+                }
+            }
         }
 
         // Fire-and-forget: mark listing dirty for search doc refresh

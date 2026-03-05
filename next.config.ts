@@ -93,10 +93,14 @@ const nextConfig: NextConfig = {
             key: "X-Frame-Options",
             value: "DENY",
           },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=31536000; includeSubDomains; preload",
-          },
+          ...(process.env.NODE_ENV === "production"
+            ? [
+                {
+                  key: "Strict-Transport-Security",
+                  value: "max-age=31536000; includeSubDomains; preload",
+                },
+              ]
+            : []),
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(self), interest-cohort=()",
@@ -141,6 +145,17 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+
+  // WSL2 fix: poll for file changes since inotify doesn't work on Windows mounts
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
+    }
+    return config;
   },
 
   // Disable powered by header

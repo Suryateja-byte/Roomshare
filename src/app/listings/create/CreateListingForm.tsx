@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/select';
 import { Loader2, Home, MapPin, List, Camera, FileText, X, AlertTriangle, CheckCircle, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import * as Sentry from '@sentry/nextjs';
+import { createListingSchema } from '@/lib/schemas';
 import ImageUploader from '@/components/listings/ImageUploader';
 import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
@@ -101,6 +103,7 @@ export default function CreateListingForm() {
     const submitAbortRef = useRef<AbortController | null>(null);
     const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const submitSucceededRef = useRef(false);
+    const idempotencyKeyRef = useRef(crypto.randomUUID());
 
     // Form field states for premium components
     const [description, setDescription] = useState('');
@@ -131,7 +134,9 @@ export default function CreateListingForm() {
         saveData,
         cancelSave,
         clearPersistedData,
-        isHydrated
+        isHydrated,
+        crossTabConflict,
+        dismissCrossTabConflict,
     } = useFormPersistence<ListingFormData>({ key: FORM_STORAGE_KEY });
 
     // Language search filter state
@@ -180,7 +185,15 @@ export default function CreateListingForm() {
             setCity(persistedData.city || '');
             setState(persistedData.state || '');
             setZip(persistedData.zip || '');
-            setMoveInDate(persistedData.moveInDate || '');
+            let restoredMoveInDate = persistedData.moveInDate || '';
+            if (restoredMoveInDate) {
+                const now = new Date();
+                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                if (restoredMoveInDate < todayStr) {
+                    restoredMoveInDate = '';
+                }
+            }
+            setMoveInDate(restoredMoveInDate);
             setLeaseDuration(persistedData.leaseDuration || '');
             setRoomType(persistedData.roomType || '');
             setGenderPreference(persistedData.genderPreference || '');
@@ -308,12 +321,48 @@ export default function CreateListingForm() {
         const abortController = new AbortController();
         submitAbortRef.current = abortController;
 
-        // Read form data from the form ref instead of the event target
-        const formData = formRef.current ? new FormData(formRef.current) : new FormData();
-        const data = Object.fromEntries(formData.entries());
-
         const imageUrls = successfulImages.map(img => img.uploadedUrl as string);
-        const idempotencyKey = crypto.randomUUID();
+        const idempotencyKey = idempotencyKeyRef.current;
+
+        // Build body exclusively from React state (all fields are controlled)
+        const bodyObj = {
+            title,
+            description,
+            price,
+            address,
+            city,
+            state,
+            zip,
+            totalSlots,
+            amenities: amenitiesValue || undefined,
+            houseRules: houseRulesValue || undefined,
+            images: imageUrls,
+            householdLanguages: selectedLanguages,
+            moveInDate: moveInDate || undefined,
+            leaseDuration: leaseDuration || undefined,
+            roomType: roomType || undefined,
+            genderPreference: genderPreference || undefined,
+            householdGender: householdGender || undefined,
+        };
+
+        // Client-side Zod pre-validation (optimistic — server validates as defense-in-depth)
+        const clientParsed = createListingSchema.safeParse(bodyObj);
+        if (!clientParsed.success) {
+            const errors: Record<string, string> = {};
+            clientParsed.error.issues.forEach((issue) => {
+                if (issue.path.length > 0) {
+                    errors[issue.path[0].toString()] = issue.message;
+                }
+            });
+            setFieldErrors(errors);
+            const firstErrorKey = Object.keys(errors)[0];
+            if (firstErrorKey) {
+                document.getElementById(firstErrorKey)?.focus();
+            }
+            setLoading(false);
+            isSubmittingRef.current = false;
+            return;
+        }
 
         try {
             const res = await fetch('/api/listings', {
@@ -322,18 +371,7 @@ export default function CreateListingForm() {
                     'Content-Type': 'application/json',
                     'X-Idempotency-Key': idempotencyKey,
                 },
-                body: JSON.stringify({
-                    ...data,
-                    amenities: amenitiesValue || undefined,
-                    houseRules: houseRulesValue || undefined,
-                    images: imageUrls,
-                    householdLanguages: selectedLanguages,
-                    moveInDate: moveInDate || undefined,
-                    leaseDuration: leaseDuration || undefined,
-                    roomType: roomType || undefined,
-                    genderPreference: genderPreference || undefined,
-                    householdGender: householdGender || undefined,
-                }),
+                body: JSON.stringify(bodyObj),
                 signal: abortController.signal,
             });
 
@@ -341,6 +379,15 @@ export default function CreateListingForm() {
 
             if (!res.ok) {
                 const json = await res.json();
+
+                // Regenerate key when the server definitively rejected (no listing created).
+                // Keep key on hash-mismatch or ambiguous errors for dedup safety.
+                const isDefinitiveRejection = res.status >= 400 && res.status < 500
+                    && !json.error?.includes('Idempotency key reused');
+                if (isDefinitiveRejection) {
+                    idempotencyKeyRef.current = crypto.randomUUID();
+                }
+
                 if (json.fields) {
                     const newFieldErrors = json.fields as Record<string, string>;
                     setFieldErrors(newFieldErrors);
@@ -360,6 +407,8 @@ export default function CreateListingForm() {
             cancelSave();
             clearPersistedData();
             submitSucceededRef.current = true;
+            navGuard.disable();
+            idempotencyKeyRef.current = crypto.randomUUID();
             toast.success('Listing published successfully!', {
                 description: 'Your listing is now live and visible to potential roommates.',
                 duration: 5000,
@@ -371,6 +420,9 @@ export default function CreateListingForm() {
             }, 1000);
         } catch (err: unknown) {
             if (err instanceof Error && err.name === 'AbortError') return;
+            Sentry.captureException(err, {
+                tags: { component: 'CreateListingForm', action: 'submit' },
+            });
             const message = err instanceof Error ? err.message : 'An unexpected error occurred';
             showError(message);
         } finally {
@@ -500,6 +552,13 @@ export default function CreateListingForm() {
                 </div>
             )}
 
+            {crossTabConflict && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 mb-4">
+                    <p>This draft was modified in another tab. Reload to see the latest version.</p>
+                    <button onClick={dismissCrossTabConflict} className="underline mt-1">Dismiss</button>
+                </div>
+            )}
+
             {/* Auto-save status indicator */}
             {!showDraftBanner && savedAt && !loading && (
                 <div className="flex items-center justify-end gap-2 mb-4 text-xs text-zinc-500 dark:text-zinc-400 animate-in fade-in duration-300">
@@ -521,6 +580,7 @@ export default function CreateListingForm() {
                             id="title"
                             name="title"
                             required
+                            maxLength={100}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="e.g. Sun-drenched Loft in Arts District"
@@ -561,8 +621,8 @@ export default function CreateListingForm() {
                                 id="price"
                                 name="price"
                                 type="number"
-                                min="0"
-                                step="1"
+                                min="0.01"
+                                step="0.01"
                                 required
                                 value={price}
                                 onChange={(e) => setPrice(e.target.value)}
@@ -611,6 +671,7 @@ export default function CreateListingForm() {
                             id="address"
                             name="address"
                             required
+                            maxLength={200}
                             value={address}
                             onChange={(e) => setAddress(e.target.value)}
                             placeholder="123 Boulevard St"
@@ -628,6 +689,7 @@ export default function CreateListingForm() {
                                 id="city"
                                 name="city"
                                 required
+                                maxLength={100}
                                 value={city}
                                 onChange={(e) => setCity(e.target.value)}
                                 placeholder="San Francisco"
@@ -644,6 +706,7 @@ export default function CreateListingForm() {
                                 id="state"
                                 name="state"
                                 required
+                                maxLength={50}
                                 value={state}
                                 onChange={(e) => setState(e.target.value)}
                                 placeholder="CA"
@@ -660,6 +723,7 @@ export default function CreateListingForm() {
                                 id="zip"
                                 name="zip"
                                 required
+                                maxLength={20}
                                 value={zip}
                                 onChange={(e) => setZip(e.target.value)}
                                 placeholder="94103"
@@ -680,7 +744,7 @@ export default function CreateListingForm() {
                     <h3 id="section-photos" className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                         <Camera className="w-4 h-4 flex-shrink-0" /> Photos
                     </h3>
-                    <div>
+                    <div id="images">
                         <Label>Upload Photos</Label>
                         <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-4">
                             At least one photo required to publish your listing
@@ -690,6 +754,9 @@ export default function CreateListingForm() {
                             initialImages={uploadedImages.filter(img => img.uploadedUrl).map(img => img.uploadedUrl!)}
                             key={draftRestored ? 'restored' : 'initial'}
                         />
+                        {fieldErrors.images && (
+                            <p className="text-sm text-red-500 mt-1">{fieldErrors.images}</p>
+                        )}
                     </div>
                 </section>
 
@@ -761,7 +828,7 @@ export default function CreateListingForm() {
                         </div>
                     </div>
 
-                    <div>
+                    <div id="householdLanguages">
                         <Label>Languages Spoken in the House</Label>
                         <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-3">Select languages spoken by household members</p>
 
@@ -821,6 +888,9 @@ export default function CreateListingForm() {
                                 </p>
                             )}
                         </div>
+                        {fieldErrors.householdLanguages && (
+                            <p className="text-sm text-red-500 mt-1">{fieldErrors.householdLanguages}</p>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

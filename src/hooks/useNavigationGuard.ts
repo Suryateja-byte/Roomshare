@@ -5,6 +5,7 @@ export interface NavigationGuardState {
     message: string;
     onStay: () => void;
     onLeave: () => void;
+    disable: () => void;
 }
 
 // Module-level reference to the real pushState (StrictMode-safe — H4)
@@ -142,10 +143,17 @@ export function useNavigationGuard(shouldBlock: boolean, message: string): Navig
         };
     }, [shouldBlock]);
 
+    // Imperatively disable blocking (e.g. after successful submit) without
+    // waiting for the next React render cycle to flip `shouldBlock` to false.
+    const disable = useCallback(() => {
+        shouldBlockRef.current = false;
+    }, []);
+
     return {
         showDialog,
         message,
         onStay,
         onLeave,
+        disable,
     };
 }

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, Plus, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import * as Sentry from '@sentry/nextjs';
 
 interface ImageObject {
     file?: File;
@@ -132,6 +133,7 @@ export default function ImageUploader({
 
         // If uploading to cloud, process uploads
         if (uploadToCloud) {
+            uploadControllerRef.current?.abort();
             const controller = new AbortController();
             uploadControllerRef.current = controller;
 
@@ -150,6 +152,10 @@ export default function ImageUploader({
                         setImages(prev => prev.filter(img => !img.isUploading));
                         break;
                     }
+                    Sentry.captureException(error, {
+                        tags: { component: 'ImageUploader', action: 'upload' },
+                        extra: { imageId: imgObj.id },
+                    });
                     setImages(prev => prev.map(img =>
                         img.id === imgObj.id
                             ? { ...img, error: (error as Error).message, isUploading: false }
@@ -170,11 +176,39 @@ export default function ImageUploader({
 
     const removeImage = (idToRemove: string) => {
         const imageToRemove = images.find(img => img.id === idToRemove);
-        if (imageToRemove?.previewUrl && !imageToRemove.uploadedUrl?.startsWith('http')) {
+
+        // Revoke blob URL for non-uploaded images
+        if (imageToRemove?.previewUrl?.startsWith('blob:')) {
             URL.revokeObjectURL(imageToRemove.previewUrl);
         }
+
+        // Fire-and-forget: delete from Supabase storage (best effort)
+        if (imageToRemove?.uploadedUrl) {
+            const match = imageToRemove.uploadedUrl.match(
+                /\/storage\/v1\/object\/public\/images\/(.+)$/
+            );
+            const storagePath = match ? match[1] : null;
+            if (storagePath) {
+                fetch('/api/upload', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: storagePath }),
+                }).catch(() => {}); // Best effort
+            }
+        }
+
         const updatedImages = images.filter(img => img.id !== idToRemove);
         setImages(updatedImages);
+    };
+
+    const setAsMain = (imageId: string) => {
+        setImages(prev => {
+            const idx = prev.findIndex(img => img.id === imageId);
+            if (idx <= 0) return prev; // Already main or not found
+            const reordered = [...prev];
+            reordered.unshift(...reordered.splice(idx, 1));
+            return reordered;
+        });
     };
 
     // Retry a failed upload
@@ -189,6 +223,7 @@ export default function ImageUploader({
                 : i
         ));
 
+        uploadControllerRef.current?.abort();
         const controller = new AbortController();
         uploadControllerRef.current = controller;
 
@@ -208,6 +243,10 @@ export default function ImageUploader({
                 ));
                 return;
             }
+            Sentry.captureException(error, {
+                tags: { component: 'ImageUploader', action: 'retry' },
+                extra: { imageId },
+            });
             setImages(prev => prev.map(i =>
                 i.id === imageId
                     ? { ...i, error: (error as Error).message, isUploading: false }
@@ -355,7 +394,7 @@ export default function ImageUploader({
                                 </span>
                             )}
 
-                            {/* Overlay with Delete Button */}
+                            {/* Overlay with Delete Button + Set as Main */}
                             {!image.isUploading && (
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-start justify-end p-2">
                                     <button
@@ -370,6 +409,21 @@ export default function ImageUploader({
                                         <X size={14} />
                                     </button>
                                 </div>
+                            )}
+
+                            {/* Set as main button (non-main, non-error, non-uploading images) */}
+                            {index > 0 && !image.error && !image.isUploading && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAsMain(image.id);
+                                    }}
+                                    className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 hover:bg-zinc-900 hover:text-white text-zinc-600 text-xs font-medium rounded-md shadow-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                    aria-label="Set as main photo"
+                                >
+                                    Set as main
+                                </button>
                             )}
                         </div>
                     ))}

@@ -5,6 +5,8 @@ import { withRateLimit } from '@/lib/with-rate-limit';
 import { captureApiError, apiErrorResponse } from '@/lib/api-error-handler';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import sharp from 'sharp';
+import { circuitBreakers, isCircuitOpenError } from '@/lib/circuit-breaker';
 
 // Initialize Supabase client with service role for storage operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -117,6 +119,21 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Strip EXIF/metadata (GPS coords, camera serial) while preserving orientation
+        let processedBuffer: Buffer;
+        try {
+            if (file.type === 'image/gif') {
+                // Skip sharp for GIF to preserve animation frames
+                processedBuffer = buffer;
+            } else {
+                // rotate() auto-applies EXIF orientation then strips all metadata
+                processedBuffer = await sharp(buffer).rotate().toBuffer();
+            }
+        } catch {
+            // Corrupt image: fallback to original buffer (graceful degradation)
+            processedBuffer = buffer;
+        }
+
         // Generate unique filename
         const timestamp = Date.now();
         const randomString = Math.random().toString(36).substring(2, 15);
@@ -128,44 +145,64 @@ export async function POST(request: NextRequest) {
         const folder = type === 'profile' ? 'profiles' : 'listings';
         const path = `${folder}/${session.user.id}/${filename}`;
 
-        // Upload to Supabase Storage
-        const { data, error: uploadError } = await supabase.storage
-            .from(bucket)
-            .upload(path, buffer, {
-                contentType: file.type,
-                upsert: false
+        // Upload to Supabase Storage with circuit breaker + timeout
+        const UPLOAD_TIMEOUT_MS = 15000;
+
+        try {
+            await circuitBreakers.supabaseStorage.execute(async () => {
+                const uploadPromise = supabase.storage
+                    .from(bucket)
+                    .upload(path, processedBuffer, { contentType: file.type, upsert: false });
+
+                // Race upload against timeout — clear timer on settlement to prevent leak
+                let timeoutId: ReturnType<typeof setTimeout> | undefined;
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    timeoutId = setTimeout(() => reject(new Error('Upload timeout')), UPLOAD_TIMEOUT_MS);
+                });
+                uploadPromise.then(() => clearTimeout(timeoutId!), () => clearTimeout(timeoutId!));
+
+                const { error: uploadError } = await Promise.race([uploadPromise, timeoutPromise]);
+
+                // CRITICAL: Throw on SDK error so circuit breaker counts it as failure
+                if (uploadError) {
+                    throw uploadError;
+                }
             });
 
-        if (uploadError) {
-            logger.sync.error('Supabase upload error', {
-                errorType: uploadError.name,
-                bucket,
-                path
-            });
-
-            // Provide more specific error messages
-            if (uploadError.message.includes('Bucket not found')) {
-                return NextResponse.json(
-                    { error: 'Storage not configured' },
-                    { status: 500 }
-                );
+            // Check if client disconnected after upload (partial fix for P2-2d)
+            if (request.signal.aborted) {
+                try {
+                    await supabase.storage.from(bucket).remove([path]);
+                } catch (cleanupErr) {
+                    logger.sync.warn('Failed to clean up orphaned upload after client abort', {
+                        route: '/api/upload', path,
+                        error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+                    });
+                }
+                return new NextResponse(null, { status: 499 });
             }
 
-            return NextResponse.json(
-                { error: 'Failed to upload file' },
-                { status: 500 }
-            );
+            // Get public URL
+            const { data: urlData } = supabase.storage
+                .from(bucket)
+                .getPublicUrl(path);
+
+            return NextResponse.json({ url: urlData.publicUrl, path });
+        } catch (error) {
+            if (isCircuitOpenError(error)) {
+                return NextResponse.json(
+                    { error: 'Storage service temporarily unavailable' },
+                    { status: 503, headers: { 'Retry-After': '30' } }
+                );
+            }
+            if (error instanceof Error && error.message === 'Upload timeout') {
+                return NextResponse.json(
+                    { error: 'Upload timed out. Please try again.' },
+                    { status: 504 }
+                );
+            }
+            throw error;
         }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(path);
-
-        return NextResponse.json({
-            url: urlData.publicUrl,
-            path: path
-        });
     } catch (error) {
         // Handle specific error types
         if (error instanceof TypeError && error.message.includes('fetch')) {

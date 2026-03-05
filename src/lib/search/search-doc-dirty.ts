@@ -18,6 +18,7 @@ import { features } from "@/lib/env";
 type DirtyReason =
   | "listing_created"
   | "listing_updated"
+  | "listing_deleted"
   | "status_changed"
   | "view_count"
   | "review_changed";
