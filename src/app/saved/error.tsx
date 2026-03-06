@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { RefreshCw, Heart } from 'lucide-react';
 import Link from 'next/link';
+import * as Sentry from '@sentry/nextjs';
 
 export default function SavedError({
     error,
@@ -12,7 +13,7 @@ export default function SavedError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error('Saved listings error:', error);
+        Sentry.captureException(error);
     }, [error]);
 
     return (
@@ -24,7 +25,7 @@ export default function SavedError({
                 Unable to load saved listings
             </h2>
             <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
-                {error.message || 'We encountered an error while loading your saved listings. Please try again.'}
+                We encountered an error while loading your saved listings. Please try again.
             </p>
             <div className="flex gap-3">
                 <button

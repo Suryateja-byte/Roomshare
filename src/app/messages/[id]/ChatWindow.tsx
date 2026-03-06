@@ -70,7 +70,7 @@ export default function ChatWindow({
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [isSending, setIsSending] = useState(false);
-    const [isPolling, setIsPolling] = useState(false);
+    const isPollingRef = useRef(false);
     const [isTyping, setIsTyping] = useState(false);
     const [otherUserTyping, setOtherUserTyping] = useState(false);
     const [isOnline, setIsOnline] = useState(false);
@@ -206,40 +206,37 @@ export default function ChatWindow({
 
     // Poll for new messages as fallback (or primary if Supabase not configured)
     const pollForMessages = useCallback(async () => {
-        if (isPolling) return;
-        setIsPolling(true);
+        if (isPollingRef.current) return;
+        isPollingRef.current = true;
 
         try {
             const result = await getMessages(conversationId);
-            if (result && Array.isArray(result)) {
-                // Check if there are new messages
-                const newMessages = result.filter(
-                    (msg: Message) => !messages.some(m => m.id === msg.id)
-                );
-
-                if (newMessages.length > 0) {
-                    setMessages(prev => {
-                        const combined = [...prev, ...newMessages];
-                        // Sort by createdAt and remove duplicates
-                        const unique = combined.reduce((acc: Message[], curr) => {
-                            if (!acc.some(m => m.id === curr.id)) {
-                                acc.push(curr);
-                            }
-                            return acc;
-                        }, []);
-                        return unique.sort((a, b) =>
-                            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-                        );
-                    });
+            if (result && Array.isArray(result) && result.length > 0) {
+                setMessages(prev => {
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const newMessages = result.filter(
+                        (msg: Message) => !existingIds.has(msg.id)
+                    );
+                    if (newMessages.length === 0) return prev;
+                    const combined = [...prev, ...newMessages];
+                    const unique = combined.reduce((acc: Message[], curr) => {
+                        if (!acc.some(m => m.id === curr.id)) {
+                            acc.push(curr);
+                        }
+                        return acc;
+                    }, []);
                     lastMessageIdRef.current = result[result.length - 1]?.id || null;
-                }
+                    return unique.sort((a, b) =>
+                        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                    );
+                });
             }
         } catch (error) {
             console.error('Polling error:', error);
         } finally {
-            setIsPolling(false);
+            isPollingRef.current = false;
         }
-    }, [conversationId, messages, isPolling]);
+    }, [conversationId]);
 
     // Set up real-time subscription with presence and typing
     useEffect(() => {
@@ -261,6 +258,8 @@ export default function ChatWindow({
                         filter: `conversationId=eq.${conversationId}`
                     }, (payload) => {
                         const newMessage = payload.new as any;
+                        // SECURITY: No RLS on Message table — client-side guard prevents cross-conversation bleed
+                        if (!newMessage.conversationId || newMessage.conversationId !== conversationId) return;
                         newMessage.createdAt = new Date(newMessage.createdAt);
 
                         setMessages((prev) => {

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { RefreshCw, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import * as Sentry from '@sentry/nextjs';
 
 export default function VerifyError({
     error,
@@ -12,7 +13,7 @@ export default function VerifyError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error('Verification error:', error);
+        Sentry.captureException(error);
     }, [error]);
 
     return (
@@ -24,7 +25,7 @@ export default function VerifyError({
                 Verification error
             </h2>
             <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
-                {error.message || 'We encountered an error during verification. Please try again or contact support.'}
+                We encountered an error during verification. Please try again or contact support.
             </p>
             <div className="flex gap-3">
                 <button

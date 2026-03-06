@@ -108,11 +108,10 @@ describe('emailTemplates', () => {
   })
 
   describe('newMessage', () => {
-    it('should generate new message email', () => {
+    it('should generate new message email without message content', () => {
       const data = {
         recipientName: 'John',
         senderName: 'Jane',
-        messagePreview: 'Hello, I am interested in your listing!',
         conversationId: 'conv-123',
       }
 
@@ -120,30 +119,14 @@ describe('emailTemplates', () => {
 
       expect(result.subject).toBe('New message from Jane')
       expect(result.html).toContain('Hi John')
-      expect(result.html).toContain('Hello, I am interested in your listing!')
+      expect(result.html).toContain('Open the app to read it')
       expect(result.html).toContain('/messages/conv-123')
     })
 
-    it('should truncate long messages', () => {
-      const longMessage = 'A'.repeat(200)
-      const data = {
-        recipientName: 'John',
-        senderName: 'Jane',
-        messagePreview: longMessage,
-        conversationId: 'conv-123',
-      }
-
-      const result = emailTemplates.newMessage(data)
-
-      expect(result.html).toContain('...')
-      expect(result.html).not.toContain(longMessage)
-    })
-
-    it('should escape message fields and encode conversation id in link', () => {
+    it('should escape sender/recipient names and encode conversation id in link', () => {
       const data = {
         recipientName: '<img src=x onerror=alert(1)>',
         senderName: '<script>alert(1)</script>',
-        messagePreview: '\"><b>hello</b>',
         conversationId: '../../"><script>alert(1)</script>',
       }
 
@@ -153,7 +136,6 @@ describe('emailTemplates', () => {
       expect(result.html).not.toContain('<script>alert(1)</script>')
       expect(result.html).toContain('&lt;img src=x onerror=alert(1)&gt;')
       expect(result.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
-      expect(result.html).toContain('&quot;&gt;&lt;b&gt;hello&lt;/b&gt;')
       expect(result.html).toContain('/messages/..%2F..%2F%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E')
     })
   })

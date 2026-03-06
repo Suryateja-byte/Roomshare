@@ -13,7 +13,6 @@ export default function ForgotPasswordPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
-    const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
     const [turnstileToken, setTurnstileToken] = useState<string>('');
     const [turnstileError, setTurnstileError] = useState(false);
     const turnstileRef = useRef<TurnstileWidgetRef>(null);
@@ -37,10 +36,6 @@ export default function ForgotPasswordPage() {
             }
 
             setSuccess(true);
-            // In development, show the reset link
-            if (data.resetUrl) {
-                setDevResetUrl(data.resetUrl);
-            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Something went wrong');
             turnstileRef.current?.reset();
@@ -62,19 +57,6 @@ export default function ForgotPasswordPage() {
                         <p className="text-zinc-500 mb-6">
                             If an account exists for <strong>{email}</strong>, you will receive a password reset link shortly.
                         </p>
-
-                        {/* Dev mode: Show reset link */}
-                        {devResetUrl && (
-                            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-left">
-                                <p className="text-xs text-yellow-700 font-medium mb-2">Development Mode - Reset Link:</p>
-                                <a
-                                    href={devResetUrl}
-                                    className="text-xs text-blue-600 hover:underline break-all"
-                                >
-                                    {devResetUrl}
-                                </a>
-                            </div>
-                        )}
 
                         <div className="space-y-3">
                             <Button
@@ -150,10 +132,20 @@ export default function ForgotPasswordPage() {
                             onError={() => setTurnstileError(true)}
                         />
 
+                        {turnstileError && (
+                            <p className="text-sm text-red-600 dark:text-red-400">
+                                Security check failed.{' '}
+                                <button type="button" className="underline"
+                                    onClick={() => { turnstileRef.current?.reset(); setTurnstileError(false); }}>
+                                    Try again
+                                </button>
+                            </p>
+                        )}
+
                         <Button
                             type="submit"
                             className="w-full"
-                            disabled={isLoading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken && !turnstileError)}
+                            disabled={isLoading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
                         >
                             {isLoading ? (
                                 <>

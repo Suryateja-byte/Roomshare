@@ -23,7 +23,6 @@ import BlockUserButton from '@/components/BlockUserButton';
 type UserWithDetails = {
     id: string;
     name: string | null;
-    email: string | null;
     emailVerified: Date | null;
     image: string | null;
     bio: string | null;
@@ -77,7 +76,7 @@ const Badge = ({ icon: Icon, text, variant = "default" }: { icon?: any; text: st
 };
 
 const ListingCard = ({ listing }: { listing: UserWithDetails['listings'][0] }) => {
-    const imageUrl = listing.images?.[0] || `https://source.unsplash.com/random/800x600/?apartment,room&sig=${listing.id}`;
+    const imageUrl = listing.images?.[0] || '/images/listing-placeholder.svg';
     const locationText = listing.location
         ? `${listing.location.city}, ${listing.location.state}`
         : 'Location not specified';

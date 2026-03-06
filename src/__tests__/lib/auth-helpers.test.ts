@@ -26,6 +26,7 @@ import {
   isGoogleEmailVerified,
   checkSuspension,
   AUTH_ROUTES,
+  _suspensionCache,
 } from '@/lib/auth-helpers';
 import { getToken } from 'next-auth/jwt';
 import { prisma } from '@/lib/prisma';
@@ -172,6 +173,7 @@ describe('checkSuspension', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    _suspensionCache.clear();
     process.env = { ...originalEnv, AUTH_SECRET: 'test-secret' } as any;
   });
 

@@ -23,19 +23,20 @@ export async function POST(request: NextRequest) {
     try {
         const { email, turnstileToken } = await request.json();
 
+        // Validate email BEFORE spending a Turnstile API call
+        if (!email) {
+            return NextResponse.json(
+                { error: 'Email is required' },
+                { status: 400 }
+            );
+        }
+
         // Verify Turnstile token before processing
         const turnstileResult = await verifyTurnstileToken(turnstileToken);
         if (!turnstileResult.success) {
             return NextResponse.json(
                 { error: 'Bot verification failed. Please try again.' },
                 { status: 403 }
-            );
-        }
-
-        if (!email) {
-            return NextResponse.json(
-                { error: 'Email is required' },
-                { status: 400 }
             );
         }
 

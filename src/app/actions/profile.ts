@@ -6,13 +6,14 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { checkSuspension } from './suspension';
 import { logger } from '@/lib/logger';
+import { supabaseImageUrlSchema } from '@/lib/schemas';
 
 const updateProfileSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100, 'Name is too long'),
     bio: z.string().max(500, 'Bio must be less than 500 characters').optional().nullable(),
     countryOfOrigin: z.string().max(100).optional().nullable(),
     languages: z.array(z.string()).optional(),
-    image: z.string().url().optional().nullable(),
+    image: supabaseImageUrlSchema.optional().nullable(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

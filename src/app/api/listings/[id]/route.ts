@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
 import { createClient } from '@supabase/supabase-js';
-import { householdLanguagesSchema, supabaseImageUrlSchema, sanitizeUnicode } from '@/lib/schemas';
+import { householdLanguagesSchema, supabaseImageUrlSchema, sanitizeUnicode, noHtmlTags, NO_HTML_MSG, listingLeaseDurationSchema, listingRoomTypeSchema, listingGenderPreferenceSchema, listingHouseholdGenderSchema } from '@/lib/schemas';
 import { VALID_AMENITIES, VALID_HOUSE_RULES } from '@/lib/filter-schema';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
@@ -26,11 +26,17 @@ function extractStoragePath(publicUrl: string): string | null {
 }
 
 const updateListingSchema = z.object({
-    title: z.string().trim().min(1).max(100).transform(sanitizeUnicode),
-    description: z.string().trim().min(1).max(1000).transform(sanitizeUnicode),
+    title: z.string().trim().min(1).max(100).transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
+    description: z.string().trim().min(1).max(1000).transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
     price: z.coerce.number().positive().multipleOf(0.01),
-    amenities: z.union([z.array(z.string().max(50)).max(20), z.string()]).optional().default([]),
-    houseRules: z.union([z.array(z.string().max(50)).max(20), z.string()]).optional().default([]),
+    amenities: z.union([
+        z.array(z.string().max(50).transform(sanitizeUnicode)).max(20),
+        z.string().transform(s => [sanitizeUnicode(s)]),
+    ]).optional().default([]),
+    houseRules: z.union([
+        z.array(z.string().max(50).transform(sanitizeUnicode)).max(20),
+        z.string().transform(s => [sanitizeUnicode(s)]),
+    ]).optional().default([]),
     totalSlots: z.coerce.number().int().min(1).max(20),
     address: z.string().trim().min(1).max(200),
     city: z.string().trim().min(1).max(100),
@@ -40,11 +46,11 @@ const updateListingSchema = z.object({
         z.string().trim().refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Invalid date format' }),
         z.null(),
     ]).optional(),
-    leaseDuration: z.string().trim().max(100).nullable().optional(),
-    roomType: z.string().trim().max(100).nullable().optional(),
-    householdLanguages: z.array(z.string().trim().toLowerCase()).max(20).optional(),
-    genderPreference: z.string().trim().max(50).nullable().optional(),
-    householdGender: z.string().trim().max(50).nullable().optional(),
+    leaseDuration: listingLeaseDurationSchema,
+    roomType: listingRoomTypeSchema,
+    householdLanguages: z.array(z.string().trim().toLowerCase().transform(sanitizeUnicode)).max(20).optional(),
+    genderPreference: listingGenderPreferenceSchema,
+    householdGender: listingHouseholdGenderSchema,
     primaryHomeLanguage: z.string().refine(isValidLanguageCode, { message: 'Invalid language code' }).nullable().optional(),
     images: z.array(supabaseImageUrlSchema).max(10).optional(),
 });

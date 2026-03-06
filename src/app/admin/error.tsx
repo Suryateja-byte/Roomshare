@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { RefreshCw, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import * as Sentry from '@sentry/nextjs';
 
 export default function AdminError({
     error,
@@ -13,7 +14,7 @@ export default function AdminError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error('Admin error:', error);
+        Sentry.captureException(error);
     }, [error]);
 
     return (
@@ -25,7 +26,7 @@ export default function AdminError({
                 Admin panel error
             </h2>
             <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
-                {error.message || 'We encountered an error while loading the admin panel. Please try again.'}
+                We encountered an error while loading the admin panel. Please try again.
             </p>
             <div className="flex gap-3">
                 <Button onClick={() => reset()} size="lg" className="gap-2">

@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { checkSuspension, checkEmailVerified } from './suspension';
-import { logger } from '@/lib/logger';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { z } from 'zod';
 import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
@@ -131,7 +131,7 @@ export async function sendMessage(conversationId: string, content: string) {
             where: { id: safeConversationId },
             include: {
                 participants: {
-                    select: { id: true, name: true, email: true }
+                    select: { id: true, name: true }
                 }
             }
         });
@@ -185,6 +185,15 @@ export async function sendMessage(conversationId: string, content: string) {
         const otherParticipants = conversation.participants.filter(
             (p) => p.id !== session.user.id,
         );
+
+        // Fetch emails separately — keep PII out of the hot-path participant select
+        const otherParticipantIds = otherParticipants.map(p => p.id);
+        const participantEmails = await prisma.user.findMany({
+            where: { id: { in: otherParticipantIds } },
+            select: { id: true, email: true }
+        });
+        const emailMap = new Map(participantEmails.map(p => [p.id, p.email]));
+
         await Promise.all(
             otherParticipants.map(async (participant) => {
                 // Create in-app notification
@@ -197,12 +206,11 @@ export async function sendMessage(conversationId: string, content: string) {
                 });
 
                 // Send email (respecting user preferences)
-                // Truncate email preview to match in-app notification (50 chars)
-                if (participant.email) {
-                    await sendNotificationEmailWithPreference('newMessage', participant.id, participant.email, {
+                const email = emailMap.get(participant.id);
+                if (email) {
+                    await sendNotificationEmailWithPreference('newMessage', participant.id, email, {
                         recipientName: participant.name || 'User',
                         senderName,
-                        messagePreview: safeContent.substring(0, 50) + (safeContent.length > 50 ? '...' : ''),
                         conversationId: safeConversationId
                     });
                 }
@@ -462,7 +470,7 @@ export async function deleteMessage(messageId: string): Promise<{ success: boole
     } catch (error: unknown) {
         logger.sync.error('Failed to delete message', {
             action: 'deleteMessage',
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: sanitizeErrorMessage(error),
         });
         return { success: false, error: 'Failed to delete message' };
     }
@@ -521,7 +529,7 @@ export async function deleteConversation(conversationId: string): Promise<{ succ
     } catch (error: unknown) {
         logger.sync.error('Failed to delete conversation', {
             action: 'deleteConversation',
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: sanitizeErrorMessage(error),
         });
         return { success: false, error: 'Failed to delete conversation' };
     }

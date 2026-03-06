@@ -80,21 +80,33 @@ export async function POST(request: NextRequest) {
         // Hash the new password
         const hashedPassword = await bcrypt.hash(password, 12);
 
-        // Update the user's password
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { password: hashedPassword }
-        });
-
-        // Delete the used token
-        await prisma.passwordResetToken.delete({
-            where: { id: resetToken.id }
+        // P0-2 FIX: Atomic password reset — delete token + update password in one transaction
+        // bcrypt hash stays outside transaction (CPU-intensive, 100-500ms)
+        await prisma.$transaction(async (tx) => {
+            const deleted = await tx.passwordResetToken.deleteMany({
+                where: { id: resetToken.id }
+            });
+            if (deleted.count === 0) {
+                throw new Error('TOKEN_ALREADY_USED');
+            }
+            await tx.user.update({
+                where: { id: user.id },
+                data: { password: hashedPassword }
+            });
         });
 
         return NextResponse.json({
             message: 'Password has been reset successfully'
         });
     } catch (error) {
+        // P0-2 FIX: Discriminate expected race condition from real errors
+        if (error instanceof Error && error.message === 'TOKEN_ALREADY_USED') {
+            return NextResponse.json(
+                { error: 'This reset link has already been used. Please request a new one.' },
+                { status: 400 }
+            );
+        }
+
         logger.sync.error('Reset password error', {
             error: sanitizeErrorMessage(error),
             route: '/api/auth/reset-password',
@@ -109,8 +121,8 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint to verify token validity
 export async function GET(request: NextRequest) {
-    // P1-2 FIX: Add rate limiting to prevent token enumeration
-    const rateLimitResponse = await withRateLimit(request, { type: 'resetPassword' });
+    // Separate rate limit bucket for GET (token verification) vs POST (actual reset)
+    const rateLimitResponse = await withRateLimit(request, { type: 'resetPasswordVerify' });
     if (rateLimitResponse) return rateLimitResponse;
 
     const { searchParams } = new URL(request.url);

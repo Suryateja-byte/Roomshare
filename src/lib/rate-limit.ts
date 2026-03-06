@@ -203,6 +203,9 @@ export async function checkRateLimit(
 
 // Predefined rate limit configurations
 export const RATE_LIMITS = {
+  // P0-1 FIX: Rate limit credential login (per-email and per-IP)
+  login: { limit: 10, windowMs: 15 * 60 * 1000 },       // 10 per 15 min (per email)
+  loginByIp: { limit: 30, windowMs: 15 * 60 * 1000 },   // 30 per 15 min (per IP)
   register: { limit: 5, windowMs: 60 * 60 * 1000 }, // 5 per hour
   forgotPassword: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 per hour
   resendVerification: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 per hour
@@ -212,6 +215,7 @@ export const RATE_LIMITS = {
   // P1 fixes: Additional rate limits for unprotected endpoints
   verifyEmail: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
   resetPassword: { limit: 5, windowMs: 60 * 60 * 1000 }, // 5 per hour
+  resetPasswordVerify: { limit: 15, windowMs: 60 * 60 * 1000 }, // 15 GET verifications per hour
   createListing: { limit: 5, windowMs: 24 * 60 * 60 * 1000 }, // 5 per day
   updateListing: { limit: 20, windowMs: 24 * 60 * 60 * 1000 }, // 20 per day
   deleteListing: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
@@ -248,6 +252,7 @@ export const RATE_LIMITS = {
   notifications: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   savedSearchMutations: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
   canDeleteCheck: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
+  bookingStatus: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
 } as const;
 
 function getFirstForwardedIp(forwardedFor: string | null): string | null {

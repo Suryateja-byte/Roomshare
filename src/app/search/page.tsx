@@ -188,7 +188,9 @@ export default async function SearchPage({
     let v2NextCursor: string | null = null;
 
     // Check if v2 is enabled via feature flag OR query param override (?v2=1)
-    const v2Override = rawParams.v2 === '1' || rawParams.v2 === 'true';
+    // P0-7 FIX: Only allow v2 override in non-production (prevents feature flag bypass)
+    const v2Override = process.env.NODE_ENV !== 'production'
+        && (rawParams.v2 === '1' || rawParams.v2 === 'true');
     const useV2Search = features.searchV2 || v2Override;
 
     // Try v2 orchestration if enabled

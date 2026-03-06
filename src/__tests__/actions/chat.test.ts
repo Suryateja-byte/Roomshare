@@ -39,6 +39,7 @@ jest.mock('@/lib/prisma', () => {
     },
     user: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     $transaction: jest.fn(),
   };
@@ -185,6 +186,7 @@ describe('Chat Actions', () => {
       ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
       ;(prisma.message.create as jest.Mock).mockResolvedValue(mockMessage)
       ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ name: 'Test User', emailVerified: new Date() })
+      ;(prisma.user.findMany as jest.Mock).mockResolvedValue([{ id: 'other-456', email: 'other@example.com' }])
       ;(prisma.conversationDeletion.deleteMany as jest.Mock).mockResolvedValue({ count: 0 })
     })
 

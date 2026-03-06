@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { safeMark, safeMeasure } from "@/lib/perf";
 import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -71,19 +72,6 @@ export function SearchResultsClient({
     new Set(initialListings.map((l) => l.id)),
   );
 
-  // Reset client-side pagination state when the search query/filters change.
-  // Without this, extra listings and cursor state can leak across map/filter updates.
-  useEffect(() => {
-    setExtraListings([]);
-    setNextCursor(initialNextCursor);
-    setLoadError(null);
-    setIsLoadingMore(false);
-    isLoadingRef.current = false;
-    seenIdsRef.current = new Set(initialListings.map((l) => l.id));
-    // The component is keyed by searchParamsString in the parent route.
-    // Reset only when params change to avoid unnecessary load-more state loss.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParamsString]);
 
   const allListings = useMemo(
     () => [...initialListings, ...extraListings],
@@ -142,12 +130,12 @@ export function SearchResultsClient({
     isLoadingRef.current = true;
     setIsLoadingMore(true);
     setLoadError(null);
-    performance.mark('load-more-start');
+    safeMark('load-more-start');
 
     try {
       const result = await fetchMoreListings(nextCursor, rawParams);
-      performance.mark('load-more-end');
-      performance.measure('load-more', 'load-more-start', 'load-more-end');
+      safeMark('load-more-end');
+      safeMeasure('load-more', 'load-more-start', 'load-more-end');
 
       // Deduplicate by ID
       const dedupedItems = result.items.filter((item) => {
@@ -159,9 +147,11 @@ export function SearchResultsClient({
       setExtraListings((prev) => [...prev, ...dedupedItems]);
       setNextCursor(result.nextCursor);
     } catch (err) {
-      setLoadError(
-        err instanceof Error ? err.message : "Failed to load more results",
-      );
+      const raw = err instanceof Error ? err.message : "Failed to load more results";
+      const friendly = raw.includes("Rate limit")
+        ? "Too many requests — please wait a moment and try again."
+        : "Failed to load more results. Please try again.";
+      setLoadError(friendly);
     } finally {
       isLoadingRef.current = false;
       setIsLoadingMore(false);

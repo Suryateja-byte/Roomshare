@@ -88,6 +88,8 @@ export default function MobileBottomSheet({
   );
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const dragOffsetRef = useRef(0);
+  const viewportHeightRef = useRef(0);
 
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -174,6 +176,8 @@ export default function MobileBottomSheet({
       isScrollDrag.current = false;
       isDraggingRef.current = true;
       // P2-FIX (#78): Cache viewport height at drag start to avoid repeated DOM access during touchmove
+      viewportHeightRef.current = window.innerHeight;
+      dragOffsetRef.current = 0;
       setViewportHeight(window.innerHeight);
       setIsDragging(true);
       setDragOffset(0);
@@ -193,12 +197,14 @@ export default function MobileBottomSheet({
         isDraggingRef.current = false;
         setIsDragging(false);
         setDragOffset(0);
+        dragOffsetRef.current = 0;
         return;
       }
       if (dy < 0) return; // Only allow downward drag from content
     }
 
     setDragOffset(dy);
+    dragOffsetRef.current = dy;
   }, []);
 
   const handleTouchEnd = useCallback(() => {
@@ -206,30 +212,36 @@ export default function MobileBottomSheet({
     isDraggingRef.current = false;
     setIsDragging(false);
 
+    const currentDragOffset = dragOffsetRef.current;
+    const currentViewportHeight = viewportHeightRef.current;
+
     // P2-FIX (#87): Clamp elapsed time to avoid velocity spikes from very short drags
     // or division by near-zero if touchend fires immediately after touchstart
     const rawElapsed = Date.now() - dragStartTime.current;
     const elapsed = Math.max(rawElapsed, 16); // Minimum 16ms (~1 frame)
-    const velocity = dragOffset / elapsed; // px/ms, positive = downward
+    const velocity = currentDragOffset / elapsed; // px/ms, positive = downward
 
-    if (Math.abs(dragOffset) < DRAG_THRESHOLD && Math.abs(velocity) < FLICK_VELOCITY) {
+    if (Math.abs(currentDragOffset) < DRAG_THRESHOLD && Math.abs(velocity) < FLICK_VELOCITY) {
       // Too small a drag — stay put
       setDragOffset(0);
+      dragOffsetRef.current = 0;
       return;
     }
 
     // P2-FIX (#78): Use cached viewport height from drag start
     const currentFraction =
-      dragStartSnap.current - dragOffset / (viewportHeight || window.innerHeight);
+      dragStartSnap.current - currentDragOffset / (currentViewportHeight || window.innerHeight);
     const newIndex = findNearestSnap(currentFraction, velocity);
 
     setSnapIndex(newIndex);
     setDragOffset(0);
-  }, [dragOffset, findNearestSnap, setSnapIndex]);
+    dragOffsetRef.current = 0;
+  }, [findNearestSnap, setSnapIndex]);
 
   // Reset drag state on system interruption (incoming call, notification, gesture conflict)
   const handleTouchCancel = useCallback(() => {
     isDraggingRef.current = false;
+    dragOffsetRef.current = 0;
     setIsDragging(false);
     setDragOffset(0);
   }, []);

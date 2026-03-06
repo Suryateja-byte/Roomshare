@@ -15,6 +15,7 @@ const FilterModal = dynamic(() => import('@/components/search/FilterModal'), {
     loading: () => null,
 });
 import { parseNaturalLanguageQuery, nlQueryToSearchParams } from '@/lib/search/natural-language-parser';
+import { safeMark } from '@/lib/perf';
 // Import canonical allowlists from shared parsing module
 import {
     VALID_AMENITIES,
@@ -403,7 +404,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
 
         // Debounce the navigation to prevent race conditions
-        performance.mark('search-submit');
+        safeMark('search-submit');
         setIsSearching(true);
         lastSearchRef.current = searchUrl;
 

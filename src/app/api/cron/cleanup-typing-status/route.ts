@@ -3,37 +3,12 @@ import { prisma } from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { withRetry } from '@/lib/retry';
+import { validateCronAuth } from '@/lib/cron-auth';
 
 export async function GET(request: NextRequest) {
     try {
-        // Verify the request is from Vercel Cron
-        const authHeader = request.headers.get('authorization');
-        const cronSecret = process.env.CRON_SECRET;
-
-        // Defense in depth: validate secret configuration
-        if (!cronSecret || cronSecret.length < 32) {
-            logger.sync.error('[Cron] CRON_SECRET not configured or too short (min 32 chars)');
-            return NextResponse.json(
-                { error: 'Server configuration error' },
-                { status: 500 }
-            );
-        }
-
-        // Reject placeholder values
-        if (cronSecret.includes('change-in-production') || cronSecret.startsWith('your-') || cronSecret.startsWith('generate-')) {
-            logger.sync.error('[Cron] CRON_SECRET contains placeholder value');
-            return NextResponse.json(
-                { error: 'Server configuration error' },
-                { status: 500 }
-            );
-        }
-
-        if (authHeader !== `Bearer ${cronSecret}`) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            );
-        }
+        const authError = validateCronAuth(request);
+        if (authError) return authError;
 
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 

@@ -92,7 +92,10 @@ export default function ImageUploader({
 
     const processFiles = async (newFiles: File[]) => {
         // Filter for images only
-        const validImageFiles = newFiles.filter(file => file.type.startsWith('image/'));
+        const ALLOWED_IMAGE_TYPES = new Set([
+            'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+        ]);
+        const validImageFiles = newFiles.filter(file => ALLOWED_IMAGE_TYPES.has(file.type));
 
         // Filter out oversized files
         const oversized = validImageFiles.filter(f => f.size > MAX_FILE_SIZE_BYTES);

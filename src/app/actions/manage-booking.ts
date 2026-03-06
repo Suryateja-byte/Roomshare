@@ -7,6 +7,7 @@ import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from './suspension';
 import { logger } from '@/lib/logger';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import {
     validateTransition,
     isInvalidStateTransitionError,
@@ -24,6 +25,9 @@ export async function updateBookingStatus(
     if (!session?.user?.id) {
         return { error: 'Unauthorized', code: 'SESSION_EXPIRED' };
     }
+
+    const rl = await checkRateLimit(session.user.id, 'updateBookingStatus', RATE_LIMITS.bookingStatus);
+    if (!rl.success) return { error: 'Too many requests. Please wait.' };
 
     const suspension = await checkSuspension();
     if (suspension.suspended) {
@@ -87,11 +91,16 @@ export async function updateBookingStatus(
             try {
                 await prisma.$transaction(async (tx) => {
                     // Lock the listing row with FOR UPDATE to prevent concurrent reads
-                    const [listing] = await tx.$queryRaw<Array<{ availableSlots: number; totalSlots: number; id: string }>>`
-                        SELECT "availableSlots", "totalSlots", "id" FROM "Listing"
+                    const [listing] = await tx.$queryRaw<Array<{ availableSlots: number; totalSlots: number; id: string; ownerId: string }>>`
+                        SELECT "availableSlots", "totalSlots", "id", "ownerId" FROM "Listing"
                         WHERE "id" = ${booking.listing.id}
                         FOR UPDATE
                     `;
+
+                    // P0-3 FIX: Re-verify ownership under row lock (TOCTOU protection)
+                    if (listing.ownerId !== session.user.id) {
+                        throw new Error('UNAUTHORIZED_IN_TRANSACTION');
+                    }
 
                     if (listing.availableSlots <= 0) {
                         throw new Error('NO_SLOTS_AVAILABLE');
@@ -142,6 +151,9 @@ export async function updateBookingStatus(
                 // Transaction succeeded - continue with notifications below
             } catch (error) {
                 if (error instanceof Error) {
+                    if (error.message === 'UNAUTHORIZED_IN_TRANSACTION') {
+                        return { error: 'Only the listing owner can accept or reject bookings', code: 'UNAUTHORIZED' };
+                    }
                     if (error.message === 'NO_SLOTS_AVAILABLE') {
                         return { error: 'No available slots for this listing' };
                     }
@@ -182,24 +194,48 @@ export async function updateBookingStatus(
 
         // Handle REJECTED status
         if (status === 'REJECTED') {
-            // P0-04 FIX: Use optimistic locking to prevent concurrent modifications
-            const updateResult = await prisma.booking.updateMany({
-                where: {
-                    id: bookingId,
-                    version: booking.version, // Optimistic lock check
-                },
-                data: {
-                    status: 'REJECTED',
-                    rejectionReason: rejectionReason?.trim() || null,
-                    version: { increment: 1 },
-                }
-            });
+            // P0-3 FIX: Wrap in transaction with FOR UPDATE to re-verify ownership (TOCTOU protection)
+            try {
+                await prisma.$transaction(async (tx) => {
+                    const [listing] = await tx.$queryRaw<Array<{ ownerId: string }>>`
+                        SELECT "ownerId" FROM "Listing"
+                        WHERE "id" = ${booking.listing.id}
+                        FOR UPDATE
+                    `;
 
-            if (updateResult.count === 0) {
-                return {
-                    error: 'Booking was modified by another request. Please refresh and try again.',
-                    code: 'CONCURRENT_MODIFICATION'
-                };
+                    if (!listing || listing.ownerId !== session.user.id) {
+                        throw new Error('UNAUTHORIZED_IN_TRANSACTION');
+                    }
+
+                    const updateResult = await tx.booking.updateMany({
+                        where: {
+                            id: bookingId,
+                            version: booking.version,
+                        },
+                        data: {
+                            status: 'REJECTED',
+                            rejectionReason: rejectionReason?.trim() || null,
+                            version: { increment: 1 },
+                        }
+                    });
+
+                    if (updateResult.count === 0) {
+                        throw new Error('CONCURRENT_MODIFICATION');
+                    }
+                });
+            } catch (error) {
+                if (error instanceof Error) {
+                    if (error.message === 'UNAUTHORIZED_IN_TRANSACTION') {
+                        return { error: 'Only the listing owner can accept or reject bookings', code: 'UNAUTHORIZED' };
+                    }
+                    if (error.message === 'CONCURRENT_MODIFICATION') {
+                        return {
+                            error: 'Booking was modified by another request. Please refresh and try again.',
+                            code: 'CONCURRENT_MODIFICATION'
+                        };
+                    }
+                }
+                throw error;
             }
 
             // Build rejection message with optional reason
@@ -228,6 +264,8 @@ export async function updateBookingStatus(
         }
 
         // Handle CANCELLED status - wrap in transaction for data integrity
+        // P0-3 NOTE: CANCELLED path TOCTOU is mitigated by optimistic locking (version field)
+        // and tenantId immutability on bookings — no ownership re-check needed here
         if (status === 'CANCELLED') {
             if (booking.status === 'ACCEPTED') {
                 // P0-04 FIX: Atomically update booking with optimistic lock and increment slots

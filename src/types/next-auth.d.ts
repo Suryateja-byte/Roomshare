@@ -9,6 +9,7 @@ declare module 'next-auth' {
             isAdmin: boolean;
             isSuspended: boolean;
         } & DefaultSession['user'];
+        authTime?: number;  // P0-5: Actual sign-in timestamp (not token refresh)
     }
 
     interface User extends DefaultUser {
@@ -25,5 +26,6 @@ declare module 'next-auth/jwt' {
         isAdmin?: boolean;
         isSuspended?: boolean;
         image?: string | null;
+        authTime?: number;  // P0-5: Actual sign-in timestamp (not token refresh)
     }
 }

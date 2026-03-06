@@ -344,10 +344,20 @@ function SignUpForm() {
                             onError={() => setTurnstileError(true)}
                         />
 
+                        {turnstileError && (
+                            <p className="text-sm text-red-600 dark:text-red-400">
+                                Security check failed.{' '}
+                                <button type="button" className="underline"
+                                    onClick={() => { turnstileRef.current?.reset(); setTurnstileError(false); }}>
+                                    Try again
+                                </button>
+                            </p>
+                        )}
+
                         {/* Submit Button */}
                         <Button
                             type="submit"
-                            disabled={loading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken && !turnstileError)}
+                            disabled={loading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
                             className="w-full h-11 sm:h-12 rounded-lg shadow-sm hover:shadow-md transition-all"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Create account <ArrowRight className="w-4 h-4 ml-2" /></>}

@@ -8,6 +8,7 @@ import { z } from "zod"
 import { logger, sanitizeErrorMessage } from "@/lib/logger"
 import { isGoogleEmailVerified, AUTH_ROUTES, normalizeEmail } from "@/lib/auth-helpers"
 import { verifyTurnstileToken } from "@/lib/turnstile"
+import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit"
 
 async function getUser(email: string) {
     try {
@@ -79,6 +80,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 if (token.image) {
                     session.user.image = token.image as string
                 }
+                // P0-5 FIX: Forward authTime to session for freshness checks
+                session.authTime = token.authTime as number | undefined
             }
             return session
         },
@@ -91,6 +94,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 token.isSuspended = user.isSuspended
                 token.image = user.image
                 token.name = user.name
+                // P0-5 FIX: Track actual authentication time (NOT token refresh time)
+                // Set ONLY on initial sign-in, never updated during refreshes
+                token.authTime = Math.floor(Date.now() / 1000)
             }
 
             // Refresh from DB on sign-in, explicit update, or first OAuth link
@@ -145,16 +151,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
         authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user;
-            const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
-            const isOnAuth = nextUrl.pathname.startsWith('/login') || nextUrl.pathname.startsWith('/signup');
+            const pathname = nextUrl.pathname;
+            const isAdmin = !!auth?.user?.isAdmin;
 
-            if (isOnDashboard) {
+            const protectedPaths = [
+                '/dashboard', '/bookings', '/messages', '/settings', '/profile',
+                '/notifications', '/saved', '/recently-viewed', '/saved-searches'
+            ];
+            const isProtected = protectedPaths.some(p => pathname.startsWith(p));
+            const isAdminRoute = pathname.startsWith('/admin');
+            const isOnAuth = pathname.startsWith('/login') || pathname.startsWith('/signup');
+
+            if (isAdminRoute) {
+                if (!isLoggedIn) return false;
+                if (!isAdmin) return Response.redirect(new URL('/', nextUrl));
+                return true;
+            }
+            if (isProtected) {
                 if (isLoggedIn) return true;
-                return false; // Redirect unauthenticated users to login page
-            } else if (isLoggedIn && isOnAuth) {
+                return false;
+            }
+            if (isLoggedIn && isOnAuth) {
                 return Response.redirect(new URL('/', nextUrl));
             }
-
             return true;
         },
     },
@@ -167,7 +186,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             allowDangerousEmailAccountLinking: true,
         }),
         Credentials({
-            async authorize(credentials) {
+            async authorize(credentials, request) {
                 const parsedCredentials = z
                     .object({
                         email: z.string().email(),
@@ -177,6 +196,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     .safeParse(credentials)
 
                 if (parsedCredentials.success) {
+                    const { password } = parsedCredentials.data
+                    // Normalize email BEFORE rate limit to prevent casing bypass
+                    const email = normalizeEmail(parsedCredentials.data.email)
+
+                    // P0-1 FIX: Rate limit before Turnstile (which has a kill-switch)
+                    try {
+                        const emailRl = await checkRateLimit(email, 'loginByEmail', RATE_LIMITS.login)
+                        if (!emailRl.success) {
+                            logger.sync.warn("Login rate limited (email)")
+                            return null
+                        }
+                        const ip = getClientIP(request)
+                        const ipRl = await checkRateLimit(ip, 'loginByIp', RATE_LIMITS.loginByIp)
+                        if (!ipRl.success) {
+                            logger.sync.warn("Login rate limited (IP)")
+                            return null
+                        }
+                    } catch {
+                        logger.sync.error("Login rate limit check failed, failing closed")
+                        return null
+                    }
+
                     // Verify Turnstile token before any DB lookup
                     const turnstileResult = await verifyTurnstileToken(
                         parsedCredentials.data.turnstileToken
@@ -186,8 +227,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         return null
                     }
 
-                    const { password } = parsedCredentials.data
-                    const email = normalizeEmail(parsedCredentials.data.email)
                     const user = await getUser(email)
                     if (!user) return null
                     if (!user.password) return null

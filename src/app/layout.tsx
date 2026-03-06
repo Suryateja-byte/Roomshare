@@ -44,8 +44,9 @@ export const viewport: Viewport = {
 };
 
 import MainLayout from "@/components/MainLayout";
-
-// ... existing imports
+// CSP nonce is forwarded via x-nonce header from proxy.ts
+// Read it here with: const nonce = (await headers()).get('x-nonce') || undefined;
+// when adding inline <Script nonce={nonce}> tags
 
 export default async function RootLayout({
   children,

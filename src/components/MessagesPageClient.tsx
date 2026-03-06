@@ -87,6 +87,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
     const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastMsgIdRef = useRef<string | undefined>(undefined);
     const router = useRouter();
     const { isOffline } = useNetworkStatus();
     const [showDeleteConversationDialog, setShowDeleteConversationDialog] = useState(false);
@@ -104,7 +105,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         setIsMarkingAllRead(true);
         try {
             const result = await markAllMessagesAsRead();
-            if (result.error) {
+            if ('error' in result) {
                 toast.error(result.error);
             } else {
                 toast.success(`Marked ${result.count} messages as read`);
@@ -182,6 +183,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 setConversations(prev => prev.filter(c => c.id !== activeId));
                 setActiveId(null);
                 setMsgs([]);
+                lastMsgIdRef.current = undefined;
                 router.refresh();
             }
         } catch (error) {
@@ -216,6 +218,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 // Extract messages array from result
                 const messages = Array.isArray(result) ? result : (result.messages || []);
                 setMsgs(messages);
+                lastMsgIdRef.current = messages.length > 0 ? messages[messages.length - 1].id : undefined;
 
                 // Notify navbar to refresh unread count
                 window.dispatchEvent(new Event('messagesRead'));
@@ -239,7 +242,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
 
         const pollInterval = setInterval(async () => {
             try {
-                const lastMessageId = msgs.length > 0 ? msgs[msgs.length - 1].id : undefined;
+                const lastMessageId = lastMsgIdRef.current;
                 // Only poll if we're not dealing with optimistic messages
                 if (lastMessageId?.startsWith('opt-')) return;
 
@@ -251,10 +254,12 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 // Add new messages if any
                 if (result.hasNewMessages && result.messages.length > 0) {
                     setMsgs(prev => {
-                        // Filter out any messages we already have
                         const existingIds = new Set(prev.map(m => m.id));
                         const newMessages = result.messages.filter((m: Message) => !existingIds.has(m.id));
-                        return [...prev, ...newMessages];
+                        const updated = [...prev, ...newMessages];
+                        const lastReal = updated.filter(m => !m.id.startsWith('opt-')).pop();
+                        if (lastReal) lastMsgIdRef.current = lastReal.id;
+                        return updated;
                     });
 
                     // BIZ-08: Explicitly mark as read since user is actively viewing
@@ -269,7 +274,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         }, 3000); // Poll every 3 seconds
 
         return () => clearInterval(pollInterval);
-    }, [activeId, msgs]);
+    }, [activeId]);
 
     // Handle typing status
     const handleInputChange = useCallback((value: string) => {
@@ -374,6 +379,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         // Success - replace optimistic message with sent message
         const sentMessage = result;
         setMsgs(prev => prev.map(m => m.id === optimisticId ? { ...sentMessage, sender: undefined, status: 'sent' as const } : m));
+        lastMsgIdRef.current = sentMessage.id;
 
         // Update conversation list to show latest message
         setConversations(prev => prev.map(c => {
@@ -433,6 +439,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 ? { ...sentMessage, sender: undefined, status: 'sent' as const }
                 : m
         ));
+        lastMsgIdRef.current = sentMessage.id;
 
         // Update conversation list
         setConversations(prev => prev.map(c => {

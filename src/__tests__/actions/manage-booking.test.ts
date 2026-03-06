@@ -49,6 +49,13 @@ jest.mock("@/lib/booking-state-machine", () => ({
   isInvalidStateTransitionError: jest.fn(() => false),
 }));
 
+jest.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: jest.fn(),
+  RATE_LIMITS: {
+    bookingStatus: { limit: 30, windowMs: 60 * 1000 },
+  },
+}));
+
 jest.mock("@/lib/logger", () => ({
   logger: {
     debug: jest.fn(),
@@ -87,6 +94,7 @@ import { createInternalNotification } from "@/lib/notifications";
 import { sendNotificationEmailWithPreference } from "@/lib/email";
 import { checkSuspension } from "@/app/actions/suspension";
 import { validateTransition } from "@/lib/booking-state-machine";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 describe("manage-booking actions", () => {
   const mockSession = {
@@ -151,6 +159,7 @@ describe("manage-booking actions", () => {
       success: true,
     });
     (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
+    (checkRateLimit as jest.Mock).mockResolvedValue({ success: true, remaining: 29, resetAt: new Date() });
     (validateTransition as jest.Mock).mockImplementation(() => {});
     // Mock user.findUnique for suspension check
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({
@@ -185,6 +194,15 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
 
         expect(result.error).toBe("Unauthorized");
+      });
+
+      it("returns error when rate limited", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (checkRateLimit as jest.Mock).mockResolvedValue({ success: false, remaining: 0, resetAt: new Date() });
+
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+
+        expect(result.error).toBe("Too many requests. Please wait.");
       });
     });
 
@@ -240,7 +258,7 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValue([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123" },
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
                 ]),
               booking: {
                 count: jest.fn().mockResolvedValue(0),
@@ -284,7 +302,7 @@ describe("manage-booking actions", () => {
           $queryRaw: jest
             .fn()
             .mockResolvedValue([
-              { availableSlots: 2, totalSlots: 3, id: "listing-123" },
+              { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
             ]),
           booking: {
             count: jest.fn().mockResolvedValue(0),
@@ -315,7 +333,7 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValue([
-                  { availableSlots: 0, totalSlots: 2, id: "listing-123" },
+                  { availableSlots: 0, totalSlots: 2, id: "listing-123", ownerId: "owner-123" },
                 ]),
               booking: { count: jest.fn(), update: jest.fn() },
               listing: { update: jest.fn() },
@@ -336,7 +354,7 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValue([
-                  { availableSlots: 1, totalSlots: 2, id: "listing-123" },
+                  { availableSlots: 1, totalSlots: 2, id: "listing-123", ownerId: "owner-123" },
                 ]),
               booking: {
                 count: jest.fn().mockResolvedValue(2), // 2 overlapping accepted bookings = capacity exceeded
@@ -362,7 +380,7 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValue([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123" },
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
                 ]),
               booking: {
                 count: jest.fn().mockResolvedValue(0),
@@ -394,7 +412,7 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValue([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123" },
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
                 ]),
               booking: {
                 count: jest.fn().mockResolvedValue(0),
@@ -428,7 +446,7 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValue([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123" },
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
                 ]),
               booking: {
                 count: jest.fn().mockResolvedValue(0),
@@ -449,18 +467,30 @@ describe("manage-booking actions", () => {
     });
 
     describe("REJECT flow", () => {
+      let mockTxUpdateMany: jest.Mock;
+
       beforeEach(() => {
         (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
-        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
-          count: 1,
-        });
+        mockTxUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+        // P0-3: REJECTED path now uses $transaction with FOR UPDATE ownership check
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123" }]),
+              booking: {
+                updateMany: mockTxUpdateMany,
+              },
+            };
+            return callback(tx);
+          },
+        );
       });
 
       it("updates booking status to REJECTED", async () => {
         await updateBookingStatus("booking-123", "REJECTED");
 
-        expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+        expect(mockTxUpdateMany).toHaveBeenCalledWith({
           where: { id: "booking-123", version: 1 },
           data: { status: "REJECTED", rejectionReason: null, version: { increment: 1 } },
         });
@@ -583,9 +613,18 @@ describe("manage-booking actions", () => {
       beforeEach(() => {
         (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
-        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
-          count: 1,
-        });
+        // P0-3: REJECTED path now uses $transaction with FOR UPDATE
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123" }]),
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          },
+        );
       });
 
       it("revalidates /bookings path", async () => {

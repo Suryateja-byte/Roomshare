@@ -13,18 +13,29 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user
-      const isOnDashboard = nextUrl.pathname.startsWith("/dashboard")
-      const isOnAuth =
-        nextUrl.pathname.startsWith("/login")
-        || nextUrl.pathname.startsWith("/signup")
+      const pathname = nextUrl.pathname
+      const isAdmin = !!auth?.user?.isAdmin
 
-      if (isOnDashboard) {
-        if (isLoggedIn) return true
-        return false // Redirect unauthenticated users to login page
-      } else if (isLoggedIn && isOnAuth) {
-        return Response.redirect(new URL("/", nextUrl))
+      const protectedPaths = [
+        '/dashboard', '/bookings', '/messages', '/settings', '/profile',
+        '/notifications', '/saved', '/recently-viewed', '/saved-searches'
+      ]
+      const isProtected = protectedPaths.some(p => pathname.startsWith(p))
+      const isAdminRoute = pathname.startsWith('/admin')
+      const isOnAuth = pathname.startsWith('/login') || pathname.startsWith('/signup')
+
+      if (isAdminRoute) {
+        if (!isLoggedIn) return false
+        if (!isAdmin) return Response.redirect(new URL('/', nextUrl))
+        return true
       }
-
+      if (isProtected) {
+        if (isLoggedIn) return true
+        return false
+      }
+      if (isLoggedIn && isOnAuth) {
+        return Response.redirect(new URL('/', nextUrl))
+      }
       return true
     },
   },

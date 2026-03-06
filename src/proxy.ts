@@ -18,7 +18,11 @@ export default auth(async function proxy(request: NextRequest) {
     return suspensionResponse;
   }
 
-  const { requestHeaders, responseHeaders } = applySecurityHeaders(request);
+  const { requestHeaders, responseHeaders, nonce } = applySecurityHeaders(request);
+
+  if (nonce) {
+    requestHeaders.set('x-nonce', nonce);
+  }
 
   const requestId =
     request.headers.get("x-request-id") ||

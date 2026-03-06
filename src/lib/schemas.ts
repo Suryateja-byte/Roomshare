@@ -115,8 +115,8 @@ export function sanitizeUnicode(str: string): string {
 }
 
 // Defense-in-depth: reject HTML tags in user-facing text fields (M-D4)
-const noHtmlTags = (val: string) => !/<[^>]*>/.test(val);
-const NO_HTML_MSG = "HTML tags are not allowed";
+export const noHtmlTags = (val: string) => !/<[^>]*>/.test(val);
+export const NO_HTML_MSG = "HTML tags are not allowed";
 
 export const createListingSchema = z.object({
     title: z.string().trim().min(1, "Title is required").max(100, "Title must be 100 characters or less").transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),

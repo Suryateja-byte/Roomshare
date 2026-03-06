@@ -27,26 +27,46 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
     const currentUserId = session?.user?.id;
 
     // Fetch the user with their listings
+    // P0-4 FIX: Use explicit select to prevent PII leaks (email, password, isAdmin, isSuspended)
     const user = await prisma.user.findUnique({
         where: { id },
-        include: {
+        select: {
+            id: true,
+            name: true,
+            emailVerified: true,
+            image: true,
+            bio: true,
+            countryOfOrigin: true,
+            languages: true,
+            isVerified: true,
+            createdAt: true,
             listings: {
-                include: {
-                    location: true,
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    price: true,
+                    availableSlots: true,
+                    images: true,
+                    status: true,
+                    createdAt: true,
+                    location: {
+                        select: { city: true, state: true }
+                    },
                 },
-                orderBy: {
-                    createdAt: 'desc',
-                },
+                orderBy: { createdAt: 'desc' },
             },
             reviewsReceived: {
-                include: {
+                select: {
+                    id: true,
+                    rating: true,
+                    comment: true,
+                    createdAt: true,
                     author: {
                         select: { id: true, name: true, image: true }
                     }
                 },
-                orderBy: {
-                    createdAt: 'desc'
-                },
+                orderBy: { createdAt: 'desc' },
                 take: 10
             }
         },

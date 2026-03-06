@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { RefreshCw, Bell } from 'lucide-react';
 import Link from 'next/link';
+import * as Sentry from '@sentry/nextjs';
 
 export default function NotificationsError({
     error,
@@ -12,7 +13,7 @@ export default function NotificationsError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error('Notifications error:', error);
+        Sentry.captureException(error);
     }, [error]);
 
     return (
@@ -24,7 +25,7 @@ export default function NotificationsError({
                 Unable to load notifications
             </h2>
             <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
-                {error.message || 'We encountered an error while loading your notifications. Please try again.'}
+                We encountered an error while loading your notifications. Please try again.
             </p>
             <div className="flex gap-3">
                 <button

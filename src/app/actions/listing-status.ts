@@ -7,7 +7,7 @@ import { checkSuspension } from './suspension';
 import { logger } from '@/lib/logger';
 import { markListingDirty } from '@/lib/search/search-doc-dirty';
 import { z } from 'zod';
-import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { checkRateLimit, RATE_LIMITS, getClientIPFromHeaders } from '@/lib/rate-limit';
 
 export type ListingStatus = 'ACTIVE' | 'PAUSED' | 'RENTED';
 
@@ -45,6 +45,18 @@ export async function updateListingStatus(listingId: string, status: ListingStat
             return { error: 'You can only update your own listings' };
         }
 
+        if (status === 'PAUSED') {
+            const activeBookings = await prisma.booking.count({
+                where: {
+                    listingId,
+                    status: { in: ['ACCEPTED', 'PENDING'] },
+                },
+            });
+            if (activeBookings > 0) {
+                return { error: 'Cannot pause a listing with active or pending bookings. Please resolve them first.' };
+            }
+        }
+
         await prisma.listing.update({
             where: { id: listingId },
             data: { status }
@@ -71,12 +83,17 @@ export async function updateListingStatus(listingId: string, status: ListingStat
 
 export async function incrementViewCount(listingId: string) {
     const session = await auth();
-    if (!session?.user?.id) {
-        return { error: 'Unauthorized' };
+    let identifier: string;
+    if (session?.user?.id) {
+        identifier = session.user.id;
+    } else {
+        const { headers: getHeaders } = await import('next/headers');
+        const headersList = await getHeaders();
+        identifier = getClientIPFromHeaders(headersList);
     }
 
     // Rate limit: prevent view count gaming
-    const rl = await checkRateLimit(session.user.id, 'viewCount', RATE_LIMITS.viewCount);
+    const rl = await checkRateLimit(identifier, 'viewCount', RATE_LIMITS.viewCount);
     if (!rl.success) {
         return { success: true }; // Silently succeed — don't reveal rate limiting for views
     }
