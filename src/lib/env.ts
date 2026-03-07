@@ -154,6 +154,19 @@ const clientEnvSchema = z.object({
   // App URL (used for metadataBase, sitemap, robots, structured data)
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
 }).superRefine((data, ctx) => {
+  const hasSupabaseUrl = !!data.NEXT_PUBLIC_SUPABASE_URL;
+  const hasSupabaseAnonKey = !!data.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (hasSupabaseUrl !== hasSupabaseAnonKey) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must both be set or both be omitted",
+      path: hasSupabaseUrl
+        ? ["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+        : ["NEXT_PUBLIC_SUPABASE_URL"],
+    });
+  }
+
   if (process.env.NODE_ENV === "production") {
     if (!data.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
       ctx.addIssue({

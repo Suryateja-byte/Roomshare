@@ -45,6 +45,10 @@ function safeParseFloat(value: string, min?: number, max?: number): number | und
     return parsed;
 }
 
+function normalizeMapNumber(value: number, fallback = 0): number {
+    return Number.isFinite(value) ? value : fallback;
+}
+
 interface Listing {
     id: string;
     title: string;
@@ -661,16 +665,19 @@ export default function MapComponent({
             type: 'Feature' as const,
             geometry: {
                 type: 'Point' as const,
-                coordinates: [listing.location.lng, listing.location.lat]
+                coordinates: [
+                    normalizeMapNumber(listing.location.lng),
+                    normalizeMapNumber(listing.location.lat),
+                ]
             },
             properties: {
                 id: listing.id,
                 title: listing.title,
-                price: listing.price,
-                availableSlots: listing.availableSlots,
+                price: normalizeMapNumber(listing.price),
+                availableSlots: normalizeMapNumber(listing.availableSlots),
                 images: JSON.stringify(listing.images || []),
-                lat: listing.location.lat,
-                lng: listing.location.lng,
+                lat: normalizeMapNumber(listing.location.lat),
+                lng: normalizeMapNumber(listing.location.lng),
                 // P3a: Include tier for differentiated pin styling (primary = larger, mini = smaller)
                 tier: listing.tier
             }

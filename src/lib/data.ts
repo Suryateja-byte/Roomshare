@@ -10,6 +10,7 @@ import { hasActiveFilters } from "@/lib/search-params";
 import {
   clampBoundsToMaxSpan,
 } from "@/lib/validation";
+import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
 import {
   MIN_QUERY_LENGTH,
   MAX_QUERY_LENGTH,
@@ -763,17 +764,17 @@ export async function getMapListings(
       ...queryParams,
     );
 
-    return listings.map((l) => ({
+    return sanitizeMapListings(listings.map((l) => ({
       id: l.id,
       title: l.title,
-      price: Number(l.price),
+      price: l.price,
       availableSlots: l.availableSlots,
       images: l.images || [],
       location: {
-        lat: Number(l.lat) || 0,
-        lng: Number(l.lng) || 0,
+        lat: l.lat,
+        lng: l.lng,
       },
-    }));
+    })));
   } catch (error) {
     const dataError = wrapDatabaseError(error, "getMapListings");
     dataError.log({

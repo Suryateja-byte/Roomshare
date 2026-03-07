@@ -227,6 +227,8 @@ export const RATE_LIMITS = {
   // P2 fixes: Rate limits for scraping protection and abuse prevention
   listingsRead: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100 per hour (scraping protection)
   unreadCount: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute (frequent polling)
+  messagesPoll: { limit: 180, windowMs: 60 * 1000 }, // 180 per minute (3s polling across multiple tabs)
+  messageRead: { limit: 120, windowMs: 60 * 1000 }, // 120 per minute (visibility/read-receipt updates)
   toggleFavorite: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
   createReport: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
   uploadDelete: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour

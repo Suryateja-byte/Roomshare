@@ -27,6 +27,7 @@ import {
   isValidQuery,
   crossesAntimeridian,
 } from "@/lib/search-types";
+import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
 import {
   LOW_RESULTS_THRESHOLD,
   expandFiltersForNearMatches,
@@ -783,17 +784,17 @@ async function getSearchDocMapListingsInternal(
     const truncated = listings.length > MAX_MAP_MARKERS;
     const trimmedListings = truncated ? listings.slice(0, MAX_MAP_MARKERS) : listings;
 
-    const mappedListings = trimmedListings.map((l) => ({
+    const mappedListings = sanitizeMapListings(trimmedListings.map((l) => ({
       id: l.id,
       title: l.title,
-      price: Number(l.price),
+      price: l.price,
       availableSlots: l.availableSlots,
       images: l.primaryImage ? [l.primaryImage] : [],
       location: {
-        lat: Number(l.lat) || 0,
-        lng: Number(l.lng) || 0,
+        lat: l.lat,
+        lng: l.lng,
       },
-    }));
+    })));
 
     return {
       listings: mappedListings,

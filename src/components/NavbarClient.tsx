@@ -159,7 +159,9 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     const fetchUnreadCount = useCallback(async () => {
         if (!user) return;
         try {
-            const response = await fetch('/api/messages/unread');
+            const response = await fetch('/api/messages?view=unreadCount', {
+                cache: 'no-store',
+            });
             if (response.ok) {
                 const data = await response.json();
                 setCurrentUnreadCount(data.count);

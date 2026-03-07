@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase, createChatChannel, broadcastTyping, trackPresence, safeRemoveChannel } from '@/lib/supabase';
-import { sendMessage, getMessages } from '@/app/actions/chat';
+import { sendMessage } from '@/app/actions/chat';
 import { blockUser, unblockUser } from '@/app/actions/block';
 import { useRouter } from 'next/navigation';
 import { Send, Loader2, Check, CheckCheck, MoreVertical, Ban, ShieldOff, WifiOff, AlertCircle, RotateCw } from 'lucide-react';
@@ -58,6 +58,13 @@ interface ChatWindowProps {
     otherUserImage?: string | null;
 }
 
+function isAbortError(error: unknown): boolean {
+    return (
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        (error instanceof Error && error.name === 'AbortError')
+    );
+}
+
 export default function ChatWindow({
     initialMessages,
     conversationId,
@@ -74,18 +81,22 @@ export default function ChatWindow({
     const [isTyping, setIsTyping] = useState(false);
     const [otherUserTyping, setOtherUserTyping] = useState(false);
     const [isOnline, setIsOnline] = useState(false);
-    const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+    const [transportMode, setTransportMode] = useState<'realtime' | 'polling'>('polling');
+    const transportModeRef = useRef<'realtime' | 'polling'>('polling');
     const [showBlockDialog, setShowBlockDialog] = useState(false);
     const [isBlocking, setIsBlocking] = useState(false);
     const [isUnblocking, setIsUnblocking] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesRef = useRef<Message[]>(initialMessages);
     const inputRef = useRef<HTMLInputElement>(null);
     const channelRef = useRef<RealtimeChannel | null>(null);
+    const pollAbortRef = useRef<AbortController | null>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const router = useRouter();
     const lastMessageIdRef = useRef<string | null>(
         initialMessages.length > 0 ? initialMessages[initialMessages.length - 1].id : null
     );
+    const lastReadMessageIdRef = useRef<string | null>(null);
 
     // Block status tracking
     const { blockStatus, isBlocked, refetch: refetchBlockStatus } = useBlockStatus(otherUserId, currentUserId);
@@ -138,8 +149,13 @@ export default function ChatWindow({
     }, []);
 
     useEffect(() => {
+        messagesRef.current = messages;
         scrollToBottom();
     }, [messages, scrollToBottom]);
+
+    useEffect(() => {
+        transportModeRef.current = transportMode;
+    }, [transportMode]);
 
     // Warn user when navigating away during message send or with unsaved input
     useEffect(() => {
@@ -176,14 +192,43 @@ export default function ChatWindow({
         inputRef.current?.focus();
     }, [conversationId]);
 
-    // Dispatch event when messages are read
-    useEffect(() => {
-        window.dispatchEvent(new CustomEvent('messagesRead'));
-    }, []);
+    const markConversationRead = useCallback(async (latestIncomingMessageId?: string | null) => {
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+            return;
+        }
+
+        const targetMessageId = latestIncomingMessageId ?? [...messagesRef.current]
+            .reverse()
+            .find((message) => message.senderId !== currentUserId)?.id ?? null;
+
+        if (!targetMessageId || lastReadMessageIdRef.current === targetMessageId) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'markRead',
+                    conversationId,
+                }),
+            });
+
+            if (response.ok) {
+                lastReadMessageIdRef.current = targetMessageId;
+                window.dispatchEvent(new CustomEvent('messagesRead'));
+            }
+        } catch (error) {
+            console.error('Failed to mark messages as read:', error);
+        }
+    }, [conversationId, currentUserId]);
 
     // Debounced function to broadcast typing stopped
     const stopTypingBroadcast = useDebouncedCallback(() => {
-        if (channelRef.current && connectionStatus === 'connected') {
+        if (channelRef.current && transportMode === 'realtime') {
             broadcastTyping(channelRef.current, currentUserId, currentUserName || '', false);
         }
         setIsTyping(false);
@@ -195,7 +240,7 @@ export default function ChatWindow({
 
         if (e.target.value && !isTyping) {
             setIsTyping(true);
-            if (channelRef.current && connectionStatus === 'connected') {
+            if (channelRef.current && transportMode === 'realtime') {
                 broadcastTyping(channelRef.current, currentUserId, currentUserName || '', true);
             }
         }
@@ -208,10 +253,31 @@ export default function ChatWindow({
     const pollForMessages = useCallback(async () => {
         if (isPollingRef.current) return;
         isPollingRef.current = true;
+        const abortController = new AbortController();
+        pollAbortRef.current = abortController;
 
         try {
-            const result = await getMessages(conversationId);
-            if (result && Array.isArray(result) && result.length > 0) {
+            const params = new URLSearchParams({
+                conversationId,
+                poll: '1',
+            });
+            if (lastMessageIdRef.current) {
+                params.set('lastMessageId', lastMessageIdRef.current);
+            }
+
+            const response = await fetch(`/api/messages?${params.toString()}`, {
+                method: 'GET',
+                cache: 'no-store',
+                signal: abortController.signal,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Polling failed with status ${response.status}`);
+            }
+
+            const payload = await response.json();
+            const result = Array.isArray(payload?.messages) ? payload.messages as Message[] : [];
+            if (result.length > 0) {
                 setMessages(prev => {
                     const existingIds = new Set(prev.map(m => m.id));
                     const newMessages = result.filter(
@@ -230,19 +296,30 @@ export default function ChatWindow({
                         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
                     );
                 });
+                lastMessageIdRef.current = result[result.length - 1]?.id || lastMessageIdRef.current;
+
+                if (result.some((message) => message.senderId !== currentUserId)) {
+                    void markConversationRead(result[result.length - 1]?.id ?? null);
+                }
             }
         } catch (error) {
-            console.error('Polling error:', error);
+            if (!isAbortError(error)) {
+                console.error('Polling error:', error);
+            }
         } finally {
+            if (pollAbortRef.current === abortController) {
+                pollAbortRef.current = null;
+            }
             isPollingRef.current = false;
         }
-    }, [conversationId]);
+    }, [conversationId, currentUserId, markConversationRead]);
 
     // Set up real-time subscription with presence and typing
     useEffect(() => {
         let pollInterval: NodeJS.Timeout | null = null;
 
         if (supabase) {
+            setTransportMode('polling');
             // Create channel with broadcast and presence
             const channel = createChatChannel(conversationId);
 
@@ -261,6 +338,7 @@ export default function ChatWindow({
                         // SECURITY: No RLS on Message table — client-side guard prevents cross-conversation bleed
                         if (!newMessage.conversationId || newMessage.conversationId !== conversationId) return;
                         newMessage.createdAt = new Date(newMessage.createdAt);
+                        lastMessageIdRef.current = newMessage.id;
 
                         setMessages((prev) => {
                             if (prev.some(m => m.id === newMessage.id)) return prev;
@@ -270,9 +348,8 @@ export default function ChatWindow({
                         // Clear typing indicator when message received
                         if (newMessage.senderId !== currentUserId) {
                             setOtherUserTyping(false);
+                            void markConversationRead(newMessage.id);
                         }
-
-                        router.refresh();
                     })
                     // Listen for typing broadcasts
                     .on('broadcast', { event: 'typing' }, (payload) => {
@@ -317,21 +394,31 @@ export default function ChatWindow({
                     })
                     .subscribe(async (status) => {
                         if (status === 'SUBSCRIBED') {
-                            setConnectionStatus('connected');
+                            setTransportMode('realtime');
                             // Track our presence using the wrapper with defensive checks
                             await trackPresence(channel, currentUserId, currentUserName || 'User');
-                        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                            setConnectionStatus('disconnected');
+                        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                            setTransportMode('polling');
                         }
                     });
             }
+        } else {
+            setTransportMode('polling');
         }
 
-        // Always set up polling as fallback (every 5 seconds)
-        pollInterval = setInterval(pollForMessages, 5000);
+        if (!isOffline) {
+            void pollForMessages();
+            pollInterval = setInterval(() => {
+                if (transportModeRef.current !== 'realtime') {
+                    void pollForMessages();
+                }
+            }, 5000);
+        }
 
         return () => {
             safeRemoveChannel(channelRef.current);
+            pollAbortRef.current?.abort();
+            pollAbortRef.current = null;
             if (pollInterval) {
                 clearInterval(pollInterval);
             }
@@ -339,7 +426,20 @@ export default function ChatWindow({
                 clearTimeout(typingTimeoutRef.current);
             }
         };
-    }, [conversationId, router, pollForMessages, currentUserId, currentUserName]);
+    }, [conversationId, currentUserId, currentUserName, isOffline, markConversationRead, pollForMessages]);
+
+    useEffect(() => {
+        void markConversationRead();
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                void markConversationRead();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [markConversationRead]);
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -358,7 +458,7 @@ export default function ChatWindow({
         setIsTyping(false);
 
         // Broadcast that we stopped typing
-        if (channelRef.current && connectionStatus === 'connected') {
+        if (channelRef.current && transportMode === 'realtime') {
             broadcastTyping(channelRef.current, currentUserId, currentUserName || '', false);
         }
 
@@ -501,16 +601,16 @@ export default function ChatWindow({
         if (otherUserTyping) {
             return 'typing...';
         }
-        if (connectionStatus === 'connected' && isOnline) {
-            return 'Online';
-        }
-        if (connectionStatus === 'connected') {
+        if (isOffline) {
             return 'Offline';
         }
-        if (connectionStatus === 'connecting') {
-            return 'Connecting...';
+        if (transportMode === 'realtime' && isOnline) {
+            return 'Online';
         }
-        return 'Offline';
+        if (transportMode === 'realtime') {
+            return 'Offline';
+        }
+        return 'Polling for updates';
     };
 
     return (
@@ -523,7 +623,7 @@ export default function ChatWindow({
                         name={otherUserName}
                         className="w-10 h-10"
                     />
-                    {connectionStatus === 'connected' && isOnline && !isBlocked && (
+                    {transportMode === 'realtime' && isOnline && !isBlocked && (
                         <span data-testid="online-status" className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-zinc-900" />
                     )}
                 </div>

@@ -229,7 +229,7 @@ export function SearchResultsClient({
                 key={listing.id}
                 listing={listing}
                 isSaved={savedIdsSet.has(listing.id)}
-                priority={index < 4}
+                priority={index === 0}
                 showTotalPrice={showTotalPrice}
                 estimatedMonths={estimatedMonths}
               />

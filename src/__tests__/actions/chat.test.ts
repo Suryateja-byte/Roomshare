@@ -56,6 +56,21 @@ jest.mock('@/auth', () => ({
   auth: jest.fn(),
 }))
 
+jest.mock('next/headers', () => ({
+  headers: jest.fn().mockResolvedValue({
+    get: jest.fn(),
+  }),
+}))
+
+jest.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({ success: true }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue('127.0.0.1'),
+  RATE_LIMITS: {
+    chatStartConversation: {},
+    chatSendMessage: {},
+  },
+}))
+
 jest.mock('@/lib/notifications', () => ({
   createInternalNotification: jest.fn().mockResolvedValue({ success: true }),
 }))
@@ -325,17 +340,10 @@ describe('Chat Actions', () => {
       expect(result).toEqual(mockMessages)
     })
 
-    it('marks unread messages as read', async () => {
+    it('does not mark unread messages as read during fetch', async () => {
       await getMessages('conv-123')
 
-      expect(prisma.message.updateMany).toHaveBeenCalledWith({
-        where: {
-          conversationId: 'conv-123',
-          senderId: { not: 'user-123' },
-          read: false,
-        },
-        data: { read: true },
-      })
+      expect(prisma.message.updateMany).not.toHaveBeenCalled()
     })
   })
 

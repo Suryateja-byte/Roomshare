@@ -6,15 +6,19 @@ jest.mock('@/lib/prisma', () => {
   const mockPrisma: Record<string, any> = {
     conversation: {
       findUnique: jest.fn(),
-      findFirst: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
       update: jest.fn(),
     },
     message: {
+      findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       count: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    typingStatus: {
+      findMany: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -100,7 +104,7 @@ describe('Messages API', () => {
         { id: 'msg-1', content: 'Hello', sender: { id: 'user-123', name: 'User', image: null } },
         { id: 'msg-2', content: 'Hi', sender: { id: 'user-456', name: 'Other', image: null } },
       ]
-      ;(prisma.conversation.findFirst as jest.Mock).mockResolvedValue(mockConversation)
+      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
       ;(prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages)
       ;(prisma.message.count as jest.Mock).mockResolvedValue(2)
 
@@ -113,7 +117,7 @@ describe('Messages API', () => {
     })
 
     it('returns 403 when user is not participant', async () => {
-      ;(prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conv-123',
         participants: [{ id: 'other-1' }, { id: 'other-2' }],
         deletions: [],
@@ -123,6 +127,49 @@ describe('Messages API', () => {
       const response = await GET(request)
 
       expect(response.status).toBe(403)
+    })
+
+    it('supports safe polling reads without mutating message state', async () => {
+      const mockConversation = {
+        id: 'conv-123',
+        participants: [{ id: 'user-123' }, { id: 'user-456' }],
+        deletions: [],
+      }
+      const cursorMessage = {
+        id: 'msg-1',
+        conversationId: 'conv-123',
+        createdAt: new Date('2026-03-06T12:00:00.000Z'),
+      }
+      const polledMessages = [
+        {
+          id: 'msg-2',
+          content: 'Hello after cursor',
+          sender: { id: 'user-456', name: 'Other', image: null },
+          createdAt: new Date('2026-03-06T12:01:00.000Z'),
+        },
+      ]
+
+      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
+      ;(prisma.message.findUnique as jest.Mock).mockResolvedValue(cursorMessage)
+      ;(prisma.message.findMany as jest.Mock).mockResolvedValue(polledMessages)
+      ;(prisma.typingStatus.findMany as jest.Mock).mockResolvedValue([
+        {
+          user: { id: 'user-456', name: 'Other User' },
+        },
+      ])
+
+      const request = new Request('http://localhost/api/messages?conversationId=conv-123&poll=1&lastMessageId=msg-1')
+      const response = await GET(request)
+
+      expect(response.status).toBe(200)
+      const data = await response.json()
+      expect(data).toEqual({
+        messages: polledMessages,
+        typingUsers: [{ id: 'user-456', name: 'Other User' }],
+        hasNewMessages: true,
+      })
+      expect(prisma.message.updateMany).not.toHaveBeenCalled()
+      expect(prisma.message.count).not.toHaveBeenCalled()
     })
 
     it('returns all conversations when no conversationId', async () => {

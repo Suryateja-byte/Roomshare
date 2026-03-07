@@ -3,14 +3,23 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
 
 const mockPush = jest.fn();
+const mockRefresh = jest.fn();
 const mockSendMessage = jest.fn();
-const mockCreateChatChannel = jest.fn();
-const mockSafeRemoveChannel = jest.fn();
+const mockSetTypingStatus = jest.fn();
+const mockMarkAllMessagesAsRead = jest.fn();
+const mockDeleteConversation = jest.fn();
+const mockRouter = {
+  push: mockPush,
+  refresh: mockRefresh,
+};
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
+  useRouter: () => mockRouter,
+}));
+
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a>,
 }));
 
 jest.mock('sonner', () => ({
@@ -21,12 +30,11 @@ jest.mock('sonner', () => ({
   },
 }));
 
-jest.mock('use-debounce', () => ({
-  useDebouncedCallback: (callback: (...args: unknown[]) => void) => callback,
-}));
-
 jest.mock('@/app/actions/chat', () => ({
   sendMessage: (...args: unknown[]) => mockSendMessage(...args),
+  setTypingStatus: (...args: unknown[]) => mockSetTypingStatus(...args),
+  markAllMessagesAsRead: (...args: unknown[]) => mockMarkAllMessagesAsRead(...args),
+  deleteConversation: (...args: unknown[]) => mockDeleteConversation(...args),
 }));
 
 jest.mock('@/app/actions/block', () => ({
@@ -42,27 +50,10 @@ jest.mock('@/hooks/useBlockStatus', () => ({
   }),
 }));
 
-jest.mock('@/hooks/useRateLimitHandler', () => ({
-  useRateLimitHandler: () => ({
-    isRateLimited: false,
-    retryAfter: 0,
-    handleError: jest.fn(() => false),
-    reset: jest.fn(),
-  }),
-}));
-
 jest.mock('@/hooks/useNetworkStatus', () => ({
   useNetworkStatus: () => ({
     isOffline: false,
   }),
-}));
-
-jest.mock('@/lib/supabase', () => ({
-  supabase: null,
-  createChatChannel: (...args: unknown[]) => mockCreateChatChannel(...args),
-  broadcastTyping: jest.fn(),
-  trackPresence: jest.fn(),
-  safeRemoveChannel: (...args: unknown[]) => mockSafeRemoveChannel(...args),
 }));
 
 jest.mock('@/components/UserAvatar', () => ({
@@ -84,11 +75,6 @@ jest.mock('@/components/CharacterCounter', () => ({
       {current}/{max}
     </div>
   ),
-}));
-
-jest.mock('@/components/RateLimitCountdown', () => ({
-  __esModule: true,
-  default: () => <div data-testid="rate-limit-countdown">rate limit</div>,
 }));
 
 jest.mock('@/components/ui/dropdown-menu', () => ({
@@ -137,17 +123,14 @@ jest.mock('@/components/ui/alert-dialog', () => ({
   AlertDialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-import ChatWindow from '@/app/messages/[id]/ChatWindow';
+import MessagesPageClient from '@/components/MessagesPageClient';
 
 type MockMessage = {
   id: string;
   content: string;
   senderId: string;
   createdAt: string | Date;
-  sender?: {
-    name: string | null;
-    image: string | null;
-  };
+  read?: boolean;
 };
 
 function createJsonResponse(body: unknown, status = 200) {
@@ -164,15 +147,29 @@ function buildMessage(id: string, senderId: string, content: string): MockMessag
     senderId,
     content,
     createdAt: new Date(`2026-03-06T12:00:0${id.endsWith('2') ? '2' : '1'}Z`).toISOString(),
-    sender: {
-      name: senderId === 'other-user' ? 'Other User' : 'Current User',
-      image: null,
-    },
+    read: senderId === 'user-123',
   };
 }
 
-describe('Route ChatWindow', () => {
+describe('MessagesPageClient', () => {
   const fetchMock = jest.fn<typeof fetch>();
+  const initialConversations = [
+    {
+      id: 'conv-1',
+      updatedAt: new Date('2026-03-06T11:59:00.000Z'),
+      participants: [
+        { id: 'user-123', name: 'Current User', image: null },
+        { id: 'other-user', name: 'Other User', image: null },
+      ],
+      messages: [
+        buildMessage('preview-1', 'other-user', 'Preview message'),
+      ],
+      listing: {
+        title: 'Test Listing',
+      },
+      unreadCount: 1,
+    },
+  ];
 
   beforeAll(() => {
     Object.defineProperty(Element.prototype, 'scrollIntoView', {
@@ -186,7 +183,8 @@ describe('Route ChatWindow', () => {
     jest.useFakeTimers();
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
-    sessionStorage.clear();
+    mockMarkAllMessagesAsRead.mockResolvedValue({ success: true, count: 0 });
+    mockDeleteConversation.mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -195,70 +193,42 @@ describe('Route ChatWindow', () => {
     jest.useRealTimers();
   });
 
-  it('shows polling mode when realtime is unavailable and never shows connecting', async () => {
+  it('loads and polls messages through the safe GET endpoint and marks inbound messages as read', async () => {
+    const firstInbound = buildMessage('msg-1', 'other-user', 'Hello from inbox polling');
+    const secondInbound = buildMessage('msg-2', 'other-user', 'Follow-up from inbox polling');
+
     fetchMock.mockImplementation((input) => {
-      const url = String(input);
-      if (url.includes('/api/messages?')) {
-        return createJsonResponse({ messages: [], hasNewMessages: false });
-      }
-      throw new Error(`Unexpected fetch: ${url}`);
-    });
-
-    render(
-      <ChatWindow
-        initialMessages={[]}
-        conversationId="conv-123"
-        currentUserId="user-123"
-        currentUserName="Current User"
-        otherUserId="other-user"
-        otherUserName="Other User"
-        otherUserImage={null}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/messages?conversationId=conv-123&poll=1'),
-        expect.objectContaining({ method: 'GET' }),
-      );
-    });
-
-    expect(screen.getByTestId('connection-status')).toHaveTextContent('Polling for updates');
-    expect(screen.queryByText('Connecting...')).not.toBeInTheDocument();
-    expect(mockCreateChatChannel).not.toHaveBeenCalled();
-  });
-
-  it('polls with lastMessageId, merges incremental messages, and marks inbound messages as read', async () => {
-    const firstInbound = buildMessage('msg-1', 'other-user', 'Hello from polling');
-    const secondInbound = buildMessage('msg-2', 'other-user', 'Second poll result');
-
-    fetchMock.mockImplementation((input, init) => {
       const url = String(input);
       if (url === '/api/messages') {
         return createJsonResponse({ success: true, count: 1 });
       }
       if (url.includes('/api/messages?')) {
         if (url.includes('lastMessageId=msg-1')) {
-          return createJsonResponse({ messages: [secondInbound], hasNewMessages: true });
+          return createJsonResponse({
+            messages: [secondInbound],
+            typingUsers: [{ id: 'other-user', name: 'Other User' }],
+            hasNewMessages: true,
+          });
         }
-        return createJsonResponse({ messages: [firstInbound], hasNewMessages: true });
+
+        return createJsonResponse({
+          messages: [firstInbound],
+          typingUsers: [],
+          hasNewMessages: true,
+        });
       }
-      throw new Error(`Unexpected fetch: ${url} ${String(init?.method ?? '')}`);
+
+      throw new Error(`Unexpected fetch: ${url}`);
     });
 
     render(
-      <ChatWindow
-        initialMessages={[]}
-        conversationId="conv-123"
+      <MessagesPageClient
         currentUserId="user-123"
-        currentUserName="Current User"
-        otherUserId="other-user"
-        otherUserName="Other User"
-        otherUserImage={null}
+        initialConversations={initialConversations}
       />,
     );
 
-    expect(await screen.findByText('Hello from polling')).toBeInTheDocument();
+    expect((await screen.findAllByText('Hello from inbox polling')).length).toBeGreaterThan(0);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -267,25 +237,25 @@ describe('Route ChatWindow', () => {
           method: 'POST',
           body: JSON.stringify({
             action: 'markRead',
-            conversationId: 'conv-123',
+            conversationId: 'conv-1',
           }),
         }),
       );
     });
 
     await act(async () => {
-      jest.advanceTimersByTime(5000);
+      jest.advanceTimersByTime(3000);
     });
 
-    expect(await screen.findByText('Second poll result')).toBeInTheDocument();
+    expect((await screen.findAllByText('Follow-up from inbox polling')).length).toBeGreaterThan(0);
+    expect(screen.getByTestId('typing-indicator')).toHaveTextContent('Other User is typing...');
 
-    const pollUrls = fetchMock.mock.calls
+    const pollingUrls = fetchMock.mock.calls
       .map(([input]) => String(input))
-      .filter((url) => url.includes('/api/messages?conversationId=conv-123&poll=1'));
+      .filter((url) => url.includes('/api/messages?conversationId=conv-1&poll=1'));
 
-    expect(pollUrls[0]).toContain('conversationId=conv-123');
-    expect(pollUrls.some((url) => url.includes('lastMessageId=msg-1'))).toBe(true);
-    expect(screen.getAllByTestId('message-bubble')).toHaveLength(2);
+    expect(pollingUrls.length).toBeGreaterThan(1);
+    expect(pollingUrls.some((url) => url.includes('lastMessageId=msg-1'))).toBe(true);
   });
 
   it('aborts in-flight polling on unmount without logging a polling error', async () => {
@@ -310,24 +280,20 @@ describe('Route ChatWindow', () => {
           );
         });
       }
+
       return createJsonResponse({ success: true, count: 0 });
     });
 
     const { unmount } = render(
-      <ChatWindow
-        initialMessages={[]}
-        conversationId="conv-123"
+      <MessagesPageClient
         currentUserId="user-123"
-        currentUserName="Current User"
-        otherUserId="other-user"
-        otherUserName="Other User"
-        otherUserImage={null}
+        initialConversations={initialConversations}
       />,
     );
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/messages?conversationId=conv-123&poll=1'),
+        expect.stringContaining('/api/messages?conversationId=conv-1&poll=1'),
         expect.objectContaining({ method: 'GET' }),
       );
     });

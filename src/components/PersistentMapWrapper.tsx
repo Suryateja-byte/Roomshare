@@ -34,6 +34,7 @@ import { useSearchV2Data, type V2MapData } from "@/contexts/SearchV2DataContext"
 import { useActivePanBounds } from "@/contexts/MapBoundsContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
+import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
 import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
@@ -339,7 +340,7 @@ function MapDataLoadingBar() {
  * - availableSlots: for "N Available" / "Filled" badge in popup
  * - tier: for differentiated pin styling (primary = larger, mini = smaller)
  */
-function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
+export function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
   // Build lookup map from pins for tier data (O(1) lookups)
   const pinTierMap = new Map<string, "primary" | "mini">();
   if (v2MapData.pins) {
@@ -351,7 +352,7 @@ function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
   }
 
   // P2-3 FIX: Filter out malformed features before accessing coordinates
-  return v2MapData.geojson.features
+  return sanitizeMapListings(v2MapData.geojson.features
     .filter((feature) => {
       const coordinates = feature.geometry?.coordinates;
       if (!Array.isArray(coordinates) || coordinates.length < 2) return false;
@@ -367,14 +368,14 @@ function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
       return {
         id: feature.properties.id,
         title: feature.properties.title ?? "",
-        price: feature.properties.price ?? 0,
+        price: feature.properties.price,
         availableSlots: feature.properties.availableSlots,
         images: feature.properties.image ? [feature.properties.image] : [],
         location: { lng, lat },
         // Add tier from pins lookup (defaults to undefined if not in pins mode)
         tier: pinTierMap.get(feature.properties.id),
       };
-    });
+    }));
 }
 
 interface PersistentMapWrapperProps {

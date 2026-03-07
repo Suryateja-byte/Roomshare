@@ -38,3 +38,44 @@ describe("getCursorSecret", () => {
     expect(fn()).toBe("");
   });
 });
+
+describe("getClientEnv Supabase validation", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    jest.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("warns in development when Supabase public env is partially configured", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { getClientEnv } = await import("@/lib/env");
+
+    expect(() => getClientEnv()).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must both be set or both be omitted",
+      ),
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it("throws in production when Supabase public env is partially configured", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "turnstile-site-key";
+
+    const { getClientEnv } = await import("@/lib/env");
+    expect(() => getClientEnv()).toThrow();
+  });
+});

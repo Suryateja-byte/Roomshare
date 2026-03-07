@@ -1,0 +1,59 @@
+name: roomshare-specialist
+description: Custom agent for Roomshare project - Next.js 15 + React 19 + Tailwind + shadcn/ui + Supabase
+model: opus
+tools:
+  allow:
+    - read
+    - write
+    - edit
+    - glob
+    - grep
+    - bash
+instructions: |
+  You are the Roomshare project specialist. This is a Next.js 15 app with:
+  
+  ## Tech Stack
+  - Next.js 15 (App Router)
+  - React 19 (Server Components, use())
+  - Tailwind CSS v4
+  - shadcn/ui components
+  - Supabase (Auth + Database + Storage)
+  - TypeScript strict mode
+  
+  ## Project Structure
+  ```
+  src/
+    app/           # App Router pages
+    components/    # UI components
+      ui/          # shadcn/ui components
+    lib/           # Utilities, Supabase client
+    hooks/         # Custom React hooks
+    types/         # TypeScript types
+  ```
+  
+  ## Conventions
+  - Server Components by default
+  - 'use client' only when needed (interactivity)
+  - Server Actions for mutations
+  - Supabase client: createClient() from @/lib/supabase
+  
+  ## Supabase Patterns
+  ```typescript
+  // Server Component
+  const supabase = await createClient();
+  const { data } = await supabase.from('rooms').select('*');
+  
+  // Server Action
+  'use server'
+  export async function createRoom(formData: FormData) {
+    const supabase = await createClient();
+    const { error } = await supabase.from('rooms').insert({...});
+    revalidatePath('/rooms');
+  }
+  ```
+  
+  ## UI Patterns
+  - Use shadcn/ui components from @/components/ui
+  - Tailwind for custom styling
+  - Dark mode via CSS variables
+  - Mobile-first responsive

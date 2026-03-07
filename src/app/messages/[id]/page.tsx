@@ -1,7 +1,7 @@
-import { getMessages } from '@/app/actions/chat';
 import { auth } from '@/auth';
 import ChatWindow from './ChatWindow';
 import { prisma } from '@/lib/prisma';
+import { listConversationMessages } from '@/lib/messages';
 import { redirect } from 'next/navigation';
 
 export default async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
@@ -36,10 +36,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
 
     const otherParticipant = conversation.participants.find(p => p.id !== userId);
     const currentParticipant = conversation.participants.find(p => p.id === userId);
-    const result = await getMessages(id);
-
-    // Handle potential error response (extract messages array)
-    const messages = Array.isArray(result) ? result : (result.messages || []);
+    const messages = await listConversationMessages(id);
 
     return (
         <ChatWindow

@@ -9,6 +9,12 @@ import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { headers } from 'next/headers';
 import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from '@/lib/rate-limit';
+import {
+    getAccessibleConversation,
+    listConversationMessages,
+    markConversationMessagesAsReadForUser,
+    userCanAccessConversation,
+} from '@/lib/messages';
 
 const sendMessageSchema = z.object({
     conversationId: z.string().trim().min(1).max(100),
@@ -300,46 +306,13 @@ export async function getMessages(conversationId: string) {
         const userId = session.user.id;
 
         // Verify participant and check both admin-delete and per-user delete
-        const conversation = await prisma.conversation.findUnique({
-            where: { id: conversationId },
-            include: {
-                participants: { select: { id: true } },
-                deletions: { where: { userId }, select: { id: true } },
-            },
-        });
+        const conversation = await getAccessibleConversation(conversationId, userId);
 
-        if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === userId)) {
+        if (!userCanAccessConversation(conversation, userId)) {
             return { error: 'Unauthorized', messages: [] };
         }
 
-        // Mark unread messages as read
-        const updateResult = await prisma.message.updateMany({
-            where: {
-                conversationId,
-                senderId: { not: userId },
-                read: false,
-            },
-            data: { read: true },
-        });
-
-        await logger.debug('Messages marked as read', {
-            action: 'getMessages',
-            conversationId: conversationId.slice(0, 8) + '...',
-            markedCount: updateResult.count,
-        });
-
-        return await prisma.message.findMany({
-            where: {
-                conversationId,
-                deletedAt: null // Exclude soft-deleted messages
-            },
-            orderBy: { createdAt: 'asc' },
-            include: {
-                sender: {
-                    select: { id: true, name: true, image: true },
-                },
-            },
-        });
+        return await listConversationMessages(conversationId);
     } catch (error: unknown) {
         logger.sync.error('Failed to get messages', {
             action: 'getMessages',
@@ -673,31 +646,8 @@ export async function pollMessages(conversationId: string, lastMessageId?: strin
             name: ts.user.name
         }));
 
-        // P1-14 FIX: Validate lastMessageId before using in query
-        let lastMessageTime: Date | null = null;
-        if (lastMessageId) {
-            const lastMessage = await prisma.message.findUnique({
-                where: { id: lastMessageId },
-                select: { createdAt: true }
-            });
-            lastMessageTime = lastMessage?.createdAt || null;
-        }
-
-        // Get new messages since last check
-        const messages = await prisma.message.findMany({
-            where: {
-                conversationId,
-                deletedAt: null,
-                ...(lastMessageTime ? {
-                    createdAt: { gt: lastMessageTime }
-                } : {})
-            },
-            orderBy: { createdAt: 'asc' },
-            include: {
-                sender: {
-                    select: { id: true, name: true, image: true }
-                }
-            }
+        const messages = await listConversationMessages(conversationId, {
+            afterMessageId: lastMessageId,
         });
 
         // BIZ-08: Do NOT mark messages as read during background polling.
@@ -744,14 +694,7 @@ export async function markConversationMessagesAsRead(conversationId: string) {
             return { error: 'Unauthorized' };
         }
 
-        const result = await prisma.message.updateMany({
-            where: {
-                conversationId,
-                senderId: { not: userId },
-                read: false,
-            },
-            data: { read: true },
-        });
+        const result = await markConversationMessagesAsReadForUser(conversationId, userId);
 
         return { success: true, count: result.count };
     } catch (error: unknown) {
