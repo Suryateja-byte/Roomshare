@@ -52,7 +52,7 @@ describe("getClientEnv Supabase validation", () => {
   });
 
   it("warns in development when Supabase public env is partially configured", async () => {
-    process.env.NODE_ENV = "development";
+    (process.env as { NODE_ENV?: string }).NODE_ENV = "development";
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -70,7 +70,7 @@ describe("getClientEnv Supabase validation", () => {
   });
 
   it("throws in production when Supabase public env is partially configured", async () => {
-    process.env.NODE_ENV = "production";
+    (process.env as { NODE_ENV?: string }).NODE_ENV = "production";
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "turnstile-site-key";

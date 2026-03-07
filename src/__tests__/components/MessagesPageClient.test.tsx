@@ -152,7 +152,7 @@ function buildMessage(id: string, senderId: string, content: string): MockMessag
 }
 
 describe('MessagesPageClient', () => {
-  const fetchMock = jest.fn<typeof fetch>();
+  const fetchMock = jest.fn();
   const initialConversations = [
     {
       id: 'conv-1',

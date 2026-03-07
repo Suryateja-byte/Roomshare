@@ -172,7 +172,7 @@ function buildMessage(id: string, senderId: string, content: string): MockMessag
 }
 
 describe('Route ChatWindow', () => {
-  const fetchMock = jest.fn<typeof fetch>();
+  const fetchMock = jest.fn();
 
   beforeAll(() => {
     Object.defineProperty(Element.prototype, 'scrollIntoView', {
