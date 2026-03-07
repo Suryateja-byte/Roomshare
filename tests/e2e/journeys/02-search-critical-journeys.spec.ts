@@ -8,6 +8,7 @@
 import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 import {
   openFilterModal,
+  openFilterModalAndWaitForFacets,
   applyFilters,
 } from "../helpers/filter-helpers";
 
@@ -113,8 +114,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
-    // Open more filters (uses retry-click for hydration race)
-    const modal = await openFilterModal(page);
+    // Open more filters (uses retry-click for hydration race + waits for facets)
+    const modal = await openFilterModalAndWaitForFacets(page);
 
     // Select Wifi amenity
     const wifiBtn = modal.getByRole("button", { name: "Wifi" });

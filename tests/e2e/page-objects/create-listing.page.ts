@@ -104,7 +104,7 @@ export class CreateListingPage {
 
     // State — error banner uses role="alert" and data-testid
     this.errorBanner = page.locator('[data-testid="form-error-banner"]');
-    this.draftBanner = page.getByText('You have an unsaved draft');
+    this.draftBanner = page.getByText('You have a saved draft');
     this.resumeDraftButton = page.getByRole('button', { name: 'Resume Draft' });
     this.startFreshButton = page.getByRole('button', { name: 'Start Fresh' });
     this.autoSaveIndicator = page.getByText(/Draft saved/);

@@ -76,6 +76,13 @@ test.describe("Breathing Pending State (PR1)", () => {
         return;
       }
 
+      // Wait for the search-count API response to settle so the Apply button's
+      // disabled/enabled state is stable before we check visibility.
+      await page.waitForResponse(
+        (resp) => resp.url().includes('/api/search-count'),
+        { timeout: 10_000 }
+      ).catch(() => {}); // OK if already resolved or not fired
+
       // Wait for Apply button spinner to disappear (DOM stability)
       const showButton = applyButton(page);
       await expect(showButton).toBeVisible({ timeout: 5000 });

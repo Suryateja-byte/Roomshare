@@ -274,7 +274,26 @@ export async function openFilterModal(page: Page): Promise<Locator> {
   // Do NOT silently catch: if this times out, every subsequent interaction will
   // also fail, so failing fast here provides a clear diagnostic.
   await applyButton(page).waitFor({ state: "attached", timeout: 60_000 });
+  await applyButton(page).scrollIntoViewIfNeeded().catch(() => {});
 
+  return dialog;
+}
+
+/**
+ * Open filter modal and wait for facet counts to load.
+ * Use this when the test interacts with amenity/house-rule buttons that can be
+ * disabled by zero-count facets arriving after the 300ms debounce.
+ */
+export async function openFilterModalAndWaitForFacets(page: Page): Promise<Locator> {
+  const facetsPromise = page
+    .waitForResponse((r) => r.url().includes("/api/search/facets"), { timeout: 10_000 })
+    .catch(() => null);
+  const dialog = await openFilterModal(page);
+  await facetsPromise;
+  // Wait for amenity buttons to update (disabled attr removed after facet render)
+  await page.locator('[aria-label="Select amenities"] button:not([disabled])').first()
+    .waitFor({ state: "attached", timeout: 5_000 })
+    .catch(() => {}); // Fallback: if all buttons are disabled, proceed anyway
   return dialog;
 }
 

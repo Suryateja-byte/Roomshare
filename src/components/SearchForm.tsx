@@ -363,9 +363,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
 
         // Price validation with auto-swap if inverted
-        // Use committed (URL-derived) values so chip removals aren't reverted by stale pending state
-        let finalMinPrice = committed.minPrice ? parseFloat(committed.minPrice) : null;
-        let finalMaxPrice = committed.maxPrice ? parseFloat(committed.maxPrice) : null;
+        // IMPORTANT: Use pending.minPrice/maxPrice (primitives) not the full pending object.
+        // Inline price inputs write to pending only — modal filters use committed via commitFilters().
+        // Using full pending would recreate this callback on every keystroke in any filter input.
+        let finalMinPrice = pending.minPrice ? parseFloat(pending.minPrice) : null;
+        let finalMaxPrice = pending.maxPrice ? parseFloat(pending.maxPrice) : null;
 
         // Enforce non-negative values
         if (finalMinPrice !== null && finalMinPrice < 0) finalMinPrice = 0;
@@ -411,8 +413,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         // Save to recent searches when navigating (with filters for enhanced format)
         if (trimmedLocation) {
             const activeFilters: Partial<RecentSearchFilters> = {};
-            if (committed.minPrice) activeFilters.minPrice = committed.minPrice;
-            if (committed.maxPrice) activeFilters.maxPrice = committed.maxPrice;
+            if (pending.minPrice) activeFilters.minPrice = pending.minPrice;
+            if (pending.maxPrice) activeFilters.maxPrice = pending.maxPrice;
             if (committed.roomType) activeFilters.roomType = committed.roomType;
             if (committed.leaseDuration) activeFilters.leaseDuration = committed.leaseDuration;
             if (committed.amenities.length > 0) activeFilters.amenities = committed.amenities;
@@ -447,7 +449,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             if (resetSearchingTimeoutRef.current) clearTimeout(resetSearchingTimeoutRef.current);
             resetSearchingTimeoutRef.current = setTimeout(() => setIsSearching(false), 500);
         }, SEARCH_DEBOUNCE_MS);
-    }, [location, committed, selectedCoords, router, isSearching, saveRecentSearch, searchParams, transitionContext]);
+    }, [location, pending.minPrice, pending.maxPrice, committed, selectedCoords, router, isSearching, saveRecentSearch, searchParams, transitionContext]);
 
     // Cleanup timeouts on unmount
     useEffect(() => {

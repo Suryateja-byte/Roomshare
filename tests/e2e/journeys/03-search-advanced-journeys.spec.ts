@@ -11,6 +11,7 @@
 import { test, expect, selectors, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 import {
   openFilterModal,
+  openFilterModalAndWaitForFacets,
   applyFilters,
   closeFilterModal,
 } from "../helpers/filter-helpers";
@@ -135,7 +136,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
 
-    const modal = await openFilterModal(page);
+    const modal = await openFilterModalAndWaitForFacets(page);
 
     // Toggle multiple amenities — use retry to handle hydration race on Mobile Chrome
     const amenityFieldset = modal.locator('fieldset').filter({ hasText: /amenities/i });
@@ -503,7 +504,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
 
-    const modal = await openFilterModal(page);
+    const modal = await openFilterModalAndWaitForFacets(page);
 
     const amenityFieldset = modal.locator('fieldset').filter({ hasText: /amenities/i });
     // Re-query each time — React re-renders replace DOM elements after state changes

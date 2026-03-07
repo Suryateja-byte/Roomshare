@@ -67,13 +67,16 @@ test.describe('Homepage — Anonymous User', () => {
 
   test('HP-04: Featured listings section renders with listing cards', async ({ page }) => {
     test.slow(); // Triple timeout — Suspense boundary may be slow in CI
+    // FeaturedListings uses framer-motion whileInView — scroll to trigger animation
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(500);
     // FeaturedListings rendered via Suspense — wait for cards or empty state
     // Cards use data-testid="listing-card" and link to /listings/
     await expect(
       page.locator('[data-testid="listing-card"]')
         .or(page.locator('a[href*="/listings/"]'))
-        .or(page.getByText(/newest listings/i))
-        .or(page.getByText(/be the first to list/i))
+        .or(page.getByText(/latest curated spaces/i))
+        .or(page.getByText(/be the first to share/i))
         .first()
     ).toBeVisible({ timeout: 20000 });
   });
