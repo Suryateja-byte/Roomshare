@@ -1,5 +1,5 @@
 /**
- * Tests for reports API route (A6.4)
+ * Tests for POST /api/reports route
  */
 
 jest.mock('next/server', () => ({
@@ -24,19 +24,15 @@ jest.mock('@/lib/prisma', () => ({
     report: { findFirst: jest.fn(), create: jest.fn() },
   },
 }));
-
 jest.mock('@/auth', () => ({ auth: jest.fn() }));
-
 jest.mock('@/lib/with-rate-limit', () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
-
 jest.mock('@/lib/api-error-handler', () => ({
-  captureApiError: jest.fn().mockImplementation(() => ({
-    status: 500,
-    json: async () => ({ error: 'Internal error' }),
-    headers: new Map(),
-  })),
+  captureApiError: jest.fn().mockImplementation(() => {
+    const { NextResponse } = require('next/server');
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }),
 }));
 
 import { POST } from '@/app/api/reports/route';
@@ -68,6 +64,8 @@ describe('POST /api/reports', () => {
     (auth as jest.Mock).mockResolvedValue(null);
     const res = await POST(createRequest({ listingId: 'l1', reason: 'spam' }));
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized');
   });
 
   it('returns 400 for invalid JSON', async () => {
@@ -78,6 +76,8 @@ describe('POST /api/reports', () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid JSON');
   });
 
   it('returns 400 for Zod failure: empty reason', async () => {
@@ -85,17 +85,22 @@ describe('POST /api/reports', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('Invalid request');
+    expect(body.details).toBeDefined();
   });
 
   it('returns 400 for Zod failure: missing listingId', async () => {
     const res = await POST(createRequest({ reason: 'spam' }));
     expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid request');
   });
 
   it('returns 404 when listing not found', async () => {
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue(null);
     const res = await POST(createRequest({ listingId: 'l1', reason: 'spam' }));
     expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Listing not found');
   });
 
   it('returns 400 for self-reporting own listing', async () => {
@@ -103,27 +108,39 @@ describe('POST /api/reports', () => {
     const res = await POST(createRequest({ listingId: 'l1', reason: 'spam' }));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain('cannot report your own');
+    expect(body.error).toBe('You cannot report your own listing');
   });
 
-  it('returns 409 for duplicate OPEN/RESOLVED report', async () => {
+  it('returns 409 for duplicate OPEN report', async () => {
     (prisma.report.findFirst as jest.Mock).mockResolvedValue({ id: 'existing', status: 'OPEN' });
     const res = await POST(createRequest({ listingId: 'l1', reason: 'spam' }));
     expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toContain('already reported');
   });
 
   it('allows re-report when previous was DISMISSED', async () => {
+    // When previous report was DISMISSED, findFirst (which filters for OPEN/RESOLVED) returns null
     (prisma.report.findFirst as jest.Mock).mockResolvedValue(null);
-    (prisma.report.create as jest.Mock).mockResolvedValue({ id: 'new-report' });
+    (prisma.report.create as jest.Mock).mockResolvedValue({ id: 'new-report', reason: 'spam' });
     const res = await POST(createRequest({ listingId: 'l1', reason: 'spam', details: 'Fake listing' }));
     expect(res.status).toBe(200);
-    expect(prisma.report.create).toHaveBeenCalled();
+    expect(prisma.report.create).toHaveBeenCalledWith({
+      data: {
+        listingId: 'l1',
+        reporterId: 'user-123',
+        reason: 'spam',
+        details: 'Fake listing',
+      },
+    });
   });
 
   it('creates report successfully', async () => {
     (prisma.report.create as jest.Mock).mockResolvedValue({ id: 'report-1' });
     const res = await POST(createRequest({ listingId: 'l1', reason: 'spam', details: 'Details here' }));
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toBe('report-1');
     expect(prisma.report.create).toHaveBeenCalledWith({
       data: {
         listingId: 'l1',
@@ -140,6 +157,7 @@ describe('POST /api/reports', () => {
     );
     const res = await POST(createRequest({ listingId: 'l1', reason: 'spam' }));
     expect(res.status).toBe(429);
+    // Rate limiting happens before auth check
     expect(auth).not.toHaveBeenCalled();
   });
 });
