@@ -280,9 +280,14 @@ export async function PATCH(
         }
 
         // Validate image URL ownership (prevent cross-user URL injection)
+        // URLs already stored on the listing are trusted (e.g. seed data
+        // uploaded by a different user); only NEW URLs must match the
+        // current user's storage prefix.
         if (Array.isArray(images) && images.length > 0) {
+            const existingImageSet = new Set(listing.images as string[]);
             const expectedPrefix = `listings/${userId}/`;
             const hasInvalidImage = images.some(url => {
+                if (existingImageSet.has(url)) return false; // already trusted
                 const storagePath = extractStoragePath(url);
                 return !storagePath || !storagePath.startsWith(expectedPrefix);
             });

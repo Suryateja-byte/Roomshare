@@ -264,6 +264,13 @@ export class CreateListingPage {
     await this.submitButton.click();
   }
 
+  /**
+   * Click submit and wait for POST /api/listings response.
+   *
+   * PRECONDITION: All form data must pass client-side Zod validation.
+   * If client validation fires, no fetch occurs and this will time out.
+   * For tests that intentionally trigger client validation, use submit() instead.
+   */
   async submitAndWaitForResponse() {
     const responsePromise = this.page.waitForResponse(
       (resp) => resp.url().includes('/api/listings') && resp.request().method() === 'POST',

@@ -447,26 +447,26 @@ test.describe("LD: Booking Form", () => {
     ).toBeVisible({ timeout: 5_000 });
   });
 
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Block 5b: Unauthenticated booking CTA (separate describe for storageState)
+// ═══════════════════════════════════════════════════════════════════════════
+test.describe("LD: Unauthenticated", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("LD-20  unauthenticated user sees sign-in CTA", async ({
     page,
     nav,
   }) => {
-    // Override to unauthenticated state
-    await page.context().clearCookies();
-
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
     // Should see login prompt instead of booking form
     const signInCta = page
-      .getByText(/Sign in to book|Log in to book|Sign in/i)
+      .getByText(/Sign in to book this room/i)
       .first();
-    const bookBtn = page.getByRole("button", { name: /Request to Book/i });
-
-    // Either sign-in CTA visible OR book button redirects to login
-    const hasSignIn = await signInCta.isVisible().catch(() => false);
-    const hasBook = await bookBtn.isVisible().catch(() => false);
-    expect(hasSignIn || hasBook).toBeTruthy();
+    await expect(signInCta).toBeVisible({ timeout: 10000 });
   });
 });
 

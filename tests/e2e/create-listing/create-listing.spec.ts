@@ -114,6 +114,9 @@ test.describe('Create Listing — Functional Tests', () => {
 
     test(`F-004: Validation — description too short ${tags.auth} ${tags.core}`, async ({ page }) => {
       const clp = new CreateListingPage(page);
+      // 'short' (5 chars) fails client-side Zod validation (min 10),
+      // so handleSubmit returns early WITHOUT calling fetch.
+      // We verify client-side validation catches it — no network wait needed.
       const data = validData({ description: 'short' });
 
       await clp.goto();
@@ -122,16 +125,10 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.uploadTestImage();
       await clp.waitForUploadComplete();
 
-      // Mock API to return validation error for short description
-      await clp.mockListingApiError(400, {
-        error: 'Validation failed',
-        fields: { description: 'Description must be at least 10 characters' },
-      });
+      // Click submit — client Zod blocks the fetch, so don't use submitAndWaitForResponse
+      await clp.submit();
 
-      const response = await clp.submitAndWaitForResponse();
-      expect(response.ok()).toBe(false);
-
-      // Server returns field-level errors for description
+      // Client-side validation should show field error for description
       await clp.expectValidationError('description');
     });
 

@@ -67,11 +67,9 @@ test.describe('Homepage — Anonymous User', () => {
 
   test('HP-04: Featured listings section renders with listing cards', async ({ page }) => {
     test.slow(); // Triple timeout — Suspense boundary may be slow in CI
-    // FeaturedListings uses framer-motion whileInView — scroll to trigger animation
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(500);
-    // FeaturedListings rendered via Suspense — wait for cards or empty state
-    // Cards use data-testid="listing-card" and link to /listings/
+    // reducedMotion: 'reduce' (set by _disableAnimations fixture) makes
+    // framer-motion skip whileInView animations — elements render at
+    // final state immediately, so no scroll needed to trigger visibility.
     await expect(
       page.locator('[data-testid="listing-card"]')
         .or(page.locator('a[href*="/listings/"]'))

@@ -232,9 +232,30 @@ export function useBatchedFilters(
     prevDrawerOpenRef.current = isDrawerOpen;
 
     if (drawerJustOpened) {
-      // Force sync when drawer opens — external changes (chip removal,
-      // category bar, browser back/forward) must always be reflected.
-      setPendingState(committed);
+      // Merge committed URL state with any user-edited pending fields.
+      // Without this merge, opening the drawer would wipe inline edits
+      // (e.g. price typed into the search bar) because committed state
+      // reflects the URL which hasn't been updated yet.
+      setPendingState((prevPending) => {
+        const prevCommitted = previousCommittedRef.current;
+        const merged: BatchedFilterValues = { ...committed };
+        const scalarKeys = [
+          'minPrice', 'maxPrice', 'roomType', 'leaseDuration',
+          'moveInDate', 'genderPreference', 'householdGender',
+        ] as const;
+        for (const key of scalarKeys) {
+          if (prevPending[key] !== prevCommitted[key]) {
+            merged[key] = prevPending[key];
+          }
+        }
+        const arrayKeys = ['amenities', 'houseRules', 'languages'] as const;
+        for (const key of arrayKeys) {
+          if (!arraysEqual(prevPending[key], prevCommitted[key])) {
+            merged[key] = [...prevPending[key]];
+          }
+        }
+        return merged;
+      });
       previousCommittedRef.current = committed;
       return;
     }

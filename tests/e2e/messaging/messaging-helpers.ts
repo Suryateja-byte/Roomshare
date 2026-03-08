@@ -63,8 +63,12 @@ export async function openConversation(page: Page, index = 0): Promise<void> {
     const sidebarVisible = await sidebar.isVisible().catch(() => false);
     if (!sidebarVisible) {
       const backBtn = page.locator('[data-testid="back-button"], button[aria-label="Back"], nav button').first();
-      const backVisible = await backBtn.isVisible({ timeout: 3_000 }).catch(() => false);
-      if (backVisible) await backBtn.click();
+      try {
+        await backBtn.waitFor({ state: 'visible', timeout: 3_000 });
+        await backBtn.click();
+      } catch {
+        // back button not present; sidebar is already showing
+      }
     }
   }
 
@@ -98,7 +102,12 @@ export async function goToConversation(page: Page, conversationId: string): Prom
   const url = page.url();
   if (url.includes('/login') || url.includes('/auth')) return false;
   const input = page.locator(MSG_SELECTORS.messageInput);
-  return input.isVisible({ timeout: 10_000 }).catch(() => false);
+  try {
+    await expect(input).toBeVisible({ timeout: 10_000 });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // --- Messaging Actions ---
