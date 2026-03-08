@@ -157,14 +157,15 @@ export async function waitForSearchReady(
 ): Promise<void> {
   const url = extraParams ? `${SEARCH_URL}&${extraParams}` : SEARCH_URL;
   await page.goto(url);
-  await page.waitForLoadState("domcontentloaded");
+  await page.waitForLoadState("load");
   await page
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  // Wait for domcontentloaded to ensure React hydration completes —
-  // without this, button clicks can fire before event handlers attach
-  await page.waitForLoadState("domcontentloaded").catch(() => {});
+  // Wait for Filters button to be visible — confirms SearchForm hydrated
+  await page.getByRole("button", { name: /^Filters/ })
+    .waitFor({ state: "visible", timeout: 15_000 })
+    .catch(() => {});
 }
 
 /**
@@ -177,12 +178,15 @@ export async function gotoSearchWithFilters(
 ): Promise<void> {
   const url = buildSearchUrl(params);
   await page.goto(url);
-  await page.waitForLoadState("domcontentloaded");
+  await page.waitForLoadState("load");
   await page
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  await page.waitForLoadState("domcontentloaded").catch(() => {});
+  // Wait for Filters button to be visible — confirms SearchForm hydrated
+  await page.getByRole("button", { name: /^Filters/ })
+    .waitFor({ state: "visible", timeout: 15_000 })
+    .catch(() => {});
 }
 
 // ---------------------------------------------------------------------------

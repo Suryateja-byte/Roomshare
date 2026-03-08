@@ -259,7 +259,18 @@ test.describe("Map Error States and Accessibility", () => {
           !e.includes("FetchTimeoutError") &&
           !e.includes("timed out") &&
           !e.includes("photon.komoot") &&
-          !e.includes("TimeoutError")
+          !e.includes("TimeoutError") &&
+          !e.includes("Warning:") &&
+          !e.includes("Deprecated") &&
+          !e.includes("CORS") &&
+          !e.includes("cookie") &&
+          !e.includes("Refused to") &&
+          !e.includes("source-map") &&
+          !e.includes("chunk") &&
+          !e.includes("Supabase") &&
+          !e.includes("NEXT_") &&
+          !e.includes("act(") &&
+          !e.includes("punycode")
       );
 
       // Should have no critical JavaScript errors

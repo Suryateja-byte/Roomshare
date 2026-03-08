@@ -164,15 +164,9 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.uploadTestImage();
       await clp.waitForUploadComplete();
 
-      // Mock API to return validation error for zero price
-      await clp.mockListingApiError(400, {
-        error: 'Validation failed',
-        fields: { price: 'Price must be a positive number' },
-      });
-
-      const response = await clp.submitAndWaitForResponse();
-      expect(response.ok()).toBe(false);
-
+      // Client-side Zod .positive() catches price=0 — no fetch occurs
+      await clp.submit();
+      await clp.expectOnCreatePage();
       await clp.expectValidationError('price');
     });
 
@@ -186,15 +180,9 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.uploadTestImage();
       await clp.waitForUploadComplete();
 
-      // Mock API to return validation error for excessive price
-      await clp.mockListingApiError(400, {
-        error: 'Validation failed',
-        fields: { price: 'Price cannot exceed $50,000' },
-      });
-
-      const response = await clp.submitAndWaitForResponse();
-      expect(response.ok()).toBe(false);
-
+      // Client-side Zod .max(50000) catches price=99999 — no fetch occurs
+      await clp.submit();
+      await clp.expectOnCreatePage();
       await clp.expectValidationError('price');
     });
 
@@ -287,9 +275,9 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.expectSuccess();
     });
 
-    test(`F-013: Optional — house rules "No smoking" ${tags.auth}`, async ({ page }) => {
+    test(`F-013: Optional — house rules ${tags.auth}`, async ({ page }) => {
       const clp = new CreateListingPage(page);
-      const data = validData({ houseRules: 'No smoking' });
+      const data = validData({ houseRules: 'Pets allowed' });
 
       await clp.goto();
       await clp.fillRequiredFields(data);

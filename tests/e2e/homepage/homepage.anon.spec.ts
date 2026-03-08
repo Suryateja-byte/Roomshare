@@ -66,10 +66,15 @@ test.describe('Homepage — Anonymous User', () => {
   });
 
   test('HP-04: Featured listings section renders with listing cards', async ({ page }) => {
-    test.slow(); // Triple timeout — Suspense boundary may be slow in CI
-    // reducedMotion: 'reduce' (set by _disableAnimations fixture) makes
-    // framer-motion skip whileInView animations — elements render at
-    // final state immediately, so no scroll needed to trigger visibility.
+    test.slow();
+    // Framer Motion uses whileInView + initial="hidden" (opacity: 0) for
+    // featured listings. IntersectionObserver must fire to trigger visibility.
+    // Note: _disableAnimations fixture's reducedMotion does NOT affect Framer
+    // Motion because the app lacks <MotionConfig reducedMotion="user">.
+    // Scroll the section into view to trigger the IntersectionObserver.
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(500); // Wait for Framer Motion animation
+
     await expect(
       page.locator('[data-testid="listing-card"]')
         .or(page.locator('a[href*="/listings/"]'))

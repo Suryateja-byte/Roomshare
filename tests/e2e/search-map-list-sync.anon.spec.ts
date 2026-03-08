@@ -117,20 +117,19 @@ async function clickMarkerByListingId(page: Page, listingId: string): Promise<vo
         `.maplibregl-marker [data-listing-id="${id}"]`,
       ) as HTMLElement | null;
       if (!inner?.isConnected) return 'not-found';
-      // Strategy 1: Click the .maplibregl-marker wrapper (react-map-gl native handler)
+      // Click the .maplibregl-marker wrapper (react-map-gl native handler).
+      // REMOVED keyboard Enter dispatch — it caused double-easeTo race condition
+      // where two moveend events cleared isProgrammaticMoveRef → triggered
+      // search-as-move → cleared activeId. .toPass() retry handles cases
+      // where the first click doesn't register.
       const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
       if (wrapper) wrapper.click();
-      // Strategy 2: Keyboard Enter on inner div (React onKeyDown handler)
-      inner.focus();
-      inner.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
-      }));
       return 'ok';
     }, listingId);
     expect(result).toBe('ok');
 
-    // Small wait for React state propagation before checking card state
-    await page.waitForTimeout(200);
+    // Wait for React state propagation + easeTo animation before checking card state
+    await page.waitForTimeout(500);
 
     // Verify the click triggered handleMarkerClick → setActive(listingId)
     const cardState = await getCardState(page, listingId);
@@ -161,12 +160,9 @@ async function clickMarkerFast(page: Page, listingId: string): Promise<void> {
       `.maplibregl-marker [data-listing-id="${id}"]`,
     ) as HTMLElement | null;
     if (!inner?.isConnected) return;
+    // Click wrapper only — keyboard Enter removed to avoid double-easeTo race
     const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
     if (wrapper) wrapper.click();
-    inner.focus();
-    inner.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
-    }));
   }, listingId);
 }
 
