@@ -1,246 +1,207 @@
 /**
- * Tests for email utility functions
- * Note: Since this module uses 'use server' directive, we test the core logic patterns
+ * Tests for email service — sendEmail retry, circuit breaker, and dev mode (D2.2-B)
  */
 
-// Mock dependencies before imports
-const mockPrismaUser = {
-  findUnique: jest.fn(),
-}
+// Use var for hoisting compatibility with jest.mock factories
+/* eslint-disable no-var */
+var mockFetchWithTimeout: jest.Mock;
+var mockIsAllowingRequests: jest.Mock;
+var mockExecute: jest.Mock;
+/* eslint-enable no-var */
+
+// These must be assigned before jest.mock factories reference them
+mockFetchWithTimeout = jest.fn();
+mockIsAllowingRequests = jest.fn().mockReturnValue(true);
+mockExecute = jest.fn().mockImplementation((fn: () => any) => fn());
+
+jest.mock('@/lib/fetch-with-timeout', () => {
+  class FetchTimeoutError extends Error {
+    url: string;
+    timeout: number;
+    constructor(url: string, timeout: number) {
+      super(`Request to ${url} timed out after ${timeout}ms`);
+      this.name = 'FetchTimeoutError';
+      this.url = url;
+      this.timeout = timeout;
+    }
+  }
+  return {
+    fetchWithTimeout: (...args: any[]) => mockFetchWithTimeout(...args),
+    FetchTimeoutError,
+  };
+});
+
+jest.mock('@/lib/circuit-breaker', () => ({
+  circuitBreakers: {
+    email: {
+      // Use wrapper functions to defer resolution — var assignment happens after factory runs
+      isAllowingRequests: (...args: any[]) => mockIsAllowingRequests(...args),
+      execute: (...args: any[]) => mockExecute(...args),
+    },
+  },
+  isCircuitOpenError: jest.fn().mockReturnValue(false),
+}));
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {
-    user: mockPrismaUser,
+    user: { findUnique: jest.fn() },
   },
-}))
-
-const mockEmailTemplates = {
-  welcome: jest.fn((_data?: Record<string, unknown>) => ({
-    subject: 'Welcome to RoomShare',
-    html: '<p>Welcome!</p>',
-  })),
-  bookingRequest: jest.fn((_data?: Record<string, unknown>) => ({
-    subject: 'New Booking Request',
-    html: '<p>You have a new booking request</p>',
-  })),
-  bookingAccepted: jest.fn((_data?: Record<string, unknown>) => ({
-    subject: 'Booking Accepted',
-    html: '<p>Your booking was accepted</p>',
-  })),
-  newMessage: jest.fn((_data?: Record<string, unknown>) => ({
-    subject: 'New Message',
-    html: '<p>You have a new message</p>',
-  })),
-  newReview: jest.fn((_data?: Record<string, unknown>) => ({
-    subject: 'New Review',
-    html: '<p>You have a new review</p>',
-  })),
-}
+}));
 
 jest.mock('@/lib/email-templates', () => ({
-  emailTemplates: mockEmailTemplates,
-}))
+  emailTemplates: {
+    welcome: jest.fn(() => ({ subject: 'Welcome', html: '<p>Welcome</p>' })),
+    bookingRequest: jest.fn(() => ({ subject: 'Booking', html: '<p>Booking</p>' })),
+  },
+}));
 
-describe('email utilities', () => {
-  let fetchSpy: jest.SpyInstance
+// Set RESEND_API_KEY before importing sendEmail (module-level const)
+process.env.RESEND_API_KEY = 'test-key-123';
 
+import { sendEmail } from '@/lib/email';
+import { FetchTimeoutError } from '@/lib/fetch-with-timeout';
+
+describe('sendEmail retry and circuit breaker (D2.2)', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(jest.fn())
-  })
+    jest.clearAllMocks();
+    jest.useRealTimers();
+    mockIsAllowingRequests.mockReturnValue(true);
+    mockExecute.mockImplementation((fn: () => any) => fn());
+  });
 
-  afterEach(() => {
-    fetchSpy.mockRestore()
-  })
+  it('retries on 5xx errors with exponential backoff', async () => {
+    jest.useFakeTimers();
 
-  describe('sendEmail behavior patterns', () => {
-    it('should handle missing RESEND_API_KEY gracefully in dev mode', () => {
-      // Without an API key, the function should return success in dev mode
-      // This is the expected behavior based on the source code
-      expect(true).toBe(true) // Placeholder - actual test requires function import
-    })
-
-    it('should call Resend API when key is present', () => {
-      // When RESEND_API_KEY is set, fetch should be called to Resend API
-      expect(true).toBe(true)
-    })
-
-    it('should return success structure', () => {
-      // Response should have { success: boolean, error?: string }
-      const mockResult = { success: true }
-      expect(mockResult).toHaveProperty('success')
-    })
-
-    it('should return error structure on failure', () => {
-      const mockResult = { success: false, error: 'API Error' }
-      expect(mockResult.success).toBe(false)
-      expect(mockResult.error).toBeDefined()
-    })
-  })
-
-  describe('sendNotificationEmail behavior patterns', () => {
-    it('should use correct template based on type', () => {
-      // Calling with 'welcome' should use welcome template
-      mockEmailTemplates.welcome({ name: 'Test' })
-      expect(mockEmailTemplates.welcome).toHaveBeenCalledWith({ name: 'Test' })
-    })
-
-    it('should pass data to template function', () => {
-      const data = { hostName: 'Host', listingTitle: 'Room' }
-      mockEmailTemplates.bookingRequest(data)
-      expect(mockEmailTemplates.bookingRequest).toHaveBeenCalledWith(data)
-    })
-
-    it('template should return subject and html', () => {
-      const result = mockEmailTemplates.welcome({ name: 'Test' })
-      expect(result).toHaveProperty('subject')
-      expect(result).toHaveProperty('html')
-    })
-  })
-
-  describe('sendNotificationEmailWithPreference behavior patterns', () => {
-    it('should check user notification preferences', async () => {
-      mockPrismaUser.findUnique.mockResolvedValue({
-        notificationPreferences: { emailBookingRequests: true },
+    mockFetchWithTimeout
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => 'Server Error',
       })
-
-      await mockPrismaUser.findUnique({
-        where: { id: 'user-123' },
-        select: { notificationPreferences: true },
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        text: async () => 'Bad Gateway',
       })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'msg-1' }),
+      });
 
-      expect(mockPrismaUser.findUnique).toHaveBeenCalledWith({
-        where: { id: 'user-123' },
-        select: { notificationPreferences: true },
-      })
-    })
+    const resultPromise = sendEmail({
+      to: 'a@b.com',
+      subject: 'Test',
+      html: '<p>Hi</p>',
+    });
 
-    it('should skip sending when preference is explicitly false', () => {
-      const prefs = { emailMessages: false }
-      // When emailMessages is false and type maps to emailMessages, skip
-      expect(prefs.emailMessages).toBe(false)
-    })
+    await jest.advanceTimersByTimeAsync(10000);
 
-    it('should send when preference is true', () => {
-      const prefs = { emailBookingRequests: true }
-      expect(prefs.emailBookingRequests).toBe(true)
-    })
+    const result = await resultPromise;
 
-    it('should send when preference is not set (default behavior)', () => {
-      const prefs: { emailMarketing: boolean; emailBookingRequests?: boolean } = { emailMarketing: false } // Only marketing is false
-      // emailBookingRequests is not set, so it defaults to true behavior
-      expect(prefs.emailBookingRequests).toBeUndefined()
-    })
+    expect(result.success).toBe(true);
+    expect(mockFetchWithTimeout).toHaveBeenCalledTimes(3);
+  });
 
-    it('should handle null preferences gracefully', () => {
-      const prefs = null
-      // Should default to sending when preferences are null
-      expect(prefs).toBeNull()
-    })
+  it('does NOT retry on 4xx client errors', async () => {
+    mockFetchWithTimeout.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: async () => 'Bad Request',
+    });
 
-    it('should map email types to preference keys correctly', () => {
-      const emailTypeToPreferenceKey: Record<string, string> = {
-        bookingRequest: 'emailBookingRequests',
-        bookingAccepted: 'emailBookingUpdates',
-        bookingRejected: 'emailBookingUpdates',
-        bookingCancelled: 'emailBookingUpdates',
-        newMessage: 'emailMessages',
-        newReview: 'emailReviews',
-        searchAlert: 'emailSearchAlerts',
-        marketing: 'emailMarketing',
-      }
+    const result = await sendEmail({
+      to: 'a@b.com',
+      subject: 'Test',
+      html: '<p>Hi</p>',
+    });
 
-      expect(emailTypeToPreferenceKey.bookingRequest).toBe('emailBookingRequests')
-      expect(emailTypeToPreferenceKey.newMessage).toBe('emailMessages')
-      expect(emailTypeToPreferenceKey.bookingAccepted).toBe('emailBookingUpdates')
-    })
-  })
+    expect(result.success).toBe(false);
+    expect(mockFetchWithTimeout).toHaveBeenCalledTimes(1);
+  });
 
-  describe('P0-06: circuit breaker integration', () => {
-    it('should fail fast when circuit breaker is open', () => {
-      // When circuitBreakers.email.isAllowingRequests() returns false,
-      // sendEmail should return immediately with error without calling the API
-      const mockCircuitBreaker = {
-        isAllowingRequests: () => false,
-        execute: jest.fn(),
-      }
+  it('returns error when circuit breaker is open', async () => {
+    mockIsAllowingRequests.mockReturnValue(false);
 
-      // Verify fail-fast behavior pattern
-      expect(mockCircuitBreaker.isAllowingRequests()).toBe(false)
-      // execute should NOT be called when circuit is open
-      expect(mockCircuitBreaker.execute).not.toHaveBeenCalled()
-    })
+    const result = await sendEmail({
+      to: 'a@b.com',
+      subject: 'Test',
+      html: '<p>Hi</p>',
+    });
 
-    it('should wrap API calls with circuit breaker execute', () => {
-      // When circuit is healthy, calls should go through execute()
-      const mockCircuitBreaker = {
-        isAllowingRequests: () => true,
-        execute: jest.fn(async (fn) => fn()),
-      }
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('circuit breaker');
+    expect(mockFetchWithTimeout).not.toHaveBeenCalled();
+  });
 
-      expect(mockCircuitBreaker.isAllowingRequests()).toBe(true)
+  it('retries on FetchTimeoutError', async () => {
+    jest.useFakeTimers();
 
-      // Simulate calling execute
-      mockCircuitBreaker.execute(async () => ({ success: true }))
-      expect(mockCircuitBreaker.execute).toHaveBeenCalled()
-    })
+    mockFetchWithTimeout
+      .mockRejectedValueOnce(
+        new FetchTimeoutError('https://api.resend.com/emails', 15000)
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'msg-2' }),
+      });
 
-    it('should handle CircuitOpenError gracefully', () => {
-      // When circuit opens during request, should return graceful error
-      class CircuitOpenError extends Error {
-        code = 'CIRCUIT_OPEN'
-        circuitName: string
-        constructor(name: string) {
-          super(`Circuit breaker '${name}' is open`)
-          this.name = 'CircuitOpenError'
-          this.circuitName = name
-        }
-      }
+    const resultPromise = sendEmail({
+      to: 'a@b.com',
+      subject: 'Test',
+      html: '<p>Hi</p>',
+    });
 
-      const error = new CircuitOpenError('email')
-      expect(error.name).toBe('CircuitOpenError')
-      expect(error.code).toBe('CIRCUIT_OPEN')
-      expect(error.circuitName).toBe('email')
+    await jest.advanceTimersByTimeAsync(5000);
 
-      // The sendEmail function should return { success: false, error: '...' }
-      // when catching CircuitOpenError, not throw
-    })
+    const result = await resultPromise;
 
-    it('should track failures through circuit breaker', () => {
-      // Failures (timeouts, API errors) should be tracked by circuit breaker
-      // to eventually trip the circuit
-      const failures: Error[] = []
-      const mockCircuitBreaker = {
-        isAllowingRequests: () => true,
-        execute: jest.fn(async (fn) => {
-          try {
-            return await fn()
-          } catch (e) {
-            failures.push(e as Error)
-            throw e
+    expect(result.success).toBe(true);
+    expect(mockFetchWithTimeout).toHaveBeenCalledTimes(2);
+  });
+
+  // IMPORTANT: This test MUST be last — jest.isolateModules corrupts the outer circuit-breaker mock
+  it('returns success in dev mode when RESEND_API_KEY is not set', async () => {
+    const originalKey = process.env.RESEND_API_KEY;
+    delete process.env.RESEND_API_KEY;
+
+    let result: any;
+    jest.isolateModules(() => {
+      jest.doMock('@/lib/fetch-with-timeout', () => ({
+        fetchWithTimeout: mockFetchWithTimeout,
+        FetchTimeoutError: class extends Error {
+          constructor(url: string, timeout: number) {
+            super(`Timeout ${timeout}`);
           }
-        }),
-      }
+        },
+      }));
+      jest.doMock('@/lib/circuit-breaker', () => ({
+        circuitBreakers: {
+          email: {
+            isAllowingRequests: () => true,
+            execute: (fn: () => any) => fn(),
+          },
+        },
+        isCircuitOpenError: () => false,
+      }));
+      jest.doMock('@/lib/prisma', () => ({
+        prisma: { user: { findUnique: jest.fn() } },
+      }));
+      jest.doMock('@/lib/email-templates', () => ({ emailTemplates: {} }));
 
-      // Simulate failure tracking pattern
-      expect(mockCircuitBreaker.execute).toBeDefined()
-      // Circuit breaker's onFailure() should be called internally
-    })
+      const { sendEmail: sendEmailNoKey } = require('@/lib/email');
+      result = sendEmailNoKey({
+        to: 'a@b.com',
+        subject: 'Test',
+        html: '<p>Hi</p>',
+      });
+    });
 
-    it('email circuit breaker should have appropriate thresholds', () => {
-      // Email circuit breaker should have reasonable defaults for email delivery:
-      // - Higher failure threshold (5) since emails can occasionally fail
-      // - Longer reset timeout (60s) to give email service time to recover
-      // - Multiple successes needed (3) to confirm service is healthy
-      const expectedConfig = {
-        failureThreshold: 5,
-        resetTimeout: 60000, // 1 minute
-        successThreshold: 3,
-      }
+    result = await result;
+    expect(result).toEqual({ success: true });
+    expect(mockFetchWithTimeout).not.toHaveBeenCalled();
 
-      expect(expectedConfig.failureThreshold).toBe(5)
-      expect(expectedConfig.resetTimeout).toBe(60000)
-      expect(expectedConfig.successThreshold).toBe(3)
-    })
-  })
-})
+    process.env.RESEND_API_KEY = originalKey;
+  });
+});

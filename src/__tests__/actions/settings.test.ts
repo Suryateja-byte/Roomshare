@@ -177,6 +177,19 @@ describe("settings actions", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe("Failed to update preferences");
     });
+
+    it("rejects extra properties via .strict() (G5.3)", async () => {
+      const prefsWithExtra = {
+        ...defaultPreferences,
+        extraField: true,
+      } as unknown as Parameters<typeof updateNotificationPreferences>[0];
+
+      const result = await updateNotificationPreferences(prefsWithExtra);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Invalid notification preferences");
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
   });
 
   describe("changePassword", () => {

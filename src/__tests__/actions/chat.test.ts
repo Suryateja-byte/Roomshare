@@ -91,6 +91,7 @@ import {
 } from '@/app/actions/chat'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 describe('Chat Actions', () => {
   const mockSession = {
@@ -179,6 +180,16 @@ describe('Chat Actions', () => {
         },
       })
     })
+
+    it('returns error when rate limited (A5.1)', async () => {
+      ;(checkRateLimit as jest.Mock).mockResolvedValueOnce({ success: false, remaining: 0 })
+
+      const result = await startConversation('listing-123')
+
+      expect(result).toEqual({ error: 'Too many attempts. Please wait.' })
+      expect(prisma.listing.findUnique).not.toHaveBeenCalled()
+      expect(prisma.conversation.create).not.toHaveBeenCalled()
+    })
   })
 
   describe('sendMessage', () => {
@@ -251,6 +262,17 @@ describe('Chat Actions', () => {
       const result = await getConversations()
 
       expect(result).toEqual([])
+    })
+
+    it('getConversations returns all conversations without explicit limit (C1.5)', async () => {
+      ;(prisma.conversation.findMany as jest.Mock).mockResolvedValue([])
+      ;(prisma.message.groupBy as jest.Mock).mockResolvedValue([])
+
+      await getConversations()
+
+      // Verify findMany was called without a `take` parameter — no pagination on conversation list
+      const findManyArgs = (prisma.conversation.findMany as jest.Mock).mock.calls[0][0]
+      expect(findManyArgs.take).toBeUndefined()
     })
 
     it('returns user conversations with unread count', async () => {
@@ -471,6 +493,14 @@ describe('Chat Actions', () => {
         },
         data: { read: true },
       })
+    })
+
+    it('returns error on failure (D3.2)', async () => {
+      ;(prisma.message.updateMany as jest.Mock).mockRejectedValue(new Error('DB timeout'))
+
+      const result = await markConversationMessagesAsRead('conv-123')
+
+      expect(result).toEqual({ error: 'Failed to mark messages as read' })
     })
   })
 })

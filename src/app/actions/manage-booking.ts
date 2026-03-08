@@ -172,22 +172,30 @@ export async function updateBookingStatus(
             }
 
             // Notify tenant of acceptance (outside transaction for performance)
-            await createInternalNotification({
-                userId: booking.tenant.id,
-                type: 'BOOKING_ACCEPTED',
-                title: 'Booking Accepted!',
-                message: `Your booking for "${booking.listing.title}" has been accepted`,
-                link: '/bookings'
-            });
+            try {
+                await createInternalNotification({
+                    userId: booking.tenant.id,
+                    type: 'BOOKING_ACCEPTED',
+                    title: 'Booking Accepted!',
+                    message: `Your booking for "${booking.listing.title}" has been accepted`,
+                    link: '/bookings'
+                });
 
-            // Send email to tenant (respecting preferences)
-            if (booking.tenant.email) {
-                await sendNotificationEmailWithPreference('bookingAccepted', booking.tenant.id, booking.tenant.email, {
-                    tenantName: booking.tenant.name || 'User',
-                    listingTitle: booking.listing.title,
-                    hostName: booking.listing.owner.name || 'Host',
-                    startDate: booking.startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-                    listingId: booking.listing.id
+                // Send email to tenant (respecting preferences)
+                if (booking.tenant.email) {
+                    await sendNotificationEmailWithPreference('bookingAccepted', booking.tenant.id, booking.tenant.email, {
+                        tenantName: booking.tenant.name || 'User',
+                        listingTitle: booking.listing.title,
+                        hostName: booking.listing.owner.name || 'Host',
+                        startDate: booking.startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+                        listingId: booking.listing.id
+                    });
+                }
+            } catch (notificationError) {
+                logger.sync.error('Failed to send acceptance notification', {
+                    action: 'updateBookingStatus',
+                    bookingId,
+                    error: notificationError instanceof Error ? notificationError.message : 'Unknown error',
                 });
             }
         }
@@ -244,21 +252,29 @@ export async function updateBookingStatus(
                 : '';
 
             // Notify tenant of rejection
-            await createInternalNotification({
-                userId: booking.tenant.id,
-                type: 'BOOKING_REJECTED',
-                title: 'Booking Not Accepted',
-                message: `Your booking for "${booking.listing.title}" was not accepted.${reasonText}`,
-                link: '/bookings'
-            });
+            try {
+                await createInternalNotification({
+                    userId: booking.tenant.id,
+                    type: 'BOOKING_REJECTED',
+                    title: 'Booking Not Accepted',
+                    message: `Your booking for "${booking.listing.title}" was not accepted.${reasonText}`,
+                    link: '/bookings'
+                });
 
-            // Send email to tenant (respecting preferences)
-            if (booking.tenant.email) {
-                await sendNotificationEmailWithPreference('bookingRejected', booking.tenant.id, booking.tenant.email, {
-                    tenantName: booking.tenant.name || 'User',
-                    listingTitle: booking.listing.title,
-                    hostName: booking.listing.owner.name || 'Host',
-                    rejectionReason: rejectionReason?.trim() || undefined
+                // Send email to tenant (respecting preferences)
+                if (booking.tenant.email) {
+                    await sendNotificationEmailWithPreference('bookingRejected', booking.tenant.id, booking.tenant.email, {
+                        tenantName: booking.tenant.name || 'User',
+                        listingTitle: booking.listing.title,
+                        hostName: booking.listing.owner.name || 'Host',
+                        rejectionReason: rejectionReason?.trim() || undefined
+                    });
+                }
+            } catch (notificationError) {
+                logger.sync.error('Failed to send rejection notification', {
+                    action: 'updateBookingStatus',
+                    bookingId,
+                    error: notificationError instanceof Error ? notificationError.message : 'Unknown error',
                 });
             }
         }
@@ -325,13 +341,21 @@ export async function updateBookingStatus(
 
 
             // Notify host of cancellation
-            await createInternalNotification({
-                userId: booking.listing.ownerId,
-                type: 'BOOKING_CANCELLED',
-                title: 'Booking Cancelled',
-                message: `${booking.tenant.name || 'A tenant'} cancelled their booking for "${booking.listing.title}"`,
-                link: '/bookings'
-            });
+            try {
+                await createInternalNotification({
+                    userId: booking.listing.ownerId,
+                    type: 'BOOKING_CANCELLED',
+                    title: 'Booking Cancelled',
+                    message: `${booking.tenant.name || 'A tenant'} cancelled their booking for "${booking.listing.title}"`,
+                    link: '/bookings'
+                });
+            } catch (notificationError) {
+                logger.sync.error('Failed to send cancellation notification', {
+                    action: 'updateBookingStatus',
+                    bookingId,
+                    error: notificationError instanceof Error ? notificationError.message : 'Unknown error',
+                });
+            }
         }
 
         revalidatePath('/bookings');

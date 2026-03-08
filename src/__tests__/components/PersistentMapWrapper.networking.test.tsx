@@ -479,6 +479,52 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       expect(errorAlert.textContent).toContain("Too many requests");
     });
 
+    it("shows loading indicator during 429 retry delay (D3.1)", async () => {
+      // First call returns 429, second call (retry) succeeds
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: new Headers({ "Retry-After": "2" }),
+          json: async () => ({ error: "Too many requests", retryAfter: 2 }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          json: async () => ({ listings: [] }),
+        });
+
+      const { container } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      // Initial fetch after debounce
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      // After 429, loading bar should STILL be visible during retry delay
+      // The MapDataLoadingBar has role="status" and aria-label="Loading map data"
+      const loadingBar = container.querySelector(
+        '[role="status"][aria-label="Loading map data"]'
+      );
+      expect(loadingBar).toBeInTheDocument();
+
+      // Advance past retry delay (2000ms from Retry-After: 2)
+      await act(async () => {
+        jest.advanceTimersByTime(2500);
+      });
+
+      // After successful retry, loading bar should be gone
+      await waitFor(() => {
+        const bar = container.querySelector(
+          '[role="status"][aria-label="Loading map data"]'
+        );
+        expect(bar).not.toBeInTheDocument();
+      });
+    });
+
     it("clears error on successful retry", async () => {
       // First request fails
       mockFetch

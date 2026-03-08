@@ -503,9 +503,13 @@ export default function PersistentMapWrapper({
   const abortControllerRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // D3.1 FIX: Track whether a 429 retry is scheduled so the finally block
+  // doesn't hide the loading bar during the retry delay.
+  const isRetryScheduledRef = useRef<boolean>(false);
 
   const fetchListings = useCallback(
     async (paramsString: string, signal?: AbortSignal, fetchBounds?: ViewportBounds) => {
+      isRetryScheduledRef.current = false;
       setIsFetchingMapData(true);
       setError(null);
 
@@ -567,6 +571,10 @@ export default function PersistentMapWrapper({
             if (process.env.NODE_ENV === 'development') {
               console.debug('[PersistentMapWrapper] Rate limited (429), retrying after', retryDelayMs, 'ms');
             }
+
+            // D3.1 FIX: Mark retry as scheduled BEFORE returning so the finally
+            // block keeps isFetchingMapData=true (loading bar stays visible).
+            isRetryScheduledRef.current = true;
 
             // Schedule automatic retry
             retryTimeoutRef.current = setTimeout(() => {
@@ -646,7 +654,11 @@ export default function PersistentMapWrapper({
         }
       } finally {
         clearTimeout(timeoutId);
-        setIsFetchingMapData(false);
+        // D3.1 FIX: Keep loading bar visible during 429 retry delay.
+        // Only clear fetching state if no retry is pending.
+        if (!isRetryScheduledRef.current) {
+          setIsFetchingMapData(false);
+        }
       }
     },
     [],

@@ -664,6 +664,128 @@ describe("manage-booking actions", () => {
         expect(result.error).toBe("Failed to update booking status");
       });
     });
+
+    describe("suspension checks (F3.4)", () => {
+      beforeEach(() => {
+        (checkSuspension as jest.Mock).mockResolvedValue({
+          suspended: true,
+          error: "Account suspended",
+        });
+      });
+
+      it("blocks suspended user from accepting booking", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+        expect(result.error).toBe("Account suspended");
+        expect(prisma.booking.findUnique).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      });
+
+      it("blocks suspended user from rejecting booking", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        const result = await updateBookingStatus("booking-123", "REJECTED");
+        expect(result.error).toBe("Account suspended");
+        expect(prisma.booking.findUnique).not.toHaveBeenCalled();
+      });
+
+      it("blocks suspended user from cancelling booking", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockTenantSession);
+        const result = await updateBookingStatus("booking-123", "CANCELLED");
+        expect(result.error).toBe("Account suspended");
+        expect(prisma.booking.findUnique).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("email failure resilience (D2.2)", () => {
+      it("booking ACCEPT succeeds even when email notification fails", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest.fn().mockResolvedValue([
+                {
+                  availableSlots: 2,
+                  totalSlots: 3,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                },
+              ]),
+              booking: {
+                count: jest.fn().mockResolvedValue(0),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+              listing: { update: jest.fn() },
+            };
+            return callback(tx);
+          },
+        );
+        (sendNotificationEmailWithPreference as jest.Mock).mockRejectedValue(
+          new Error("Resend API down"),
+        );
+
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty("error");
+      });
+
+      it("booking ACCEPT succeeds even when in-app notification fails", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest.fn().mockResolvedValue([
+                {
+                  availableSlots: 2,
+                  totalSlots: 3,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                },
+              ]),
+              booking: {
+                count: jest.fn().mockResolvedValue(0),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+              listing: { update: jest.fn() },
+            };
+            return callback(tx);
+          },
+        );
+        (createInternalNotification as jest.Mock).mockRejectedValue(
+          new Error("DB timeout"),
+        );
+
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty("error");
+      });
+
+      it("booking REJECT succeeds even when email notification fails", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest
+                .fn()
+                .mockResolvedValue([{ ownerId: "owner-123" }]),
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          },
+        );
+        (sendNotificationEmailWithPreference as jest.Mock).mockRejectedValue(
+          new Error("Resend API down"),
+        );
+
+        const result = await updateBookingStatus("booking-123", "REJECTED");
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty("error");
+      });
+    });
   });
 
   describe("getMyBookings", () => {
