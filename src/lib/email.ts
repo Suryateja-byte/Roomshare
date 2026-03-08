@@ -53,12 +53,12 @@ interface EmailOptions {
     text?: string;
 }
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Use Resend's testing domain by default (can only send to your own email in test mode)
 const FROM_EMAIL = process.env.FROM_EMAIL || 'RoomShare <onboarding@resend.dev>';
 
 // Email sending function with retry logic and circuit breaker protection
 export async function sendEmail({ to, subject, html, text }: EmailOptions): Promise<{ success: boolean; error?: string }> {
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
     if (!RESEND_API_KEY) {
         console.warn('RESEND_API_KEY not configured. Email not sent:', { subject });
         // In development, just log the email (no PII — omit recipient address)
