@@ -395,7 +395,7 @@ function buildKeysetWhereClause(
 // Build WHERE conditions for SearchDoc queries
 // ============================================
 
-interface WhereBuilder {
+export interface WhereBuilder {
   conditions: string[];
   params: unknown[];
   paramIndex: number;
@@ -403,7 +403,7 @@ interface WhereBuilder {
   ftsQueryParamIndex: number | null;
 }
 
-function buildSearchDocWhereConditions(
+export function buildSearchDocWhereConditions(
   filterParams: FilterParams,
 ): WhereBuilder {
   // SECURITY INVARIANT:

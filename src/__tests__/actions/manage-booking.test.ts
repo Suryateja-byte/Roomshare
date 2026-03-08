@@ -686,6 +686,7 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "REJECTED");
         expect(result.error).toBe("Account suspended");
         expect(prisma.booking.findUnique).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
       });
 
       it("blocks suspended user from cancelling booking", async () => {
@@ -693,6 +694,7 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "CANCELLED");
         expect(result.error).toBe("Account suspended");
         expect(prisma.booking.findUnique).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
       });
     });
 
@@ -727,6 +729,7 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
         expect(result.success).toBe(true);
         expect(result).not.toHaveProperty("error");
+        expect(prisma.$transaction).toHaveBeenCalled();
       });
 
       it("booking ACCEPT succeeds even when in-app notification fails", async () => {
@@ -759,6 +762,7 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
         expect(result.success).toBe(true);
         expect(result).not.toHaveProperty("error");
+        expect(prisma.$transaction).toHaveBeenCalled();
       });
 
       it("booking REJECT succeeds even when email notification fails", async () => {
@@ -784,6 +788,7 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "REJECTED");
         expect(result.success).toBe(true);
         expect(result).not.toHaveProperty("error");
+        expect(prisma.$transaction).toHaveBeenCalled();
       });
     });
   });

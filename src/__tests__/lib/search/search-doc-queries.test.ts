@@ -4,7 +4,44 @@
  * Tests the feature flag logic and SearchDoc query structure.
  */
 
-import { isSearchDocEnabled, buildOrderByClause } from "@/lib/search/search-doc-queries";
+import { isSearchDocEnabled, buildOrderByClause, buildSearchDocWhereConditions } from "@/lib/search/search-doc-queries";
+
+describe("buildSearchDocWhereConditions", () => {
+  it("excludes listings with null coordinates from map results (F1.1)", () => {
+    const { conditions } = buildSearchDocWhereConditions({});
+
+    // Base conditions must include NOT NULL checks for lat and lng
+    // This ensures listings with null coordinates never appear in map views
+    expect(conditions).toContain("d.lat IS NOT NULL");
+    expect(conditions).toContain("d.lng IS NOT NULL");
+  });
+
+  it("excludes PAUSED listings from search results (F2.3)", () => {
+    const { conditions } = buildSearchDocWhereConditions({});
+
+    // Base conditions must filter to ACTIVE status only
+    // PAUSED, DRAFT, ARCHIVED, etc. listings must never appear in search
+    expect(conditions).toContain("d.status = 'ACTIVE'");
+    // Verify no other status values are included
+    const statusConditions = conditions.filter(c => c.includes("d.status"));
+    expect(statusConditions).toHaveLength(1);
+  });
+
+  it("requires available slots > 0 in base conditions", () => {
+    const { conditions } = buildSearchDocWhereConditions({});
+
+    expect(conditions).toContain("d.available_slots > 0");
+  });
+
+  it("starts with paramIndex 1 and no FTS when no filters applied", () => {
+    const result = buildSearchDocWhereConditions({});
+
+    // With no filters, should have only base conditions, no params
+    expect(result.params).toHaveLength(0);
+    expect(result.paramIndex).toBe(1);
+    expect(result.ftsQueryParamIndex).toBeNull();
+  });
+});
 
 describe("buildOrderByClause", () => {
   it("includes ts_rank_cd for offset pagination with FTS", () => {

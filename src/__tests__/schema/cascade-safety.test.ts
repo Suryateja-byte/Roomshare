@@ -1,5 +1,5 @@
 /**
- * Tests for Prisma schema cascade safety (B1.3, B3.1, C1.3)
+ * Tests for Prisma schema cascade safety (B1.3, B3.1, B3.3, C1.3)
  */
 import fs from 'fs';
 import path from 'path';
@@ -43,6 +43,20 @@ describe('Prisma schema cascade safety', () => {
     expect(userIdLine).not.toContain('onDelete');
     // Should NOT have a @relation directive on userId
     expect(userIdLine).not.toContain('@relation');
+  });
+
+  it('Listing cascade deletes Location via schema (B3.3)', () => {
+    // Extract the Location model block
+    const locationMatch = schema.match(/model Location \{[\s\S]*?\n\}/);
+    expect(locationMatch).toBeTruthy();
+    const locationBlock = locationMatch![0];
+
+    // The listing relation line should have onDelete: Cascade
+    const listingRelationLine = locationBlock
+      .split('\n')
+      .find((line) => line.includes('Listing') && line.includes('@relation'));
+    expect(listingRelationLine).toBeDefined();
+    expect(listingRelationLine).toContain('onDelete: Cascade');
   });
 
   it('Message has composite index on [conversationId, createdAt] (C1.3)', () => {
