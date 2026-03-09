@@ -35,7 +35,11 @@ async function freshLogin(page: import('@playwright/test').Page) {
   }).catch(() => {});
 
   await page.goto('/login');
-  await page.waitForLoadState('domcontentloaded');
+  // Wait for all JS to load — 'load' fires after scripts are downloaded and
+  // parsed, which is a precondition for React hydration. 'domcontentloaded'
+  // only waits for HTML parsing, so clicking before hydration causes a native
+  // form GET instead of the React signIn() flow.
+  await page.waitForLoadState('load');
   // Wait for the login form to render (Suspense boundary + hydration)
   await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
 
@@ -44,7 +48,17 @@ async function freshLogin(page: import('@playwright/test').Page) {
 
   await page.getByLabel(/email/i).fill(email);
   await page.locator('input[name="password"]').fill(password);
+
+  // Wait for the NextAuth API response to prove React handled the submit
+  // (without this, clicking before hydration causes a native form GET that
+  // stays on /login and never triggers signIn())
+  const loginResponsePromise = page.waitForResponse(
+    (response) => response.url().includes('/api/auth') && response.status() === 200,
+    { timeout: 30000 }
+  );
   await page.getByRole('button', { name: /sign in|log in|login/i }).click();
+  await loginResponsePromise;
+
   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 30000 });
 }
 

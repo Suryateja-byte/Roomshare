@@ -86,6 +86,12 @@ export async function checkRateLimit(
   endpoint: string,
   config: RateLimitConfig,
 ): Promise<RateLimitResult> {
+  // E2E bypass — matches with-rate-limit.ts behavior to prevent cross-shard
+  // rate limit accumulation in CI (auth.ts calls this directly, not via middleware)
+  if (process.env.E2E_DISABLE_RATE_LIMIT === 'true') {
+    return { success: true, remaining: 999, resetAt: new Date(Date.now() + config.windowMs) };
+  }
+
   const { limit, windowMs } = config;
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMs);
