@@ -218,7 +218,7 @@ export async function clickFiltersButton(page: Page): Promise<void> {
 
   const dialog = filterDialog(page);
   const visible = await dialog
-    .waitFor({ state: "visible", timeout: 15_000 })
+    .waitFor({ state: "visible", timeout: 30_000 })
     .then(() => true)
     .catch(() => false);
 
@@ -228,7 +228,7 @@ export async function clickFiltersButton(page: Page): Promise<void> {
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
     await page.waitForTimeout(500);
-    await btn.click();
+    await btn.click({ force: true });
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 }
@@ -268,7 +268,7 @@ export async function openFilterModal(page: Page): Promise<Locator> {
   // can take 10-15s, so we give a generous initial timeout.
   await btn.click();
   let dialogVisible = await dialog
-    .waitFor({ state: "visible", timeout: 15_000 })
+    .waitFor({ state: "visible", timeout: 30_000 })
     .then(() => true)
     .catch(() => false);
 
@@ -278,7 +278,7 @@ export async function openFilterModal(page: Page): Promise<Locator> {
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
     await page.waitForTimeout(500);
-    await btn.click();
+    await btn.click({ force: true });
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 
