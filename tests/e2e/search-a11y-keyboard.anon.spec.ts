@@ -16,6 +16,7 @@ import {
   tags,
   searchResultsContainer,
 } from "./helpers/test-utils";
+import { filtersButton as getFiltersButton } from "./helpers/filter-helpers";
 
 // --------------------------------------------------------------------------
 // Constants
@@ -203,26 +204,14 @@ test.describe("Search A11y: Keyboard Navigation", () => {
 
   // 6. Focus returns to search area after filter modal close
   test("6. focus returns after filter modal close", { tag: [tags.a11y] }, async ({ page }) => {
-    // Find and click the Filters button (use getByRole to avoid matching room type filter pills)
-    const filtersButton = page.getByRole("button", { name: /^Filters/ });
+    // Find and click the Filters button (hydration-aware locator)
+    const filtersBtnLocator = getFiltersButton(page);
 
-    if (await filtersButton.isVisible().catch(() => false)) {
-      await page.waitForLoadState("domcontentloaded").catch(() => {});
-      await filtersButton.click();
+    if (await filtersBtnLocator.isVisible().catch(() => false)) {
+      await filtersBtnLocator.click();
 
-      // Filter modal should be open — retry click if it didn't appear
-      // (hydration delay: button HTML renders via SSR before onClick is attached)
       const modal = page.locator('[role="dialog"][aria-modal="true"]');
-      const modalAppeared = await modal
-        .waitFor({ state: "visible", timeout: 5_000 })
-        .then(() => true)
-        .catch(() => false);
-
-      if (!modalAppeared) {
-        // Retry: by now hydration + dynamic import should be complete
-        await filtersButton.click();
-        await expect(modal).toBeVisible({ timeout: 10_000 });
-      }
+      await expect(modal).toBeVisible({ timeout: 30_000 });
 
       // Close modal with Escape
       await page.keyboard.press("Escape");
@@ -257,17 +246,14 @@ test.describe("Search A11y: Keyboard Navigation", () => {
       }
     }
 
-    // Test with filter modal
-    const filtersButton = page.locator(
-      'button[aria-controls="search-filters"], button[aria-label*="Filter"], button:has-text("Filters")',
-    ).first();
+    // Test with filter modal (hydration-aware locator)
+    const filtersBtnLocator2 = getFiltersButton(page);
 
-    if (await filtersButton.isVisible().catch(() => false)) {
-      await page.waitForLoadState("domcontentloaded").catch(() => {});
-      await filtersButton.click();
+    if (await filtersBtnLocator2.isVisible().catch(() => false)) {
+      await filtersBtnLocator2.click();
 
       const modal = page.locator('[role="dialog"][aria-modal="true"]');
-      if (await modal.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      if (await modal.isVisible({ timeout: 30_000 }).catch(() => false)) {
         await page.keyboard.press("Escape");
         await expect(modal).not.toBeVisible();
       }

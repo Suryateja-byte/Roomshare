@@ -8,12 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
 import { SUPPORTED_LANGUAGES, getLanguageName, type LanguageCode } from '@/lib/languages';
-import dynamic from 'next/dynamic';
-
-const FilterModal = dynamic(() => import('@/components/search/FilterModal'), {
-    ssr: false,
-    loading: () => null,
-});
+import FilterModal from '@/components/search/FilterModal';
 import { parseNaturalLanguageQuery, nlQueryToSearchParams } from '@/lib/search/natural-language-parser';
 import { safeMark } from '@/lib/perf';
 // Import canonical allowlists from shared parsing module
@@ -125,12 +120,6 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     const [hasMounted, setHasMounted] = useState(false);
 
-    // Pre-warm FilterModal JS chunk on mount so it's cached before the user
-    // clicks Filters. Without this, next/dynamic only fetches the chunk when
-    // setShowFilters(true) renders <FilterModal>, causing 10-30s delays on CI.
-    useEffect(() => {
-        import('@/components/search/FilterModal');
-    }, []);
 
     // Language search filter state
     const [languageSearch, setLanguageSearch] = useState('');
@@ -793,6 +782,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                         <div className="flex items-center px-3">
                             <button
                                 type="button"
+                                data-hydrated={hasMounted || undefined}
                                 onClick={() => setShowFilters(true)}
                                 aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ''}`}
                                 aria-expanded={showFilters}

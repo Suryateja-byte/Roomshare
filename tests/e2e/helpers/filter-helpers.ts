@@ -163,9 +163,7 @@ export async function waitForSearchReady(
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
   // Wait for Filters button to be visible — confirms SearchForm hydrated
-  await page.getByRole("button", { name: /^Filters/ })
-    .waitFor({ state: "visible", timeout: 15_000 })
-    .catch(() => {});
+  await filtersButton(page).waitFor({ state: "visible", timeout: 20_000 });
 }
 
 /**
@@ -184,9 +182,7 @@ export async function gotoSearchWithFilters(
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
   // Wait for Filters button to be visible — confirms SearchForm hydrated
-  await page.getByRole("button", { name: /^Filters/ })
-    .waitFor({ state: "visible", timeout: 15_000 })
-    .catch(() => {});
+  await filtersButton(page).waitFor({ state: "visible", timeout: 20_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +194,7 @@ export async function gotoSearchWithFilters(
  * Uses regex to match both "Filters" and "Filters (N active)" states.
  */
 export function filtersButton(page: Page): Locator {
-  return page.getByRole("button", { name: /^Filters/ });
+  return page.locator('button[data-hydrated][aria-label^="Filters"]');
 }
 
 /** Locate the filter dialog */
@@ -263,9 +259,8 @@ export async function openFilterModal(page: Page): Promise<Locator> {
 
   const dialog = filterDialog(page);
 
-  // Click and wait for dialog. FilterModal is dynamic({ ssr: false }) —
-  // the JS chunk may need to load on first interaction. On CI this
-  // can take 10-15s, so we give a generous initial timeout.
+  // Click and wait for dialog. On CI under load, the modal render
+  // may take a few seconds, so we give a generous initial timeout.
   await btn.click();
   let dialogVisible = await dialog
     .waitFor({ state: "visible", timeout: 30_000 })

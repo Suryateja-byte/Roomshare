@@ -27,6 +27,7 @@ import {
   waitForNoUrlParam,
   pollForUrlParam,
   waitForUrlStable,
+  openFilterModal,
 } from "../helpers";
 import type { Page } from "@playwright/test";
 
@@ -277,22 +278,8 @@ test.describe("Price Range Filter", () => {
   test(`${tags.core} - price slider in modal adjusts pending price`, async ({ page }) => {
     await waitForSearchReady(page);
 
-    // Open filter modal using retry-click pattern for hydration race
-    const filtersBtn = page.getByRole("button", { name: /^Filters/ });
-    await expect(filtersBtn).toBeVisible({ timeout: 30_000 });
-    await filtersBtn.click();
-
-    const dialog = page.getByRole("dialog", { name: /filters/i });
-    const dialogVisible = await dialog
-      .waitFor({ state: "visible", timeout: 5_000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!dialogVisible) {
-      // Retry: hydration or dynamic import may not have been ready
-      await filtersBtn.click();
-      await expect(dialog).toBeVisible({ timeout: 30_000 });
-    }
+    // Open filter modal using shared hydration-aware helper
+    await openFilterModal(page);
 
     // Find the price range slider
     const priceSlider = page.locator('[aria-label="Price range"]');
@@ -313,6 +300,7 @@ test.describe("Price Range Filter", () => {
       await applyBtn.click();
 
       // Modal should close
+      const dialog = page.getByRole("dialog", { name: /filters/i });
       await expect(dialog).not.toBeVisible({ timeout: 30_000 });
 
       // URL may have maxPrice now (depending on slider position)
