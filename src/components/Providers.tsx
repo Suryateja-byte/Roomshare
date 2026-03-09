@@ -3,6 +3,7 @@
 import { SessionProvider } from 'next-auth/react';
 import { Session } from 'next-auth';
 import { Toaster } from 'sonner';
+import { MotionConfig } from 'framer-motion';
 import { ReactNode } from 'react';
 import { ThemeProvider } from './ThemeProvider';
 
@@ -13,15 +14,17 @@ interface ProvidersProps {
 
 export default function Providers({ children, session }: ProvidersProps) {
   return (
-    <SessionProvider
-      session={session}
-      refetchOnWindowFocus={true}
-      refetchInterval={600} // Refresh session every 10 minutes
-    >
-      <ThemeProvider>
-        {children}
-        <Toaster position="top-center" richColors />
-      </ThemeProvider>
-    </SessionProvider>
+    <MotionConfig reducedMotion="user">
+      <SessionProvider
+        session={session}
+        refetchOnWindowFocus={true}
+        refetchInterval={600} // Refresh session every 10 minutes
+      >
+        <ThemeProvider>
+          {children}
+          <Toaster position="top-center" richColors />
+        </ThemeProvider>
+      </SessionProvider>
+    </MotionConfig>
   );
 }
