@@ -67,17 +67,18 @@ test.describe('Homepage — Anonymous User', () => {
 
   test('HP-04: Featured listings section renders with listing cards', async ({ page }) => {
     test.slow();
-    // Framer Motion uses whileInView + initial="hidden" (opacity: 0) for
-    // featured listings. IntersectionObserver must fire to trigger visibility.
-    // Note: _disableAnimations fixture's reducedMotion does NOT affect Framer
-    // Motion because the app lacks <MotionConfig reducedMotion="user">.
-    // Scroll the section into view to trigger the IntersectionObserver.
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(1500); // IntersectionObserver delay + Framer Motion stagger animation (0.7s+)
+    // Framer Motion uses whileInView + initial="hidden" for featured listings.
+    // <MotionConfig reducedMotion="user"> (Providers.tsx:17) + _disableAnimations
+    // fixture (emulates prefers-reduced-motion: reduce) makes transitions instant,
+    // but IntersectionObserver must still fire to trigger the variant switch.
+    // Use scrollIntoViewIfNeeded to reliably trigger IntersectionObserver.
+    const section = page.locator('[data-testid="featured-listings-section"]');
+    await section.waitFor({ state: 'attached', timeout: 20_000 });
+    await section.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
 
     await expect(
       page.locator('[data-testid="listing-card"]')
-        .or(page.locator('a[href*="/listings/"]'))
         .or(page.getByText(/latest curated spaces/i))
         .or(page.getByText(/be the first to share/i))
         .first()
