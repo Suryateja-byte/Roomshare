@@ -567,7 +567,7 @@ export default function CreateListingForm() {
                 </div>
             )}
 
-            <form ref={formRef} onSubmit={handleSubmit} onChange={() => saveData(collectFormData())} className="space-y-12">
+            <form ref={formRef} onSubmit={handleSubmit} noValidate onChange={() => saveData(collectFormData())} className="space-y-12">
                 {/* Section 1: The Basics */}
                 <section className="space-y-6" aria-labelledby="section-basics">
                     <h3 id="section-basics" className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
@@ -621,7 +621,7 @@ export default function CreateListingForm() {
                                 id="price"
                                 name="price"
                                 type="number"
-                                min="0.01"
+                                min="0"
                                 step="0.01"
                                 required
                                 value={price}

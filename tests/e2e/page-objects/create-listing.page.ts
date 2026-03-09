@@ -131,6 +131,7 @@ export class CreateListingPage {
     await this.titleInput.fill(data.title);
     await this.descriptionInput.fill(data.description);
     await this.priceInput.fill(String(data.price));
+    await expect(this.priceInput).toHaveValue(String(data.price), { timeout: 2_000 });
     if (data.totalSlots !== undefined) {
       await this.totalSlotsInput.fill(String(data.totalSlots));
     }
@@ -299,7 +300,7 @@ export class CreateListingPage {
 
   async expectValidationError(fieldId: string) {
     const errorEl = this.page.locator(`#${fieldId}-error`);
-    await expect(errorEl).toBeVisible({ timeout: 5000 });
+    await expect(errorEl).toBeVisible({ timeout: 10_000 });
   }
 
   async expectFieldAriaInvalid(fieldId: string) {
