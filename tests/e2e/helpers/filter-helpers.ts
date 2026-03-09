@@ -227,7 +227,7 @@ export async function clickFiltersButton(page: Page): Promise<void> {
     // already true, re-clicking is a no-op. Press Escape to reset state
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(2_000);
     await btn.click({ force: true });
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
@@ -277,7 +277,7 @@ export async function openFilterModal(page: Page): Promise<Locator> {
     // already true, re-clicking is a no-op. Press Escape to reset state
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(2_000);
     await btn.click({ force: true });
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }

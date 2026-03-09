@@ -125,6 +125,13 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     const [hasMounted, setHasMounted] = useState(false);
 
+    // Pre-warm FilterModal JS chunk on mount so it's cached before the user
+    // clicks Filters. Without this, next/dynamic only fetches the chunk when
+    // setShowFilters(true) renders <FilterModal>, causing 10-30s delays on CI.
+    useEffect(() => {
+        import('@/components/search/FilterModal');
+    }, []);
+
     // Language search filter state
     const [languageSearch, setLanguageSearch] = useState('');
 
