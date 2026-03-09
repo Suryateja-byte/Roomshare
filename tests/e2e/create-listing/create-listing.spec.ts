@@ -70,7 +70,7 @@ test.describe('Create Listing — Functional Tests', () => {
         moveInDate: moveInISO,
         leaseDuration: '12 months',
         roomType: 'Private Room',
-        houseRules: 'No smoking, no pets',
+        houseRules: 'Pets allowed, Guests allowed',
       });
 
       await clp.goto();
@@ -134,6 +134,8 @@ test.describe('Create Listing — Functional Tests', () => {
 
     test(`F-005: Validation — invalid zip code ${tags.auth} ${tags.core}`, async ({ page }) => {
       const clp = new CreateListingPage(page);
+      // 'ABCDE' fails client-side Zod regex /^\d{5}(-\d{4})?$/,
+      // so handleSubmit returns early WITHOUT calling fetch.
       const data = validData({ zipCode: 'ABCDE' });
 
       await clp.goto();
@@ -142,15 +144,9 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.uploadTestImage();
       await clp.waitForUploadComplete();
 
-      // Mock API to return validation error for invalid zip
-      await clp.mockListingApiError(400, {
-        error: 'Validation failed',
-        fields: { zip: 'Invalid zip code format' },
-      });
-
-      const response = await clp.submitAndWaitForResponse();
-      expect(response.ok()).toBe(false);
-
+      // Click submit — client Zod blocks the fetch, so don't use submitAndWaitForResponse
+      await clp.submit();
+      await clp.expectOnCreatePage();
       await clp.expectValidationError('zip');
     });
 

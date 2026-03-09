@@ -213,18 +213,23 @@ export function filterDialog(page: Page): Locator {
  */
 export async function clickFiltersButton(page: Page): Promise<void> {
   const btn = filtersButton(page);
-  await expect(btn).toBeVisible({ timeout: 10_000 });
+  await expect(btn).toBeVisible({ timeout: 15_000 });
   await btn.click();
 
   const dialog = filterDialog(page);
   const visible = await dialog
-    .waitFor({ state: "visible", timeout: 5_000 })
+    .waitFor({ state: "visible", timeout: 15_000 })
     .then(() => true)
     .catch(() => false);
 
   if (!visible) {
+    // Button onClick is setShowFilters(true) — not a toggle. If state is
+    // already true, re-clicking is a no-op. Press Escape to reset state
+    // to false (via useKeyboardShortcuts), then re-click for a real transition.
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
     await btn.click();
-    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 }
 
@@ -254,30 +259,32 @@ export function clearAllButton(page: Page): Locator {
  */
 export async function openFilterModal(page: Page): Promise<Locator> {
   const btn = filtersButton(page);
-  await expect(btn).toBeVisible({ timeout: 10_000 });
+  await expect(btn).toBeVisible({ timeout: 15_000 });
 
   const dialog = filterDialog(page);
 
-  // Click and wait for dialog. If it doesn't appear, the button click may
-  // have fired before React hydration attached the onClick handler, or the
-  // FilterModal dynamic import chunk hadn't loaded yet. Retry once.
+  // Click and wait for dialog. FilterModal is dynamic({ ssr: false }) —
+  // the JS chunk may need to load on first interaction. On CI this
+  // can take 10-15s, so we give a generous initial timeout.
   await btn.click();
   let dialogVisible = await dialog
-    .waitFor({ state: "visible", timeout: 5_000 })
+    .waitFor({ state: "visible", timeout: 15_000 })
     .then(() => true)
     .catch(() => false);
 
   if (!dialogVisible) {
-    // Retry: by now hydration + dynamic import should be complete
+    // Button onClick is setShowFilters(true) — not a toggle. If state is
+    // already true, re-clicking is a no-op. Press Escape to reset state
+    // to false (via useKeyboardShortcuts), then re-click for a real transition.
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
     await btn.click();
-    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 
-  // Wait for FilterModal dynamic import to complete — the apply button
-  // is always present and is a reliable signal the chunk loaded and rendered.
-  // Do NOT silently catch: if this times out, every subsequent interaction will
-  // also fail, so failing fast here provides a clear diagnostic.
-  await applyButton(page).waitFor({ state: "attached", timeout: 60_000 });
+  // Wait for FilterModal content to fully render — the apply button
+  // is always present and is a reliable signal the chunk loaded.
+  await applyButton(page).waitFor({ state: "attached", timeout: 30_000 });
   await applyButton(page).scrollIntoViewIfNeeded().catch(() => {});
 
   return dialog;

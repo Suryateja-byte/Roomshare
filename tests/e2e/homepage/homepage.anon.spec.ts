@@ -73,7 +73,7 @@ test.describe('Homepage — Anonymous User', () => {
     // Motion because the app lacks <MotionConfig reducedMotion="user">.
     // Scroll the section into view to trigger the IntersectionObserver.
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(500); // Wait for Framer Motion animation
+    await page.waitForTimeout(1500); // IntersectionObserver delay + Framer Motion stagger animation (0.7s+)
 
     await expect(
       page.locator('[data-testid="listing-card"]')
