@@ -66,14 +66,21 @@ test.describe('Homepage — Anonymous User', () => {
   });
 
   test('HP-04: Featured listings section renders with listing cards', async ({ page }) => {
-    test.slow(); // Triple timeout — Suspense boundary may be slow in CI
-    // FeaturedListings rendered via Suspense — wait for cards or empty state
-    // Cards use data-testid="listing-card" and link to /listings/
+    test.slow();
+    // Framer Motion uses whileInView + initial="hidden" for featured listings.
+    // <MotionConfig reducedMotion="user"> (Providers.tsx:17) + _disableAnimations
+    // fixture (emulates prefers-reduced-motion: reduce) makes transitions instant,
+    // but IntersectionObserver must still fire to trigger the variant switch.
+    // Use scrollIntoViewIfNeeded to reliably trigger IntersectionObserver.
+    const section = page.locator('[data-testid="featured-listings-section"]');
+    await section.waitFor({ state: 'attached', timeout: 20_000 });
+    await section.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+
     await expect(
       page.locator('[data-testid="listing-card"]')
-        .or(page.locator('a[href*="/listings/"]'))
-        .or(page.getByText(/newest listings/i))
-        .or(page.getByText(/be the first to list/i))
+        .or(page.getByText(/latest curated spaces/i))
+        .or(page.getByText(/be the first to share/i))
         .first()
     ).toBeVisible({ timeout: 20000 });
   });

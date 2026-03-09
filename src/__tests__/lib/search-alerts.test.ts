@@ -461,6 +461,20 @@ describe('search-alerts', () => {
       })
     })
 
+    describe('subscription cap', () => {
+      it('enforces 500-subscription cap on instant alerts (G2.2)', async () => {
+        ;(prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([])
+
+        await triggerInstantAlerts(newListing)
+
+        expect(prisma.savedSearch.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            take: 500,
+          })
+        )
+      })
+    })
+
     describe('notification preferences', () => {
       it('skips user with disabled alerts', async () => {
         const disabledSearch = {

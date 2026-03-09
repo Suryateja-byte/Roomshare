@@ -1,336 +1,348 @@
-/**
- * Tests for ChatWindow component
- */
+import type { ReactNode } from 'react';
+import '@testing-library/jest-dom';
+import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
 
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import ChatWindow from '@/components/ChatWindow'
-import { toast } from 'sonner'
+const mockPush = jest.fn();
+const mockSendMessage = jest.fn();
+const mockCreateChatChannel = jest.fn();
+const mockSafeRemoveChannel = jest.fn();
 
-// Mock dependencies
-const mockIsOffline = { isOffline: false }
-jest.mock('@/hooks/useNetworkStatus', () => ({
-  useNetworkStatus: () => mockIsOffline,
-}))
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
 
 jest.mock('sonner', () => ({
   toast: {
     error: jest.fn(),
+    info: jest.fn(),
     success: jest.fn(),
   },
-}))
+}));
 
-// Mock scrollIntoView
-Element.prototype.scrollIntoView = jest.fn()
+jest.mock('use-debounce', () => ({
+  useDebouncedCallback: (callback: (...args: unknown[]) => void) => callback,
+}));
 
-describe('ChatWindow', () => {
-  const defaultProps = {
-    conversationId: 'conv-123',
-    currentUserId: 'user-456',
-  }
+jest.mock('@/app/actions/chat', () => ({
+  sendMessage: (...args: unknown[]) => mockSendMessage(...args),
+}));
 
-  const mockMessages = [
-    {
-      id: 'msg-1',
-      content: 'Hello there!',
-      senderId: 'user-456',
-      createdAt: new Date().toISOString(),
-      sender: { name: 'Current User', image: null },
+jest.mock('@/app/actions/block', () => ({
+  blockUser: jest.fn(),
+  unblockUser: jest.fn(),
+}));
+
+jest.mock('@/hooks/useBlockStatus', () => ({
+  useBlockStatus: () => ({
+    blockStatus: 'none',
+    isBlocked: false,
+    refetch: jest.fn(),
+  }),
+}));
+
+jest.mock('@/hooks/useRateLimitHandler', () => ({
+  useRateLimitHandler: () => ({
+    isRateLimited: false,
+    retryAfter: 0,
+    handleError: jest.fn(() => false),
+    reset: jest.fn(),
+  }),
+}));
+
+jest.mock('@/hooks/useNetworkStatus', () => ({
+  useNetworkStatus: () => ({
+    isOffline: false,
+  }),
+}));
+
+jest.mock('@/lib/supabase', () => ({
+  supabase: null,
+  createChatChannel: (...args: unknown[]) => mockCreateChatChannel(...args),
+  broadcastTyping: jest.fn(),
+  trackPresence: jest.fn(),
+  safeRemoveChannel: (...args: unknown[]) => mockSafeRemoveChannel(...args),
+}));
+
+jest.mock('@/components/UserAvatar', () => ({
+  __esModule: true,
+  default: ({ name }: { name?: string | null }) => (
+    <div data-testid="user-avatar">{name ?? 'avatar'}</div>
+  ),
+}));
+
+jest.mock('@/components/chat/BlockedConversationBanner', () => ({
+  __esModule: true,
+  default: () => <div data-testid="blocked-banner">blocked</div>,
+}));
+
+jest.mock('@/components/CharacterCounter', () => ({
+  __esModule: true,
+  default: ({ current, max }: { current: number; max: number }) => (
+    <div data-testid="character-counter">
+      {current}/{max}
+    </div>
+  ),
+}));
+
+jest.mock('@/components/RateLimitCountdown', () => ({
+  __esModule: true,
+  default: () => <div data-testid="rate-limit-countdown">rate limit</div>,
+}));
+
+jest.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({
+    children,
+    onClick,
+    disabled,
+    className,
+  }: {
+    children: ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+    className?: string;
+  }) => (
+    <button type="button" onClick={onClick} disabled={disabled} className={className}>
+      {children}
+    </button>
+  ),
+  DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+
+jest.mock('@/components/ui/alert-dialog', () => ({
+  AlertDialog: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialogAction: ({
+    children,
+    onClick,
+    disabled,
+    className,
+  }: {
+    children: ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+    className?: string;
+  }) => (
+    <button type="button" onClick={onClick} disabled={disabled} className={className}>
+      {children}
+    </button>
+  ),
+  AlertDialogCancel: ({ children }: { children: ReactNode }) => <button type="button">{children}</button>,
+  AlertDialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+import ChatWindow from '@/app/messages/[id]/ChatWindow';
+
+type MockMessage = {
+  id: string;
+  content: string;
+  senderId: string;
+  createdAt: string | Date;
+  sender?: {
+    name: string | null;
+    image: string | null;
+  };
+};
+
+function createJsonResponse(body: unknown, status = 200) {
+  return Promise.resolve({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  });
+}
+
+function buildMessage(id: string, senderId: string, content: string): MockMessage {
+  return {
+    id,
+    senderId,
+    content,
+    createdAt: new Date(`2026-03-06T12:00:0${id.endsWith('2') ? '2' : '1'}Z`).toISOString(),
+    sender: {
+      name: senderId === 'other-user' ? 'Other User' : 'Current User',
+      image: null,
     },
-    {
-      id: 'msg-2',
-      content: 'Hi! How are you?',
-      senderId: 'other-user',
-      createdAt: new Date().toISOString(),
-      sender: { name: 'Other User', image: null },
-    },
-  ]
+  };
+}
 
-  let fetchSpy: jest.SpyInstance
+describe('Route ChatWindow', () => {
+  const fetchMock = jest.fn();
+
+  beforeAll(() => {
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: jest.fn(),
+    });
+  });
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    jest.useFakeTimers()
-    mockIsOffline.isOffline = false
-    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockMessages),
-    } as Response)
-  })
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    fetchMock.mockReset();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    sessionStorage.clear();
+  });
 
   afterEach(() => {
-    jest.useRealTimers()
-    fetchSpy.mockRestore()
-  })
+    cleanup();
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
 
-  describe('rendering', () => {
-    it('displays messages after loading', async () => {
-      render(<ChatWindow {...defaultProps} />)
+  it('shows polling mode when realtime is unavailable and never shows connecting', async () => {
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/api/messages?')) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
 
-      await waitFor(() => {
-        expect(screen.getByText('Hello there!')).toBeInTheDocument()
-        expect(screen.getByText('Hi! How are you?')).toBeInTheDocument()
-      })
-    })
+    render(
+      <ChatWindow
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />,
+    );
 
-    it('shows empty state when no messages', async () => {
-      ;fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([]),
-      })
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/messages?conversationId=conv-123&poll=1'),
+        expect.objectContaining({ method: 'GET' }),
+      );
+    });
 
-      render(<ChatWindow {...defaultProps} />)
+    expect(screen.getByTestId('connection-status')).toHaveTextContent('Polling for updates');
+    expect(screen.queryByText('Connecting...')).not.toBeInTheDocument();
+    expect(mockCreateChatChannel).not.toHaveBeenCalled();
+  });
 
-      await waitFor(() => {
-        expect(screen.getByText('No messages yet. Start the conversation!')).toBeInTheDocument()
-      })
-    })
+  it('polls with lastMessageId, merges incremental messages, and marks inbound messages as read', async () => {
+    const firstInbound = buildMessage('msg-1', 'other-user', 'Hello from polling');
+    const secondInbound = buildMessage('msg-2', 'other-user', 'Second poll result');
 
-    it('shows error state when fetch fails', async () => {
-      ;fetchSpy.mockRejectedValue(new Error('Network error'))
+    fetchMock.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url === '/api/messages') {
+        return createJsonResponse({ success: true, count: 1 });
+      }
+      if (url.includes('/api/messages?')) {
+        if (url.includes('lastMessageId=msg-1')) {
+          return createJsonResponse({ messages: [secondInbound], hasNewMessages: true });
+        }
+        return createJsonResponse({ messages: [firstInbound], hasNewMessages: true });
+      }
+      throw new Error(`Unexpected fetch: ${url} ${String(init?.method ?? '')}`);
+    });
 
-      render(<ChatWindow {...defaultProps} />)
+    render(
+      <ChatWindow
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />,
+    );
 
-      await waitFor(() => {
-        expect(screen.getByText('Failed to load messages')).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
-      })
-    })
-  })
+    expect(await screen.findByText('Hello from polling')).toBeInTheDocument();
 
-  describe('message fetching', () => {
-    it('fetches messages on mount', async () => {
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalledWith(
-          '/api/messages?conversationId=conv-123'
-        )
-      })
-    })
-
-    it('polls for messages every 5 seconds', async () => {
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalledTimes(1)
-      })
-
-      act(() => {
-        jest.advanceTimersByTime(5000)
-      })
-
-      await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalledTimes(2)
-      })
-    })
-
-    it('retries on error button click', async () => {
-      ;fetchSpy
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockMessages),
-        })
-
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        expect(screen.getByText('Failed to load messages')).toBeInTheDocument()
-      })
-
-      const retryButton = screen.getByRole('button', { name: /try again/i })
-      fireEvent.click(retryButton)
-
-      await waitFor(() => {
-        expect(screen.getByText('Hello there!')).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('message sending', () => {
-    it('sends message on form submit', async () => {
-      ;fetchSpy
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
-
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        expect(screen.getByText('Hello there!')).toBeInTheDocument()
-      })
-
-      const input = screen.getByPlaceholderText('Type a message...')
-      const form = input.closest('form')!
-
-      fireEvent.change(input, { target: { value: 'New message' } })
-      fireEvent.submit(form)
-
-      await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalledWith('/api/messages', expect.objectContaining({
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/messages',
+        expect.objectContaining({
           method: 'POST',
-        }))
-      })
-    })
+          body: JSON.stringify({
+            action: 'markRead',
+            conversationId: 'conv-123',
+          }),
+        }),
+      );
+    });
 
-    it('clears input after sending', async () => {
-      ;fetchSpy
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+    });
 
-      render(<ChatWindow {...defaultProps} />)
+    expect(await screen.findByText('Second poll result')).toBeInTheDocument();
 
-      await waitFor(() => {
-        expect(screen.getByText('Hello there!')).toBeInTheDocument()
-      })
+    const pollUrls = fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .filter((url) => url.includes('/api/messages?conversationId=conv-123&poll=1'));
 
-      const input = screen.getByPlaceholderText('Type a message...') as HTMLInputElement
-      const form = input.closest('form')!
+    expect(pollUrls[0]).toContain('conversationId=conv-123');
+    expect(pollUrls.some((url) => url.includes('lastMessageId=msg-1'))).toBe(true);
+    expect(screen.getAllByTestId('message-bubble')).toHaveLength(2);
+  });
 
-      fireEvent.change(input, { target: { value: 'Test message' } })
-      fireEvent.submit(form)
+  it('aborts in-flight polling on unmount without logging a polling error', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      await waitFor(() => {
-        expect(input.value).toBe('')
-      })
-    })
+    fetchMock.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.includes('/api/messages?')) {
+        return new Promise((_, reject) => {
+          const signal = init?.signal;
+          if (!signal) {
+            reject(new Error('Missing abort signal'));
+            return;
+          }
 
-    it('does not send empty message', async () => {
-      ;fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockMessages),
-      })
+          signal.addEventListener(
+            'abort',
+            () => {
+              reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' }));
+            },
+            { once: true },
+          );
+        });
+      }
+      return createJsonResponse({ success: true, count: 0 });
+    });
 
-      render(<ChatWindow {...defaultProps} />)
+    const { unmount } = render(
+      <ChatWindow
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />,
+    );
 
-      await waitFor(() => {
-        expect(screen.getByText('Hello there!')).toBeInTheDocument()
-      })
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/messages?conversationId=conv-123&poll=1'),
+        expect.objectContaining({ method: 'GET' }),
+      );
+    });
 
-      // Clear the call count after initial fetch
-      const initialFetchCount = fetchSpy.mock.calls.length
+    unmount();
 
-      const input = screen.getByPlaceholderText('Type a message...')
-      const form = input.closest('form')!
+    await act(async () => {
+      await Promise.resolve();
+    });
 
-      fireEvent.change(input, { target: { value: '   ' } })
-      fireEvent.submit(form)
+    const loggedPollingError = errorSpy.mock.calls.some(
+      ([message]) => message === 'Polling error:',
+    );
 
-      // No additional fetch should be made for empty message
-      expect(fetchSpy.mock.calls.length).toBe(initialFetchCount)
-    })
-  })
-
-  describe('offline handling', () => {
-    it('shows offline banner when offline', async () => {
-      mockIsOffline.isOffline = true
-      ;fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockMessages),
-      })
-
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        expect(screen.getByText(/you're offline/i)).toBeInTheDocument()
-      })
-    })
-
-    it('shows offline placeholder in input when offline', async () => {
-      mockIsOffline.isOffline = true
-      ;fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockMessages),
-      })
-
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText("You're offline...")).toBeInTheDocument()
-      })
-    })
-
-    it('shows toast error when trying to send while offline', async () => {
-      // Start with offline state to ensure component renders with offline UI
-      mockIsOffline.isOffline = true
-      ;fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockMessages),
-      })
-
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText("You're offline...")).toBeInTheDocument()
-      })
-
-      const input = screen.getByPlaceholderText("You're offline...")
-      const form = input.closest('form')!
-
-      fireEvent.change(input, { target: { value: 'Test message' } })
-      fireEvent.submit(form)
-
-      expect(toast.error).toHaveBeenCalledWith('You are offline', expect.any(Object))
-    })
-  })
-
-  describe('failed message handling', () => {
-    it('shows failed message indicator when send fails', async () => {
-      ;fetchSpy
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockMessages) })
-        .mockRejectedValueOnce(new Error('Failed'))
-
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        expect(screen.getByText('Hello there!')).toBeInTheDocument()
-      })
-
-      const input = screen.getByPlaceholderText('Type a message...')
-      const form = input.closest('form')!
-
-      fireEvent.change(input, { target: { value: 'Failed message' } })
-      fireEvent.submit(form)
-
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Message failed to send', expect.any(Object))
-      })
-    })
-  })
-
-  describe('message display', () => {
-    it('aligns current user messages to the right', async () => {
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        const messageContainer = screen.getByText('Hello there!').closest('div[class*="flex"]')
-        expect(messageContainer).toHaveClass('justify-end')
-      })
-    })
-
-    it('aligns other user messages to the left', async () => {
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        const messageContainer = screen.getByText('Hi! How are you?').closest('div[class*="flex"]')
-        expect(messageContainer).toHaveClass('justify-start')
-      })
-    })
-  })
-
-  describe('accessibility', () => {
-    it('has accessible input placeholder', async () => {
-      ;fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockMessages),
-      })
-
-      render(<ChatWindow {...defaultProps} />)
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Type a message...')).toBeInTheDocument()
-      })
-    })
-  })
-})
+    expect(loggedPollingError).toBe(false);
+    errorSpy.mockRestore();
+  });
+});

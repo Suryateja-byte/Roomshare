@@ -19,7 +19,6 @@ jest.mock('@/lib/prisma', () => {
     },
     conversation: {
       findMany: jest.fn(),
-      findFirst: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
       count: jest.fn(),
@@ -142,7 +141,7 @@ describe('Messages Pagination (P1-03)', () => {
       const mockMessages = generateMockMessages(25);
       (prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages.slice(0, 21)); // +1 for hasMore check
       (prisma.message.count as jest.Mock).mockResolvedValue(25);
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],
@@ -163,7 +162,7 @@ describe('Messages Pagination (P1-03)', () => {
       const mockMessages = generateMockMessages(50);
       (prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages.slice(0, 51));
       (prisma.message.count as jest.Mock).mockResolvedValue(50);
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],
@@ -181,7 +180,7 @@ describe('Messages Pagination (P1-03)', () => {
       const mockMessages = generateMockMessages(150);
       (prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages.slice(0, 101));
       (prisma.message.count as jest.Mock).mockResolvedValue(150);
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],
@@ -205,7 +204,7 @@ describe('Messages Pagination (P1-03)', () => {
       const mockMessages = generateMockMessages(25);
       (prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages.slice(0, 21));
       (prisma.message.count as jest.Mock).mockResolvedValue(25);
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],
@@ -224,7 +223,7 @@ describe('Messages Pagination (P1-03)', () => {
       const mockMessages = generateMockMessages(10);
       (prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages);
       (prisma.message.count as jest.Mock).mockResolvedValue(10);
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],
@@ -243,7 +242,7 @@ describe('Messages Pagination (P1-03)', () => {
       const mockMessages = generateMockMessages(10, 20); // Messages 20-29
       (prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages);
       (prisma.message.count as jest.Mock).mockResolvedValue(30);
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],
@@ -264,7 +263,7 @@ describe('Messages Pagination (P1-03)', () => {
     });
 
     it('returns 400 for invalid cursor format', async () => {
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],
@@ -279,7 +278,7 @@ describe('Messages Pagination (P1-03)', () => {
     });
 
     it('returns 400 for negative limit', async () => {
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],
@@ -294,7 +293,7 @@ describe('Messages Pagination (P1-03)', () => {
     });
 
     it('returns 400 for non-numeric limit', async () => {
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],
@@ -312,7 +311,7 @@ describe('Messages Pagination (P1-03)', () => {
       const mockMessages = generateMockMessages(5);
       (prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages);
       (prisma.message.count as jest.Mock).mockResolvedValue(5);
-      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: 'conversation-abc',
         participants: [{ id: 'user-123' }],
         deletions: [],

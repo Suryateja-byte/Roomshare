@@ -66,6 +66,8 @@ describe("settings actions", () => {
       name: "Test User",
       email: "test@example.com",
     },
+    // P0-5: Fresh authTime for OAuth account deletion tests
+    authTime: Math.floor(Date.now() / 1000),
   };
 
   const defaultPreferences = {
@@ -174,6 +176,19 @@ describe("settings actions", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe("Failed to update preferences");
+    });
+
+    it("rejects extra properties via .strict() (G5.3)", async () => {
+      const prefsWithExtra = {
+        ...defaultPreferences,
+        extraField: true,
+      } as unknown as Parameters<typeof updateNotificationPreferences>[0];
+
+      const result = await updateNotificationPreferences(prefsWithExtra);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Invalid notification preferences");
+      expect(prisma.user.update).not.toHaveBeenCalled();
     });
   });
 
@@ -365,6 +380,40 @@ describe("settings actions", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe("Failed to delete account");
+    });
+
+    it("requires re-authentication for OAuth user with stale session", async () => {
+      // P0-5: Session older than 5 minutes should be rejected for OAuth users
+      (auth as jest.Mock).mockResolvedValue({
+        ...mockSession,
+        authTime: Math.floor(Date.now() / 1000) - 600, // 10 minutes ago
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        password: null,
+      });
+
+      const result = await deleteAccount();
+
+      expect(result.success).toBe(false);
+      expect(result.code).toBe("SESSION_FRESHNESS_REQUIRED");
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+    });
+
+    it("requires re-authentication for OAuth user with no authTime", async () => {
+      // P0-5: Sessions without authTime (pre-existing) should require re-auth
+      (auth as jest.Mock).mockResolvedValue({
+        user: mockSession.user,
+        // No authTime field
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        password: null,
+      });
+
+      const result = await deleteAccount();
+
+      expect(result.success).toBe(false);
+      expect(result.code).toBe("SESSION_FRESHNESS_REQUIRED");
+      expect(prisma.user.delete).not.toHaveBeenCalled();
     });
   });
 

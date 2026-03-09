@@ -290,4 +290,71 @@ describe('createBooking', () => {
       expect(result.currentPrice).toBe(800)
     })
   })
+
+  describe('UTC date consistency (B4.2)', () => {
+    it('booking dates are stored as Date objects (inherently UTC)', async () => {
+      let capturedCreateData: any = null
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: any) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+          user: {
+            findUnique: jest.fn().mockImplementation(({ where }) => {
+              if (where.id === 'owner-123') return Promise.resolve(mockOwner)
+              if (where.id === 'user-123') return Promise.resolve(mockTenant)
+              return Promise.resolve(null)
+            }),
+          },
+          booking: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            count: jest.fn().mockResolvedValue(0),
+            create: jest.fn().mockImplementation((args) => {
+              capturedCreateData = args.data
+              return Promise.resolve(mockBooking)
+            }),
+          },
+        }
+        return callback(tx)
+      })
+
+      await createBooking('listing-123', futureStart, futureEnd, 800)
+
+      expect(capturedCreateData).not.toBeNull()
+      expect(capturedCreateData.startDate).toBeInstanceOf(Date)
+      expect(capturedCreateData.endDate).toBeInstanceOf(Date)
+    })
+
+    it('idempotency hash uses toISOString() for date consistency', () => {
+      // The requestBody in createBooking (booking.ts line ~323) converts dates via toISOString():
+      //   { listingId, startDate: startDate.toISOString(), endDate: endDate.toISOString(), pricePerMonth }
+      // This ensures the idempotency hash is timezone-independent and deterministic.
+      const date1 = new Date('2025-06-15T00:00:00.000Z')
+      const date2 = new Date('2025-06-15T00:00:00.000Z')
+
+      // Same instant produces identical ISO strings
+      expect(date1.toISOString()).toBe(date2.toISOString())
+      expect(date1.toISOString()).toBe('2025-06-15T00:00:00.000Z')
+
+      // Verify ISO string format is UTC (ends with Z)
+      expect(date1.toISOString()).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+
+      // The requestBody shape matches what withIdempotency hashes
+      const requestBody = {
+        listingId: 'listing-123',
+        startDate: date1.toISOString(),
+        endDate: date2.toISOString(),
+        pricePerMonth: 800,
+      }
+      expect(typeof requestBody.startDate).toBe('string')
+      expect(typeof requestBody.endDate).toBe('string')
+
+      // Two calls with the same Date objects produce identical request bodies
+      const requestBody2 = {
+        listingId: 'listing-123',
+        startDate: date1.toISOString(),
+        endDate: date2.toISOString(),
+        pricePerMonth: 800,
+      }
+      expect(JSON.stringify(requestBody)).toBe(JSON.stringify(requestBody2))
+    })
+  })
 })

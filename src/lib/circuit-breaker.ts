@@ -241,4 +241,11 @@ export const circuitBreakers = {
     resetTimeout: 15000, // 15 seconds
     successThreshold: 2,
   }),
+
+  supabaseStorage: new CircuitBreaker({
+    name: 'supabase-storage',
+    failureThreshold: 5,
+    resetTimeout: 30000, // 30 seconds
+    successThreshold: 2,
+  }),
 };

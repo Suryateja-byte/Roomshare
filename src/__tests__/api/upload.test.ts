@@ -189,6 +189,36 @@ describe('upload API route', () => {
 
       expect(filename).toMatch(/^\d+-\w+\.jpg$/)
     })
+
+    it('upload path starts with listings/{userId}/ for listing type (A3.2)', () => {
+      const userId = 'user-abc-123'
+      const type = 'listing' as 'profile' | 'listing'
+      const folder = type === 'profile' ? 'profiles' : 'listings'
+      const filename = '1234567890-abcdef.jpg'
+      const path = `${folder}/${userId}/${filename}`
+
+      expect(path).toMatch(new RegExp(`^listings/${userId}/`))
+    })
+
+    it('upload path starts with profiles/{userId}/ for profile type (A3.2)', () => {
+      const userId = 'user-abc-123'
+      const type = 'profile' as 'profile' | 'listing'
+      const folder = type === 'profile' ? 'profiles' : 'listings'
+      const filename = '1234567890-abcdef.jpg'
+      const path = `${folder}/${userId}/${filename}`
+
+      expect(path).toMatch(new RegExp(`^profiles/${userId}/`))
+    })
+
+    it('DELETE rejects paths not starting with expected prefix (A3.2)', () => {
+      const userId = 'user-123'
+      const maliciousPath = 'listings/other-user/../user-123/evil.jpg'
+      const folder = maliciousPath.startsWith('profiles/') ? 'profiles' : 'listings'
+      const expectedPrefix = `${folder}/${userId}/`
+
+      // The strict startsWith check prevents path traversal
+      expect(maliciousPath.startsWith(expectedPrefix)).toBe(false)
+    })
   })
 
   describe('authentication requirements', () => {

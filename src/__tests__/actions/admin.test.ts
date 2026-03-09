@@ -572,6 +572,21 @@ describe('admin actions', () => {
         })
       )
     })
+
+    it('deletion cascades to related records via schema (B3.3)', async () => {
+      const mockListingDelete = jest.fn().mockResolvedValue({})
+      mockInteractiveTx({
+        listing: { delete: mockListingDelete },
+      })
+      ;(logAdminAction as jest.Mock).mockResolvedValue({})
+
+      const result = await deleteListing('listing-123')
+
+      expect(result.success).toBe(true)
+      expect(mockListingDelete).toHaveBeenCalledWith({
+        where: { id: 'listing-123' },
+      })
+    })
   })
 
   describe('getReports', () => {

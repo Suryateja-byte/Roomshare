@@ -15,6 +15,7 @@
  */
 
 import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
+import '@testing-library/jest-dom';
 
 // --------------------------------------------------------------------------
 // Mock Modules - Must be before component import
@@ -59,6 +60,31 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams,
 }));
 
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: (props: Record<string, unknown>) => {
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+    return <img {...props} />;
+  },
+}));
+
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({
+    children,
+    href,
+    ...props
+  }: {
+    children: React.ReactNode;
+    href: string;
+    [key: string]: unknown;
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
 // Mock listings for querySourceFeatures to return
 let mockQuerySourceFeaturesData: Array<{
   properties: {
@@ -73,6 +99,7 @@ let mockQuerySourceFeaturesData: Array<{
     tier?: string;
   };
 }> = [];
+let latestSourceProps: Record<string, unknown> | null = null;
 
 // Factory for creating mock map instance
 function createMockMapInstance() {
@@ -237,6 +264,7 @@ jest.mock('react-map-gl/maplibre', () => {
 
   const MockSource = ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => {
     const React = require('react');
+    latestSourceProps = props as Record<string, unknown>;
     return React.createElement('div', { 'data-testid': 'map-source', ...props }, children);
   };
 
@@ -429,6 +457,7 @@ describe('Map Component', () => {
     // Set up mock features for querySourceFeatures
     // This simulates what Mapbox returns for unclustered points
     mockQuerySourceFeaturesData = listingsToFeatures(mockListings);
+    latestSourceProps = null;
 
     // Set up env
     // No Mapbox token needed — geocoding uses free Photon + Nominatim
@@ -477,6 +506,47 @@ describe('Map Component', () => {
       });
       
       expect(screen.getByRole('switch', { name: /search as i move/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('geojson sanitization', () => {
+    it('coerces invalid numeric listing data before it reaches the cluster source', async () => {
+      render(
+        <MapComponent
+          listings={[
+            {
+              id: 'listing-bad-numbers',
+              title: 'Broken listing',
+              price: Number.NaN,
+              availableSlots: Number.POSITIVE_INFINITY,
+              images: ['https://example.com/img.jpg'],
+              location: { lat: Number.NaN, lng: Number.NaN },
+            } as any,
+          ]}
+        />,
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const sourceData = latestSourceProps?.data as {
+        features: Array<{
+          geometry: { coordinates: [number, number] };
+          properties: {
+            price: number;
+            availableSlots: number;
+            lat: number;
+            lng: number;
+          };
+        }>;
+      };
+
+      expect(sourceData.features[0].geometry.coordinates).toEqual([0, 0]);
+      expect(sourceData.features[0].properties.price).toBe(0);
+      expect(sourceData.features[0].properties.availableSlots).toBe(0);
+      expect(sourceData.features[0].properties.lat).toBe(0);
+      expect(sourceData.features[0].properties.lng).toBe(0);
     });
   });
 

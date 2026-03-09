@@ -30,8 +30,18 @@ jest.mock('@/hooks/useFormPersistence', () => ({
     cancelSave: jest.fn(),
     clearPersistedData: jest.fn(),
     isHydrated: true,
+    crossTabConflict: false,
+    dismissCrossTabConflict: jest.fn(),
   })),
   formatTimeSince: jest.fn(() => '2 minutes ago'),
+}))
+
+// Mock client-side Zod schema to not block submission in behavioral tests
+jest.mock('@/lib/schemas', () => ({
+  ...jest.requireActual('@/lib/schemas'),
+  createListingSchema: {
+    safeParse: jest.fn(() => ({ success: true, data: {} })),
+  },
 }))
 
 jest.mock('@/hooks/useNavigationGuard', () => ({
@@ -40,6 +50,7 @@ jest.mock('@/hooks/useNavigationGuard', () => ({
     message: '',
     onStay: jest.fn(),
     onLeave: jest.fn(),
+    disable: jest.fn(),
   }),
 }))
 
@@ -107,6 +118,8 @@ describe('CreateListingForm', () => {
       cancelSave: mockCancelSave,
       clearPersistedData: mockClearPersistedData,
       isHydrated: true,
+      crossTabConflict: false,
+      dismissCrossTabConflict: jest.fn(),
     })
   })
 
@@ -120,8 +133,20 @@ describe('CreateListingForm', () => {
     fireEvent.submit(document.querySelector('form')!)
   }
 
+  /** Fill all required fields so client-side Zod validation passes */
+  function fillRequiredFields() {
+    fireEvent.change(screen.getByLabelText(/listing title/i), { target: { value: 'Test Listing' } })
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: 'A great place to live with roommates nearby' } })
+    fireEvent.change(screen.getByLabelText(/monthly rent/i), { target: { value: '1000' } })
+    fireEvent.change(screen.getByLabelText(/street address/i), { target: { value: '123 Main St' } })
+    fireEvent.change(screen.getByLabelText(/city/i), { target: { value: 'Austin' } })
+    fireEvent.change(screen.getByLabelText(/state/i), { target: { value: 'Texas' } })
+    fireEvent.change(screen.getByLabelText(/zip code/i), { target: { value: '78701' } })
+  }
+
   /** Add one successful image and submit the form */
   async function addImageAndSubmit() {
+    fillRequiredFields()
     fireEvent.click(screen.getByTestId('add-success-image'))
     await screen.findByRole('button', { name: /publish with 1 photo/i })
     submitForm()
@@ -181,6 +206,8 @@ describe('CreateListingForm', () => {
         saveData: jest.fn(),
         clearPersistedData: jest.fn(),
         isHydrated: true,
+        crossTabConflict: false,
+        dismissCrossTabConflict: jest.fn(),
       })
 
       render(<CreateListingForm />)
@@ -199,6 +226,8 @@ describe('CreateListingForm', () => {
         saveData: jest.fn(),
         clearPersistedData: clearMock,
         isHydrated: true,
+        crossTabConflict: false,
+        dismissCrossTabConflict: jest.fn(),
       })
 
       render(<CreateListingForm />)
@@ -217,6 +246,8 @@ describe('CreateListingForm', () => {
         saveData: jest.fn(),
         clearPersistedData: jest.fn(),
         isHydrated: true,
+        crossTabConflict: false,
+        dismissCrossTabConflict: jest.fn(),
       })
 
       render(<CreateListingForm />)
@@ -342,6 +373,7 @@ describe('CreateListingForm', () => {
 
     it('redirects after 1s delay', async () => {
       render(<CreateListingForm />)
+      fillRequiredFields()
       fireEvent.click(screen.getByTestId('add-success-image'))
       await screen.findByRole('button', { name: /publish with 1 photo/i })
 
@@ -513,6 +545,7 @@ describe('CreateListingForm', () => {
       fetchSpy.mockImplementationOnce(() => new Promise(() => {}))
 
       render(<CreateListingForm />)
+      fillRequiredFields()
       fireEvent.click(screen.getByTestId('add-success-image'))
       await screen.findByRole('button', { name: /publish with 1 photo/i })
 
@@ -526,6 +559,7 @@ describe('CreateListingForm', () => {
   describe('partial upload dialog', () => {
     it('shows dialog when images have mixed status', async () => {
       render(<CreateListingForm />)
+      fillRequiredFields()
 
       fireEvent.click(screen.getByTestId('add-mixed-images'))
       await screen.findByRole('button', { name: /publish with 1 photo/i })
@@ -538,6 +572,7 @@ describe('CreateListingForm', () => {
 
     it('confirms partial submit', async () => {
       render(<CreateListingForm />)
+      fillRequiredFields()
 
       fireEvent.click(screen.getByTestId('add-mixed-images'))
       await screen.findByRole('button', { name: /publish with 1 photo/i })
@@ -555,6 +590,7 @@ describe('CreateListingForm', () => {
 
     it('cancels without submitting', async () => {
       render(<CreateListingForm />)
+      fillRequiredFields()
 
       fireEvent.click(screen.getByTestId('add-mixed-images'))
       await screen.findByRole('button', { name: /publish with 1 photo/i })
@@ -598,6 +634,7 @@ describe('CreateListingForm', () => {
       fetchSpy.mockImplementationOnce(() => new Promise(() => {}))
 
       render(<CreateListingForm />)
+      fillRequiredFields()
       fireEvent.click(screen.getByTestId('add-success-image'))
       await screen.findByRole('button', { name: /publish with 1 photo/i })
 

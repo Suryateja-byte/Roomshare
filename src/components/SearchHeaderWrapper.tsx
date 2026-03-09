@@ -13,7 +13,7 @@
  * - Shows compact search pill when scrolled down
  */
 
-import { useCallback, useState, useRef, useEffect } from "react";
+import { Suspense, useCallback, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, MessageSquare, Menu, User, Plus, Heart, Settings, LogOut } from "lucide-react";
 import { useScrollHeader } from "@/hooks/useScrollHeader";
@@ -156,7 +156,9 @@ export default function SearchHeaderWrapper() {
 
             {/* Search Form */}
             <div className="flex-1 min-w-0 relative">
-              <SearchForm />
+              <Suspense fallback={<div className="h-12" />}>
+                <SearchForm />
+              </Suspense>
             </div>
 
             {/* Right Actions - User Profile / Auth */}

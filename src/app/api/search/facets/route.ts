@@ -702,14 +702,12 @@ export async function GET(request: NextRequest) {
       // Build cache key and fetch with caching
       const cacheKey = generateFacetsCacheKey(filterParams);
 
-      const cachedFn = unstable_cache(
-        async () => getFacetsInternal(filterParams),
-        ["search-facets", cacheKey],
-        { revalidate: CACHE_TTL },
-      );
-
       const facets = await withTimeout(
-        cachedFn(),
+        unstable_cache(
+          async () => getFacetsInternal(filterParams),
+          ["search-facets", cacheKey],
+          { revalidate: CACHE_TTL },
+        )(),
         DEFAULT_TIMEOUTS.DATABASE,
         "search-facets-getFacetsInternal",
       );

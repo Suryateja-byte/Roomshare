@@ -202,7 +202,7 @@ describe('POST /api/listings — XSS / injection / boundary tests', () => {
     ;(checkEmailVerified as jest.Mock).mockResolvedValue({ verified: true })
     ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'user-123' })
     ;(prisma.listing.count as jest.Mock).mockResolvedValue(0)
-    ;(geocodeAddress as jest.Mock).mockResolvedValue({ lat: 37.7749, lng: -122.4194 })
+    ;(geocodeAddress as jest.Mock).mockResolvedValue({ status: 'success', lat: 37.7749, lng: -122.4194 })
   })
 
   // =========================================================================

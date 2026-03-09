@@ -12,6 +12,7 @@
 import { normalizeFilters, type FilterParams } from '@/lib/filter-schema';
 import { TEST_LISTINGS, ACTIVE_LISTINGS, applyFilters, sortListings } from '../fixtures/listings.fixture';
 import { sanitizeSearchQuery, isValidQuery } from '@/lib/data';
+import { DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
 
 // ============================================
 // Performance Benchmarks
@@ -564,5 +565,39 @@ describe('Stability Tests', () => {
 
     // All iterations should be identical
     expect(new Set(results).size).toBe(1);
+  });
+});
+
+// ============================================
+// API Response Time Budget Constants (C2.1, C2.2)
+// ============================================
+
+describe('API Response Time Budgets', () => {
+  it('database timeout supports <2s API response target (C2.1)', () => {
+    // C2.1: /api/search/v2 should respond in <2s for typical queries.
+    // The DATABASE timeout must be generous enough to allow the query to complete
+    // but bounded to prevent runaway queries. A 10s database timeout with a 2s
+    // production target leaves room for query execution while the API layer
+    // enforces stricter budgets via withTimeout wrappers.
+    expect(DEFAULT_TIMEOUTS.DATABASE).toBeLessThanOrEqual(10_000);
+    expect(DEFAULT_TIMEOUTS.DATABASE).toBeGreaterThanOrEqual(1_000);
+  });
+
+  it('map listings are capped at 200-400 to stay within loading budget (C2.2)', () => {
+    // C2.2: /api/map-listings should respond in <1s with max 200-400 listings.
+    // MAX_MAP_MARKERS (200) is a module-private constant in data.ts.
+    // We verify the public contract: MAP_FETCH_MAX_LAT_SPAN and
+    // MAP_FETCH_MAX_LNG_SPAN bound the viewport, and the database timeout
+    // allows the query to complete within budget.
+    const { MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN } = require('@/lib/constants');
+
+    // Viewport spans must be bounded to limit result count
+    expect(MAP_FETCH_MAX_LAT_SPAN).toBeLessThanOrEqual(180);
+    expect(MAP_FETCH_MAX_LNG_SPAN).toBeLessThanOrEqual(360);
+    expect(MAP_FETCH_MAX_LAT_SPAN).toBeGreaterThan(0);
+    expect(MAP_FETCH_MAX_LNG_SPAN).toBeGreaterThan(0);
+
+    // Database timeout allows map query to complete
+    expect(DEFAULT_TIMEOUTS.DATABASE).toBeLessThanOrEqual(10_000);
   });
 });

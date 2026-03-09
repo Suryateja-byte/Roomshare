@@ -56,7 +56,7 @@ export default function FeaturedListingsClient({ listings }: FeaturedListingsCli
     if (!listings || listings.length === 0) {
         return (
             <LazyMotion features={domAnimation}>
-            <section className="py-24 md:py-32 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800/50">
+            <section data-testid="featured-listings-section" className="py-24 md:py-32 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800/50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
                     <m.div
                         initial="hidden"
@@ -88,7 +88,7 @@ export default function FeaturedListingsClient({ listings }: FeaturedListingsCli
 
     return (
         <LazyMotion features={domAnimation}>
-        <section className="py-24 md:py-32 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800/50 relative">
+        <section data-testid="featured-listings-section" className="py-24 md:py-32 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800/50 relative">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
                 <m.div
                     initial="hidden"

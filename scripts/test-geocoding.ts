@@ -13,7 +13,7 @@ async function testGeocoding() {
         console.log(`\nTesting: ${address}`);
         const result = await geocodeAddress(address);
 
-        if (result) {
+        if (result.status === 'success') {
             console.log(`  ✓ Result: lat=${result.lat}, lng=${result.lng}`);
 
             // Check if it's the fallback coordinates
@@ -22,8 +22,10 @@ async function testGeocoding() {
             } else {
                 console.log('  ✓ SUCCESS: Unique coordinates received');
             }
+        } else if (result.status === 'not_found') {
+            console.log('  ✗ No results found for this address');
         } else {
-            console.log('  ✗ ERROR: Geocoding returned null');
+            console.log(`  ✗ ERROR: ${result.message}`);
         }
     }
 }

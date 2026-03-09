@@ -391,22 +391,27 @@ describe('SearchResultsClient', () => {
           hasNextPage: false,
         });
 
-      const { rerender } = render(<SearchResultsClient {...defaultProps} />);
+      // Use a key wrapper so changing searchParamsString unmounts/remounts (matching production behavior)
+      const Wrapper = ({ params }: { params: string }) => (
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={params === 'q=test' ? defaultProps.initialListings : [createMockListing('new-1')]}
+          initialNextCursor={params === 'q=test' ? defaultProps.initialNextCursor : 'new-cursor'}
+          searchParamsString={params}
+          query={params === 'q=test' ? 'test' : ''}
+          key={params}
+        />
+      );
+
+      const { rerender } = render(<Wrapper params="q=test" />);
 
       fireEvent.click(screen.getByRole('button', { name: /show more/i }));
       await waitFor(() => {
         expect(screen.getByTestId('listing-old-extra')).toBeInTheDocument();
       });
 
-      rerender(
-        <SearchResultsClient
-          {...defaultProps}
-          initialListings={[createMockListing('new-1')]}
-          initialNextCursor="new-cursor"
-          searchParamsString="languages=te&minLat=37.7&maxLat=37.85&minLng=-122.5&maxLng=-122.3"
-          query=""
-        />
-      );
+      const newParams = "languages=te&minLat=37.7&maxLat=37.85&minLng=-122.5&maxLng=-122.3";
+      rerender(<Wrapper params={newParams} />);
 
       expect(screen.queryByTestId('listing-old-extra')).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /show more/i }));
@@ -440,7 +445,20 @@ describe('SearchResultsClient', () => {
       fireEvent.click(screen.getByRole('button', { name: /show more/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+        expect(screen.getByText(/Failed to load more results/i)).toBeInTheDocument();
+      });
+    });
+
+    it('displays rate limit friendly message', async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      mockFetch.mockRejectedValueOnce(new Error('Rate limit exceeded'));
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /show more/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Too many requests/i)).toBeInTheDocument();
       });
     });
 
@@ -485,7 +503,7 @@ describe('SearchResultsClient', () => {
       fireEvent.click(screen.getByRole('button', { name: /show more/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+        expect(screen.getByText(/Failed to load more results/i)).toBeInTheDocument();
       });
 
       // Click try again
@@ -496,7 +514,7 @@ describe('SearchResultsClient', () => {
       });
 
       // Error message should be cleared
-      expect(screen.queryByText(/Network error/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Failed to load more results/i)).not.toBeInTheDocument();
     });
 
     it('clears previous error when new load succeeds', async () => {
@@ -510,7 +528,7 @@ describe('SearchResultsClient', () => {
       fireEvent.click(screen.getByRole('button', { name: /show more/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/First error/i)).toBeInTheDocument();
+        expect(screen.getByText(/Failed to load more results/i)).toBeInTheDocument();
       });
 
       // Second call succeeds
@@ -523,7 +541,7 @@ describe('SearchResultsClient', () => {
       fireEvent.click(screen.getByRole('button', { name: /try again/i }));
 
       await waitFor(() => {
-        expect(screen.queryByText(/First error/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Failed to load more results/i)).not.toBeInTheDocument();
         expect(screen.getByTestId('listing-3')).toBeInTheDocument();
       });
     });
@@ -533,12 +551,10 @@ describe('SearchResultsClient', () => {
     it('shows loading indicator while fetching', async () => {
       const mockFetch = fetchMoreListings as jest.Mock;
       let resolvePromise: (value: unknown) => void;
-      mockFetch.mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolvePromise = resolve;
-          })
-      );
+      // Create the deferred promise eagerly so resolvePromise is assigned
+      // before any mock invocation (avoids React 18 batching timing issues)
+      const pending = new Promise((resolve) => { resolvePromise = resolve; });
+      mockFetch.mockReturnValueOnce(pending);
 
       render(<SearchResultsClient {...defaultProps} />);
 
@@ -564,12 +580,8 @@ describe('SearchResultsClient', () => {
     it('disables load more button while loading', async () => {
       const mockFetch = fetchMoreListings as jest.Mock;
       let resolvePromise: (value: unknown) => void;
-      mockFetch.mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolvePromise = resolve;
-          })
-      );
+      const pending = new Promise((resolve) => { resolvePromise = resolve; });
+      mockFetch.mockReturnValueOnce(pending);
 
       render(<SearchResultsClient {...defaultProps} />);
 
@@ -590,12 +602,8 @@ describe('SearchResultsClient', () => {
     it('prevents multiple simultaneous load more requests', async () => {
       const mockFetch = fetchMoreListings as jest.Mock;
       let resolvePromise: (value: unknown) => void;
-      mockFetch.mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            resolvePromise = resolve;
-          })
-      );
+      const pending = new Promise((resolve) => { resolvePromise = resolve; });
+      mockFetch.mockReturnValue(pending);
 
       render(<SearchResultsClient {...defaultProps} />);
 

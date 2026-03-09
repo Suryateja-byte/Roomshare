@@ -1,30 +1,22 @@
 /**
- * Tests for messages unread count API route
+ * Tests for unread count reads through the consolidated messages API route
  */
+
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    message: {
+      count: jest.fn(),
+    },
+  },
+}));
 
 jest.mock('@/auth', () => ({
   auth: jest.fn(),
-}))
-
-jest.mock('@/app/actions/chat', () => ({
-  getUnreadMessageCount: jest.fn(),
-}))
+}));
 
 jest.mock('@/lib/with-rate-limit', () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
-}))
-
-jest.mock('@/lib/logger', () => ({
-  logger: {
-    sync: {
-      debug: jest.fn(),
-      error: jest.fn(),
-    },
-  },
-  sanitizeErrorMessage: jest.fn((e: unknown) =>
-    e instanceof Error ? e.message : typeof e === 'string' ? e : 'Unknown error'
-  ),
-}))
+}));
 
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -34,108 +26,74 @@ jest.mock('next/server', () => ({
       headers: new Map(),
     }),
   },
-}))
+}));
 
-import { GET } from '@/app/api/messages/unread/route'
-import { auth } from '@/auth'
-import { getUnreadMessageCount } from '@/app/actions/chat'
+import { GET } from '@/app/api/messages/route';
+import { prisma } from '@/lib/prisma';
+import { auth } from '@/auth';
 
-// Helper to create mock request
-const createMockRequest = () => new Request('http://localhost/api/messages/unread')
+const createMockRequest = () => new Request('http://localhost/api/messages?view=unreadCount');
 
-describe('Messages Unread API', () => {
+describe('GET /api/messages?view=unreadCount', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
   it('returns unread count for authenticated user', async () => {
-    const mockSession = { user: { id: 'user-123' } }
+    (auth as jest.Mock).mockResolvedValue({ user: { id: 'user-123' } });
+    (prisma.message.count as jest.Mock).mockResolvedValue(5);
 
-    ;(auth as jest.Mock).mockResolvedValue(mockSession)
-    ;(getUnreadMessageCount as jest.Mock).mockResolvedValue(5)
+    const response = await GET(createMockRequest());
+    const data = await response.json();
 
-    const response = await GET(createMockRequest())
-    const data = await response.json()
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ count: 5 });
+    expect(prisma.message.count).toHaveBeenCalledWith({
+      where: {
+        conversation: {
+          participants: {
+            some: { id: 'user-123' },
+          },
+          deletedAt: null,
+          deletions: { none: { userId: 'user-123' } },
+        },
+        senderId: { not: 'user-123' },
+        read: false,
+        deletedAt: null,
+      },
+    });
+  });
 
-    expect(response.status).toBe(200)
-    expect(data.count).toBe(5)
-  })
+  it('returns 0 when no unread messages exist', async () => {
+    (auth as jest.Mock).mockResolvedValue({ user: { id: 'user-123' } });
+    (prisma.message.count as jest.Mock).mockResolvedValue(0);
 
-  it('returns 0 when no unread messages', async () => {
-    const mockSession = { user: { id: 'user-123' } }
+    const response = await GET(createMockRequest());
+    const data = await response.json();
 
-    ;(auth as jest.Mock).mockResolvedValue(mockSession)
-    ;(getUnreadMessageCount as jest.Mock).mockResolvedValue(0)
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ count: 0 });
+  });
 
-    const response = await GET(createMockRequest())
-    const data = await response.json()
+  it('returns 401 when not authenticated', async () => {
+    (auth as jest.Mock).mockResolvedValue(null);
 
-    expect(response.status).toBe(200)
-    expect(data.count).toBe(0)
-  })
+    const response = await GET(createMockRequest());
+    const data = await response.json();
 
-  it('returns 401 when user is not authenticated', async () => {
-    ;(auth as jest.Mock).mockResolvedValue(null)
+    expect(response.status).toBe(401);
+    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(prisma.message.count).not.toHaveBeenCalled();
+  });
 
-    const response = await GET(createMockRequest())
-    const data = await response.json()
+  it('returns 500 when the unread count query fails', async () => {
+    (auth as jest.Mock).mockResolvedValue({ user: { id: 'user-123' } });
+    (prisma.message.count as jest.Mock).mockRejectedValue(new Error('DB Error'));
 
-    expect(response.status).toBe(401)
-    expect(data.error).toBe('Unauthorized')
-  })
+    const response = await GET(createMockRequest());
+    const data = await response.json();
 
-  it('returns 401 when session has no user id', async () => {
-    ;(auth as jest.Mock).mockResolvedValue({ user: {} })
-
-    const response = await GET(createMockRequest())
-    const data = await response.json()
-
-    expect(response.status).toBe(401)
-    expect(data.error).toBe('Unauthorized')
-  })
-
-  it('handles errors gracefully', async () => {
-    const mockSession = { user: { id: 'user-123' } }
-
-    ;(auth as jest.Mock).mockResolvedValue(mockSession)
-    ;(getUnreadMessageCount as jest.Mock).mockRejectedValue(new Error('DB Error'))
-
-    const response = await GET(createMockRequest())
-    const data = await response.json()
-
-    expect(response.status).toBe(500)
-    expect(data.error).toBe('Internal server error')
-  })
-
-  it('calls getUnreadMessageCount when authenticated', async () => {
-    const mockSession = { user: { id: 'user-123' } }
-
-    ;(auth as jest.Mock).mockResolvedValue(mockSession)
-    ;(getUnreadMessageCount as jest.Mock).mockResolvedValue(10)
-
-    await GET(createMockRequest())
-
-    expect(getUnreadMessageCount).toHaveBeenCalled()
-  })
-
-  it('does not call getUnreadMessageCount when not authenticated', async () => {
-    ;(auth as jest.Mock).mockResolvedValue(null)
-
-    await GET(createMockRequest())
-
-    expect(getUnreadMessageCount).not.toHaveBeenCalled()
-  })
-
-  it('returns large unread counts correctly', async () => {
-    const mockSession = { user: { id: 'user-123' } }
-
-    ;(auth as jest.Mock).mockResolvedValue(mockSession)
-    ;(getUnreadMessageCount as jest.Mock).mockResolvedValue(999)
-
-    const response = await GET(createMockRequest())
-    const data = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(data.count).toBe(999)
-  })
-})
+    expect(response.status).toBe(500);
+    expect(data).toEqual({ error: 'Internal server error' });
+  });
+});

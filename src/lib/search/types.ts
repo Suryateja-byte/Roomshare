@@ -25,7 +25,7 @@ export type SearchV2Mode = "geojson" | "pins";
 export interface SearchV2FeatureProperties {
   id: string;
   title: string;
-  price: number | null;
+  price: number;
   image: string | null;
   availableSlots: number;
   /** @deprecated No longer populated in API responses (S3 security fix) */

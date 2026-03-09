@@ -36,6 +36,43 @@ import {
   shouldIncludePlace,
 } from "@/lib/nearby-categories";
 
+function isFiniteLatitude(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= -90 && value <= 90;
+}
+
+function isFiniteLongitude(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= -180 && value <= 180;
+}
+
+function sanitizeNearbyPlace(place: NearbyPlace, source: "autocomplete" | "places"): NearbyPlace | null {
+  const lat = place.location?.lat;
+  const lng = place.location?.lng;
+  const distanceMiles = place.distanceMiles;
+
+  if (
+    !isFiniteLatitude(lat) ||
+    !isFiniteLongitude(lng) ||
+    typeof distanceMiles !== "number" ||
+    !Number.isFinite(distanceMiles) ||
+    distanceMiles < 0
+  ) {
+    logger.sync.warn("Skipping nearby place with invalid numeric data", {
+      source,
+      placeId: place.id,
+    });
+    return null;
+  }
+
+  return {
+    ...place,
+    location: {
+      lat,
+      lng,
+    },
+    distanceMiles,
+  };
+}
+
 // Validation schema for request body
 const requestSchema = z.object({
   listingLat: z.number().min(-90).max(90),
@@ -215,7 +252,10 @@ export async function POST(request: Request) {
       // Apply server-side distance filtering since Radar Autocomplete doesn't support radius parameter
       const places: NearbyPlace[] = (radarData.addresses || [])
         .filter(
-          (addr) => addr.latitude && addr.longitude && addr.layer === "place",
+          (addr) =>
+            addr.layer === "place" &&
+            isFiniteLatitude(addr.latitude) &&
+            isFiniteLongitude(addr.longitude),
         )
         .map(
           (addr): NearbyPlace => ({
@@ -239,6 +279,8 @@ export async function POST(request: Request) {
             ),
           }),
         )
+        .map((place) => sanitizeNearbyPlace(place, "autocomplete"))
+        .filter((place): place is NearbyPlace => place !== null)
         .filter((place) => place.distanceMiles <= radiusMiles) // Enforce radius filter
         .sort((a, b) => a.distanceMiles - b.distanceMiles)
         .slice(0, limit); // Limit to requested count after filtering
@@ -396,6 +438,11 @@ export async function POST(request: Request) {
         const placeLat = place.location.coordinates[1];
         const placeLng = place.location.coordinates[0];
 
+        if (!isFiniteLatitude(placeLat) || !isFiniteLongitude(placeLng)) {
+          logger.sync.warn("Place has invalid coordinates", { placeId: place._id });
+          return null;
+        }
+
         const nearbyPlace: NearbyPlace = {
           id:
             place._id || `place-${placeLat.toFixed(6)}-${placeLng.toFixed(6)}`,
@@ -419,7 +466,7 @@ export async function POST(request: Request) {
           nearbyPlace.chain = place.chain.name;
         }
 
-        return nearbyPlace;
+        return sanitizeNearbyPlace(nearbyPlace, "places");
       })
       .filter((place): place is NearbyPlace => place !== null)
       // Apply category-specific filtering to exclude irrelevant results

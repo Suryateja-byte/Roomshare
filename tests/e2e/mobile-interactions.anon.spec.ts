@@ -484,7 +484,7 @@ test.describe("Mobile Filter Interaction", () => {
 
     // The Filters button is in the search form header area
     // It uses aria-label containing "Filters"
-    const filtersBtn = page.locator(mobileSelectors.filtersButton).first();
+    const filtersBtn = page.locator(`${mobileSelectors.filtersButton}:visible`).first();
     const filtersVisible = await filtersBtn
       .isVisible({ timeout: 5000 })
       .catch(() => false);
@@ -508,7 +508,7 @@ test.describe("Mobile Filter Interaction", () => {
 
     if (!modalOpened) {
       // Retry: try clicking with Playwright's native click
-      await page.locator(mobileSelectors.filtersButton).first().click({ force: true });
+      await page.locator(`${mobileSelectors.filtersButton}:visible`).first().click({ force: true });
     }
 
     await expect(modal.first()).toBeVisible({ timeout: 10_000 });
@@ -522,7 +522,7 @@ test.describe("Mobile Filter Interaction", () => {
       return;
     }
 
-    const filtersBtn = page.locator(mobileSelectors.filtersButton).first();
+    const filtersBtn = page.locator(`${mobileSelectors.filtersButton}:visible`).first();
     if (!(await filtersBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
       test.skip(true, "Filters button not visible on mobile");
       return;
@@ -538,7 +538,7 @@ test.describe("Mobile Filter Interaction", () => {
       .catch(() => false);
     if (!modalOpened) {
       // Retry: try native click
-      await page.locator(mobileSelectors.filtersButton).first().click({ force: true });
+      await page.locator(`${mobileSelectors.filtersButton}:visible`).first().click({ force: true });
       const retryOpened = await modal.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
       if (!retryOpened) {
         test.skip(true, "Filter modal did not open");

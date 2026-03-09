@@ -51,16 +51,19 @@ export async function GET(request: NextRequest) {
             return NextResponse.redirect(new URL('/?error=user_not_found', request.url));
         }
 
-        // Update user's emailVerified timestamp
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { emailVerified: new Date() }
-        });
-
-        // Delete the used token
-        await prisma.verificationToken.delete({
-            where: { tokenHash }
-        });
+        // Atomic: delete token + verify user in one transaction to prevent race conditions
+        try {
+            await prisma.$transaction(async (tx) => {
+                const deleted = await tx.verificationToken.deleteMany({ where: { tokenHash } });
+                if (deleted.count === 0) throw new Error('TOKEN_ALREADY_USED');
+                await tx.user.update({ where: { id: user.id }, data: { emailVerified: new Date() } });
+            });
+        } catch (error) {
+            if (error instanceof Error && error.message === 'TOKEN_ALREADY_USED') {
+                return NextResponse.redirect(new URL('/?error=already_verified', request.url));
+            }
+            throw error;
+        }
 
         // Redirect to home with success message
         return NextResponse.redirect(new URL('/?verified=true', request.url));

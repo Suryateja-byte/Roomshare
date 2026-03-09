@@ -14,19 +14,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
-import { sanitizeErrorMessage } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { computeRecommendedScore } from "@/lib/search/recommended-score";
-
-function verifyCronSecret(authHeader: string | null, cronSecret: string): boolean {
-  if (!authHeader) return false;
-  const expected = `Bearer ${cronSecret}`;
-  const providedBuf = Buffer.from(authHeader);
-  const expectedBuf = Buffer.from(expected);
-  if (providedBuf.length !== expectedBuf.length) return false;
-  return timingSafeEqual(providedBuf, expectedBuf);
-}
+import { validateCronAuth } from "@/lib/cron-auth";
 
 // Number of dirty listings to process per cron run
 const BATCH_SIZE = parseInt(process.env.SEARCH_DOC_BATCH_SIZE || "100", 10);
@@ -244,37 +235,8 @@ async function handleOrphanDirtyFlags(
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify the request is from Vercel Cron
-    const authHeader = request.headers.get("authorization");
-    const cronSecret = process.env.CRON_SECRET;
-
-    // Defense in depth: validate secret configuration
-    if (!cronSecret || cronSecret.length < 32) {
-      console.error(
-        "[SearchDoc Cron] CRON_SECRET not configured or too short (min 32 chars)",
-      );
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 },
-      );
-    }
-
-    // Reject placeholder values
-    if (
-      cronSecret.includes("change-in-production") ||
-      cronSecret.startsWith("your-") ||
-      cronSecret.startsWith("generate-")
-    ) {
-      console.error("[SearchDoc Cron] CRON_SECRET contains placeholder value");
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 },
-      );
-    }
-
-    if (!verifyCronSecret(authHeader, cronSecret)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const authError = validateCronAuth(request);
+    if (authError) return authError;
 
     const startTime = Date.now();
 
@@ -322,19 +284,14 @@ export async function GET(request: NextRequest) {
 
     const durationMs = Date.now() - startTime;
 
-    console.log(JSON.stringify({
+    logger.sync.info('[SearchDoc Cron] Complete', {
       event: "search_doc_cron_complete",
       processed: upsertedCount,
       orphans: orphanCount,
       errors: errors.length,
       totalDirty: dirtyIds.length,
       durationMs,
-    }));
-
-    console.log(
-      `[SearchDoc Cron] Processed: ${upsertedCount}, Orphans: ${orphanCount}, ` +
-        `Errors: ${errors.length}, Duration: ${durationMs}ms`,
-    );
+    });
 
     return NextResponse.json({
       success: errors.length === 0,
@@ -345,7 +302,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[SearchDoc Cron] Error:", error);
+    logger.sync.error('[SearchDoc Cron] Error', { error: sanitizeErrorMessage(error) });
     return NextResponse.json(
       { error: "SearchDoc refresh failed" },
       { status: 500 },

@@ -1,50 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { timingSafeEqual } from 'crypto';
 import * as Sentry from '@sentry/nextjs';
 import { processSearchAlerts } from '@/lib/search-alerts';
 import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { withRetry } from '@/lib/retry';
-
-function verifyCronSecret(authHeader: string | null, cronSecret: string): boolean {
-    if (!authHeader) return false;
-    const expected = `Bearer ${cronSecret}`;
-    const providedBuf = Buffer.from(authHeader);
-    const expectedBuf = Buffer.from(expected);
-    if (providedBuf.length !== expectedBuf.length) return false;
-    return timingSafeEqual(providedBuf, expectedBuf);
-}
+import { validateCronAuth } from '@/lib/cron-auth';
 
 // Vercel Cron or external cron service endpoint
 // Secured with CRON_SECRET in all environments
 export async function GET(request: NextRequest) {
-    // Verify authorization - required in all environments
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    // Defense in depth: validate secret configuration
-    if (!cronSecret || cronSecret.length < 32) {
-        logger.sync.error('[Cron] CRON_SECRET not configured or too short (min 32 chars)');
-        return NextResponse.json(
-            { error: 'Server configuration error' },
-            { status: 500 }
-        );
-    }
-
-    // Reject placeholder values
-    if (cronSecret.includes('change-in-production') || cronSecret.startsWith('your-') || cronSecret.startsWith('generate-')) {
-        logger.sync.error('[Cron] CRON_SECRET contains placeholder value');
-        return NextResponse.json(
-            { error: 'Server configuration error' },
-            { status: 500 }
-        );
-    }
-
-    if (!verifyCronSecret(authHeader, cronSecret)) {
-        return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
-        );
-    }
+    const authError = validateCronAuth(request);
+    if (authError) return authError;
 
     try {
         logger.sync.info('Starting search alerts processing...');

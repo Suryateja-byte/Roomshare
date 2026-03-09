@@ -187,15 +187,10 @@ export const emailTemplates = {
     newMessage: (data: {
         recipientName: string;
         senderName: string;
-        messagePreview: string;
         conversationId: string;
     }) => {
         const safeRecipientName = escapeHtml(data.recipientName);
         const safeSenderName = escapeHtml(data.senderName);
-        const messagePreview = data.messagePreview.length > 150
-            ? `${data.messagePreview.substring(0, 150)}...`
-            : data.messagePreview;
-        const safeMessagePreview = escapeHtml(messagePreview);
         const conversationHref = buildAppHref(`/messages/${encodeURIComponent(data.conversationId)}`);
 
         return {
@@ -206,13 +201,8 @@ export const emailTemplates = {
                 Hi ${safeRecipientName},
             </p>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                You have a new message from <strong>${safeSenderName}</strong>:
+                You have a new message from <strong>${safeSenderName}</strong>. Open the app to read it.
             </p>
-            <div style="background-color: #f4f4f5; border-radius: 12px; padding: 20px; margin-bottom: 24px; border-left: 4px solid #18181b;">
-                <p style="margin: 0; color: #18181b; font-size: 16px; font-style: italic;">
-                    "${safeMessagePreview}"
-                </p>
-            </div>
             <a href="${conversationHref}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 Reply to Message
             </a>

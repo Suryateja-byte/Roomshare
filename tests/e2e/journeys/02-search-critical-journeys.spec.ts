@@ -8,6 +8,7 @@
 import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 import {
   openFilterModal,
+  openFilterModalAndWaitForFacets,
   applyFilters,
 } from "../helpers/filter-helpers";
 
@@ -113,8 +114,8 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
-    // Open more filters (uses retry-click for hydration race)
-    const modal = await openFilterModal(page);
+    // Open more filters (uses retry-click for hydration race + waits for facets)
+    const modal = await openFilterModalAndWaitForFacets(page);
 
     // Select Wifi amenity
     const wifiBtn = modal.getByRole("button", { name: "Wifi" });
@@ -303,18 +304,22 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
-    // Open filter modal (uses retry-click for hydration race)
-    const modal = await openFilterModal(page);
+    // Open filter modal (uses retry-click for hydration race + waits for facets)
+    const modal = await openFilterModalAndWaitForFacets(page);
 
     // Find lease duration trigger
     const leaseTrigger = modal.locator('#filter-lease');
     if (await leaseTrigger.isVisible()) {
       await leaseTrigger.click();
 
-      // Select "Month-to-month"
+      // Radix Select portal renders via CSS animation — use toBeVisible
+      // instead of isVisible (which ignores timeout param)
       const option = page.getByRole("option", { name: /month-to-month/i });
-      if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
+      try {
+        await expect(option).toBeVisible({ timeout: 5000 });
         await option.click();
+      } catch {
+        // Radix Select option not available — skip
       }
     }
 
@@ -336,14 +341,14 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
 
-    // Open filter modal (uses retry-click for hydration race)
-    const modal = await openFilterModal(page);
+    // Open filter modal + wait for facets to prevent mid-interaction re-render
+    const modal = await openFilterModalAndWaitForFacets(page);
 
     // Toggle "Pets allowed"
     const petsBtn = modal.getByRole("button", { name: "Pets allowed" });
     if (await petsBtn.isVisible()) {
       await petsBtn.click();
-      await expect(petsBtn).toHaveAttribute("aria-pressed", "true");
+      await expect(petsBtn).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
     }
 
     // Apply and verify

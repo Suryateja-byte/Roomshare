@@ -182,6 +182,24 @@ describe('useNavigationGuard', () => {
     unmount2()
   })
 
+  it('disable() immediately prevents pushState interception', () => {
+    const { result, unmount } = renderHook(() => useNavigationGuard(true, 'unsaved'))
+
+    // Imperatively disable the guard
+    act(() => {
+      result.current.disable()
+    })
+
+    // Cross-pathname push should now go through without showing dialog
+    act(() => {
+      window.history.pushState(null, '', '/other-page')
+    })
+
+    expect(result.current.showDialog).toBe(false)
+
+    unmount()
+  })
+
   it('does not add listeners when shouldBlock=false', () => {
     const addSpy = jest.spyOn(window, 'addEventListener')
 

@@ -11,6 +11,7 @@
 import { test, expect, selectors, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 import {
   openFilterModal,
+  openFilterModalAndWaitForFacets,
   applyFilters,
   closeFilterModal,
 } from "../helpers/filter-helpers";
@@ -135,7 +136,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
 
-    const modal = await openFilterModal(page);
+    const modal = await openFilterModalAndWaitForFacets(page);
 
     // Toggle multiple amenities — use retry to handle hydration race on Mobile Chrome
     const amenityFieldset = modal.locator('fieldset').filter({ hasText: /amenities/i });
@@ -503,23 +504,25 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
 
-    const modal = await openFilterModal(page);
+    const modal = await openFilterModalAndWaitForFacets(page);
 
     const amenityFieldset = modal.locator('fieldset').filter({ hasText: /amenities/i });
-    // Re-query each time — React re-renders replace DOM elements after state changes
-    const getFirstAmenity = () => amenityFieldset.getByRole("button").first();
+    // Use named locator instead of positional .first() — flex-wrap layout
+    // can resolve .first() to different buttons across viewports
+    const amenityName = "Wifi";
+    const getAmenity = () => amenityFieldset.getByRole("button", { name: new RegExp(amenityName, "i") });
 
-    if (await getFirstAmenity().isVisible()) {
+    if (await getAmenity().isVisible()) {
       // Initially unpressed
-      await expect(getFirstAmenity()).toHaveAttribute("aria-pressed", "false");
+      await expect(getAmenity()).toHaveAttribute("aria-pressed", "false", { timeout: 5_000 });
 
       // Click to select
-      await getFirstAmenity().click();
-      await expect(getFirstAmenity()).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
+      await getAmenity().click();
+      await expect(getAmenity()).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
 
       // Click again to deselect
-      await getFirstAmenity().click();
-      await expect(getFirstAmenity()).toHaveAttribute("aria-pressed", "false", { timeout: 5_000 });
+      await getAmenity().click();
+      await expect(getAmenity()).toHaveAttribute("aria-pressed", "false", { timeout: 5_000 });
     }
 
     await closeFilterModal(page);

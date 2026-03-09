@@ -770,4 +770,117 @@ describe("Search API v2 route", () => {
       expect(getListingsPaginated).toHaveBeenCalled();
     });
   });
+
+  describe("Stability contract: data filtering guarantees", () => {
+    beforeEach(() => {
+      mockFeatures.searchV2 = true;
+      jest.clearAllMocks();
+    });
+
+    it("excludes PAUSED listings from search results (F2.3)", async () => {
+      // The route delegates filtering to getListingsPaginated which includes
+      // SQL condition: l.status = 'ACTIVE'. We verify:
+      // 1. getListingsPaginated is called (delegation)
+      // 2. Only ACTIVE listings returned by the data layer appear in response
+
+      const activeListings = [
+        createMockListingData("active-1", { title: "Active Listing" }),
+        createMockListingData("active-2", { title: "Another Active" }),
+      ];
+
+      const mockListResult: PaginatedResultHybrid<ListingData> = {
+        items: activeListings,
+        hasNextPage: false,
+        hasPrevPage: false,
+        total: 2,
+        totalPages: 1,
+        page: 1,
+        limit: 20,
+      };
+
+      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
+      (getMapListings as jest.Mock).mockResolvedValue([]);
+
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+
+      // Verify delegation to data layer (which enforces status = 'ACTIVE')
+      expect(getListingsPaginated).toHaveBeenCalled();
+
+      // Verify only the ACTIVE listings from the data layer appear in results
+      expect(data.list.items).toHaveLength(2);
+      expect(data.list.items.map((item: { id: string }) => item.id)).toEqual([
+        "active-1",
+        "active-2",
+      ]);
+
+      // Verify the route does not inject any additional listings
+      // (no PAUSED, DRAFT, or other non-ACTIVE status listings can appear)
+      expect(data.list.total).toBe(2);
+    });
+
+    it("excludes listings with null coordinates from map results (F1.1)", async () => {
+      // The route delegates map data to getMapListings which includes SQL conditions:
+      //   ST_X(loc.coords::geometry) IS NOT NULL
+      //   ST_Y(loc.coords::geometry) IS NOT NULL
+      // We verify:
+      // 1. getMapListings is called (delegation)
+      // 2. Only listings with valid coordinates appear in map GeoJSON
+
+      const validMapListings = [
+        createMockMapListingData("valid-1", 37.7749, -122.4194),
+        createMockMapListingData("valid-2", 34.0522, -118.2437),
+      ];
+
+      const mockListResult: PaginatedResultHybrid<ListingData> = {
+        items: [],
+        hasNextPage: false,
+        hasPrevPage: false,
+        total: 0,
+        totalPages: 0,
+        page: 1,
+        limit: 20,
+      };
+
+      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
+      (getMapListings as jest.Mock).mockResolvedValue(validMapListings);
+
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+
+      // Verify delegation to data layer (which enforces non-null coordinates)
+      expect(getMapListings).toHaveBeenCalled();
+
+      // Verify GeoJSON features only contain valid coordinates
+      const features = data.map.geojson.features;
+      expect(features).toHaveLength(2);
+      features.forEach(
+        (feature: {
+          geometry: { coordinates: [number, number] };
+          properties: { id: string };
+        }) => {
+          const [lng, lat] = feature.geometry.coordinates;
+          expect(lng).not.toBeNull();
+          expect(lat).not.toBeNull();
+          expect(typeof lng).toBe("number");
+          expect(typeof lat).toBe("number");
+          expect(Number.isFinite(lng)).toBe(true);
+          expect(Number.isFinite(lat)).toBe(true);
+        },
+      );
+
+      // Verify feature IDs match our valid listings
+      const featureIds = features.map(
+        (f: { properties: { id: string } }) => f.properties.id,
+      );
+      expect(featureIds).toContain("valid-1");
+      expect(featureIds).toContain("valid-2");
+    });
+  });
 });

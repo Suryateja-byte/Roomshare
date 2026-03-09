@@ -74,7 +74,6 @@ export default function UserAvatar({ image, name, size = 'md', className }: User
                     alt={name || 'User'}
                     fill
                     sizes={`${sizePx[size]}px`}
-                    quality={90}
                     className={cn("object-cover transition-opacity duration-200", isLoading ? "opacity-0" : "opacity-100")}
                     onLoad={() => {
                         if (process.env.NODE_ENV === 'development') {

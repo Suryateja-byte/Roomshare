@@ -556,7 +556,7 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
 
     // Apply a filter (if filter buttons exist)
     const filterBtn = page.locator(
-      'button:has-text("Filter"), button:has-text("Filters")',
+      'button[data-hydrated][aria-label^="Filters"]',
     );
     const hasFilter = await filterBtn.first().isVisible().catch(() => false);
 

@@ -15,7 +15,6 @@ import { CategoryBar } from '@/components/search/CategoryBar';
 import { RecommendedFilters } from '@/components/search/RecommendedFilters';
 import type { V2MapData } from '@/contexts/SearchV2DataContext';
 import { features } from '@/lib/env';
-import { preload } from 'react-dom';
 import { withTimeout, DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import { sanitizeErrorMessage } from '@/lib/logger';
@@ -48,28 +47,6 @@ type SearchPageSearchParams = {
 
 interface SearchPageProps {
     searchParams: Promise<SearchPageSearchParams>;
-}
-
-
-// P2-2: Server-side preload hints for LCP optimization
-// Must match ListingCard.tsx PLACEHOLDER_IMAGES for consistent fallback behavior
-const PLACEHOLDER_IMAGES = [
-    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1484154218962-a1c002085d2f?auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1502005229766-528352261b79?auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80"
-];
-
-// Helper to get first image URL for a listing (matches ListingCard logic)
-function getFirstImageUrl(listing: { id: string; images?: string[] }): string {
-    if (listing.images && listing.images.length > 0) {
-        return listing.images[0];
-    }
-    // Deterministic placeholder selection based on listing ID
-    const placeholderIndex = listing.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % PLACEHOLDER_IMAGES.length;
-    return PLACEHOLDER_IMAGES[placeholderIndex];
 }
 
 export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
@@ -188,7 +165,9 @@ export default async function SearchPage({
     let v2NextCursor: string | null = null;
 
     // Check if v2 is enabled via feature flag OR query param override (?v2=1)
-    const v2Override = rawParams.v2 === '1' || rawParams.v2 === 'true';
+    // P0-7 FIX: Only allow v2 override in non-production (prevents feature flag bypass)
+    const v2Override = process.env.NODE_ENV !== 'production'
+        && (rawParams.v2 === '1' || rawParams.v2 === 'true');
     const useV2Search = features.searchV2 || v2Override;
 
     // Try v2 orchestration if enabled
@@ -285,16 +264,6 @@ export default async function SearchPage({
             'analyzeFilterImpact',
         ).catch(() => [] as FilterSuggestion[])
         : [];
-
-    // P2-2: Preload first 4 listing images for LCP optimization
-    // This emits <link rel="preload" as="image"> in the server-rendered HTML
-    // Only preload when we have results to display
-    if (listings.length > 0) {
-        listings.slice(0, 4).forEach((listing) => {
-            const imageUrl = getFirstImageUrl(listing);
-            preload(imageUrl, { as: 'image' });
-        });
-    }
 
     // Build search params string for client-side "Load more" fetches
     // Include all filter/sort params but NOT cursor/page (those are managed client-side)

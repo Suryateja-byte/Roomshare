@@ -15,6 +15,7 @@ import {
 } from "./helpers/test-utils";
 import {
   openFilterModal,
+  filtersButton,
   SEARCH_URL,
 } from "./helpers/filter-helpers";
 
@@ -121,31 +122,18 @@ test.describe("Search A11y: Filter Modal Accessibility", () => {
 
   // 5. Focus returns to trigger button when modal closed
   test("5. focus returns to trigger button when modal closed", { tag: [tags.a11y] }, async ({ page }) => {
-    // Remember the filters button
-    const triggerButton = page.getByRole("button", { name: /^Filters/ });
+    // Remember the filters button (hydration-aware)
+    const triggerButton = filtersButton(page);
 
-    await expect(triggerButton).toBeVisible();
+    await expect(triggerButton).toBeVisible({ timeout: 20_000 });
 
-    // Open modal with retry-click for hydration race
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
-    await triggerButton.click();
-
-    const modal = page.locator('[role="dialog"][aria-modal="true"]');
-    const visible = await modal
-      .waitFor({ state: "visible", timeout: 5_000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!visible) {
-      // Retry: hydration may not have attached onClick on first click
-      await triggerButton.click();
-      await expect(modal).toBeVisible({ timeout: 30_000 });
-    }
+    // Open modal using shared helper
+    const modal = await openFilterModal(page);
 
     // Close with the close button (X button with aria-label="Close filters")
-    const closeButton = modal.locator('button[aria-label="Close filters"]');
-    if (await closeButton.isVisible()) {
-      await closeButton.click();
+    const closeBtn = modal.locator('button[aria-label="Close filters"]');
+    if (await closeBtn.isVisible()) {
+      await closeBtn.click();
     } else {
       // Fallback: press Escape
       await page.keyboard.press("Escape");

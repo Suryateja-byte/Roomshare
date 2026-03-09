@@ -16,7 +16,9 @@ import {
 } from '@/components/ui/select';
 import { Loader2, Home, MapPin, List, ArrowLeft, FileText, CheckCircle, RefreshCcw, AlertCircle, X } from 'lucide-react';
 import Link from 'next/link';
+import * as Sentry from '@sentry/nextjs';
 import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
+import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -58,6 +60,7 @@ interface Listing {
     roomType: string | null;
     totalSlots: number;
     moveInDate: Date | null;
+    updatedAt?: string;
     location: {
         address: string;
         city: string;
@@ -112,6 +115,15 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     const [showDraftBanner, setShowDraftBanner] = useState(false);
     const [draftRestored, setDraftRestored] = useState(false);
 
+    const submitAbortRef = useRef<AbortController | null>(null);
+
+    // Cleanup: abort in-flight submit on unmount
+    useEffect(() => {
+        return () => {
+            submitAbortRef.current?.abort();
+        };
+    }, []);
+
     // Form field states for premium components
     const [description, setDescription] = useState(listing.description || '');
     const [moveInDate, setMoveInDate] = useState(formatDateForInput(listing.moveInDate));
@@ -131,9 +143,18 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
         hasDraft,
         savedAt,
         saveData,
+        cancelSave,
         clearPersistedData,
-        isHydrated
+        isHydrated,
+        crossTabConflict,
+        dismissCrossTabConflict,
     } = useFormPersistence<EditListingFormData>({ key: FORM_STORAGE_KEY });
+
+    // Navigation guard for unsaved changes
+    const navGuard = useNavigationGuard(
+        formModified && !loading,
+        'You have unsaved changes. Leave without saving?'
+    );
 
     // Show draft banner when we have a draft and haven't restored yet
     useEffect(() => {
@@ -197,6 +218,18 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     const restoreDraft = () => {
         if (!persistedData || !formRef.current) return;
 
+        // Staleness check: discard draft if listing was updated after draft was saved
+        if (savedAt && listing.updatedAt) {
+            const draftTime = savedAt.getTime();
+            const listingTime = new Date(listing.updatedAt).getTime();
+            if (draftTime < listingTime) {
+                clearPersistedData();
+                setShowDraftBanner(false);
+                setDraftRestored(true);
+                return;
+            }
+        }
+
         const form = formRef.current;
         (form.elements.namedItem('title') as HTMLInputElement).value = persistedData.title || listing.title;
         setDescription(persistedData.description || listing.description);
@@ -258,20 +291,6 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
         const formData = collectFormData();
         saveData(formData);
     }, [description, moveInDate, leaseDuration, roomType, genderPreference, householdGender, selectedLanguages]);
-
-    // Warn user when navigating away with unsaved changes
-    useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (formModified && !loading) {
-                e.preventDefault();
-                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-                return e.returnValue;
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [formModified, loading]);
 
     // Track form modifications (legacy - now merged with save)
     const handleFormChange = () => {
@@ -335,9 +354,13 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
 
+        const controller = new AbortController();
+        submitAbortRef.current = controller;
+
         try {
             const res = await fetch(`/api/listings/${listing.id}`, {
                 method: 'PATCH',
+                signal: controller.signal,
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -362,17 +385,23 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                 throw new Error(json.error || 'Failed to update listing');
             }
 
-            // Clear draft on successful submission
+            // Clear draft and navigate on success
+            cancelSave();
             clearPersistedData();
-            // Redirect to listing page on success
+            navGuard.disable();
             router.push(`/listings/${listing.id}`);
             router.refresh();
         } catch (err: any) {
+            if (err.name === 'AbortError') return; // Component unmounted
+            Sentry.captureException(err, {
+                tags: { component: 'EditListingForm', action: 'submit' },
+            });
             setError(err.message);
             // Save current form state on error so nothing is lost
             saveData(collectFormData());
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
+            submitAbortRef.current = null;
             setLoading(false);
         }
     };
@@ -456,6 +485,13 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                 </div>
             )}
 
+            {crossTabConflict && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 mb-4">
+                    <p>This draft was modified in another tab. Reload to see the latest version.</p>
+                    <button onClick={dismissCrossTabConflict} className="underline mt-1">Dismiss</button>
+                </div>
+            )}
+
             {/* Auto-save status indicator */}
             {!showDraftBanner && savedAt && formModified && !loading && (
                 <div className="flex items-center justify-end gap-2 mb-4 text-xs text-zinc-500 dark:text-zinc-400 animate-in fade-in duration-300">
@@ -477,6 +513,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             id="title"
                             name="title"
                             required
+                            maxLength={100}
                             defaultValue={listing.title}
                             placeholder="e.g. Sun-drenched Loft in Arts District"
                             disabled={loading}
@@ -492,6 +529,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             name="description"
                             required
                             rows={5}
+                            maxLength={1000}
                             className="w-full bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:bg-white dark:focus:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3.5 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/10 focus:border-zinc-900 dark:focus:border-zinc-500 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed"
                             placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
                             disabled={loading}
@@ -509,6 +547,8 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                 id="price"
                                 name="price"
                                 type="number"
+                                step="0.01"
+                                min="0.01"
                                 required
                                 defaultValue={listing.price}
                                 placeholder="2400"
@@ -541,7 +581,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                         <ImageIcon className="w-4 h-4" /> Photos
                     </h3>
 
-                    <div className="space-y-2">
+                    <div id="images" className="space-y-2">
                         <p className="text-sm text-zinc-500 dark:text-zinc-400">
                             Add photos of your space to attract potential roommates. The first image will be used as the main photo.
                         </p>
@@ -551,10 +591,11 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             maxImages={10}
                             uploadToCloud={true}
                         />
+                        <FieldError field="images" />
 
                         {images.length === 0 && (
                             <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
-                                ⚠️ At least one photo is required for your listing
+                                At least one photo is required for your listing
                             </p>
                         )}
 
@@ -580,6 +621,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             id="address"
                             name="address"
                             required
+                            maxLength={200}
                             defaultValue={listing.location?.address || ''}
                             placeholder="123 Boulevard St"
                             disabled={loading}
@@ -593,6 +635,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                 id="city"
                                 name="city"
                                 required
+                                maxLength={100}
                                 defaultValue={listing.location?.city || ''}
                                 placeholder="San Francisco"
                                 disabled={loading}
@@ -604,6 +647,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                 id="state"
                                 name="state"
                                 required
+                                maxLength={100}
                                 defaultValue={listing.location?.state || ''}
                                 placeholder="CA"
                                 disabled={loading}
@@ -615,6 +659,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                 id="zip"
                                 name="zip"
                                 required
+                                maxLength={20}
                                 defaultValue={listing.location?.zip || ''}
                                 placeholder="94103"
                                 disabled={loading}
@@ -684,7 +729,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                         </div>
                     </div>
 
-                    <div>
+                    <div id="householdLanguages">
                         <Label>Languages Spoken in the House</Label>
                         <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-3">Select languages spoken by household members</p>
 
@@ -735,6 +780,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                 </p>
                             )}
                         </div>
+                        <FieldError field="householdLanguages" />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -812,6 +858,21 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                     </Button>
                 </div>
             </form>
+
+            {navGuard.showDialog && (
+                <AlertDialog open={navGuard.showDialog}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                            <AlertDialogDescription>{navGuard.message}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel onClick={navGuard.onStay}>Stay</AlertDialogCancel>
+                            <AlertDialogAction onClick={navGuard.onLeave}>Leave</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
         </>
     );
 }

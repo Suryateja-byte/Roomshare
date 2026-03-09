@@ -27,6 +27,7 @@ import {
   isValidQuery,
   crossesAntimeridian,
 } from "@/lib/search-types";
+import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
 import {
   LOW_RESULTS_THRESHOLD,
   expandFiltersForNearMatches,
@@ -225,24 +226,29 @@ function buildKeysetWhereClause(
 
   switch (sort) {
     case "recommended": {
-      // ORDER BY: recommended_score DESC, listing_created_at DESC, id ASC
-      // k[0] = recommended_score, k[1] = listing_created_at
+      // ORDER BY: recommended_score DESC NULLS LAST, listing_created_at DESC, id ASC
+      // k[0] = recommended_score (may be null), k[1] = listing_created_at
       const scoreParam = nextParam();
       const dateParam = nextParam();
       const idParam = nextParam();
+      const cursorScore = cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      params.push(cursorScore, cursor.k[1], cursor.id);
 
-      // Cast string cursor values back to proper types
-      params.push(
-        cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null,
-        cursor.k[1],
-        cursor.id,
-      );
-
-      clause = `(
-        (d.recommended_score < ${scoreParam}::float8)
-        OR (d.recommended_score = ${scoreParam}::float8 AND d.listing_created_at < ${dateParam}::timestamptz)
-        OR (d.recommended_score = ${scoreParam}::float8 AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
-      )`;
+      if (cursorScore === null) {
+        clause = `(
+            d.recommended_score IS NULL AND (
+                d.listing_created_at < ${dateParam}::timestamptz
+                OR (d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
+            )
+        )`;
+      } else {
+        clause = `(
+            (d.recommended_score < ${scoreParam}::float8)
+            OR (d.recommended_score IS NULL)
+            OR (d.recommended_score = ${scoreParam}::float8 AND d.listing_created_at < ${dateParam}::timestamptz)
+            OR (d.recommended_score = ${scoreParam}::float8 AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
+        )`;
+      }
       break;
     }
 
@@ -389,7 +395,7 @@ function buildKeysetWhereClause(
 // Build WHERE conditions for SearchDoc queries
 // ============================================
 
-interface WhereBuilder {
+export interface WhereBuilder {
   conditions: string[];
   params: unknown[];
   paramIndex: number;
@@ -397,7 +403,7 @@ interface WhereBuilder {
   ftsQueryParamIndex: number | null;
 }
 
-function buildSearchDocWhereConditions(
+export function buildSearchDocWhereConditions(
   filterParams: FilterParams,
 ): WhereBuilder {
   // SECURITY INVARIANT:
@@ -604,7 +610,7 @@ export function buildOrderByClause(
       return `d.avg_rating DESC NULLS LAST, d.review_count DESC, ${tsRankExpr}d.listing_created_at DESC, d.id ASC`;
     case "recommended":
     default:
-      return `d.recommended_score DESC, ${tsRankExpr}d.listing_created_at DESC, d.id ASC`;
+      return `d.recommended_score DESC NULLS LAST, ${tsRankExpr}d.listing_created_at DESC, d.id ASC`;
   }
 }
 
@@ -778,17 +784,17 @@ async function getSearchDocMapListingsInternal(
     const truncated = listings.length > MAX_MAP_MARKERS;
     const trimmedListings = truncated ? listings.slice(0, MAX_MAP_MARKERS) : listings;
 
-    const mappedListings = trimmedListings.map((l) => ({
+    const mappedListings = sanitizeMapListings(trimmedListings.map((l) => ({
       id: l.id,
       title: l.title,
-      price: Number(l.price),
+      price: l.price,
       availableSlots: l.availableSlots,
       images: l.primaryImage ? [l.primaryImage] : [],
       location: {
-        lat: Number(l.lat) || 0,
-        lng: Number(l.lng) || 0,
+        lat: l.lat,
+        lng: l.lng,
       },
-    }));
+    })));
 
     return {
       listings: mappedListings,

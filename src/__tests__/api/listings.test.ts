@@ -300,8 +300,8 @@ describe('Listings API', () => {
       expect(response.status).toBe(400)
     })
 
-    it('returns 400 when geocoding fails', async () => {
-      ;(geocodeAddress as jest.Mock).mockResolvedValue(null)
+    it('returns 400 when geocoding finds no results', async () => {
+      ;(geocodeAddress as jest.Mock).mockResolvedValue({ status: 'not_found' })
 
       const request = new Request('http://localhost/api/listings', {
         method: 'POST',
@@ -325,7 +325,7 @@ describe('Listings API', () => {
     })
 
     it('creates listing successfully', async () => {
-      ;(geocodeAddress as jest.Mock).mockResolvedValue({ lat: 37.7749, lng: -122.4194 })
+      ;(geocodeAddress as jest.Mock).mockResolvedValue({ status: 'success', lat: 37.7749, lng: -122.4194 })
       const mockListing = {
         id: 'listing-new',
         title: 'Cozy Room in Downtown',
@@ -358,7 +358,7 @@ describe('Listings API', () => {
     })
 
     it('handles database errors', async () => {
-      ;(geocodeAddress as jest.Mock).mockResolvedValue({ lat: 37.7749, lng: -122.4194 })
+      ;(geocodeAddress as jest.Mock).mockResolvedValue({ status: 'success', lat: 37.7749, lng: -122.4194 })
       ;(prisma.$transaction as jest.Mock).mockRejectedValue(new Error('DB Error'))
 
       const request = new Request('http://localhost/api/listings', {
@@ -413,7 +413,7 @@ describe('Listings API', () => {
     })
 
     it('returns 400 when max listings exceeded', async () => {
-      ;(geocodeAddress as jest.Mock).mockResolvedValue({ lat: 37.7749, lng: -122.4194 })
+      ;(geocodeAddress as jest.Mock).mockResolvedValue({ status: 'success', lat: 37.7749, lng: -122.4194 })
       ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
         const tx = {
           listing: { create: jest.fn() },

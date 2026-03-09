@@ -1,10 +1,25 @@
+import { cache } from 'react';
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import { getReviews } from '@/lib/data';
 import { trackListingView } from '@/app/actions/listing-status';
 import { Metadata } from 'next';
 import { auth } from '@/auth';
+import { logger, sanitizeErrorMessage } from '@/lib/logger';
+import { sanitizeUnicode } from '@/lib/schemas';
 import ListingPageClient from './ListingPageClient';
+
+const getListingWithLocation = cache(async (id: string) => {
+    return prisma.listing.findUnique({
+        where: { id },
+        include: {
+            owner: {
+                select: { id: true, name: true, image: true, isVerified: true, bio: true, createdAt: true }
+            },
+            location: true,
+        },
+    });
+});
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -12,12 +27,9 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     const { id } = await params;
-    const listing = await prisma.listing.findUnique({
-        where: { id },
-        include: { location: true },
-    });
+    const listing = await getListingWithLocation(id);
 
-    if (!listing) {
+    if (!listing || listing.status !== 'ACTIVE') {
         return { title: 'Listing Not Found' };
     }
 
@@ -27,8 +39,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80';
 
     return {
-        title: `Rent this ${listing.title} in ${listing.location?.city || 'City'} | RoomShare`,
-        description: listing.description.substring(0, 160),
+        title: `Rent this ${sanitizeUnicode(listing.title)} in ${listing.location?.city || 'City'} | RoomShare`,
+        description: sanitizeUnicode(listing.description).substring(0, 160),
         openGraph: {
             images: [ogImage],
         },
@@ -38,24 +50,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ListingPage({ params }: PageProps) {
     const { id } = await params;
     const session = await auth();
-    const listing = await prisma.listing.findUnique({
-        where: { id },
-        include: {
-            owner: {
-                select: {
-                    id: true,
-                    name: true,
-                    image: true,
-                    isVerified: true,
-                    bio: true,
-                    createdAt: true,
-                }
-            },
-            location: true,
-        },
-    });
+    const listing = await getListingWithLocation(id);
 
     if (!listing) {
+        notFound();
+    }
+
+    const isOwner = session?.user?.id === listing.ownerId;
+    const isAdmin = session?.user?.isAdmin === true;
+    if (listing.status !== 'ACTIVE' && !isOwner && !isAdmin) {
         notFound();
     }
 
@@ -78,7 +81,10 @@ export default async function ListingPage({ params }: PageProps) {
                 };
             }
         } catch (error) {
-            console.error('Failed to fetch coordinates:', error);
+            logger.sync.error('Failed to fetch coordinates', {
+                listingId: listing.id,
+                error: sanitizeErrorMessage(error),
+            });
         }
     }
 
@@ -101,7 +107,6 @@ export default async function ListingPage({ params }: PageProps) {
     });
 
     const reviews = await getReviews(listing.id);
-    const isOwner = session?.user?.id === listing.ownerId;
 
     // Check if logged-in user has already reviewed this listing
     let userExistingReview = null;

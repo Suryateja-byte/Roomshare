@@ -86,7 +86,7 @@ jest.mock("@/lib/search-alerts", () => ({
 }));
 
 jest.mock("@/lib/geocoding", () => ({
-  geocodeAddress: jest.fn().mockResolvedValue({ lat: 37.7749, lng: -122.4194 }),
+  geocodeAddress: jest.fn().mockResolvedValue({ status: 'success', lat: 37.7749, lng: -122.4194 }),
 }));
 
 describe("markListingDirty integration", () => {

@@ -392,6 +392,38 @@ describe('POST /api/nearby', () => {
 
       expect(data.places[0].chain).toBe('Starbucks')
     })
+
+    it('filters out places with invalid numeric coordinates', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          meta: { code: 200 },
+          places: [
+            {
+              _id: 'place-valid',
+              name: 'Valid Place',
+              location: { type: 'Point', coordinates: [-122.4180, 37.7760] },
+              categories: ['indian-restaurant'],
+              formattedAddress: '123 Main St',
+            },
+            {
+              _id: 'place-invalid',
+              name: 'Broken Place',
+              location: { type: 'Point', coordinates: [null, 37.77] },
+              categories: ['indian-restaurant'],
+              formattedAddress: '456 Broken St',
+            },
+          ],
+        }),
+      })
+
+      const response = await POST(createRequest(validRequestBody))
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.places).toHaveLength(1)
+      expect(data.places[0].id).toBe('place-valid')
+    })
   })
 
   describe('error handling', () => {

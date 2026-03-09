@@ -216,7 +216,7 @@ export async function hasPasswordSet(): Promise<boolean> {
 
 export async function deleteAccount(
     password?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; code?: string }> {
     const session = await auth();
     if (!session?.user?.id) {
         return { success: false, error: 'Not authenticated' };
@@ -243,6 +243,13 @@ export async function deleteAccount(
             const isValid = await bcrypt.compare(password, user.password);
             if (!isValid) {
                 return { success: false, error: 'Password is incorrect' };
+            }
+        } else {
+            // P0-5 FIX: OAuth accounts — require fresh session (signed in within last 5 min)
+            const SESSION_FRESHNESS_SECONDS = 5 * 60;
+            const authTime = session.authTime;
+            if (!authTime || (Math.floor(Date.now() / 1000) - authTime > SESSION_FRESHNESS_SECONDS)) {
+                return { success: false, error: 'Please sign in again to confirm account deletion.', code: 'SESSION_FRESHNESS_REQUIRED' };
             }
         }
 

@@ -72,7 +72,7 @@ export const supabaseImageUrlSchema = z.string()
   .regex(SUPABASE_IMAGE_URL_PATTERN, "Image must be from Supabase storage")
   .refine((url) => {
     const expectedHost = getExpectedSupabaseHost();
-    if (!expectedHost) return true; // Skip host pin if env not configured
+    if (!expectedHost) return false; // Fail-closed: reject if env not configured
     try {
       const parsed = new URL(url);
       return parsed.host === expectedHost;
@@ -106,15 +106,23 @@ export const moveInDateSchema = z.string()
   .optional()
   .nullable();
 
+/** Strip zero-width and invisible Unicode characters, NFC-normalize */
+export function sanitizeUnicode(str: string): string {
+    return str
+        .normalize('NFC')
+        .replace(/[\u200B-\u200F\u2028-\u202F\uFEFF\u00AD]/g, '')
+        .trim();
+}
+
 // Defense-in-depth: reject HTML tags in user-facing text fields (M-D4)
-const noHtmlTags = (val: string) => !/<[^>]*>/.test(val);
-const NO_HTML_MSG = "HTML tags are not allowed";
+export const noHtmlTags = (val: string) => !/<[^>]*>/.test(val);
+export const NO_HTML_MSG = "HTML tags are not allowed";
 
 export const createListingSchema = z.object({
-    title: z.string().trim().min(1, "Title is required").max(100, "Title must be 100 characters or less").refine(noHtmlTags, NO_HTML_MSG),
-    description: z.string().trim().min(10, "Description must be at least 10 characters").max(1000, "Description must be 1000 characters or less").refine(noHtmlTags, NO_HTML_MSG),
-    price: z.coerce.number().positive("Price must be a positive number").max(50000, "Maximum $50,000/month").refine(Number.isFinite, "Must be a valid number"),
-    amenities: z.string().transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)).pipe(z.array(z.string().max(50, "Each amenity max 50 chars")).max(20, "Maximum 20 amenities").refine(items => items.every(item => VALID_AMENITIES.some(v => v.toLowerCase() === item.toLowerCase())), { message: "Invalid amenity value" })),
+    title: z.string().trim().min(1, "Title is required").max(100, "Title must be 100 characters or less").transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
+    description: z.string().trim().min(10, "Description must be at least 10 characters").max(1000, "Description must be 1000 characters or less").transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
+    price: z.coerce.number().positive("Price must be a positive number").multipleOf(0.01, "Price cannot have fractional cents").max(50000, "Maximum $50,000/month").refine(Number.isFinite, "Must be a valid number"),
+    amenities: z.string().optional().default("").transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)).pipe(z.array(z.string().max(50, "Each amenity max 50 chars")).max(20, "Maximum 20 amenities").refine(items => items.every(item => VALID_AMENITIES.some(v => v.toLowerCase() === item.toLowerCase())), { message: "Invalid amenity value" })),
     houseRules: z.string().optional().default("").transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)).pipe(z.array(z.string().max(50, "Each house rule max 50 chars")).max(20, "Maximum 20 house rules").refine(items => items.every(item => VALID_HOUSE_RULES.some(v => v.toLowerCase() === item.toLowerCase())), { message: "Invalid house rule value" })),
     totalSlots: z.coerce.number().int().positive("Total slots must be a positive integer").max(20, "Maximum 20 roommates"),
     address: z.string().trim().min(1, "Address is required").max(200, "Address must be 200 characters or less"),

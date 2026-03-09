@@ -104,7 +104,7 @@ export class CreateListingPage {
 
     // State — error banner uses role="alert" and data-testid
     this.errorBanner = page.locator('[data-testid="form-error-banner"]');
-    this.draftBanner = page.getByText('You have an unsaved draft');
+    this.draftBanner = page.getByText('You have a saved draft');
     this.resumeDraftButton = page.getByRole('button', { name: 'Resume Draft' });
     this.startFreshButton = page.getByRole('button', { name: 'Start Fresh' });
     this.autoSaveIndicator = page.getByText(/Draft saved/);
@@ -131,6 +131,7 @@ export class CreateListingPage {
     await this.titleInput.fill(data.title);
     await this.descriptionInput.fill(data.description);
     await this.priceInput.fill(String(data.price));
+    await expect(this.priceInput).toHaveValue(String(data.price), { timeout: 2_000 });
     if (data.totalSlots !== undefined) {
       await this.totalSlotsInput.fill(String(data.totalSlots));
     }
@@ -264,6 +265,13 @@ export class CreateListingPage {
     await this.submitButton.click();
   }
 
+  /**
+   * Click submit and wait for POST /api/listings response.
+   *
+   * PRECONDITION: All form data must pass client-side Zod validation.
+   * If client validation fires, no fetch occurs and this will time out.
+   * For tests that intentionally trigger client validation, use submit() instead.
+   */
   async submitAndWaitForResponse() {
     const responsePromise = this.page.waitForResponse(
       (resp) => resp.url().includes('/api/listings') && resp.request().method() === 'POST',
@@ -292,7 +300,7 @@ export class CreateListingPage {
 
   async expectValidationError(fieldId: string) {
     const errorEl = this.page.locator(`#${fieldId}-error`);
-    await expect(errorEl).toBeVisible({ timeout: 5000 });
+    await expect(errorEl).toBeVisible({ timeout: 10_000 });
   }
 
   async expectFieldAriaInvalid(fieldId: string) {

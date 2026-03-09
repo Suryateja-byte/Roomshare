@@ -7,11 +7,24 @@ jest.mock("@/lib/prisma", () => ({
     passwordResetToken: {
       findUnique: jest.fn(),
       delete: jest.fn(),
+      deleteMany: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    // P0-2: $transaction is now used for atomic password reset
+    $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        passwordResetToken: {
+          deleteMany: (prisma as any).passwordResetToken.deleteMany,
+        },
+        user: {
+          update: (prisma as any).user.update,
+        },
+      };
+      return fn(tx);
+    }),
   },
 }));
 
@@ -69,7 +82,8 @@ describe("Reset Password API", () => {
       );
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
       (prisma.user.update as jest.Mock).mockResolvedValue({});
-      (prisma.passwordResetToken.delete as jest.Mock).mockResolvedValue({});
+      // P0-2: Transaction now uses deleteMany (returns count for race detection)
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
 
       const request = createRequest({
         token: VALID_TOKEN,
@@ -87,7 +101,8 @@ describe("Reset Password API", () => {
       expect(prisma.passwordResetToken.findUnique).toHaveBeenCalledWith({
         where: { tokenHash: hashToken(VALID_TOKEN) },
       });
-      expect(prisma.passwordResetToken.delete).toHaveBeenCalled();
+      // P0-2: Now uses deleteMany inside transaction
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalled();
     });
 
     it("returns error for missing token", async () => {
@@ -214,7 +229,8 @@ describe("Reset Password API", () => {
       );
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
       (prisma.user.update as jest.Mock).mockResolvedValue({});
-      (prisma.passwordResetToken.delete as jest.Mock).mockResolvedValue({});
+      // P0-2: Transaction now uses deleteMany for race detection
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
 
       const request = createRequest({
         token: VALID_TOKEN,
@@ -222,7 +238,8 @@ describe("Reset Password API", () => {
       });
       await POST(request);
 
-      expect(prisma.passwordResetToken.delete).toHaveBeenCalledWith({
+      // P0-2: Now uses deleteMany inside atomic transaction
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
         where: { id: "token-123" },
       });
     });

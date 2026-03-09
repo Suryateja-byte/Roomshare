@@ -123,6 +123,12 @@ export default function SettingsClient({
         if (result.success) {
             await signOut({ callbackUrl: '/' });
         } else {
+            // P0-5 FIX: Handle stale session for OAuth accounts
+            if ('code' in result && result.code === 'SESSION_FRESHNESS_REQUIRED') {
+                toast.error('Please sign in again to confirm account deletion.');
+                await signOut({ callbackUrl: '/login?callbackUrl=/settings' });
+                return;
+            }
             setDeleting(false);
             setShowPasswordModal(false);
             toast.error(result.error || 'Failed to delete account');
@@ -245,7 +251,7 @@ export default function SettingsClient({
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20 focus:border-zinc-400"
                                 required
-                                minLength={6}
+                                minLength={12}
                             />
                             <PasswordStrengthMeter password={newPassword} className="mt-2" />
                         </div>

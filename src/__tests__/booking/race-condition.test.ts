@@ -32,7 +32,9 @@ jest.mock('@/lib/prisma', () => ({
     booking: {
       create: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       count: jest.fn(),
+      updateMany: jest.fn(),
     },
     idempotencyKey: {
       findUnique: jest.fn(),
@@ -42,6 +44,16 @@ jest.mock('@/lib/prisma', () => ({
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   },
+}));
+
+jest.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({ success: true }),
+  RATE_LIMITS: { bookingStatus: { maxRequests: 10, windowMs: 60000 } },
+}));
+
+jest.mock('@/lib/booking-state-machine', () => ({
+  validateTransition: jest.fn(),
+  isInvalidStateTransitionError: jest.fn().mockReturnValue(false),
 }));
 
 jest.mock('@/auth', () => ({
@@ -80,6 +92,7 @@ jest.mock('@/lib/logger', () => ({
 }));
 
 import { createBooking } from '@/app/actions/booking';
+import { updateBookingStatus } from '@/app/actions/manage-booking';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { createInternalNotification } from '@/lib/notifications';
@@ -407,6 +420,91 @@ describe('Booking Race Condition Prevention', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('not currently available');
     });
+  });
+});
+
+describe('cross-operation concurrency (B2.2)', () => {
+  const ownerSession = {
+    user: { id: 'owner-456', email: 'owner@example.com' },
+  };
+
+  const futureStart = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const futureEnd = new Date(Date.now() + 210 * 24 * 60 * 60 * 1000);
+
+  const mockBookingForAccept = {
+    id: 'booking-accept-1',
+    listingId: 'listing-abc',
+    tenantId: 'user-123',
+    status: 'PENDING',
+    version: 1,
+    startDate: futureStart,
+    endDate: futureEnd,
+    totalPrice: 4800,
+    listing: {
+      id: 'listing-abc',
+      title: 'Test Listing',
+      ownerId: 'owner-456',
+      availableSlots: 1,
+      totalSlots: 1,
+      owner: { name: 'Owner Name' },
+    },
+    tenant: {
+      id: 'user-123',
+      name: 'Tenant Name',
+      email: 'tenant@example.com',
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (auth as jest.Mock).mockResolvedValue(ownerSession);
+    // Mock user.findUnique for suspension check
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'owner-456',
+      isSuspended: false,
+      emailVerified: new Date(),
+    });
+    (createInternalNotification as jest.Mock).mockResolvedValue({ success: true });
+    (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({ success: true });
+  });
+
+  it('ACCEPT uses FOR UPDATE lock on Listing row to prevent cross-operation races', async () => {
+    // Setup: mock booking.findUnique (called before the transaction)
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBookingForAccept);
+
+    // Capture the tx.$queryRaw calls inside the interactive transaction
+    const mockQueryRaw = jest.fn().mockResolvedValue([
+      { availableSlots: 1, totalSlots: 1, id: 'listing-abc', ownerId: 'owner-456' },
+    ]);
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        $queryRaw: mockQueryRaw,
+        booking: {
+          count: jest.fn().mockResolvedValue(0),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        listing: {
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      return callback(tx);
+    });
+
+    const result = await updateBookingStatus('booking-accept-1', 'ACCEPTED');
+
+    expect(result.success).toBe(true);
+
+    // Verify $queryRaw was called with a tagged template literal containing FOR UPDATE
+    expect(mockQueryRaw).toHaveBeenCalledTimes(1);
+    // Tagged template literals are captured as [TemplateStringsArray, ...values]
+    const queryCall = mockQueryRaw.mock.calls[0];
+    // queryCall[0] is the TemplateStringsArray — join its parts to reconstruct the SQL
+    const sqlParts = Array.from(queryCall[0] as TemplateStringsArray);
+    const fullSql = sqlParts.join('?');
+    expect(fullSql).toContain('FOR UPDATE');
+    // Also verify the query selects from the Listing table
+    expect(fullSql).toContain('"Listing"');
   });
 });
 

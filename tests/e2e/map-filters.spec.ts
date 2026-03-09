@@ -24,6 +24,7 @@ import {
   searchResultsContainer,
 } from "./helpers/test-utils";
 import { pollForUrlParam, pollForUrlParamPresent } from "./helpers/sync-helpers";
+import { openFilterModal } from "./helpers/filter-helpers";
 import type { Page } from "@playwright/test";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -73,24 +74,6 @@ async function getMapInstanceId(page: Page): Promise<string | null> {
     }
     return "map-exists";
   });
-}
-
-/**
- * Open the filter modal on desktop
- */
-async function openFilterModal(page: Page) {
-  // Try multiple selector strategies for the Filters button
-  const filtersBtn = page.getByRole("button", { name: "Filters", exact: true })
-    .or(page.locator('[data-testid="mobile-filter-button"]'))
-    .or(page.locator('button:has-text("Filters")'));
-
-  await expect(filtersBtn.first()).toBeVisible({ timeout: 10_000 });
-  await filtersBtn.first().click();
-
-  // Wait for filter modal/dialog to appear
-  const filterDialog = page.getByRole("dialog", { name: /filters/i })
-    .or(page.locator('[role="dialog"]'));
-  await expect(filterDialog.first()).toBeVisible({ timeout: 5_000 });
 }
 
 /**

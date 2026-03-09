@@ -48,6 +48,7 @@ jest.mock('@/lib/prisma', () => {
     },
     user: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -185,7 +186,7 @@ describe('Comprehensive IDOR Protection Tests', () => {
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBookingOwnedByAlice);
         (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
           const tx = {
-            $queryRaw: jest.fn().mockResolvedValue([{ availableSlots: 2, totalSlots: 3, id: 'listing-xyz' }]),
+            $queryRaw: jest.fn().mockResolvedValue([{ availableSlots: 2, totalSlots: 3, id: 'listing-xyz', ownerId: 'bob-456' }]),
             booking: {
               count: jest.fn().mockResolvedValue(0),
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -319,6 +320,7 @@ describe('Comprehensive IDOR Protection Tests', () => {
         (prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation);
         // Include emailVerified for successful message sending
         (prisma.user.findUnique as jest.Mock).mockResolvedValue({ emailVerified: new Date() });
+        (prisma.user.findMany as jest.Mock).mockResolvedValue([{ id: 'alice-123', email: 'alice@example.com' }]);
         (prisma.message.create as jest.Mock).mockResolvedValue({
           ...mockMessage,
           senderId: 'bob-456',

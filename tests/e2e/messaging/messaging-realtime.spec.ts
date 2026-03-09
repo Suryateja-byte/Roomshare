@@ -68,8 +68,20 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
     const ready = await goToMessages(page);
     test.skip(!ready, 'Auth session expired');
 
-    // User1 opens conversation with thirdUser (index 1)
-    await openConversation(page, 1);
+    // User1 opens conversation with thirdUser — use name-based selection
+    // instead of fragile index (conversation ordering changes when updatedAt changes)
+    const convItems = page.locator(MSG_SELECTORS.conversationItem);
+    await expect(convItems.first()).toBeVisible({ timeout: 15_000 });
+    const thirdUserConv = convItems.filter({ hasText: /E2E Third/i }).first();
+    const hasThirdUser = await thirdUserConv.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (hasThirdUser) {
+      await thirdUserConv.click();
+      const messageInput = page.locator(MSG_SELECTORS.messageInput);
+      await expect(messageInput).toBeVisible({ timeout: 10_000 });
+    } else {
+      // Fallback to index-based if name not found
+      await openConversation(page, 1);
+    }
 
     let ctx2: Awaited<ReturnType<typeof createUser2Context>> | null = null;
     try {

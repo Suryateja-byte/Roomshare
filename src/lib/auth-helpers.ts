@@ -130,16 +130,37 @@ function buildSuspensionBlockedResponse(): NextResponse {
  *
  * @returns true if suspended, false if not, undefined on error (graceful degradation)
  */
+// In-memory cache for suspension status — reduces DB queries on warm instances.
+// In Edge Runtime this cache is per-invocation (no benefit); in Node.js Runtime
+// it persists across warm invocations within the same function instance.
+/** @internal Exported for test cleanup only */
+export const _suspensionCache = new Map<string, { value: boolean | undefined; expiresAt: number }>();
+const SUSPENSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 async function getLiveSuspensionStatus(
   userId: string
 ): Promise<boolean | undefined> {
+  const cached = _suspensionCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { isSuspended: true },
     });
 
-    return user?.isSuspended === true;
+    const value = user?.isSuspended === true;
+    _suspensionCache.set(userId, { value, expiresAt: Date.now() + SUSPENSION_CACHE_TTL });
+
+    // Prevent unbounded cache growth
+    if (_suspensionCache.size > 1000) {
+      const oldestKey = _suspensionCache.keys().next().value;
+      if (oldestKey) _suspensionCache.delete(oldestKey);
+    }
+
+    return value;
   } catch {
     return undefined;
   }

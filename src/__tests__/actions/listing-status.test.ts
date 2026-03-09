@@ -9,6 +9,9 @@ jest.mock('@/lib/prisma', () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    booking: {
+      count: jest.fn(),
+    },
     user: {
       findUnique: jest.fn(),
     },
@@ -109,6 +112,7 @@ describe('listing-status actions', () => {
       beforeEach(() => {
         ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
         ;(prisma.listing.update as jest.Mock).mockResolvedValue({ ...mockListing, status: 'PAUSED' })
+        ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
       })
 
       it('updates status to PAUSED', async () => {
@@ -158,9 +162,26 @@ describe('listing-status actions', () => {
       })
     })
 
+    describe('RENTED status and availableSlots (F2.2)', () => {
+      it('setting RENTED status only updates the status field, not availableSlots', async () => {
+        ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
+        ;(prisma.listing.update as jest.Mock).mockResolvedValue({ ...mockListing, status: 'RENTED' })
+        ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
+
+        await updateListingStatus('listing-123', 'RENTED')
+
+        // updateListingStatus only sets { status: 'RENTED' } — availableSlots is not modified
+        expect(prisma.listing.update).toHaveBeenCalledWith({
+          where: { id: 'listing-123' },
+          data: { status: 'RENTED' },
+        })
+      })
+    })
+
     describe('error handling', () => {
       it('returns error on database failure', async () => {
         ;(prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing)
+        ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
         ;(prisma.listing.update as jest.Mock).mockRejectedValue(new Error('DB Error'))
 
         const result = await updateListingStatus('listing-123', 'PAUSED')

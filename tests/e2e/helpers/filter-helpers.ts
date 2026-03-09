@@ -157,14 +157,13 @@ export async function waitForSearchReady(
 ): Promise<void> {
   const url = extraParams ? `${SEARCH_URL}&${extraParams}` : SEARCH_URL;
   await page.goto(url);
-  await page.waitForLoadState("domcontentloaded");
+  await page.waitForLoadState("load");
   await page
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  // Wait for domcontentloaded to ensure React hydration completes —
-  // without this, button clicks can fire before event handlers attach
-  await page.waitForLoadState("domcontentloaded").catch(() => {});
+  // Wait for Filters button to be visible — confirms SearchForm hydrated
+  await filtersButton(page).waitFor({ state: "visible", timeout: 20_000 });
 }
 
 /**
@@ -177,12 +176,13 @@ export async function gotoSearchWithFilters(
 ): Promise<void> {
   const url = buildSearchUrl(params);
   await page.goto(url);
-  await page.waitForLoadState("domcontentloaded");
+  await page.waitForLoadState("load");
   await page
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  await page.waitForLoadState("domcontentloaded").catch(() => {});
+  // Wait for Filters button to be visible — confirms SearchForm hydrated
+  await filtersButton(page).waitFor({ state: "visible", timeout: 20_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ export async function gotoSearchWithFilters(
  * Uses regex to match both "Filters" and "Filters (N active)" states.
  */
 export function filtersButton(page: Page): Locator {
-  return page.getByRole("button", { name: /^Filters/ });
+  return page.locator('button[data-hydrated][aria-label^="Filters"]');
 }
 
 /** Locate the filter dialog */
@@ -209,18 +209,23 @@ export function filterDialog(page: Page): Locator {
  */
 export async function clickFiltersButton(page: Page): Promise<void> {
   const btn = filtersButton(page);
-  await expect(btn).toBeVisible({ timeout: 10_000 });
+  await expect(btn).toBeVisible({ timeout: 15_000 });
   await btn.click();
 
   const dialog = filterDialog(page);
   const visible = await dialog
-    .waitFor({ state: "visible", timeout: 5_000 })
+    .waitFor({ state: "visible", timeout: 30_000 })
     .then(() => true)
     .catch(() => false);
 
   if (!visible) {
-    await btn.click();
-    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    // Button onClick is setShowFilters(true) — not a toggle. If state is
+    // already true, re-clicking is a no-op. Press Escape to reset state
+    // to false (via useKeyboardShortcuts), then re-click for a real transition.
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(2_000);
+    await btn.click({ force: true });
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 }
 
@@ -250,31 +255,51 @@ export function clearAllButton(page: Page): Locator {
  */
 export async function openFilterModal(page: Page): Promise<Locator> {
   const btn = filtersButton(page);
-  await expect(btn).toBeVisible({ timeout: 10_000 });
+  await expect(btn).toBeVisible({ timeout: 15_000 });
 
   const dialog = filterDialog(page);
 
-  // Click and wait for dialog. If it doesn't appear, the button click may
-  // have fired before React hydration attached the onClick handler, or the
-  // FilterModal dynamic import chunk hadn't loaded yet. Retry once.
+  // Click and wait for dialog. On CI under load, the modal render
+  // may take a few seconds, so we give a generous initial timeout.
   await btn.click();
   let dialogVisible = await dialog
-    .waitFor({ state: "visible", timeout: 5_000 })
+    .waitFor({ state: "visible", timeout: 30_000 })
     .then(() => true)
     .catch(() => false);
 
   if (!dialogVisible) {
-    // Retry: by now hydration + dynamic import should be complete
-    await btn.click();
-    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    // Button onClick is setShowFilters(true) — not a toggle. If state is
+    // already true, re-clicking is a no-op. Press Escape to reset state
+    // to false (via useKeyboardShortcuts), then re-click for a real transition.
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(2_000);
+    await btn.click({ force: true });
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 
-  // Wait for FilterModal dynamic import to complete — the apply button
-  // is always present and is a reliable signal the chunk loaded and rendered.
-  // Do NOT silently catch: if this times out, every subsequent interaction will
-  // also fail, so failing fast here provides a clear diagnostic.
-  await applyButton(page).waitFor({ state: "attached", timeout: 60_000 });
+  // Wait for FilterModal content to fully render — the apply button
+  // is always present and is a reliable signal the chunk loaded.
+  await applyButton(page).waitFor({ state: "attached", timeout: 30_000 });
+  await applyButton(page).scrollIntoViewIfNeeded().catch(() => {});
 
+  return dialog;
+}
+
+/**
+ * Open filter modal and wait for facet counts to load.
+ * Use this when the test interacts with amenity/house-rule buttons that can be
+ * disabled by zero-count facets arriving after the 300ms debounce.
+ */
+export async function openFilterModalAndWaitForFacets(page: Page): Promise<Locator> {
+  const facetsPromise = page
+    .waitForResponse((r) => r.url().includes("/api/search/facets"), { timeout: 10_000 })
+    .catch(() => null);
+  const dialog = await openFilterModal(page);
+  await facetsPromise;
+  // Wait for amenity buttons to update (disabled attr removed after facet render)
+  await page.locator('[aria-label="Select amenities"] button:not([disabled])').first()
+    .waitFor({ state: "attached", timeout: 5_000 })
+    .catch(() => {}); // Fallback: if all buttons are disabled, proceed anyway
   return dialog;
 }
 

@@ -8,6 +8,39 @@
 
 import { test, expect, tags, timeouts, selectors, SF_BOUNDS } from '../helpers';
 
+/**
+ * On mobile, MessagesPageClient auto-selects the first conversation on mount
+ * (useEffect sets activeId), which hides the conversation list and shows the
+ * messages panel. This helper checks if a conversation is already open before
+ * trying to click one — preventing the pointer-event interception race on mobile.
+ *
+ * Returns true if a conversation is open and the message area is visible.
+ */
+async function ensureConversationOpen(page: import('@playwright/test').Page): Promise<boolean> {
+  const messageArea = page.getByPlaceholder(/message|type/i)
+    .or(page.locator('textarea'))
+    .or(page.locator('[data-testid="message-bubble"]'))
+    .first();
+
+  // Already in a conversation (mobile auto-select or desktop default)
+  if (await messageArea.isVisible({ timeout: 3000 }).catch(() => false)) {
+    return true;
+  }
+
+  // Not in a conversation — click the first one (desktop, or mobile without conversations)
+  const conversationItem = page
+    .locator('[data-testid="conversation-item"]')
+    .first();
+
+  if (!(await conversationItem.isVisible().catch(() => false))) {
+    return false; // No conversations available
+  }
+
+  await conversationItem.click();
+  await page.waitForURL(/\/messages\//, { timeout: 5000 }).catch(() => {});
+  return await messageArea.isVisible({ timeout: 5000 }).catch(() => false);
+}
+
 test.describe('Messaging Journeys', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
 
@@ -100,34 +133,18 @@ test.describe('Messaging Journeys', () => {
 
       await page.waitForLoadState('domcontentloaded');
 
-      const conversationItem = page
-        .locator('[data-testid="conversation-item"], [class*="conversation-item"]')
-        .first();
+      const conversationLoaded = await ensureConversationOpen(page);
 
-      if (await conversationItem.isVisible().catch(() => false)) {
-        await conversationItem.click();
-
-        // Wait for either URL change OR conversation content to load
-        await page.waitForURL(/\/messages\//, { timeout: 5000 }).catch(() => {});
-
-        // Verify conversation loaded by checking for message content area
-        const messageArea = page.getByPlaceholder(/message|type/i)
-          .or(page.locator('textarea'))
-          .or(page.locator('[data-testid="message-bubble"]'))
-          .first();
-        const conversationLoaded = await messageArea.isVisible({ timeout: 5000 }).catch(() => false);
-
-        if (!conversationLoaded) {
-          test.skip(true, 'Conversation did not load after clicking item');
-          return;
-        }
-
-        // Should show message input
-        const messageInput = page.getByPlaceholder(/message|type/i)
-          .or(page.locator('textarea'))
-          .first();
-        await expect(messageInput).toBeVisible({ timeout: 10000 });
+      if (!conversationLoaded) {
+        test.skip(true, 'No conversations available or conversation did not load');
+        return;
       }
+
+      // Should show message input
+      const messageInput = page.getByPlaceholder(/message|type/i)
+        .or(page.locator('textarea'))
+        .first();
+      await expect(messageInput).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -143,48 +160,31 @@ test.describe('Messaging Journeys', () => {
 
       await page.waitForLoadState('domcontentloaded');
 
-      // Open first conversation
-      const conversationItem = page
-        .locator('[data-testid="conversation-item"]')
+      const conversationLoaded = await ensureConversationOpen(page);
+
+      if (!conversationLoaded) {
+        test.skip(true, 'Conversation did not load');
+        return;
+      }
+
+      // Send a message
+      const messageInput = page.getByPlaceholder(/message|type/i)
+        .or(page.locator('textarea'))
         .first();
 
-      if (await conversationItem.isVisible().catch(() => false)) {
-        await conversationItem.click();
+      if (await messageInput.isVisible().catch(() => false)) {
+        const testMessage = `Test message ${Date.now()}`;
+        await messageInput.fill(testMessage);
 
-        // Wait for either URL change OR conversation content to load
-        await page.waitForURL(/\/messages\//, { timeout: 5000 }).catch(() => {});
+        const sendButton = page.getByRole('button', { name: /send/i }).first();
+        if (await sendButton.isVisible().catch(() => false)) {
+          await sendButton.click();
 
-        // Verify conversation loaded by checking for message content area
-        const messageArea = page.getByPlaceholder(/message|type/i)
-          .or(page.locator('textarea'))
-          .or(page.locator('[data-testid="message-bubble"]'))
-          .first();
-        const conversationLoaded = await messageArea.isVisible({ timeout: 5000 }).catch(() => false);
+          // Message should appear in conversation
+          await expect(page.getByText(testMessage)).toBeVisible({ timeout: 10000 });
 
-        if (!conversationLoaded) {
-          test.skip(true, 'Conversation did not load after clicking item');
-          return;
-        }
-
-        // Send a message
-        const messageInput = page.getByPlaceholder(/message|type/i)
-          .or(page.locator('textarea'))
-          .first();
-
-        if (await messageInput.isVisible().catch(() => false)) {
-          const testMessage = `Test message ${Date.now()}`;
-          await messageInput.fill(testMessage);
-
-          const sendButton = page.getByRole('button', { name: /send/i }).first();
-          if (await sendButton.isVisible().catch(() => false)) {
-            await sendButton.click();
-
-            // Message should appear in conversation
-            await expect(page.getByText(testMessage)).toBeVisible({ timeout: 10000 });
-
-            // Input should be cleared
-            await expect(messageInput).toBeEmpty();
-          }
+          // Input should be cleared
+          await expect(messageInput).toBeEmpty();
         }
       }
     });
@@ -202,36 +202,20 @@ test.describe('Messaging Journeys', () => {
 
       await page.waitForLoadState('domcontentloaded');
 
-      const conversationItem = page
-        .locator('[data-testid="conversation-item"]')
-        .first();
+      const conversationLoaded = await ensureConversationOpen(page);
 
-      if (await conversationItem.isVisible().catch(() => false)) {
-        await conversationItem.click();
+      if (!conversationLoaded) {
+        test.skip(true, 'Conversation did not load');
+        return;
+      }
 
-        // Wait for either URL change OR conversation content to load
-        await page.waitForURL(/\/messages\//, { timeout: 5000 }).catch(() => {});
+      // Wait for polling interval (5 seconds + buffer)
+      await page.waitForTimeout(timeouts.polling);
 
-        // Verify conversation loaded by checking for message content area
-        const messageArea = page.getByPlaceholder(/message|type/i)
-          .or(page.locator('textarea'))
-          .or(page.locator('[data-testid="message-bubble"]'))
-          .first();
-        const conversationLoaded = await messageArea.isVisible({ timeout: 5000 }).catch(() => false);
-
-        if (!conversationLoaded) {
-          test.skip(true, 'Conversation did not load after clicking item');
-          return;
-        }
-
-        // Wait for polling interval (5 seconds + buffer)
-        await page.waitForTimeout(timeouts.polling);
-
-        // Page should still be responsive and not error
-        const messageInput = page.getByPlaceholder(/message|type/i).first();
-        if (await messageInput.isVisible().catch(() => false)) {
-          await expect(messageInput).toBeEnabled();
-        }
+      // Page should still be responsive and not error
+      const messageInput = page.getByPlaceholder(/message|type/i).first();
+      if (await messageInput.isVisible().catch(() => false)) {
+        await expect(messageInput).toBeEnabled();
       }
     });
   });
@@ -300,38 +284,36 @@ test.describe('Messaging Journeys', () => {
 
       await page.waitForLoadState('domcontentloaded');
 
-      const conversationItem = page
-        .locator('[data-testid="conversation-item"]')
-        .first();
+      const conversationLoaded = await ensureConversationOpen(page);
 
-      if (await conversationItem.isVisible().catch(() => false)) {
-        await conversationItem.click();
-        await page.waitForLoadState('domcontentloaded');
+      if (!conversationLoaded) {
+        test.skip(true, 'No conversations available');
+        return;
+      }
 
-        // Find block button (often in menu)
-        const menuButton = page.getByRole('button', { name: /menu|more|options/i }).first();
+      // Find block button (often in menu)
+      const menuButton = page.getByRole('button', { name: /menu|more|options/i }).first();
 
-        if (await menuButton.isVisible().catch(() => false)) {
-          await menuButton.click();
+      if (await menuButton.isVisible().catch(() => false)) {
+        await menuButton.click();
 
-          const blockOption = page.getByRole('menuitem', { name: /block/i }).first();
+        const blockOption = page.getByRole('menuitem', { name: /block/i }).first();
 
-          if (await blockOption.isVisible().catch(() => false)) {
-            await blockOption.click();
+        if (await blockOption.isVisible().catch(() => false)) {
+          await blockOption.click();
 
-            // Confirm block
-            const confirmButton = page.getByRole('button', { name: /confirm|block|yes/i }).first();
-            if (await confirmButton.isVisible().catch(() => false)) {
-              await confirmButton.click();
-            }
-
-            // Should show blocked state
-            await expect(
-              page.getByText(/blocked/i)
-                .or(page.locator(selectors.toast))
-                .first()
-            ).toBeVisible({ timeout: 5000 });
+          // Confirm block
+          const confirmButton = page.getByRole('button', { name: /confirm|block|yes/i }).first();
+          if (await confirmButton.isVisible().catch(() => false)) {
+            await confirmButton.click();
           }
+
+          // Should show blocked state
+          await expect(
+            page.getByText(/blocked/i)
+              .or(page.locator(selectors.toast))
+              .first()
+          ).toBeVisible({ timeout: 5000 });
         }
       }
     });
@@ -349,22 +331,20 @@ test.describe('Messaging Journeys', () => {
 
       await page.waitForLoadState('domcontentloaded');
 
-      const conversationItem = page
-        .locator('[data-testid="conversation-item"]')
-        .first();
+      const conversationLoaded = await ensureConversationOpen(page);
 
-      if (await conversationItem.isVisible().catch(() => false)) {
-        await conversationItem.click();
-        await page.waitForLoadState('domcontentloaded');
+      if (!conversationLoaded) {
+        test.skip(true, 'No conversations available');
+        return;
+      }
 
-        const sendButton = page.getByRole('button', { name: /send/i }).first();
+      const sendButton = page.getByRole('button', { name: /send/i }).first();
 
-        // Try to send empty message
-        if (await sendButton.isVisible().catch(() => false)) {
-          // Button should be disabled when input is empty
-          const isDisabled = await sendButton.isDisabled();
-          expect(isDisabled).toBeTruthy();
-        }
+      // Try to send empty message
+      if (await sendButton.isVisible().catch(() => false)) {
+        // Button should be disabled when input is empty
+        const isDisabled = await sendButton.isDisabled();
+        expect(isDisabled).toBeTruthy();
       }
     });
 
@@ -383,33 +363,31 @@ test.describe('Messaging Journeys', () => {
 
       await page.waitForLoadState('domcontentloaded');
 
-      const conversationItem = page
-        .locator('[data-testid="conversation-item"]')
-        .first();
+      const conversationLoaded = await ensureConversationOpen(page);
 
-      if (await conversationItem.isVisible().catch(() => false)) {
-        await conversationItem.click();
-        await page.waitForLoadState('domcontentloaded');
-
-        // Go offline
-        await network.goOffline();
-
-        const messageInput = page.getByPlaceholder(/message|type/i).first();
-        if (await messageInput.isVisible().catch(() => false)) {
-          await messageInput.fill('Message while offline');
-
-          const sendButton = page.getByRole('button', { name: /send/i }).first();
-          if (await sendButton.isVisible().catch(() => false)) {
-            await sendButton.click();
-
-            // Should show offline/retry indicator
-            await page.waitForTimeout(2000);
-          }
-        }
-
-        // Go back online
-        await network.goOnline();
+      if (!conversationLoaded) {
+        test.skip(true, 'No conversations available');
+        return;
       }
+
+      // Go offline
+      await network.goOffline();
+
+      const messageInput = page.getByPlaceholder(/message|type/i).first();
+      if (await messageInput.isVisible().catch(() => false)) {
+        await messageInput.fill('Message while offline');
+
+        const sendButton = page.getByRole('button', { name: /send/i }).first();
+        if (await sendButton.isVisible().catch(() => false)) {
+          await sendButton.click();
+
+          // Should show offline/retry indicator
+          await page.waitForTimeout(2000);
+        }
+      }
+
+      // Go back online
+      await network.goOnline();
     });
   });
 });

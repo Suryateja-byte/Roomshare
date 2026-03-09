@@ -5,7 +5,7 @@ import { Search, Send, ArrowLeft, MoreVertical, Paperclip, AlertCircle, Ban, Shi
 import CharacterCounter from '@/components/CharacterCounter';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { toast } from 'sonner';
-import { getMessages, sendMessage, pollMessages, setTypingStatus, markAllMessagesAsRead, markConversationMessagesAsRead, deleteConversation } from '@/app/actions/chat';
+import { sendMessage, setTypingStatus, markAllMessagesAsRead, deleteConversation } from '@/app/actions/chat';
 import { blockUser, unblockUser } from '@/app/actions/block';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -46,7 +46,7 @@ interface Message {
     id: string;
     content: string;
     senderId: string;
-    createdAt: Date;
+    createdAt: Date | string;
     read?: boolean;
     status?: 'sending' | 'sent' | 'failed';
     sender?: {
@@ -58,7 +58,7 @@ interface Message {
 
 interface Conversation {
     id: string;
-    updatedAt: Date;
+    updatedAt: Date | string;
     participants: Participant[];
     messages: Message[];
     listing: {
@@ -70,6 +70,13 @@ interface Conversation {
 interface MessagesPageClientProps {
     currentUserId: string;
     initialConversations: any[]; // Using any[] temporarily to match Prisma return type structure easily, or define strict type
+}
+
+function isAbortError(error: unknown): boolean {
+    return (
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        (error instanceof Error && error.name === 'AbortError')
+    );
 }
 
 export default function MessagesPageClient({ currentUserId, initialConversations }: MessagesPageClientProps) {
@@ -87,6 +94,11 @@ export default function MessagesPageClient({ currentUserId, initialConversations
     const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const messagesRef = useRef<Message[]>([]);
+    const lastMsgIdRef = useRef<string | undefined>(undefined);
+    const lastReadMessageIdRef = useRef<string | null>(null);
+    const pollAbortRef = useRef<AbortController | null>(null);
+    const isPollingRef = useRef(false);
     const router = useRouter();
     const { isOffline } = useNetworkStatus();
     const [showDeleteConversationDialog, setShowDeleteConversationDialog] = useState(false);
@@ -104,7 +116,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         setIsMarkingAllRead(true);
         try {
             const result = await markAllMessagesAsRead();
-            if (result.error) {
+            if ('error' in result) {
                 toast.error(result.error);
             } else {
                 toast.success(`Marked ${result.count} messages as read`);
@@ -128,6 +140,65 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         otherParticipant?.id,
         currentUserId
     );
+
+    const updateConversationPreview = useCallback((conversationId: string, latestMessage: Message) => {
+        setConversations(prev => prev.map(c => {
+            if (c.id !== conversationId) return c;
+            return {
+                ...c,
+                updatedAt: latestMessage.createdAt,
+                messages: [latestMessage],
+                unreadCount: 0,
+            };
+        }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+    }, []);
+
+    const markConversationRead = useCallback(async (conversationId: string, latestIncomingMessageId?: string | null) => {
+        if (
+            !latestIncomingMessageId ||
+            (typeof document !== 'undefined' && document.visibilityState !== 'visible') ||
+            lastReadMessageIdRef.current === latestIncomingMessageId
+        ) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'markRead',
+                    conversationId,
+                }),
+            });
+
+            if (response.status === 401) {
+                router.push('/login?callbackUrl=/messages');
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(`Read receipt failed with status ${response.status}`);
+            }
+
+            lastReadMessageIdRef.current = latestIncomingMessageId;
+            setConversations(prev => prev.map(c => (
+                c.id === conversationId
+                    ? { ...c, unreadCount: 0 }
+                    : c
+            )));
+            setMsgs(prev => prev.map(message => (
+                message.senderId !== currentUserId
+                    ? { ...message, read: true }
+                    : message
+            )));
+            window.dispatchEvent(new Event('messagesRead'));
+        } catch (error) {
+            console.error('Failed to mark messages as read:', error);
+        }
+    }, [currentUserId, router]);
 
 
     // Handle blocking a user
@@ -182,6 +253,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 setConversations(prev => prev.filter(c => c.id !== activeId));
                 setActiveId(null);
                 setMsgs([]);
+                lastMsgIdRef.current = undefined;
                 router.refresh();
             }
         } catch (error) {
@@ -199,77 +271,166 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         }
     }, [initialConversations]);
 
-    // Fetch messages when activeId changes
-    useEffect(() => {
-        async function fetchMessages() {
-            if (!activeId) return;
-            setLoadingMessages(true);
-            try {
-                const result = await getMessages(activeId);
-
-                // Handle session expiry
-                if (!Array.isArray(result) && result.code === 'SESSION_EXPIRED') {
-                    router.push(`/login?callbackUrl=/messages`);
-                    return;
-                }
-
-                // Extract messages array from result
-                const messages = Array.isArray(result) ? result : (result.messages || []);
-                setMsgs(messages);
-
-                // Notify navbar to refresh unread count
-                window.dispatchEvent(new Event('messagesRead'));
-            } catch (error) {
-                console.error('Failed to fetch messages:', error);
-            } finally {
-                setLoadingMessages(false);
-            }
-        }
-        fetchMessages();
-    }, [activeId]);
-
     // Scroll to bottom when messages change
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [msgs]);
 
-    // Polling for new messages and typing status
+    useEffect(() => {
+        messagesRef.current = msgs;
+    }, [msgs]);
+
+    // Fetch messages when activeId changes and poll safely for updates
     useEffect(() => {
         if (!activeId) return;
 
-        const pollInterval = setInterval(async () => {
-            try {
-                const lastMessageId = msgs.length > 0 ? msgs[msgs.length - 1].id : undefined;
-                // Only poll if we're not dealing with optimistic messages
-                if (lastMessageId?.startsWith('opt-')) return;
+        let isActive = true;
+        let pollInterval: NodeJS.Timeout | null = null;
 
-                const result = await pollMessages(activeId, lastMessageId);
+        setTypingUsers([]);
+        setMsgs([]);
+        messagesRef.current = [];
+        lastMsgIdRef.current = undefined;
+        lastReadMessageIdRef.current = null;
 
-                // Update typing users
-                setTypingUsers(result.typingUsers);
+        const fetchMessages = async (lastMessageId?: string) => {
+            if (!isActive || (lastMessageId && isPollingRef.current)) return;
+            if (lastMessageId?.startsWith('opt-')) return;
 
-                // Add new messages if any
-                if (result.hasNewMessages && result.messages.length > 0) {
-                    setMsgs(prev => {
-                        // Filter out any messages we already have
-                        const existingIds = new Set(prev.map(m => m.id));
-                        const newMessages = result.messages.filter((m: Message) => !existingIds.has(m.id));
-                        return [...prev, ...newMessages];
-                    });
-
-                    // BIZ-08: Explicitly mark as read since user is actively viewing
-                    await markConversationMessagesAsRead(activeId);
-
-                    // Notify navbar to refresh unread count
-                    window.dispatchEvent(new Event('messagesRead'));
-                }
-            } catch (error) {
-                console.error('Polling error:', error);
+            if (lastMessageId) {
+                isPollingRef.current = true;
             }
-        }, 3000); // Poll every 3 seconds
 
-        return () => clearInterval(pollInterval);
-    }, [activeId, msgs]);
+            const abortController = new AbortController();
+            pollAbortRef.current?.abort();
+            pollAbortRef.current = abortController;
+
+            try {
+                const params = new URLSearchParams({
+                    conversationId: activeId,
+                    poll: '1',
+                });
+                if (lastMessageId) {
+                    params.set('lastMessageId', lastMessageId);
+                }
+
+                const response = await fetch(`/api/messages?${params.toString()}`, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    signal: abortController.signal,
+                });
+
+                if (response.status === 401) {
+                    router.push('/login?callbackUrl=/messages');
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch messages with status ${response.status}`);
+                }
+
+                const payload = await response.json();
+                if (!isActive) return;
+
+                const fetchedMessages = Array.isArray(payload?.messages) ? payload.messages as Message[] : [];
+                const fetchedTypingUsers = Array.isArray(payload?.typingUsers) ? payload.typingUsers as TypingUser[] : [];
+
+                setTypingUsers(fetchedTypingUsers);
+
+                if (!lastMessageId) {
+                    messagesRef.current = fetchedMessages;
+                    setMsgs(fetchedMessages);
+                    setLoadingMessages(false);
+
+                    const latestMessage = fetchedMessages[fetchedMessages.length - 1];
+                    if (latestMessage) {
+                        lastMsgIdRef.current = latestMessage.id;
+                        updateConversationPreview(activeId, latestMessage);
+                    }
+
+                    const latestIncomingMessageId = [...fetchedMessages]
+                        .reverse()
+                        .find(message => message.senderId !== currentUserId)?.id ?? null;
+                    await markConversationRead(activeId, latestIncomingMessageId);
+                    return;
+                }
+
+                if (fetchedMessages.length === 0) {
+                    return;
+                }
+
+                const existingIds = new Set(messagesRef.current.map(message => message.id));
+                const newMessages = fetchedMessages.filter((message: Message) => !existingIds.has(message.id));
+
+                if (newMessages.length === 0) {
+                    return;
+                }
+
+                const updatedMessages = [...messagesRef.current, ...newMessages]
+                    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                messagesRef.current = updatedMessages;
+                setMsgs(updatedMessages);
+
+                const latestMessage = updatedMessages[updatedMessages.length - 1];
+                if (latestMessage) {
+                    lastMsgIdRef.current = latestMessage.id;
+                    updateConversationPreview(activeId, latestMessage);
+                }
+
+                const latestIncomingMessageId = [...newMessages]
+                    .reverse()
+                    .find(message => message.senderId !== currentUserId)?.id ?? null;
+                await markConversationRead(activeId, latestIncomingMessageId);
+            } catch (error) {
+                if (!isAbortError(error)) {
+                    console.error(lastMessageId ? 'Polling error:' : 'Failed to fetch messages:', error);
+                }
+            } finally {
+                if (pollAbortRef.current === abortController) {
+                    pollAbortRef.current = null;
+                }
+                if (!lastMessageId && isActive) {
+                    setLoadingMessages(false);
+                }
+                if (lastMessageId) {
+                    isPollingRef.current = false;
+                }
+            }
+        };
+
+        setLoadingMessages(true);
+        void fetchMessages().then(() => {
+            if (!isActive) return;
+            pollInterval = setInterval(() => {
+                void fetchMessages(lastMsgIdRef.current);
+            }, 3000);
+        });
+
+        return () => {
+            isActive = false;
+            pollAbortRef.current?.abort();
+            pollAbortRef.current = null;
+            isPollingRef.current = false;
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+        };
+    }, [activeId, currentUserId, markConversationRead, router, updateConversationPreview]);
+
+    useEffect(() => {
+        if (!activeId) return;
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== 'visible') return;
+            const latestIncomingMessageId = [...messagesRef.current]
+                .reverse()
+                .find(message => message.senderId !== currentUserId)?.id ?? null;
+            void markConversationRead(activeId, latestIncomingMessageId);
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [activeId, currentUserId, markConversationRead]);
 
     // Handle typing status
     const handleInputChange = useCallback((value: string) => {
@@ -374,6 +535,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         // Success - replace optimistic message with sent message
         const sentMessage = result;
         setMsgs(prev => prev.map(m => m.id === optimisticId ? { ...sentMessage, sender: undefined, status: 'sent' as const } : m));
+        lastMsgIdRef.current = sentMessage.id;
 
         // Update conversation list to show latest message
         setConversations(prev => prev.map(c => {
@@ -433,6 +595,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 ? { ...sentMessage, sender: undefined, status: 'sent' as const }
                 : m
         ));
+        lastMsgIdRef.current = sentMessage.id;
 
         // Update conversation list
         setConversations(prev => prev.map(c => {

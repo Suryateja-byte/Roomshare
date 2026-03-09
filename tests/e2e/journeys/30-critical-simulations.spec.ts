@@ -25,29 +25,6 @@ async function waitForSearchReady(page: import('@playwright/test').Page) {
   }).toBeGreaterThan(0);
 }
 
-/** Helper: login for tests that need fresh auth (clears pre-loaded storage state) */
-async function freshLogin(page: import('@playwright/test').Page) {
-  await page.context().clearCookies();
-  await page.context().clearPermissions();
-  // Clear storage state
-  await page.evaluate(() => {
-    try { localStorage.clear(); sessionStorage.clear(); } catch {}
-  }).catch(() => {});
-
-  await page.goto('/login');
-  await page.waitForLoadState('domcontentloaded');
-  // Wait for the login form to render (Suspense boundary + hydration)
-  await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
-
-  const email = process.env.E2E_TEST_EMAIL || 'test@example.com';
-  const password = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
-
-  await page.getByLabel(/email/i).fill(email);
-  await page.locator('input[name="password"]').fill(password);
-  await page.getByRole('button', { name: /sign in|log in|login/i }).click();
-  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 30000 });
-}
-
 test.describe('30 Critical User Journey Simulations', () => {
   // Dev server compiles routes on first visit (16s+ per route)
   test.use({ actionTimeout: 30000, navigationTimeout: 60000 });
@@ -434,8 +411,7 @@ test.describe('30 Critical User Journey Simulations', () => {
   // ──────────────────────────────────────────────
 
   test('S20: Authenticated user — save a listing to favorites', async ({ page }) => {
-    await freshLogin(page);
-
+    // Uses chromium project's storageState (authenticated via auth.setup)
     await page.goto('/search');
     await waitForSearchReady(page);
 
@@ -460,7 +436,6 @@ test.describe('30 Critical User Journey Simulations', () => {
   });
 
   test('S21: Authenticated user — view bookings page', async ({ page }) => {
-    await freshLogin(page);
     await page.goto('/bookings');
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('#main-content')).toBeVisible();
@@ -470,21 +445,18 @@ test.describe('30 Critical User Journey Simulations', () => {
   });
 
   test('S22: Authenticated user — view and navigate messages', async ({ page }) => {
-    await freshLogin(page);
     await page.goto('/messages');
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('#main-content')).toBeVisible();
   });
 
   test('S23: Authenticated user — view notifications', async ({ page }) => {
-    await freshLogin(page);
     await page.goto('/notifications');
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('#main-content')).toBeVisible();
   });
 
   test('S24: Authenticated user — update profile', async ({ page }) => {
-    await freshLogin(page);
     await page.goto('/profile');
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('#main-content')).toBeVisible();

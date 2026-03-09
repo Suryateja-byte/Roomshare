@@ -185,7 +185,15 @@ export function useFacets({
           return;
         }
 
-        throw new Error(`Facets request failed: ${response.status}`);
+        // Graceful degradation for unexpected status codes (404, 403, etc.)
+        // Facets are supplementary — never block the filter UI.
+        console.warn(`[useFacets] Unexpected status ${response.status}, returning empty facets`);
+        facetsCache.set(cacheKey, EMPTY_FACETS, ERROR_FALLBACK_TTL_MS);
+        if (!abortController.signal.aborted) {
+          setFacets((prev) => prev ?? EMPTY_FACETS);
+          setIsLoading(false);
+        }
+        return;
       }
 
       const data = await response.json();

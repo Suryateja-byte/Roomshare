@@ -31,37 +31,37 @@ describe('geocodeAddress', () => {
     jest.clearAllMocks()
   })
 
-  it('should return coordinates for valid address', async () => {
+  it('should return success with coordinates for valid address', async () => {
     mockForwardGeocode.mockResolvedValueOnce({ lat: 37.7749, lng: -122.4194 })
 
     const result = await geocodeAddress('123 Main St, San Francisco, CA')
 
-    expect(result).toEqual({ lat: 37.7749, lng: -122.4194 })
+    expect(result).toEqual({ status: 'success', lat: 37.7749, lng: -122.4194 })
     expect(mockForwardGeocode).toHaveBeenCalledWith('123 Main St, San Francisco, CA')
   })
 
-  it('should return null when no results found', async () => {
+  it('should return not_found when no results found', async () => {
     mockForwardGeocode.mockResolvedValueOnce(null)
 
     const result = await geocodeAddress('Invalid Address XYZ123')
 
-    expect(result).toBeNull()
+    expect(result).toEqual({ status: 'not_found' })
   })
 
-  it('should return null on API error', async () => {
+  it('should return error on API error', async () => {
     mockForwardGeocode.mockRejectedValueOnce(new Error('Request failed'))
 
     const result = await geocodeAddress('123 Main St')
 
-    expect(result).toBeNull()
+    expect(result).toEqual({ status: 'error', message: 'Geocoding service error' })
   })
 
-  it('should return null on network error', async () => {
+  it('should return error on network error', async () => {
     mockForwardGeocode.mockRejectedValueOnce(new Error('Network error'))
 
     const result = await geocodeAddress('123 Main St')
 
-    expect(result).toBeNull()
+    expect(result).toEqual({ status: 'error', message: 'Geocoding service error' })
   })
 
   it('should pass address to forwardGeocode', async () => {
@@ -77,7 +77,7 @@ describe('geocodeAddress', () => {
 
     const result = await geocodeAddress('123 Main St')
 
-    // forwardGeocode returns undefined, which is falsy, so geocodeAddress returns null
-    expect(result).toBeNull()
+    // forwardGeocode returns undefined, which is falsy, so geocodeAddress returns not_found
+    expect(result).toEqual({ status: 'not_found' })
   })
 })
