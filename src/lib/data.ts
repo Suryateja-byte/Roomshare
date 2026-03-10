@@ -767,7 +767,7 @@ export async function getMapListings(
     return sanitizeMapListings(listings.map((l) => ({
       id: l.id,
       title: l.title,
-      price: l.price,
+      price: Number(l.price),
       availableSlots: l.availableSlots,
       images: l.images || [],
       location: {

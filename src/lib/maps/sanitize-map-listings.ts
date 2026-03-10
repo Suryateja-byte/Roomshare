@@ -19,7 +19,9 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
       ? value
       : typeof value === "string" && value.trim().length > 0
         ? Number(value)
-        : Number.NaN;
+        : value != null && typeof value === "object"
+          ? Number(value)
+          : Number.NaN;
 
   return Number.isFinite(parsed) ? parsed : fallback;
 }

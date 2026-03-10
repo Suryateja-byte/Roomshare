@@ -787,7 +787,7 @@ async function getSearchDocMapListingsInternal(
     const mappedListings = sanitizeMapListings(trimmedListings.map((l) => ({
       id: l.id,
       title: l.title,
-      price: l.price,
+      price: Number(l.price),
       availableSlots: l.availableSlots,
       images: l.primaryImage ? [l.primaryImage] : [],
       location: {
