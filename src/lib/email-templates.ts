@@ -483,4 +483,85 @@ export const emailTemplates = {
         `),
     };
     },
+
+    bookingHoldRequest: (data: {
+        hostName: string;
+        tenantName: string;
+        listingTitle: string;
+        holdExpiresAt: string;
+    }) => {
+        const safeHost = escapeHtml(data.hostName);
+        const safeTenant = escapeHtml(data.tenantName);
+        const safeTitle = escapeHtml(data.listingTitle);
+        const safeExpires = escapeHtml(data.holdExpiresAt);
+
+        return {
+            subject: sanitizeSubject(`New hold request on ${data.listingTitle}`),
+            html: baseTemplate(`
+            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Hold Request</h2>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Hi ${safeHost},
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                <strong>${safeTenant}</strong> has placed a hold on <strong>"${safeTitle}"</strong>.
+            </p>
+            <div style="background-color: #f4f4f5; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                <p style="margin: 0; color: #18181b; font-size: 16px;">
+                    This hold expires on <strong>${safeExpires}</strong>.
+                </p>
+            </div>
+            <a href="${buildAppHref('/bookings')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                View Bookings
+            </a>
+        `),
+        };
+    },
+
+    bookingExpired: (data: {
+        tenantName: string;
+        listingTitle: string;
+    }) => {
+        const safeName = escapeHtml(data.tenantName);
+        const safeTitle = escapeHtml(data.listingTitle);
+
+        return {
+            subject: sanitizeSubject(`Booking request expired for ${data.listingTitle}`),
+            html: baseTemplate(`
+            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Booking Expired</h2>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Hi ${safeName},
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Your booking request for <strong>"${safeTitle}"</strong> has expired.
+            </p>
+            <a href="${buildAppHref('/search')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                Browse Listings
+            </a>
+        `),
+        };
+    },
+
+    bookingHoldExpired: (data: {
+        tenantName: string;
+        listingTitle: string;
+    }) => {
+        const safeName = escapeHtml(data.tenantName);
+        const safeTitle = escapeHtml(data.listingTitle);
+
+        return {
+            subject: sanitizeSubject(`Hold expired for ${data.listingTitle}`),
+            html: baseTemplate(`
+            <h2 style="margin: 0 0 16px; color: #d97706; font-size: 20px;">Hold Expired</h2>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Hi ${safeName},
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Your hold on <strong>"${safeTitle}"</strong> has expired.
+            </p>
+            <a href="${buildAppHref('/search')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                Browse Listings
+            </a>
+        `),
+        };
+    },
 };

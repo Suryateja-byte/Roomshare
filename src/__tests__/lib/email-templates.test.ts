@@ -277,6 +277,98 @@ describe('emailTemplates', () => {
     })
   })
 
+  describe('bookingHoldRequest', () => {
+    it('should generate hold request email for host', () => {
+      const data = {
+        hostName: 'John Host',
+        tenantName: 'Jane Tenant',
+        listingTitle: 'Cozy Room',
+        holdExpiresAt: 'March 15, 2026',
+      }
+
+      const result = emailTemplates.bookingHoldRequest(data)
+
+      expect(result.subject).toContain('Cozy Room')
+      expect(result.html).toContain('John Host')
+      expect(result.html).toContain('Jane Tenant')
+      expect(result.html).toContain('March 15, 2026')
+      expect(result.html).toContain('/bookings')
+      expect(result.html).toContain('<!DOCTYPE html>')
+    })
+
+    it('should escape XSS in user-controlled fields', () => {
+      const data = {
+        hostName: '<script>alert("xss")</script>',
+        tenantName: '<img src=x onerror=alert(1)>',
+        listingTitle: 'Room "Special" & <Fancy>',
+        holdExpiresAt: 'March 15, 2026',
+      }
+
+      const result = emailTemplates.bookingHoldRequest(data)
+
+      expect(result.html).not.toContain('<script>')
+      expect(result.html).toContain('&lt;script&gt;')
+      expect(result.html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+      expect(result.html).toContain('&amp;')
+    })
+  })
+
+  describe('bookingExpired', () => {
+    it('should generate expiration email for tenant', () => {
+      const data = {
+        tenantName: 'Jane Tenant',
+        listingTitle: 'Cozy Room',
+      }
+
+      const result = emailTemplates.bookingExpired(data)
+
+      expect(result.subject).toContain('Cozy Room')
+      expect(result.html).toContain('Jane Tenant')
+      expect(result.html).toContain('expired')
+      expect(result.html).toContain('/search')
+    })
+
+    it('should escape XSS in user-controlled fields', () => {
+      const data = {
+        tenantName: '<script>alert("xss")</script>',
+        listingTitle: '<img src=x>',
+      }
+
+      const result = emailTemplates.bookingExpired(data)
+
+      expect(result.html).not.toContain('<script>')
+      expect(result.html).toContain('&lt;script&gt;')
+    })
+  })
+
+  describe('bookingHoldExpired', () => {
+    it('should generate hold expiration email for tenant with amber styling', () => {
+      const data = {
+        tenantName: 'Jane Tenant',
+        listingTitle: 'Cozy Room',
+      }
+
+      const result = emailTemplates.bookingHoldExpired(data)
+
+      expect(result.subject).toContain('Cozy Room')
+      expect(result.html).toContain('Jane Tenant')
+      expect(result.html).toContain('#d97706')
+      expect(result.html).toContain('expired')
+    })
+
+    it('should escape XSS in user-controlled fields', () => {
+      const data = {
+        tenantName: '<script>alert("xss")</script>',
+        listingTitle: '<img src=x>',
+      }
+
+      const result = emailTemplates.bookingHoldExpired(data)
+
+      expect(result.html).not.toContain('<script>')
+      expect(result.html).toContain('&lt;script&gt;')
+    })
+  })
+
   describe('reviewResponse', () => {
     it('should generate review response email', () => {
       const data = {

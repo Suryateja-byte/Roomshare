@@ -117,6 +117,7 @@ model Listing {
   moveInDate          DateTime?
   status              ListingStatus    @default(ACTIVE)
   viewCount           Int              @default(0)
+  version             Int              @default(1)  // Optimistic locking for race-safe updates
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   owner               User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -302,6 +303,9 @@ enum NotificationType {
   BOOKING_ACCEPTED
   BOOKING_REJECTED
   BOOKING_CANCELLED
+  BOOKING_HOLD_REQUEST
+  BOOKING_EXPIRED
+  BOOKING_HOLD_EXPIRED
   NEW_MESSAGE
   NEW_REVIEW
   LISTING_SAVED
