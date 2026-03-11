@@ -71,6 +71,7 @@ interface ListingFormData {
     roomType: string;
     genderPreference: string;
     householdGender: string;
+    bookingMode: string;
     selectedLanguages: string[];
     images: PersistedImageData[];
 }
@@ -87,7 +88,11 @@ const FORM_SECTIONS = [
 
 const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
 
-export default function CreateListingForm() {
+interface CreateListingFormProps {
+    enableWholeUnitMode?: boolean;
+}
+
+export default function CreateListingForm({ enableWholeUnitMode = false }: CreateListingFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -112,6 +117,7 @@ export default function CreateListingForm() {
     const [roomType, setRoomType] = useState('');
     const [genderPreference, setGenderPreference] = useState('');
     const [householdGender, setHouseholdGender] = useState('');
+    const [bookingMode, setBookingMode] = useState('SHARED');
 
     // Form field states for tracking completion
     const [title, setTitle] = useState('');
@@ -198,6 +204,7 @@ export default function CreateListingForm() {
             setRoomType(persistedData.roomType || '');
             setGenderPreference(persistedData.genderPreference || '');
             setHouseholdGender(persistedData.householdGender || '');
+            setBookingMode(persistedData.bookingMode || 'SHARED');
             setSelectedLanguages(persistedData.selectedLanguages || []);
             setAmenitiesValue(persistedData.amenities || '');
             setHouseRulesValue(persistedData.houseRules || '');
@@ -247,6 +254,7 @@ export default function CreateListingForm() {
             roomType,
             genderPreference,
             householdGender,
+            bookingMode,
             selectedLanguages,
             images: uploadedImages
                 .filter(img => img.uploadedUrl && !img.error)
@@ -261,7 +269,7 @@ export default function CreateListingForm() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isHydrated, draftRestored, hasDraft, title, description, price, totalSlots,
         address, city, state, zip, amenitiesValue, houseRulesValue, moveInDate,
-        leaseDuration, roomType, genderPreference, householdGender,
+        leaseDuration, roomType, genderPreference, householdGender, bookingMode,
         selectedLanguages, uploadedImages]);
 
     // Cleanup: abort in-flight submission and clear redirect timeout on unmount
@@ -343,6 +351,7 @@ export default function CreateListingForm() {
             roomType: roomType || undefined,
             genderPreference: genderPreference || undefined,
             householdGender: householdGender || undefined,
+            bookingMode: enableWholeUnitMode ? bookingMode : 'SHARED',
         };
 
         // Client-side Zod pre-validation (optimistic — server validates as defense-in-depth)
@@ -655,6 +664,60 @@ export default function CreateListingForm() {
                             <FieldError field="totalSlots" fieldErrors={fieldErrors} />
                         </div>
                     </div>
+
+                    {/* Booking Mode Selector (behind feature flag) */}
+                    {enableWholeUnitMode && (
+                        <fieldset className="space-y-3" disabled={loading}>
+                            <legend className="text-sm font-medium text-zinc-900 dark:text-white">Booking Mode</legend>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label
+                                    className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                        bookingMode === 'SHARED'
+                                            ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800'
+                                            : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="bookingMode"
+                                        value="SHARED"
+                                        checked={bookingMode === 'SHARED'}
+                                        onChange={(e) => setBookingMode(e.target.value)}
+                                        className="mt-0.5"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-medium text-zinc-900 dark:text-white">Shared space (multiple tenants)</span>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                            Individual slots can be booked by different tenants.
+                                        </p>
+                                    </div>
+                                </label>
+                                <label
+                                    className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                        bookingMode === 'WHOLE_UNIT'
+                                            ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800'
+                                            : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="bookingMode"
+                                        value="WHOLE_UNIT"
+                                        checked={bookingMode === 'WHOLE_UNIT'}
+                                        onChange={(e) => setBookingMode(e.target.value)}
+                                        className="mt-0.5"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-medium text-zinc-900 dark:text-white">Entire unit (one party)</span>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                            The entire unit is booked by a single party at a time.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                            <FieldError field="bookingMode" fieldErrors={fieldErrors} />
+                        </fieldset>
+                    )}
                 </section>
 
                 <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>

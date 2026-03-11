@@ -6,6 +6,7 @@ import {
   MAX_QUERY_LENGTH,
   LAT_OFFSET_DEGREES,
 } from "./constants";
+import { VALID_BOOKING_MODES } from "./filter-schema";
 
 // Re-export for backward compatibility
 export { MAX_SAFE_PRICE, MAX_SAFE_PAGE, MAX_ARRAY_ITEMS };
@@ -29,6 +30,7 @@ export interface FilterParams {
   languages?: string[];
   genderPreference?: string;
   householdGender?: string;
+  bookingMode?: string;
   bounds?: {
     minLat: number;
     maxLat: number;
@@ -54,7 +56,8 @@ export function hasActiveFilters(params: FilterParams): boolean {
     params.roomType ||
     (params.languages && params.languages.length > 0) ||
     params.genderPreference ||
-    params.householdGender
+    params.householdGender ||
+    params.bookingMode
   );
 }
 
@@ -73,6 +76,7 @@ export interface RawSearchParams {
   roomType?: string | string[];
   genderPreference?: string | string[];
   householdGender?: string | string[];
+  bookingMode?: string | string[];
   minLat?: string | string[];
   maxLat?: string | string[];
   minLng?: string | string[];
@@ -119,6 +123,7 @@ export const FILTER_QUERY_KEYS = [
   "roomType",
   "genderPreference",
   "householdGender",
+  "bookingMode",
   "nearMatches",
 ] as const;
 
@@ -199,6 +204,9 @@ export function buildCanonicalFilterParamsFromSearchParams(
     }
     if (filterParams.householdGender) {
       canonical.set("householdGender", filterParams.householdGender);
+    }
+    if (filterParams.bookingMode) {
+      canonical.set("bookingMode", filterParams.bookingMode);
     }
     if (typeof filterParams.nearMatches === "boolean") {
       canonical.set(
@@ -546,6 +554,10 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     getFirstValue(raw.householdGender),
     VALID_HOUSEHOLD_GENDERS as readonly string[],
   );
+  const validBookingMode = safeParseEnum(
+    getFirstValue(raw.bookingMode),
+    VALID_BOOKING_MODES as readonly string[],
+  );
 
   // Parse nearMatches boolean flag.
   // Accept both boolean strings and numeric toggles for backward compatibility:
@@ -570,6 +582,7 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     roomType: validRoomType,
     genderPreference: validGenderPreference,
     householdGender: validHouseholdGender,
+    bookingMode: validBookingMode,
     bounds,
     sort: sortOption,
     nearMatches,

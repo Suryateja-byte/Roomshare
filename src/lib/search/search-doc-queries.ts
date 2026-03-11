@@ -121,7 +121,7 @@ const HYBRID_COUNT_THRESHOLD = 100;
 // 48 = 4 pages of 12 items - enough for initial exploration
 export const MAX_UNBOUNDED_RESULTS = 48;
 
-const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%"]);
+const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%", "HELD"]);
 
 function assertParameterizedWhereClause(whereClause: string): void {
   const literalPattern = /'([^']*)'/g;
@@ -167,6 +167,7 @@ function buildBaseCacheFields(params: FilterParams) {
     moveInDate: params.moveInDate || "",
     genderPreference: params.genderPreference || "",
     householdGender: params.householdGender || "",
+    bookingMode: params.bookingMode || "",
     bounds: params.bounds
       ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",
@@ -422,12 +423,20 @@ export function buildSearchDocWhereConditions(
     languages,
     genderPreference,
     householdGender,
+    bookingMode,
     bounds,
   } = filterParams;
 
   // Base conditions for SearchDoc
   const conditions: string[] = [
-    "d.available_slots > 0",
+    (features.softHoldsEnabled || features.softHoldsDraining)
+      ? `(d.available_slots - COALESCE((
+          SELECT SUM("slotsRequested") FROM "Booking" b
+          WHERE b."listingId" = d.id
+            AND b.status = 'HELD'
+            AND b."heldUntil" > NOW()
+        ), 0)) > 0`
+      : 'd.available_slots > 0',
     "d.status = 'ACTIVE'",
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
@@ -550,6 +559,12 @@ export function buildSearchDocWhereConditions(
   if (householdGender && householdGender !== "any") {
     conditions.push(`d.household_gender = $${paramIndex++}`);
     params.push(householdGender);
+  }
+
+  // Phase 3: Booking mode filter
+  if (bookingMode && bookingMode !== "any") {
+    conditions.push(`d."booking_mode" = $${paramIndex++}`);
+    params.push(bookingMode);
   }
 
   return { conditions, params, paramIndex, ftsQueryParamIndex };

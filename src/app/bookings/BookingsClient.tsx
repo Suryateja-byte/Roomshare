@@ -19,7 +19,8 @@ import {
     WifiOff,
     Filter,
     AlertTriangle,
-    Bell
+    Bell,
+    PauseCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -92,6 +93,16 @@ const statusConfig = {
         color: 'bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700',
         icon: AlertCircle,
         label: 'Cancelled'
+    },
+    HELD: {
+        color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+        icon: PauseCircle,
+        label: 'Held'
+    },
+    EXPIRED: {
+        color: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+        icon: AlertCircle,
+        label: 'Expired'
     }
 };
 
@@ -149,8 +160,8 @@ function BookingCard({
         ? `${booking.listing.location.city}, ${booking.listing.location.state}`
         : 'Location not specified';
 
-    const showActions = type === 'received' && booking.status === 'PENDING';
-    const showCancelButton = type === 'sent' && (booking.status === 'PENDING' || booking.status === 'ACCEPTED');
+    const showActions = type === 'received' && ['PENDING', 'HELD'].includes(booking.status);
+    const showCancelButton = type === 'sent' && ['PENDING', 'ACCEPTED', 'HELD'].includes(booking.status);
 
     return (
         <div data-testid="booking-item" className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -435,7 +446,7 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
     const currentBookings = statusFilter === 'ALL'
         ? allBookings
         : allBookings.filter(b => b.status === statusFilter);
-    const pendingReceivedCount = bookings.received.filter(b => b.status === 'PENDING').length;
+    const pendingReceivedCount = bookings.received.filter(b => b.status === 'PENDING' || b.status === 'HELD').length;
 
     // Status filter options with counts
     const statusOptions: { value: BookingStatus | 'ALL'; label: string; count: number }[] = [
@@ -444,6 +455,8 @@ export default function BookingsClient({ sentBookings, receivedBookings }: Booki
         { value: 'ACCEPTED', label: 'Accepted', count: allBookings.filter(b => b.status === 'ACCEPTED').length },
         { value: 'REJECTED', label: 'Rejected', count: allBookings.filter(b => b.status === 'REJECTED').length },
         { value: 'CANCELLED', label: 'Cancelled', count: allBookings.filter(b => b.status === 'CANCELLED').length },
+        { value: 'HELD', label: 'Held', count: allBookings.filter(b => b.status === 'HELD').length },
+        { value: 'EXPIRED', label: 'Expired', count: allBookings.filter(b => b.status === 'EXPIRED').length },
     ];
 
     return (

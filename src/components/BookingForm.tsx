@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { FocusTrap } from '@/components/ui/FocusTrap';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
-import { createBooking, BookingResult } from '@/app/actions/booking';
+import { createBooking, createHold, BookingResult } from '@/app/actions/booking';
 import { useRouter } from 'next/navigation';
 import { Loader2, LogIn, AlertTriangle, RefreshCw, CheckCircle, XCircle, WifiOff, Calendar, Info } from 'lucide-react';
 import Link from 'next/link';
@@ -29,6 +29,7 @@ interface BookingFormProps {
     isLoggedIn: boolean;
     status?: ListingStatus;
     bookedDates?: BookedDateRange[];
+    holdEnabled?: boolean;
 }
 
 const MIN_BOOKING_DAYS = 30; // Industry standard minimum stay
@@ -54,7 +55,7 @@ const availabilityConfig: Record<ListingStatus, { label: string; colorClass: str
     }
 };
 
-export default function BookingForm({ listingId, price, ownerId, isOwner, isLoggedIn, status = 'ACTIVE', bookedDates = [] }: BookingFormProps) {
+export default function BookingForm({ listingId, price, ownerId, isOwner, isLoggedIn, status = 'ACTIVE', bookedDates = [], holdEnabled = false }: BookingFormProps) {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -281,6 +282,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 parseLocalDate(startDate),
                 parseLocalDate(endDate),
                 price,
+                1,  // slotsRequested — single-slot default until multi-slot UI is built
                 idempotencyKeyRef.current
             );
 
@@ -615,6 +617,47 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                         'Request to Book'
                     )}
                 </Button>
+
+                {holdEnabled && (
+                    <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="w-full rounded-xl"
+                        disabled={isLoading || isOffline || hasSubmittedSuccessfully || (bookingInfo !== null && !bookingInfo.isValid) || (dateConflict?.overlaps ?? false)}
+                        onClick={async () => {
+                            if (!startDate || !endDate || !bookingInfo?.isValid) return;
+                            setIsLoading(true);
+                            setMessage('');
+                            setErrorType(null);
+                            try {
+                                const result: BookingResult = await createHold(
+                                    listingId,
+                                    parseLocalDate(startDate),
+                                    parseLocalDate(endDate),
+                                    price,
+                                    1
+                                );
+                                if (result.success) {
+                                    setMessage('Hold placed successfully!');
+                                    setErrorType(null);
+                                    setHasSubmittedSuccessfully(true);
+                                    setTimeout(() => router.push('/bookings'), 1500);
+                                } else {
+                                    setErrorType(categorizeError(result));
+                                    setMessage(result.error || 'Failed to place hold');
+                                }
+                            } catch {
+                                setErrorType('server');
+                                setMessage('An unexpected error occurred. Please try again.');
+                            } finally {
+                                setIsLoading(false);
+                            }
+                        }}
+                    >
+                        Place Hold (15 min)
+                    </Button>
+                )}
 
                 {/* Error/Success Messages */}
                 {message && (

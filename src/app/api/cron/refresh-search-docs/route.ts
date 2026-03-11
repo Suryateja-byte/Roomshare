@@ -40,6 +40,7 @@ interface ListingWithData {
   availableSlots: number;
   viewCount: number;
   status: string;
+  bookingMode: string;
   createdAt: Date;
   // Location data
   address: string;
@@ -94,6 +95,7 @@ async function fetchListingsWithData(
       l."availableSlots" as "availableSlots",
       l."viewCount" as "viewCount",
       l.status::text as status,
+      l."booking_mode" as "bookingMode",
       l."createdAt" as "createdAt",
       loc.address,
       loc.city,
@@ -145,6 +147,7 @@ async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
       address, city, state, zip, location_geog, lat, lng,
       avg_rating, review_count, recommended_score,
       amenities_lower, house_rules_lower, household_languages_lower,
+      booking_mode,
       doc_created_at, doc_updated_at
     ) VALUES (
       ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
@@ -156,6 +159,7 @@ async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
       ${listing.lat}, ${listing.lng},
       ${listing.avgRating}, ${listing.reviewCount}, ${recommendedScore},
       ${amenitiesLower}, ${houseRulesLower}, ${householdLanguagesLower},
+      ${listing.bookingMode},
       NOW(), NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
@@ -189,6 +193,7 @@ async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
       amenities_lower = EXCLUDED.amenities_lower,
       house_rules_lower = EXCLUDED.house_rules_lower,
       household_languages_lower = EXCLUDED.household_languages_lower,
+      booking_mode = EXCLUDED.booking_mode,
       doc_updated_at = NOW()
   `;
 }

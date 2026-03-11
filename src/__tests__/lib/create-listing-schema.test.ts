@@ -19,6 +19,7 @@ jest.mock('@/lib/filter-schema', () => ({
   VALID_HOUSEHOLD_GENDERS: ['any', 'ALL_MALE', 'ALL_FEMALE', 'MIXED'],
   VALID_AMENITIES: ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool', 'Furnished'],
   VALID_HOUSE_RULES: ['Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed'],
+  VALID_BOOKING_MODES: ['any', 'SHARED', 'WHOLE_UNIT'],
 }))
 
 import {

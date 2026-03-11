@@ -17,7 +17,7 @@ import {
 describe('booking-state-machine', () => {
   describe('VALID_TRANSITIONS', () => {
     it('defines transitions for all booking statuses', () => {
-      const allStatuses: BookingStatus[] = ['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED'];
+      const allStatuses: BookingStatus[] = ['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED', 'HELD', 'EXPIRED'];
       allStatuses.forEach(status => {
         expect(VALID_TRANSITIONS).toHaveProperty(status);
         expect(Array.isArray(VALID_TRANSITIONS[status])).toBe(true);
@@ -38,6 +38,18 @@ describe('booking-state-machine', () => {
 
     it('CANCELLED is a terminal state', () => {
       expect(VALID_TRANSITIONS.CANCELLED).toEqual([]);
+    });
+
+    it('HELD can transition to ACCEPTED, REJECTED, CANCELLED, or EXPIRED', () => {
+      expect(VALID_TRANSITIONS.HELD).toEqual(['ACCEPTED', 'REJECTED', 'CANCELLED', 'EXPIRED']);
+    });
+
+    it('EXPIRED is a terminal state', () => {
+      expect(VALID_TRANSITIONS.EXPIRED).toEqual([]);
+    });
+
+    it('PENDING cannot transition to HELD (holds are created, not transitioned)', () => {
+      expect(VALID_TRANSITIONS.PENDING).not.toContain('HELD');
     });
   });
 
@@ -101,6 +113,62 @@ describe('booking-state-machine', () => {
     it('rejects CANCELLED -> REJECTED', () => {
       expect(canTransition('CANCELLED', 'REJECTED')).toBe(false);
     });
+
+    // Valid transitions from HELD
+    it('allows HELD -> ACCEPTED', () => {
+      expect(canTransition('HELD', 'ACCEPTED')).toBe(true);
+    });
+
+    it('allows HELD -> REJECTED', () => {
+      expect(canTransition('HELD', 'REJECTED')).toBe(true);
+    });
+
+    it('allows HELD -> CANCELLED', () => {
+      expect(canTransition('HELD', 'CANCELLED')).toBe(true);
+    });
+
+    it('allows HELD -> EXPIRED', () => {
+      expect(canTransition('HELD', 'EXPIRED')).toBe(true);
+    });
+
+    // Invalid transitions from HELD
+    it('rejects HELD -> PENDING', () => {
+      expect(canTransition('HELD', 'PENDING')).toBe(false);
+    });
+
+    it('rejects HELD -> HELD (no-op)', () => {
+      expect(canTransition('HELD', 'HELD')).toBe(false);
+    });
+
+    // Invalid transitions from EXPIRED (terminal)
+    it('rejects EXPIRED -> PENDING', () => {
+      expect(canTransition('EXPIRED', 'PENDING')).toBe(false);
+    });
+
+    it('rejects EXPIRED -> ACCEPTED', () => {
+      expect(canTransition('EXPIRED', 'ACCEPTED')).toBe(false);
+    });
+
+    it('rejects EXPIRED -> REJECTED', () => {
+      expect(canTransition('EXPIRED', 'REJECTED')).toBe(false);
+    });
+
+    it('rejects EXPIRED -> CANCELLED', () => {
+      expect(canTransition('EXPIRED', 'CANCELLED')).toBe(false);
+    });
+
+    it('rejects EXPIRED -> HELD', () => {
+      expect(canTransition('EXPIRED', 'HELD')).toBe(false);
+    });
+
+    it('rejects EXPIRED -> EXPIRED (no-op)', () => {
+      expect(canTransition('EXPIRED', 'EXPIRED')).toBe(false);
+    });
+
+    // PENDING -> HELD is invalid (holds are created, not transitioned)
+    it('rejects PENDING -> HELD', () => {
+      expect(canTransition('PENDING', 'HELD')).toBe(false);
+    });
   });
 
   describe('validateTransition', () => {
@@ -109,10 +177,18 @@ describe('booking-state-machine', () => {
       expect(() => validateTransition('PENDING', 'REJECTED')).not.toThrow();
       expect(() => validateTransition('PENDING', 'CANCELLED')).not.toThrow();
       expect(() => validateTransition('ACCEPTED', 'CANCELLED')).not.toThrow();
+      expect(() => validateTransition('HELD', 'ACCEPTED')).not.toThrow();
+      expect(() => validateTransition('HELD', 'REJECTED')).not.toThrow();
+      expect(() => validateTransition('HELD', 'CANCELLED')).not.toThrow();
+      expect(() => validateTransition('HELD', 'EXPIRED')).not.toThrow();
     });
 
     it('throws InvalidStateTransitionError for invalid transitions', () => {
       expect(() => validateTransition('CANCELLED', 'ACCEPTED'))
+        .toThrow(InvalidStateTransitionError);
+      expect(() => validateTransition('EXPIRED', 'ACCEPTED'))
+        .toThrow(InvalidStateTransitionError);
+      expect(() => validateTransition('HELD', 'PENDING'))
         .toThrow(InvalidStateTransitionError);
     });
 
@@ -161,6 +237,14 @@ describe('booking-state-machine', () => {
     it('returns empty array for CANCELLED', () => {
       expect(getAllowedTransitions('CANCELLED')).toEqual([]);
     });
+
+    it('returns correct transitions for HELD', () => {
+      expect(getAllowedTransitions('HELD')).toEqual(['ACCEPTED', 'REJECTED', 'CANCELLED', 'EXPIRED']);
+    });
+
+    it('returns empty array for EXPIRED', () => {
+      expect(getAllowedTransitions('EXPIRED')).toEqual([]);
+    });
   });
 
   describe('isTerminalStatus', () => {
@@ -178,6 +262,14 @@ describe('booking-state-machine', () => {
 
     it('CANCELLED is terminal', () => {
       expect(isTerminalStatus('CANCELLED')).toBe(true);
+    });
+
+    it('HELD is not terminal', () => {
+      expect(isTerminalStatus('HELD')).toBe(false);
+    });
+
+    it('EXPIRED is terminal', () => {
+      expect(isTerminalStatus('EXPIRED')).toBe(true);
     });
   });
 
@@ -219,6 +311,18 @@ describe('booking-state-machine', () => {
     it('indicates terminal state in message when no transitions allowed', () => {
       const error = new InvalidStateTransitionError('CANCELLED', 'ACCEPTED');
       expect(error.message).toContain('terminal state');
+    });
+
+    it('indicates EXPIRED terminal state in message', () => {
+      const error = new InvalidStateTransitionError('EXPIRED', 'PENDING');
+      expect(error.message).toContain('terminal state');
+      expect(error.message).toContain('EXPIRED');
+      expect(error.message).toContain('PENDING');
+    });
+
+    it('includes allowed transitions for HELD in error message', () => {
+      const error = new InvalidStateTransitionError('HELD', 'PENDING');
+      expect(error.message).toContain('ACCEPTED, REJECTED, CANCELLED, EXPIRED');
     });
   });
 });

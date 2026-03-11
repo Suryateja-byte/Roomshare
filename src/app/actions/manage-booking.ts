@@ -72,6 +72,34 @@ export async function updateBookingStatus(
             return { error: 'Only the listing owner can accept or reject bookings' };
         }
 
+        // Phase 4: Check-on-read inline expiry (defense-in-depth, D9)
+        // If sweeper lags, reading an expired HELD booking auto-expires it
+        if (booking.status === 'HELD' && booking.heldUntil && new Date(booking.heldUntil) < new Date()) {
+            // Best-effort inline expiry — sweeper is the primary mechanism
+            try {
+                await prisma.$transaction(async (tx) => {
+                    // FOR UPDATE on Listing to coordinate with sweeper
+                    await tx.$queryRaw`SELECT 1 FROM "Listing" WHERE "id" = ${booking.listing.id} FOR UPDATE`;
+
+                    const result = await tx.booking.updateMany({
+                        where: { id: booking.id, status: 'HELD', version: booking.version },
+                        data: { status: 'EXPIRED', heldUntil: null, version: { increment: 1 } }
+                    });
+                    if (result.count > 0) {
+                        await tx.$executeRaw`
+                            UPDATE "Listing"
+                            SET "availableSlots" = LEAST("availableSlots" + ${booking.slotsRequested}, "totalSlots")
+                            WHERE "id" = ${booking.listing.id}
+                        `;
+                    }
+                });
+            } catch {
+                // Sweeper will handle it — swallow error silently
+            }
+            // Always return error regardless of whether expiry succeeded
+            return { error: 'This hold has expired.' };
+        }
+
         // P0-03 FIX: Validate state transition before proceeding
         // Prevents invalid transitions like CANCELLED → ACCEPTED
         try {
@@ -88,87 +116,162 @@ export async function updateBookingStatus(
 
         // Handle ACCEPTED status with atomic transaction to prevent double-booking
         if (status === 'ACCEPTED') {
-            try {
-                await prisma.$transaction(async (tx) => {
-                    // Lock the listing row with FOR UPDATE to prevent concurrent reads
-                    const [listing] = await tx.$queryRaw<Array<{ availableSlots: number; totalSlots: number; id: string; ownerId: string }>>`
-                        SELECT "availableSlots", "totalSlots", "id", "ownerId" FROM "Listing"
-                        WHERE "id" = ${booking.listing.id}
-                        FOR UPDATE
-                    `;
-
-                    // P0-3 FIX: Re-verify ownership under row lock (TOCTOU protection)
-                    if (listing.ownerId !== session.user.id) {
-                        throw new Error('UNAUTHORIZED_IN_TRANSACTION');
-                    }
-
-                    if (listing.availableSlots <= 0) {
-                        throw new Error('NO_SLOTS_AVAILABLE');
-                    }
-
-                    // Count overlapping ACCEPTED bookings for capacity check
-                    // For multi-slot listings, we allow multiple bookings for same dates up to capacity
-                    const overlappingAcceptedCount = await tx.booking.count({
-                        where: {
-                            listingId: booking.listingId,
-                            id: { not: bookingId },
-                            status: 'ACCEPTED',
-                            AND: [
-                                { startDate: { lte: booking.endDate } },
-                                { endDate: { gte: booking.startDate } }
-                            ]
-                        }
-                    });
-
-                    // Check if accepting this booking would exceed capacity
-                    // overlappingAcceptedCount + 1 (this booking) must not exceed totalSlots
-                    if (overlappingAcceptedCount + 1 > listing.totalSlots) {
-                        throw new Error('CAPACITY_EXCEEDED');
-                    }
-
-                    // P0-04 FIX: Atomically update booking status with optimistic locking
-                    // If version changed since we read it, another process modified it
-                    const updateResult = await tx.booking.updateMany({
-                        where: {
-                            id: bookingId,
-                            version: booking.version, // Optimistic lock check
-                        },
-                        data: {
-                            status: 'ACCEPTED',
-                            version: { increment: 1 },
-                        }
-                    });
-
-                    if (updateResult.count === 0) {
-                        throw new Error('CONCURRENT_MODIFICATION');
-                    }
-
-                    await tx.listing.update({
-                        where: { id: booking.listing.id },
-                        data: { availableSlots: { decrement: 1 } }
-                    });
-                });
-                // Transaction succeeded - continue with notifications below
-            } catch (error) {
-                if (error instanceof Error) {
-                    if (error.message === 'UNAUTHORIZED_IN_TRANSACTION') {
-                        return { error: 'Only the listing owner can accept or reject bookings', code: 'UNAUTHORIZED' };
-                    }
-                    if (error.message === 'NO_SLOTS_AVAILABLE') {
-                        return { error: 'No available slots for this listing' };
-                    }
-                    if (error.message === 'CAPACITY_EXCEEDED') {
-                        return { error: 'Cannot accept: all slots for these dates are already booked' };
-                    }
-                    // P0-04: Handle concurrent modification (optimistic lock failure)
-                    if (error.message === 'CONCURRENT_MODIFICATION') {
-                        return {
-                            error: 'Booking was modified by another request. Please refresh and try again.',
-                            code: 'CONCURRENT_MODIFICATION'
-                        };
-                    }
+            // Phase 4: HELD→ACCEPTED path — slots already consumed at hold creation (D4)
+            if (booking.status === ('HELD' as BookingStatus)) {
+                // Verify hold is still active before accepting
+                if (booking.heldUntil && new Date(booking.heldUntil as Date) < new Date()) {
+                    return { error: 'This hold has expired. The booking has been automatically released.' };
                 }
-                throw error; // Re-throw unexpected errors
+
+                try {
+                    await prisma.$transaction(async (tx) => {
+                        // FOR UPDATE lock for TOCTOU protection
+                        const [listing] = await tx.$queryRaw<Array<{ ownerId: string }>>`
+                            SELECT "ownerId" FROM "Listing"
+                            WHERE "id" = ${booking.listing.id}
+                            FOR UPDATE
+                        `;
+
+                        if (listing.ownerId !== session.user.id) {
+                            throw new Error('UNAUTHORIZED_IN_TRANSACTION');
+                        }
+
+                        // Verify booking is still HELD and not expired (atomic check)
+                        const updateResult = await tx.booking.updateMany({
+                            where: {
+                                id: bookingId,
+                                status: 'HELD',
+                                version: booking.version,
+                            },
+                            data: {
+                                status: 'ACCEPTED',
+                                heldUntil: null, // Clear hold expiry
+                                version: { increment: 1 },
+                            }
+                        });
+
+                        if (updateResult.count === 0) {
+                            throw new Error('HOLD_EXPIRED_OR_MODIFIED');
+                        }
+
+                        // NO slot decrement — slots were consumed at hold creation (D4)
+                    });
+                } catch (error) {
+                    if (error instanceof Error) {
+                        if (error.message === 'UNAUTHORIZED_IN_TRANSACTION') {
+                            return { error: 'Only the listing owner can accept or reject bookings', code: 'UNAUTHORIZED' };
+                        }
+                        if (error.message === 'HOLD_EXPIRED_OR_MODIFIED') {
+                            return {
+                                error: 'This hold has expired or was modified. Please refresh and try again.',
+                                code: 'CONCURRENT_MODIFICATION'
+                            };
+                        }
+                    }
+                    if (error instanceof Error && error.message.includes('WHOLE_UNIT_OVERLAP')) {
+                        return { error: 'Cannot accept: overlapping booking exists for this whole-unit listing' };
+                    }
+                    throw error;
+                }
+            } else {
+                // PENDING→ACCEPTED path (original logic)
+                try {
+                    await prisma.$transaction(async (tx) => {
+                        // Lock the listing row with FOR UPDATE to prevent concurrent reads
+                        const [listing] = await tx.$queryRaw<Array<{ availableSlots: number; totalSlots: number; id: string; ownerId: string; bookingMode: string }>>`
+                            SELECT "availableSlots", "totalSlots", "id", "ownerId", "booking_mode" as "bookingMode" FROM "Listing"
+                            WHERE "id" = ${booking.listing.id}
+                            FOR UPDATE
+                        `;
+
+                        // P0-3 FIX: Re-verify ownership under row lock (TOCTOU protection)
+                        if (listing.ownerId !== session.user.id) {
+                            throw new Error('UNAUTHORIZED_IN_TRANSACTION');
+                        }
+
+                        // Phase 3: For WHOLE_UNIT, override slotsNeeded to current totalSlots from the locked row.
+                        const slotsNeeded = listing.bookingMode === 'WHOLE_UNIT'
+                            ? listing.totalSlots
+                            : booking.slotsRequested;
+                        if (listing.availableSlots < slotsNeeded) {
+                            throw new Error('NO_SLOTS_AVAILABLE');
+                        }
+
+                        // Phase 4 (6a-ii): Capacity check includes ACCEPTED + active HELD bookings
+                        const overlappingSlots = await tx.$queryRaw<[{ total: bigint }]>`
+                            SELECT COALESCE(SUM("slotsRequested"), 0) AS total
+                            FROM "Booking"
+                            WHERE "listingId" = ${booking.listingId}
+                            AND "id" != ${bookingId}
+                            AND (
+                                "status" = 'ACCEPTED'
+                                OR ("status" = 'HELD' AND "heldUntil" > NOW())
+                            )
+                            AND "startDate" <= ${booking.endDate}
+                            AND "endDate" >= ${booking.startDate}
+                        `;
+                        const usedSlots = Number(overlappingSlots[0].total);
+
+                        if (usedSlots + slotsNeeded > listing.totalSlots) {
+                            throw new Error('CAPACITY_EXCEEDED');
+                        }
+
+                        // P0-04 FIX: Atomically update booking status with optimistic locking
+                        const updateResult = await tx.booking.updateMany({
+                            where: {
+                                id: bookingId,
+                                version: booking.version,
+                            },
+                            data: {
+                                status: 'ACCEPTED',
+                                version: { increment: 1 },
+                            }
+                        });
+
+                        if (updateResult.count === 0) {
+                            throw new Error('CONCURRENT_MODIFICATION');
+                        }
+
+                        // C2 FIX: Conditional UPDATE — hard error if insufficient slots
+                        // Phase 3: Use slotsNeeded (which accounts for WHOLE_UNIT override)
+                        const slotsToDecrement = slotsNeeded;
+                        const decrementResult = await tx.$executeRaw`
+                            UPDATE "Listing"
+                            SET "availableSlots" = "availableSlots" - ${slotsToDecrement}
+                            WHERE "id" = ${booking.listing.id}
+                            AND "availableSlots" >= ${slotsToDecrement}
+                        `;
+                        if (decrementResult === 0) {
+                            throw new Error('SLOT_UNDERFLOW');
+                        }
+                    });
+                } catch (error) {
+                    if (error instanceof Error) {
+                        if (error.message === 'UNAUTHORIZED_IN_TRANSACTION') {
+                            return { error: 'Only the listing owner can accept or reject bookings', code: 'UNAUTHORIZED' };
+                        }
+                        if (error.message === 'NO_SLOTS_AVAILABLE') {
+                            return { error: 'No available slots for this listing' };
+                        }
+                        if (error.message === 'CAPACITY_EXCEEDED') {
+                            return { error: 'Cannot accept: all slots for these dates are already booked' };
+                        }
+                        if (error.message === 'SLOT_UNDERFLOW') {
+                            return { error: 'No available slots for this listing' };
+                        }
+                        if (error.message === 'CONCURRENT_MODIFICATION') {
+                            return {
+                                error: 'Booking was modified by another request. Please refresh and try again.',
+                                code: 'CONCURRENT_MODIFICATION'
+                            };
+                        }
+                    }
+                    // Phase 3: Handle DB trigger exception for WHOLE_UNIT overlap
+                    if (error instanceof Error && error.message.includes('WHOLE_UNIT_OVERLAP')) {
+                        return { error: 'Cannot accept: overlapping booking exists for this whole-unit listing' };
+                    }
+                    throw error;
+                }
             }
 
             // Notify tenant of acceptance (outside transaction for performance)
@@ -181,7 +284,6 @@ export async function updateBookingStatus(
                     link: '/bookings'
                 });
 
-                // Send email to tenant (respecting preferences)
                 if (booking.tenant.email) {
                     await sendNotificationEmailWithPreference('bookingAccepted', booking.tenant.id, booking.tenant.email, {
                         tenantName: booking.tenant.name || 'User',
@@ -223,12 +325,23 @@ export async function updateBookingStatus(
                         data: {
                             status: 'REJECTED',
                             rejectionReason: rejectionReason?.trim() || null,
+                            heldUntil: null, // Clear hold expiry if HELD→REJECTED
                             version: { increment: 1 },
                         }
                     });
 
                     if (updateResult.count === 0) {
                         throw new Error('CONCURRENT_MODIFICATION');
+                    }
+
+                    // Phase 4 (6c-ii): If was HELD, restore slots (HELD consumed slots at creation)
+                    if (booking.status === ('HELD' as BookingStatus)) {
+                        const slotsToRestore = booking.slotsRequested;
+                        await tx.$executeRaw`
+                            UPDATE "Listing"
+                            SET "availableSlots" = LEAST("availableSlots" + ${slotsToRestore}, "totalSlots")
+                            WHERE "id" = ${booking.listing.id}
+                        `;
                     }
                 });
             } catch (error) {
@@ -283,17 +396,21 @@ export async function updateBookingStatus(
         // P0-3 NOTE: CANCELLED path TOCTOU is mitigated by optimistic locking (version field)
         // and tenantId immutability on bookings — no ownership re-check needed here
         if (status === 'CANCELLED') {
-            if (booking.status === 'ACCEPTED') {
-                // P0-04 FIX: Atomically update booking with optimistic lock and increment slots
+            // Phase 4 (6c): Both ACCEPTED and HELD consume slots — must restore on cancel
+            if (booking.status === 'ACCEPTED' || booking.status === ('HELD' as BookingStatus)) {
                 try {
                     await prisma.$transaction(async (tx) => {
+                        // FOR UPDATE lock on Listing to prevent concurrent slot modification
+                        await tx.$queryRaw`SELECT 1 FROM "Listing" WHERE "id" = ${booking.listing.id} FOR UPDATE`;
+
                         const updateResult = await tx.booking.updateMany({
                             where: {
                                 id: bookingId,
-                                version: booking.version, // Optimistic lock check
+                                version: booking.version,
                             },
                             data: {
                                 status: 'CANCELLED',
+                                heldUntil: null, // Clear hold expiry if HELD
                                 version: { increment: 1 },
                             }
                         });
@@ -303,9 +420,11 @@ export async function updateBookingStatus(
                         }
 
                         // BIZ-07: Clamp availableSlots so it never exceeds totalSlots
-                    await tx.$executeRaw`
+                        // Phase 2: Restore slotsRequested (not hardcoded 1)
+                        const slotsToRestore = booking.slotsRequested;
+                        await tx.$executeRaw`
                             UPDATE "Listing"
-                            SET "availableSlots" = LEAST("availableSlots" + 1, "totalSlots")
+                            SET "availableSlots" = LEAST("availableSlots" + ${slotsToRestore}, "totalSlots")
                             WHERE "id" = ${booking.listing.id}
                         `;
                     });
@@ -319,11 +438,11 @@ export async function updateBookingStatus(
                     throw error;
                 }
             } else {
-                // P0-04 FIX: Use optimistic locking for non-accepted bookings too
+                // PENDING — no slots consumed, plain cancel with optimistic lock
                 const updateResult = await prisma.booking.updateMany({
                     where: {
                         id: bookingId,
-                        version: booking.version, // Optimistic lock check
+                        version: booking.version,
                     },
                     data: {
                         status: 'CANCELLED',

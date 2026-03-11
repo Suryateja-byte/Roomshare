@@ -118,6 +118,7 @@ model Listing {
   status              ListingStatus    @default(ACTIVE)
   viewCount           Int              @default(0)
   version             Int              @default(1)  // Optimistic locking for race-safe updates
+  bookingMode         String           @default("SHARED") @map("booking_mode")
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   owner               User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -170,6 +171,8 @@ enum BookingStatus {
   ACCEPTED
   REJECTED
   CANCELLED
+  HELD
+  EXPIRED
 }
 
 enum ListingStatus {
@@ -187,7 +190,9 @@ model Booking {
   status          BookingStatus @default(PENDING)
   totalPrice      Decimal       @db.Decimal(10, 2)
   rejectionReason String? // Optional reason when host rejects booking
+  slotsRequested  Int           @default(1) // Phase 2: Number of slots this booking reserves
   version         Int           @default(1) // P0-04: Optimistic locking for race-safe updates
+  heldUntil       DateTime?                 // Phase 4: Expiry time for HELD bookings (null for non-holds)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 

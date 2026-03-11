@@ -261,6 +261,12 @@ export const RATE_LIMITS = {
   savedSearchMutations: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
   canDeleteCheck: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
   bookingStatus: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
+  // Phase 2: Rate limit booking creation (C4 fix — was unprotected)
+  createBooking: { limit: 10, windowMs: 60 * 60 * 1000 },       // 10 per hour (per user)
+  createBookingByIp: { limit: 30, windowMs: 60 * 60 * 1000 },   // 30 per hour (per IP — higher for shared NAT)
+  // Phase 4: Rate limit hold creation
+  createHold: { limit: 10, windowMs: 60 * 60 * 1000 },          // 10 holds/hour per user
+  createHoldByIp: { limit: 30, windowMs: 60 * 60 * 1000 },      // 30 holds/hour per IP
 } as const;
 
 function getFirstForwardedIp(forwardedFor: string | null): string | null {

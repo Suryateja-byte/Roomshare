@@ -10,6 +10,7 @@ import {
     Eye,
     Users,
     Bed,
+    Home,
     ChevronRight,
     Star,
     Zap,
@@ -94,6 +95,7 @@ interface ListingPageClientProps {
         householdLanguages: string[];
         totalSlots: number;
         availableSlots: number;
+        bookingMode: string;
         status: string;
         viewCount: number;
         genderPreference: string | null;
@@ -123,6 +125,7 @@ interface ListingPageClientProps {
         createdAt: string;
     } | null;
     bookedDates: BookedDateRange[];
+    holdEnabled?: boolean;
     coordinates: { lat: number; lng: number } | null;
 }
 
@@ -197,6 +200,7 @@ export default function ListingPageClient({
     userHasBooking,
     userExistingReview,
     bookedDates,
+    holdEnabled,
     coordinates
 }: ListingPageClientProps) {
     const hasImages = listing.images && listing.images.length > 0;
@@ -301,6 +305,11 @@ export default function ListingPageClient({
                                 <InfoStat icon={Users}>
                                     {listing.availableSlots} / {listing.totalSlots} Slots Available
                                 </InfoStat>
+                                {listing.bookingMode === 'WHOLE_UNIT' && (
+                                    <InfoStat icon={Home}>
+                                        Entire Unit
+                                    </InfoStat>
+                                )}
                                 <InfoStat icon={Bed}>
                                     Furnished
                                 </InfoStat>
@@ -551,6 +560,7 @@ export default function ListingPageClient({
                                         isLoggedIn={isLoggedIn}
                                         status={listing.status as 'ACTIVE' | 'PAUSED' | 'RENTED'}
                                         bookedDates={bookedDates}
+                                        holdEnabled={holdEnabled}
                                     />
                                 )}
                             </div>

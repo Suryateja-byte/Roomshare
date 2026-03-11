@@ -46,6 +46,46 @@ jest.mock('@/app/actions/block', () => ({
   checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
 }))
 
+jest.mock('@/app/actions/suspension', () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+  checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
+}))
+
+jest.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({ success: true, remaining: 9, resetAt: new Date() }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue('127.0.0.1'),
+  RATE_LIMITS: {
+    createBooking: { limit: 10, windowMs: 3600000 },
+    createBookingByIp: { limit: 30, windowMs: 3600000 },
+  },
+}))
+
+jest.mock('next/headers', () => ({
+  headers: jest.fn().mockResolvedValue(new Headers()),
+}))
+
+jest.mock('@/lib/logger', () => ({
+  logger: {
+    sync: {
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    },
+  },
+}))
+
+jest.mock('@prisma/client', () => ({
+  Prisma: {
+    TransactionIsolationLevel: {
+      Serializable: 'Serializable',
+      ReadCommitted: 'ReadCommitted',
+      RepeatableRead: 'RepeatableRead',
+      ReadUncommitted: 'ReadUncommitted',
+    },
+  },
+}))
+
 import { createBooking } from '@/app/actions/booking'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
@@ -70,6 +110,7 @@ describe('createBooking', () => {
     availableSlots: 2,
     status: 'ACTIVE',
     price: 800,
+    bookingMode: 'SHARED',
   }
 
   const mockOwner = {
@@ -112,7 +153,9 @@ describe('createBooking', () => {
       ; (prisma.$transaction as jest.Mock).mockImplementation(async (callback: any) => {
         // Create a mock transaction context
         const tx = {
-          $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([mockListing])  // FOR UPDATE lock
+            .mockResolvedValueOnce([{ total: BigInt(0) }]),  // SUM(slotsRequested)
           user: {
             findUnique: jest.fn().mockImplementation(({ where }) => {
               if (where.id === 'owner-123') return Promise.resolve(mockOwner)
@@ -122,7 +165,6 @@ describe('createBooking', () => {
           },
           booking: {
             findFirst: jest.fn().mockResolvedValue(null),
-            count: jest.fn().mockResolvedValue(0),
             create: jest.fn().mockResolvedValue(mockBooking),
           },
         }
@@ -203,7 +245,7 @@ describe('createBooking', () => {
         const tx = {
           $queryRaw: jest.fn().mockResolvedValue([]), // Empty array = no listing
           user: { findUnique: jest.fn() },
-          booking: { findFirst: jest.fn(), count: jest.fn(), create: jest.fn() },
+          booking: { findFirst: jest.fn(), create: jest.fn() },
         }
         return callback(tx)
       })
@@ -252,7 +294,9 @@ describe('createBooking', () => {
       let capturedCreateData: any = null
       ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: any) => {
         const tx = {
-          $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([mockListing])
+            .mockResolvedValueOnce([{ total: BigInt(0) }]),
           user: {
             findUnique: jest.fn().mockImplementation(({ where }) => {
               if (where.id === 'owner-123') return Promise.resolve(mockOwner)
@@ -262,7 +306,6 @@ describe('createBooking', () => {
           },
           booking: {
             findFirst: jest.fn().mockResolvedValue(null),
-            count: jest.fn().mockResolvedValue(0),
             create: jest.fn().mockImplementation((args) => {
               capturedCreateData = args.data
               return Promise.resolve(mockBooking)
@@ -296,7 +339,9 @@ describe('createBooking', () => {
       let capturedCreateData: any = null
       ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: any) => {
         const tx = {
-          $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([mockListing])
+            .mockResolvedValueOnce([{ total: BigInt(0) }]),
           user: {
             findUnique: jest.fn().mockImplementation(({ where }) => {
               if (where.id === 'owner-123') return Promise.resolve(mockOwner)
@@ -306,7 +351,6 @@ describe('createBooking', () => {
           },
           booking: {
             findFirst: jest.fn().mockResolvedValue(null),
-            count: jest.fn().mockResolvedValue(0),
             create: jest.fn().mockImplementation((args) => {
               capturedCreateData = args.data
               return Promise.resolve(mockBooking)

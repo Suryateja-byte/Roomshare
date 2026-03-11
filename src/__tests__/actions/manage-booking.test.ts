@@ -146,6 +146,7 @@ describe("manage-booking actions", () => {
     endDate: new Date("2025-05-01"),
     totalPrice: 2400,
     status: "PENDING",
+    slotsRequested: 1,
     version: 1,
     listing: mockListing,
     tenant: mockTenant,
@@ -257,17 +258,15 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
-                ]),
+                .mockResolvedValueOnce([
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                ])
+                .mockResolvedValueOnce([{ total: BigInt(0) }]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                count: jest.fn().mockResolvedValue(0),
                 updateMany: jest
                   .fn()
                   .mockResolvedValue({ count: 1 }),
-              },
-              listing: {
-                update: jest.fn().mockResolvedValue(mockListing),
               },
             };
             return callback(tx);
@@ -297,21 +296,19 @@ describe("manage-booking actions", () => {
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
       });
 
-      it("decrements availableSlots when accepting", async () => {
+      it("decrements availableSlots via conditional UPDATE when accepting", async () => {
         const mockTx = {
           $queryRaw: jest
             .fn()
-            .mockResolvedValue([
-              { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
-            ]),
+            .mockResolvedValueOnce([
+              { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+            ])
+            .mockResolvedValueOnce([{ total: BigInt(0) }]),
+          $executeRaw: jest.fn().mockResolvedValue(1),
           booking: {
-            count: jest.fn().mockResolvedValue(0),
             updateMany: jest
               .fn()
               .mockResolvedValue({ count: 1 }),
-          },
-          listing: {
-            update: jest.fn().mockResolvedValue(mockListing),
           },
         };
         (prisma.$transaction as jest.Mock).mockImplementation(
@@ -320,10 +317,8 @@ describe("manage-booking actions", () => {
 
         await updateBookingStatus("booking-123", "ACCEPTED");
 
-        expect(mockTx.listing.update).toHaveBeenCalledWith({
-          where: { id: "listing-123" },
-          data: { availableSlots: { decrement: 1 } },
-        });
+        // C2 FIX: Uses conditional $executeRaw instead of Prisma decrement
+        expect(mockTx.$executeRaw).toHaveBeenCalled();
       });
 
       it("returns error when no slots available", async () => {
@@ -333,10 +328,8 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValue([
-                  { availableSlots: 0, totalSlots: 2, id: "listing-123", ownerId: "owner-123" },
+                  { availableSlots: 0, totalSlots: 2, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
                 ]),
-              booking: { count: jest.fn(), update: jest.fn() },
-              listing: { update: jest.fn() },
             };
             return callback(tx);
           },
@@ -353,14 +346,10 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([
-                  { availableSlots: 1, totalSlots: 2, id: "listing-123", ownerId: "owner-123" },
-                ]),
-              booking: {
-                count: jest.fn().mockResolvedValue(2), // 2 overlapping accepted bookings = capacity exceeded
-                update: jest.fn(),
-              },
-              listing: { update: jest.fn() },
+                .mockResolvedValueOnce([
+                  { availableSlots: 1, totalSlots: 2, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                ])
+                .mockResolvedValueOnce([{ total: BigInt(2) }]), // SUM=2 slots used = capacity exceeded
             };
             return callback(tx);
           },
@@ -379,16 +368,16 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
-                ]),
+                .mockResolvedValueOnce([
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                ])
+                .mockResolvedValueOnce([{ total: BigInt(0) }]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                count: jest.fn().mockResolvedValue(0),
                 updateMany: jest
                   .fn()
                   .mockResolvedValue({ count: 1 }),
               },
-              listing: { update: jest.fn() },
             };
             return callback(tx);
           },
@@ -411,16 +400,16 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
-                ]),
+                .mockResolvedValueOnce([
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                ])
+                .mockResolvedValueOnce([{ total: BigInt(0) }]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                count: jest.fn().mockResolvedValue(0),
                 updateMany: jest
                   .fn()
                   .mockResolvedValue({ count: 1 }),
               },
-              listing: { update: jest.fn() },
             };
             return callback(tx);
           },
@@ -445,16 +434,16 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123" },
-                ]),
+                .mockResolvedValueOnce([
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                ])
+                .mockResolvedValueOnce([{ total: BigInt(0) }]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                count: jest.fn().mockResolvedValue(0),
                 updateMany: jest
                   .fn()
                   .mockResolvedValue({ count: 1 }),
               },
-              listing: { update: jest.fn() },
             };
             return callback(tx);
           },
@@ -463,6 +452,32 @@ describe("manage-booking actions", () => {
         await updateBookingStatus("booking-123", "ACCEPTED");
 
         expect(prisma.$transaction).toHaveBeenCalled();
+      });
+
+      it("returns SLOT_UNDERFLOW when conditional UPDATE fails (double-accept race)", async () => {
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest
+                .fn()
+                .mockResolvedValueOnce([
+                  { availableSlots: 1, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                ])
+                .mockResolvedValueOnce([{ total: BigInt(0) }]),
+              $executeRaw: jest.fn().mockResolvedValue(0), // WHERE guard failed — no rows updated
+              booking: {
+                updateMany: jest
+                  .fn()
+                  .mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          },
+        );
+
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+
+        expect(result.error).toBe("No available slots for this listing");
       });
     });
 
@@ -492,7 +507,7 @@ describe("manage-booking actions", () => {
 
         expect(mockTxUpdateMany).toHaveBeenCalledWith({
           where: { id: "booking-123", version: 1 },
-          data: { status: "REJECTED", rejectionReason: null, version: { increment: 1 } },
+          data: { status: "REJECTED", rejectionReason: null, heldUntil: null, version: { increment: 1 } },
         });
       });
 
@@ -540,6 +555,7 @@ describe("manage-booking actions", () => {
               .fn()
               .mockResolvedValue({ count: 1 }),
           },
+          $queryRaw: jest.fn().mockResolvedValue([]), // FOR UPDATE lock on Listing
           $executeRaw: jest.fn().mockResolvedValue(1),
         };
         (prisma.$transaction as jest.Mock).mockImplementation(
@@ -705,19 +721,15 @@ describe("manage-booking actions", () => {
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
-              $queryRaw: jest.fn().mockResolvedValue([
-                {
-                  availableSlots: 2,
-                  totalSlots: 3,
-                  id: "listing-123",
-                  ownerId: "owner-123",
-                },
-              ]),
+              $queryRaw: jest.fn()
+                .mockResolvedValueOnce([
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                ])
+                .mockResolvedValueOnce([{ total: BigInt(0) }]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                count: jest.fn().mockResolvedValue(0),
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
-              listing: { update: jest.fn() },
             };
             return callback(tx);
           },
@@ -738,19 +750,15 @@ describe("manage-booking actions", () => {
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
-              $queryRaw: jest.fn().mockResolvedValue([
-                {
-                  availableSlots: 2,
-                  totalSlots: 3,
-                  id: "listing-123",
-                  ownerId: "owner-123",
-                },
-              ]),
+              $queryRaw: jest.fn()
+                .mockResolvedValueOnce([
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                ])
+                .mockResolvedValueOnce([{ total: BigInt(0) }]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                count: jest.fn().mockResolvedValue(0),
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
-              listing: { update: jest.fn() },
             };
             return callback(tx);
           },

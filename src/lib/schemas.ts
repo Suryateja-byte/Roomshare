@@ -7,6 +7,7 @@ import {
   VALID_HOUSEHOLD_GENDERS,
   VALID_AMENITIES,
   VALID_HOUSE_RULES,
+  VALID_BOOKING_MODES,
 } from './filter-schema';
 
 /**
@@ -53,6 +54,9 @@ export const listingGenderPreferenceSchema = z.enum(LISTING_GENDER_PREFERENCES a
 
 const LISTING_HOUSEHOLD_GENDERS = VALID_HOUSEHOLD_GENDERS.filter((v): v is Exclude<typeof v, 'any'> => v !== 'any');
 export const listingHouseholdGenderSchema = z.enum(LISTING_HOUSEHOLD_GENDERS as unknown as [string, ...string[]]).optional().nullable();
+
+const LISTING_BOOKING_MODES = VALID_BOOKING_MODES.filter((v): v is Exclude<typeof v, 'any'> => v !== 'any');
+export const listingBookingModeSchema = z.enum(LISTING_BOOKING_MODES as unknown as [string, ...string[]]).optional().nullable();
 
 // ============================================
 // Image URL Validation Schema
@@ -147,6 +151,7 @@ export const createListingApiSchema = createListingSchema.extend({
   householdLanguages: householdLanguagesSchema.optional().default([]),
   primaryHomeLanguage: primaryHomeLanguageSchema,
   moveInDate: moveInDateSchema,
+  bookingMode: listingBookingModeSchema,
 });
 
 export type CreateListingApiInput = z.infer<typeof createListingApiSchema>;
@@ -157,6 +162,11 @@ export const createBookingSchema = z.object({
     startDate: z.coerce.date({ message: "Valid start date is required" }),
     endDate: z.coerce.date({ message: "Valid end date is required" }),
     pricePerMonth: z.coerce.number().positive("Price must be positive"),
+    slotsRequested: z.coerce.number()
+        .int("Slots must be a whole number")
+        .min(1, "Must request at least 1 slot")
+        .max(20, "Cannot request more than 20 slots")
+        .default(1),
 }).refine(
     (data) => data.endDate > data.startDate,
     { message: "End date must be after start date", path: ["endDate"] }
@@ -178,3 +188,36 @@ export const createBookingSchema = z.object({
 );
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
+
+// Phase 4: Hold validation schema (same constraints as booking but semantically distinct)
+export const createHoldSchema = z.object({
+    listingId: z.string().min(1, "Listing ID is required"),
+    startDate: z.coerce.date({ message: "Valid start date is required" }),
+    endDate: z.coerce.date({ message: "Valid end date is required" }),
+    pricePerMonth: z.coerce.number().positive("Price must be positive"),
+    slotsRequested: z.coerce.number()
+        .int("Slots must be a whole number")
+        .min(1, "Must request at least 1 slot")
+        .max(20, "Cannot request more than 20 slots")
+        .default(1),
+}).refine(
+    (data) => data.endDate > data.startDate,
+    { message: "End date must be after start date", path: ["endDate"] }
+).refine(
+    (data) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const startDate = new Date(data.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        return startDate >= today;
+    },
+    { message: "Start date cannot be in the past", path: ["startDate"] }
+).refine(
+    (data) => {
+        const diffDays = Math.ceil((data.endDate.getTime() - data.startDate.getTime()) / (1000 * 60 * 60 * 24));
+        return diffDays >= 30;
+    },
+    { message: "Minimum booking duration is 30 days", path: ["endDate"] }
+);
+
+export type CreateHoldInput = z.infer<typeof createHoldSchema>;
