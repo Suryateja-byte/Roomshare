@@ -19,7 +19,9 @@ import { logger } from "@/lib/logger";
 import { validateCronAuth } from "@/lib/cron-auth";
 import { features } from "@/lib/env";
 import { createInternalNotification } from "@/lib/notifications";
+import { markListingsDirty } from "@/lib/search/search-doc-dirty";
 import { SWEEPER_BATCH_SIZE, SWEEPER_ADVISORY_LOCK_KEY } from "@/lib/hold-constants";
+import { logBookingAudit } from '@/lib/booking-audit';
 
 interface ExpiredHoldInfo {
   bookingId: string;
@@ -31,6 +33,7 @@ interface ExpiredHoldInfo {
   hostId: string;
   hostEmail: string | null;
   hostName: string | null;
+  heldUntil: Date;
 }
 
 export async function GET(request: NextRequest) {
@@ -70,6 +73,7 @@ export async function GET(request: NextRequest) {
           tenantId: string;
           slotsRequested: number;
           version: number;
+          heldUntil: Date;
           tenantEmail: string | null;
           tenantName: string | null;
           listingTitle: string;
@@ -79,6 +83,7 @@ export async function GET(request: NextRequest) {
         }>
       >`
         SELECT b.id, b."listingId", b."tenantId", b."slotsRequested", b.version,
+               b."heldUntil",
                t.email as "tenantEmail", t.name as "tenantName",
                l.title as "listingTitle", l."ownerId" as "hostId",
                o.email as "hostEmail", o.name as "hostName"
@@ -116,6 +121,16 @@ export async function GET(request: NextRequest) {
           SET "availableSlots" = LEAST("availableSlots" + ${hold.slotsRequested}, "totalSlots")
           WHERE id = ${hold.listingId}
         `;
+
+        await logBookingAudit(tx, {
+          bookingId: hold.id,
+          action: 'EXPIRED',
+          previousStatus: 'HELD',
+          newStatus: 'EXPIRED',
+          actorId: null,
+          actorType: 'SYSTEM',
+          details: { slotsRequested: hold.slotsRequested, heldUntil: hold.heldUntil },
+        });
       }
 
       return { skipped: false, expired: expiredBookings.length, holds: expiredBookings } as const;
@@ -141,6 +156,7 @@ export async function GET(request: NextRequest) {
       hostId: h.hostId,
       hostEmail: h.hostEmail,
       hostName: h.hostName,
+      heldUntil: h.heldUntil,
     }));
 
     // Send notifications OUTSIDE the transaction to avoid holding locks
@@ -170,6 +186,12 @@ export async function GET(request: NextRequest) {
           error: notifError instanceof Error ? notifError.message : "Unknown error",
         });
       }
+    }
+
+    // Mark affected listings dirty for search doc refresh (availableSlots changed)
+    if (expiredHolds.length > 0) {
+      const affectedListingIds = [...new Set(expiredHolds.map(h => h.listingId))];
+      await markListingsDirty(affectedListingIds, 'booking_hold_expired');
     }
 
     const durationMs = Date.now() - startTime;

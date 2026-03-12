@@ -14,6 +14,7 @@ import { withIdempotency } from '@/lib/idempotency';
 import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from '@/lib/rate-limit';
 import { headers } from 'next/headers';
 import { HOLD_TTL_MINUTES, MAX_HOLDS_PER_USER } from '@/lib/hold-constants';
+import { logBookingAudit } from '@/lib/booking-audit';
 
 // Booking result type for structured error handling
 export type BookingResult = {
@@ -23,6 +24,8 @@ export type BookingResult = {
     code?: string;
     fieldErrors?: Record<string, string>;
     currentPrice?: number;
+    heldUntil?: string;       // Phase 4: ISO timestamp for hold expiry (powers countdown timer)
+    holdTtlMinutes?: number;  // Phase 4: TTL in minutes for hold
 };
 
 // Internal result type with side effect data (not exposed to callers)
@@ -221,6 +224,16 @@ async function executeBookingTransaction(
         }
     });
 
+    await logBookingAudit(tx, {
+      bookingId: booking.id,
+      action: 'CREATED',
+      previousStatus: null,
+      newStatus: 'PENDING',
+      actorId: userId,
+      actorType: 'USER',
+      details: { slotsRequested: booking.slotsRequested, listingId },
+    });
+
     return {
         success: true,
         bookingId: booking.id,
@@ -281,6 +294,24 @@ function toBookingResult(result: InternalBookingResult): BookingResult {
         };
     }
     return { success: true, bookingId: result.bookingId };
+}
+
+function toHoldBookingResult(result: InternalHoldResult): BookingResult {
+    if (!result.success) {
+        return {
+            success: false,
+            error: result.error,
+            code: result.code,
+            fieldErrors: result.fieldErrors,
+            currentPrice: result.currentPrice
+        };
+    }
+    return {
+        success: true,
+        bookingId: result.bookingId,
+        heldUntil: result.heldUntil.toISOString(),
+        holdTtlMinutes: result.holdTtlMinutes,
+    };
 }
 
 export async function createBooking(
@@ -470,6 +501,8 @@ type InternalHoldResult =
         ownerEmail: string | null;
         ownerName: string | null;
         tenantName: string | null;
+        holdTtlMinutes: number;
+        heldUntil: Date;
       };
 
 /**
@@ -511,8 +544,10 @@ async function executeHoldTransaction(
         status: string;
         price: number;
         bookingMode: string;
+        holdTtlMinutes: number;
     }>>`
-        SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status", "price", "booking_mode" as "bookingMode"
+        SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status", "price",
+               "booking_mode" as "bookingMode", "hold_ttl_minutes" as "holdTtlMinutes"
         FROM "Listing"
         WHERE "id" = ${listingId}
         FOR UPDATE
@@ -590,23 +625,28 @@ async function executeHoldTransaction(
         return { success: false, error: 'No available slots for this listing.' };
     }
 
-    // Duplicate hold check: same user, same listing, overlapping dates, active hold
-    const existingHold = await tx.booking.findFirst({
+    // Duplicate booking/hold check: same user, same listing, overlapping dates, any active status
+    const existingBooking = await tx.booking.findFirst({
         where: {
             tenantId: userId,
             listingId,
-            status: 'HELD' as never, // Cast needed until prisma generate
-            heldUntil: { gt: new Date() },
+            status: { in: ['PENDING', 'HELD', 'ACCEPTED'] },
             AND: [
                 { startDate: { lte: endDate } },
-                { endDate: { gte: startDate } }
+                { endDate: { gte: startDate } },
+                // For HELD, also check it hasn't expired (PENDING/ACCEPTED don't have heldUntil)
+                { OR: [
+                    { status: { not: 'HELD' } },
+                    { heldUntil: { gt: new Date() } }
+                ]}
             ]
         }
     });
-    if (existingHold) {
+    if (existingBooking) {
+        const statusLabel = existingBooking.status === 'HELD' ? 'hold' : 'booking';
         return {
             success: false,
-            error: 'You already have an active hold for overlapping dates on this listing.',
+            error: `You already have an active ${statusLabel} for overlapping dates on this listing.`,
             code: 'DUPLICATE_HOLD'
         };
     }
@@ -634,8 +674,9 @@ async function executeHoldTransaction(
     const pricePerDay = listingPrice / 30;
     const totalPrice = Math.round(diffDays * pricePerDay * 100) / 100;
 
-    // Calculate heldUntil
-    const heldUntil = new Date(Date.now() + HOLD_TTL_MINUTES * 60 * 1000);
+    // Use per-listing TTL with fallback to global default
+    const ttlMinutes = listing.holdTtlMinutes || HOLD_TTL_MINUTES;
+    const heldUntil = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
     // Create the booking with HELD status
     const booking = await tx.booking.create({
@@ -645,10 +686,21 @@ async function executeHoldTransaction(
             startDate,
             endDate,
             totalPrice,
-            status: 'HELD' as never, // Cast needed until prisma generate
+            status: 'HELD',
             slotsRequested: effectiveSlotsRequested,
             heldUntil,
+            heldAt: new Date(),
         }
+    });
+
+    await logBookingAudit(tx, {
+      bookingId: booking.id,
+      action: 'HELD',
+      previousStatus: null,
+      newStatus: 'HELD',
+      actorId: userId,
+      actorType: 'USER',
+      details: { slotsRequested: effectiveSlotsRequested, listingId, heldUntil },
     });
 
     return {
@@ -659,7 +711,9 @@ async function executeHoldTransaction(
         listingOwnerId: listing.ownerId,
         ownerEmail: owner.email,
         ownerName: owner.name,
-        tenantName: tenant?.name || null
+        tenantName: tenant?.name || null,
+        holdTtlMinutes: ttlMinutes,
+        heldUntil,
     };
 }
 
@@ -722,6 +776,14 @@ export async function createHold(
     const ipRl = await checkRateLimit(ip, 'createHoldByIp', RATE_LIMITS.createHoldByIp);
     if (!ipRl.success) {
         return { success: false, error: 'Too many hold requests. Please wait before trying again.', code: 'RATE_LIMITED' };
+    }
+
+    // Per-listing rate limit: prevents hold-cycling attack (hold → expire → re-apply on 1-slot listings)
+    const perListingRl = await checkRateLimit(
+        `${session.user.id}:${listingId}`, 'createHoldPerListing', RATE_LIMITS.createHoldPerListing
+    );
+    if (!perListingRl.success) {
+        return { success: false, error: 'Too many hold attempts on this listing. Please wait.', code: 'RATE_LIMITED' };
     }
 
     const suspension = await checkSuspension();
@@ -802,7 +864,7 @@ export async function createHold(
             }
         }
 
-        return toBookingResult(idempotencyResult.result);
+        return toHoldBookingResult(idempotencyResult.result);
     }
 
     // Non-idempotency fallback with retry for serialization conflicts
@@ -828,7 +890,7 @@ export async function createHold(
                 }
             }
 
-            return toBookingResult(result);
+            return toHoldBookingResult(result);
         } catch (error: unknown) {
             const isPrismaError = (err: unknown): err is { code: string } => {
                 return typeof err === 'object' && err !== null && 'code' in err && typeof (err as { code: unknown }).code === 'string';

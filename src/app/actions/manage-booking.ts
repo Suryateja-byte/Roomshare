@@ -7,6 +7,7 @@ import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
 import { checkSuspension } from './suspension';
 import { logger } from '@/lib/logger';
+import { logBookingAudit } from '@/lib/booking-audit';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import {
     validateTransition,
@@ -32,6 +33,11 @@ export async function updateBookingStatus(
     const suspension = await checkSuspension();
     if (suspension.suspended) {
         return { error: suspension.error || 'Account suspended' };
+    }
+
+    // Phase 4: Only the sweeper CTE should set EXPIRED — block manual API calls
+    if (status === 'EXPIRED') {
+        return { error: 'Cannot manually expire bookings', code: 'INVALID_TARGET_STATUS' };
     }
 
     try {
@@ -103,7 +109,7 @@ export async function updateBookingStatus(
         // P0-03 FIX: Validate state transition before proceeding
         // Prevents invalid transitions like CANCELLED → ACCEPTED
         try {
-            validateTransition(booking.status as BookingStatus, status);
+            validateTransition(booking.status, status);
         } catch (error) {
             if (isInvalidStateTransitionError(error)) {
                 return {
@@ -117,7 +123,7 @@ export async function updateBookingStatus(
         // Handle ACCEPTED status with atomic transaction to prevent double-booking
         if (status === 'ACCEPTED') {
             // Phase 4: HELD→ACCEPTED path — slots already consumed at hold creation (D4)
-            if (booking.status === ('HELD' as BookingStatus)) {
+            if (booking.status === 'HELD') {
                 // Verify hold is still active before accepting
                 if (booking.heldUntil && new Date(booking.heldUntil as Date) < new Date()) {
                     return { error: 'This hold has expired. The booking has been automatically released.' };
@@ -153,6 +159,16 @@ export async function updateBookingStatus(
                         if (updateResult.count === 0) {
                             throw new Error('HOLD_EXPIRED_OR_MODIFIED');
                         }
+
+                        await logBookingAudit(tx, {
+                          bookingId: bookingId,
+                          action: 'ACCEPTED',
+                          previousStatus: 'HELD',
+                          newStatus: 'ACCEPTED',
+                          actorId: session.user.id,
+                          actorType: 'HOST',
+                          details: { slotsRequested: booking.slotsRequested, version: booking.version },
+                        });
 
                         // NO slot decrement — slots were consumed at hold creation (D4)
                     });
@@ -244,6 +260,16 @@ export async function updateBookingStatus(
                         if (decrementResult === 0) {
                             throw new Error('SLOT_UNDERFLOW');
                         }
+
+                        await logBookingAudit(tx, {
+                          bookingId: bookingId,
+                          action: 'ACCEPTED',
+                          previousStatus: 'PENDING',
+                          newStatus: 'ACCEPTED',
+                          actorId: session.user.id,
+                          actorType: 'HOST',
+                          details: { slotsRequested: booking.slotsRequested, version: booking.version },
+                        });
                     });
                 } catch (error) {
                     if (error instanceof Error) {
@@ -335,7 +361,7 @@ export async function updateBookingStatus(
                     }
 
                     // Phase 4 (6c-ii): If was HELD, restore slots (HELD consumed slots at creation)
-                    if (booking.status === ('HELD' as BookingStatus)) {
+                    if (booking.status === 'HELD') {
                         const slotsToRestore = booking.slotsRequested;
                         await tx.$executeRaw`
                             UPDATE "Listing"
@@ -343,6 +369,16 @@ export async function updateBookingStatus(
                             WHERE "id" = ${booking.listing.id}
                         `;
                     }
+
+                    await logBookingAudit(tx, {
+                      bookingId: booking.id,
+                      action: 'REJECTED',
+                      previousStatus: booking.status,
+                      newStatus: 'REJECTED',
+                      actorId: session.user.id,
+                      actorType: 'HOST',
+                      details: { rejectionReason, version: booking.version },
+                    });
                 });
             } catch (error) {
                 if (error instanceof Error) {
@@ -397,7 +433,7 @@ export async function updateBookingStatus(
         // and tenantId immutability on bookings — no ownership re-check needed here
         if (status === 'CANCELLED') {
             // Phase 4 (6c): Both ACCEPTED and HELD consume slots — must restore on cancel
-            if (booking.status === 'ACCEPTED' || booking.status === ('HELD' as BookingStatus)) {
+            if (booking.status === 'ACCEPTED' || booking.status === 'HELD') {
                 try {
                     await prisma.$transaction(async (tx) => {
                         // FOR UPDATE lock on Listing to prevent concurrent slot modification
@@ -427,6 +463,16 @@ export async function updateBookingStatus(
                             SET "availableSlots" = LEAST("availableSlots" + ${slotsToRestore}, "totalSlots")
                             WHERE "id" = ${booking.listing.id}
                         `;
+
+                        await logBookingAudit(tx, {
+                          bookingId: bookingId,
+                          action: 'CANCELLED',
+                          previousStatus: booking.status,
+                          newStatus: 'CANCELLED',
+                          actorId: session.user.id,
+                          actorType: 'USER',
+                          details: { slotsRequested: booking.slotsRequested, previousStatus: booking.status },
+                        });
                     });
                 } catch (error) {
                     if (error instanceof Error && error.message === 'CONCURRENT_MODIFICATION') {
@@ -438,23 +484,42 @@ export async function updateBookingStatus(
                     throw error;
                 }
             } else {
-                // PENDING — no slots consumed, plain cancel with optimistic lock
-                const updateResult = await prisma.booking.updateMany({
-                    where: {
-                        id: bookingId,
-                        version: booking.version,
-                    },
-                    data: {
-                        status: 'CANCELLED',
-                        version: { increment: 1 },
-                    }
-                });
+                // PENDING — no slots consumed, wrap in TX for audit atomicity
+                try {
+                    await prisma.$transaction(async (tx) => {
+                        const updateResult = await tx.booking.updateMany({
+                            where: {
+                                id: bookingId,
+                                version: booking.version,
+                            },
+                            data: {
+                                status: 'CANCELLED',
+                                version: { increment: 1 },
+                            }
+                        });
 
-                if (updateResult.count === 0) {
-                    return {
-                        error: 'Booking was modified by another request. Please refresh and try again.',
-                        code: 'CONCURRENT_MODIFICATION'
-                    };
+                        if (updateResult.count === 0) {
+                            throw new Error('CONCURRENT_MODIFICATION');
+                        }
+
+                        await logBookingAudit(tx, {
+                          bookingId: bookingId,
+                          action: 'CANCELLED',
+                          previousStatus: 'PENDING',
+                          newStatus: 'CANCELLED',
+                          actorId: session.user.id,
+                          actorType: 'USER',
+                          details: { slotsRequested: booking.slotsRequested },
+                        });
+                    });
+                } catch (error) {
+                    if (error instanceof Error && error.message === 'CONCURRENT_MODIFICATION') {
+                        return {
+                            error: 'Booking was modified by another request. Please refresh and try again.',
+                            code: 'CONCURRENT_MODIFICATION'
+                        };
+                    }
+                    throw error;
                 }
             }
 

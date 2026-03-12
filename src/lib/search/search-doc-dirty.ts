@@ -21,7 +21,9 @@ type DirtyReason =
   | "listing_deleted"
   | "status_changed"
   | "view_count"
-  | "review_changed";
+  | "review_changed"
+  | "booking_hold_expired"
+  | "reconcile_slots";
 
 /**
  * Mark a single listing as dirty for SearchDoc refresh.

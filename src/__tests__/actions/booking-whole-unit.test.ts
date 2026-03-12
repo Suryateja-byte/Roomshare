@@ -9,6 +9,8 @@
  * 5. Sequential non-overlapping bookings are allowed
  */
 
+jest.mock('@/lib/booking-audit', () => ({ logBookingAudit: jest.fn() }));
+
 // Mock dependencies before imports
 jest.mock('@/lib/prisma', () => ({
   prisma: {
@@ -97,6 +99,7 @@ jest.mock('@/lib/env', () => ({
   features: {
     multiSlotBooking: true,
     wholeUnitMode: true,
+    bookingAudit: true,
   },
   getServerEnv: jest.fn(() => ({})),
 }));
@@ -106,6 +109,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { createInternalNotification } from '@/lib/notifications';
 import { sendNotificationEmailWithPreference } from '@/lib/email';
+import { logBookingAudit } from '@/lib/booking-audit';
 
 describe('createBooking — WHOLE_UNIT mode (Phase 3)', () => {
   const mockSession = {
@@ -209,6 +213,36 @@ describe('createBooking — WHOLE_UNIT mode (Phase 3)', () => {
       expect(result.success).toBe(true);
       expect(capturedCreateData).not.toBeNull();
       expect(capturedCreateData!.slotsRequested).toBe(4); // totalSlots, not default 1
+    });
+
+    it('calls logBookingAudit with CREATED action', async () => {
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([mockWholeUnitListing])
+            .mockResolvedValueOnce([{ total: BigInt(0) }]),
+          user: {
+            findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
+              if (where.id === 'owner-123') return Promise.resolve(mockOwner);
+              if (where.id === 'user-123') return Promise.resolve(mockTenant);
+              return Promise.resolve(null);
+            }),
+          },
+          booking: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue(mockBooking),
+          },
+        };
+        return callback(tx);
+      });
+
+      const result = await createBooking('listing-123', futureStart, futureEnd, 800);
+
+      expect(result.success).toBe(true);
+      expect(logBookingAudit).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ action: 'CREATED', newStatus: 'PENDING', previousStatus: null }),
+      );
     });
 
     it('overrides client-provided slotsRequested=2 to totalSlots=4 for WHOLE_UNIT', async () => {

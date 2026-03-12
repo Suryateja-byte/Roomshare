@@ -2,6 +2,8 @@
  * Tests for manage-booking server actions
  */
 
+jest.mock('@/lib/booking-audit', () => ({ logBookingAudit: jest.fn() }));
+
 // Mock dependencies before imports
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -95,6 +97,7 @@ import { sendNotificationEmailWithPreference } from "@/lib/email";
 import { checkSuspension } from "@/app/actions/suspension";
 import { validateTransition } from "@/lib/booking-state-machine";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logBookingAudit } from '@/lib/booking-audit';
 
 describe("manage-booking actions", () => {
   const mockSession = {
@@ -278,11 +281,48 @@ describe("manage-booking actions", () => {
         expect(result.success).toBe(true);
       });
 
+      it("calls logBookingAudit with ACCEPTED action on accept", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest
+                .fn()
+                .mockResolvedValueOnce([
+                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                ])
+                .mockResolvedValueOnce([{ total: BigInt(0) }]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
+              booking: {
+                updateMany: jest
+                  .fn()
+                  .mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          },
+        );
+
+        await updateBookingStatus("booking-123", "ACCEPTED");
+
+        expect(logBookingAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: 'ACCEPTED', previousStatus: 'PENDING' }),
+        );
+      });
+
       it("allows tenant to cancel booking", async () => {
         (auth as jest.Mock).mockResolvedValue(mockTenantSession);
-        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
-          count: 1,
-        });
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          },
+        );
 
         const result = await updateBookingStatus("booking-123", "CANCELLED");
 
@@ -511,6 +551,15 @@ describe("manage-booking actions", () => {
         });
       });
 
+      it("calls logBookingAudit with REJECTED action on reject", async () => {
+        await updateBookingStatus("booking-123", "REJECTED");
+
+        expect(logBookingAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: 'REJECTED' }),
+        );
+      });
+
       it("creates notification for tenant on rejection", async () => {
         await updateBookingStatus("booking-123", "REJECTED");
 
@@ -570,24 +619,60 @@ describe("manage-booking actions", () => {
 
       it("does not increment slots when cancelling pending booking", async () => {
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking); // status: PENDING
-        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
-          count: 1,
-        });
+        const mockTxUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              booking: {
+                updateMany: mockTxUpdateMany,
+              },
+            };
+            return callback(tx);
+          },
+        );
 
         await updateBookingStatus("booking-123", "CANCELLED");
 
-        expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+        expect(mockTxUpdateMany).toHaveBeenCalledWith({
           where: { id: "booking-123", version: 1 },
           data: { status: "CANCELLED", version: { increment: 1 } },
         });
-        // Transaction not used for non-accepted bookings
+        // No $executeRaw for slot restore on PENDING cancel
+      });
+
+      it("calls logBookingAudit with CANCELLED action on pending cancel", async () => {
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking); // status: PENDING
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          },
+        );
+
+        await updateBookingStatus("booking-123", "CANCELLED");
+
+        expect(logBookingAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: 'CANCELLED', previousStatus: 'PENDING' }),
+        );
       });
 
       it("creates notification for host on cancellation", async () => {
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
-        (prisma.booking.updateMany as jest.Mock).mockResolvedValue({
-          count: 1,
-        });
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          },
+        );
 
         await updateBookingStatus("booking-123", "CANCELLED");
 

@@ -19,6 +19,14 @@
     {
       "path": "/api/cron/cleanup-idempotency-keys",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/sweep-expired-holds",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-slots",
+      "schedule": "0 5 * * 0"
     }
   ]
 }

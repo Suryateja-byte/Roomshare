@@ -7,6 +7,8 @@
  * rate limiting, and price validation.
  */
 
+jest.mock('@/lib/booking-audit', () => ({ logBookingAudit: jest.fn() }));
+
 // Mock dependencies before imports
 jest.mock('@/lib/prisma', () => ({
   prisma: {
@@ -65,6 +67,7 @@ jest.mock('@/lib/rate-limit', () => ({
     createBookingByIp: { limit: 30, windowMs: 3600000 },
     createHold: { limit: 10, windowMs: 3600000 },
     createHoldByIp: { limit: 30, windowMs: 3600000 },
+    createHoldPerListing: { limit: 3, windowMs: 3600000 },
   },
 }))
 
@@ -101,6 +104,7 @@ jest.mock('@/lib/env', () => ({
     softHoldsDraining: false,
     multiSlotBooking: true,
     wholeUnitMode: true,
+    bookingAudit: true,
   },
   getServerEnv: jest.fn(() => ({})),
 }))
@@ -115,6 +119,7 @@ import { auth } from '@/auth'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { withIdempotency } from '@/lib/idempotency'
 import { MAX_HOLDS_PER_USER, HOLD_TTL_MINUTES } from '@/lib/hold-constants'
+import { logBookingAudit } from '@/lib/booking-audit'
 
 // Typed reference for per-test feature flag mutation
 const mockEnv = jest.requireMock('@/lib/env') as {
@@ -144,6 +149,7 @@ describe('createHold', () => {
     status: 'ACTIVE',
     price: 800,
     bookingMode: 'SHARED',
+    holdTtlMinutes: 15,
   }
 
   const mockOwner = {
@@ -277,6 +283,21 @@ describe('createHold', () => {
 
       // Verify slot decrement was called
       expect(executeRawCalled).toBe(true)
+    })
+
+    it('calls logBookingAudit with HELD action', async () => {
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx()
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+
+      expect(result.success).toBe(true)
+      expect(logBookingAudit).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ action: 'HELD', newStatus: 'HELD', previousStatus: null }),
+      )
     })
   })
 
@@ -425,6 +446,65 @@ describe('createHold', () => {
       expect(result.code).toBe('DUPLICATE_HOLD')
       expect(result.error).toContain('active hold for overlapping dates')
     })
+
+    it('rejects hold when user has PENDING booking with overlapping dates', async () => {
+      const existingPending = {
+        id: 'existing-pending-456',
+        listingId: 'listing-123',
+        tenantId: 'user-123',
+        status: 'PENDING',
+        heldUntil: null,
+        startDate: futureStart,
+        endDate: futureEnd,
+      }
+
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx({ existingHold: existingPending })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+
+      expect(result.success).toBe(false)
+      expect(result.code).toBe('DUPLICATE_HOLD')
+      expect(result.error).toContain('active booking for overlapping dates')
+    })
+
+    it('rejects hold when user has ACCEPTED booking with overlapping dates', async () => {
+      const existingAccepted = {
+        id: 'existing-accepted-456',
+        listingId: 'listing-123',
+        tenantId: 'user-123',
+        status: 'ACCEPTED',
+        heldUntil: null,
+        startDate: futureStart,
+        endDate: futureEnd,
+      }
+
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx({ existingHold: existingAccepted })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+
+      expect(result.success).toBe(false)
+      expect(result.code).toBe('DUPLICATE_HOLD')
+      expect(result.error).toContain('active booking for overlapping dates')
+    })
+
+    it('allows hold when user has EXPIRED booking with overlapping dates', async () => {
+      // existingHold = null means findFirst returns null (no active booking found)
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx({ existingHold: null })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+
+      expect(result.success).toBe(true)
+      expect(result.bookingId).toBeTruthy()
+    })
   })
 
   // ─────────────────────────────────────────────────────────────
@@ -441,6 +521,8 @@ describe('createHold', () => {
         ownerEmail: 'host@example.com',
         ownerName: 'Host User',
         tenantName: 'Test User',
+        holdTtlMinutes: 15,
+        heldUntil: new Date(Date.now() + 15 * 60 * 1000),
       }
 
       ;(withIdempotency as jest.Mock).mockResolvedValue({
@@ -599,6 +681,87 @@ describe('createHold', () => {
       expect(result.success).toBe(false)
       expect(result.code).toBe('PRICE_CHANGED')
       expect(result.currentPrice).toBe(800)
+    })
+  })
+
+  // ─────────────────────────────────────────────────────────────
+  // 13. heldAt timestamp is set on hold creation
+  // ─────────────────────────────────────────────────────────────
+  describe('heldAt timestamp', () => {
+    it('sets heldAt to current time on hold creation', async () => {
+      let capturedCreateData: Record<string, unknown> | null = null
+
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx()
+        tx.booking.create = jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
+          capturedCreateData = args.data
+          return Promise.resolve(mockHoldBooking)
+        })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const before = Date.now()
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+      const after = Date.now()
+
+      expect(result.success).toBe(true)
+      expect(capturedCreateData).not.toBeNull()
+      expect(capturedCreateData!.heldAt).toBeInstanceOf(Date)
+      const heldAt = capturedCreateData!.heldAt as Date
+      expect(heldAt.getTime()).toBeGreaterThanOrEqual(before)
+      expect(heldAt.getTime()).toBeLessThanOrEqual(after)
+    })
+  })
+
+  // ─────────────────────────────────────────────────────────────
+  // 14. Per-listing holdTtlMinutes
+  // ─────────────────────────────────────────────────────────────
+  describe('per-listing holdTtlMinutes', () => {
+    it('uses listing.holdTtlMinutes for TTL when set to non-default value', async () => {
+      const customTtlListing = { ...mockListing, holdTtlMinutes: 30 }
+      let capturedCreateData: Record<string, unknown> | null = null
+
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx({ listing: customTtlListing })
+        tx.booking.create = jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
+          capturedCreateData = args.data
+          return Promise.resolve(mockHoldBooking)
+        })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+
+      expect(result.success).toBe(true)
+      expect(capturedCreateData).not.toBeNull()
+
+      // Verify heldUntil is ~30 min from now (not 15)
+      const heldUntil = capturedCreateData!.heldUntil as Date
+      const expectedHeldUntil = Date.now() + 30 * 60 * 1000
+      expect(Math.abs(heldUntil.getTime() - expectedHeldUntil)).toBeLessThan(5000)
+    })
+
+    it('falls back to HOLD_TTL_MINUTES when listing uses default 15', async () => {
+      let capturedCreateData: Record<string, unknown> | null = null
+
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx() // uses mockListing with holdTtlMinutes: 15
+        tx.booking.create = jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
+          capturedCreateData = args.data
+          return Promise.resolve(mockHoldBooking)
+        })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+
+      expect(result.success).toBe(true)
+      expect(capturedCreateData).not.toBeNull()
+
+      // Verify heldUntil is ~15 min from now (the default)
+      const heldUntil = capturedCreateData!.heldUntil as Date
+      const expectedHeldUntil = Date.now() + HOLD_TTL_MINUTES * 60 * 1000
+      expect(Math.abs(heldUntil.getTime() - expectedHeldUntil)).toBeLessThan(5000)
     })
   })
 })

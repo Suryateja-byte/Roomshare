@@ -7,6 +7,8 @@
  * counting HELD bookings, and feature-flag independence.
  */
 
+jest.mock('@/lib/booking-audit', () => ({ logBookingAudit: jest.fn() }));
+
 // Mock dependencies before imports
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -99,6 +101,7 @@ import {
   isInvalidStateTransitionError,
 } from "@/lib/booking-state-machine";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logBookingAudit } from '@/lib/booking-audit';
 
 describe("manage-booking-hold — Phase 4 hold management paths", () => {
   const mockOwnerSession = {
@@ -144,7 +147,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     startDate: new Date("2025-02-01"),
     endDate: new Date("2025-05-01"),
     totalPrice: 2400,
-    status: "HELD" as never,
+    status: "HELD",
     slotsRequested: 1,
     version: 1,
     heldUntil: futureHeldUntil,
@@ -220,6 +223,35 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
         version: { increment: 1 },
       },
     });
+  });
+
+  // -----------------------------------------------------------------------
+  // 1b. HELD->ACCEPTED — audit call
+  // -----------------------------------------------------------------------
+  it("HELD->ACCEPTED calls logBookingAudit with ACCEPTED action", async () => {
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockHeldBooking);
+
+    const mockTxUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const mockTxQueryRaw = jest
+      .fn()
+      .mockResolvedValue([{ ownerId: "owner-123" }]);
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: mockTxQueryRaw,
+        $executeRaw: jest.fn(),
+        booking: { updateMany: mockTxUpdateMany },
+      };
+      return callback(tx);
+    });
+
+    const result = await updateBookingStatus("booking-held-1", "ACCEPTED");
+
+    expect(result.success).toBe(true);
+    expect(logBookingAudit).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: 'ACCEPTED', previousStatus: 'HELD' }),
+    );
   });
 
   // -----------------------------------------------------------------------
@@ -467,7 +499,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     const expiredBooking = {
       ...mockHeldBooking,
       id: "booking-expired-1",
-      status: "EXPIRED" as never,
+      status: "EXPIRED",
       heldUntil: null,
     };
 
@@ -495,7 +527,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     const pendingBooking = {
       ...mockHeldBooking,
       id: "booking-pending-1",
-      status: "PENDING" as never,
+      status: "PENDING",
       heldUntil: null,
     };
 
@@ -509,7 +541,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     const result = await updateBookingStatus(
       "booking-pending-1",
-      "HELD" as never
+      "HELD"
     );
 
     expect(result.error).toBe("Cannot change booking from PENDING to HELD");
@@ -524,7 +556,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     const pendingBooking = {
       ...mockHeldBooking,
       id: "booking-pending-cap",
-      status: "PENDING" as never,
+      status: "PENDING",
       heldUntil: null,
       slotsRequested: 1,
     };

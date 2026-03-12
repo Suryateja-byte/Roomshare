@@ -6,6 +6,8 @@
  * outside tx, empty batches, and partial batch failure resilience.
  */
 
+jest.mock('@/lib/booking-audit', () => ({ logBookingAudit: jest.fn() }));
+
 // --- Mocks (must be before imports) ---
 
 const mockQueryRaw = jest.fn()
@@ -67,6 +69,7 @@ import { features } from '@/lib/env'
 import { createInternalNotification } from '@/lib/notifications'
 import { logger } from '@/lib/logger'
 import { NextRequest } from 'next/server'
+import { logBookingAudit } from '@/lib/booking-audit'
 
 // --- Helpers ---
 
@@ -88,6 +91,7 @@ function makeExpiredHold(overrides: Partial<{
   tenantId: string
   slotsRequested: number
   version: number
+  heldUntil: Date
   tenantEmail: string | null
   tenantName: string | null
   listingTitle: string
@@ -101,6 +105,7 @@ function makeExpiredHold(overrides: Partial<{
     tenantId: overrides.tenantId ?? 'tenant-1',
     slotsRequested: overrides.slotsRequested ?? 1,
     version: overrides.version ?? 1,
+    heldUntil: overrides.heldUntil ?? new Date(Date.now() - 60000),
     tenantEmail: overrides.tenantEmail ?? 'tenant@example.com',
     tenantName: overrides.tenantName ?? 'Tenant One',
     listingTitle: overrides.listingTitle ?? 'Cozy Room',
@@ -416,5 +421,31 @@ describe('GET /api/cron/sweep-expired-holds', () => {
 
     // No transaction started
     expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  // -------------------------------------------------------
+  // 10. Booking audit logging
+  // -------------------------------------------------------
+  it('calls logBookingAudit with EXPIRED action and SYSTEM actor', async () => {
+    const hold = makeExpiredHold({ id: 'b-audit' })
+    setupTransaction({ expiredBookings: [hold] })
+
+    const response = await GET(createRequest())
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.success).toBe(true)
+    expect(data.expired).toBe(1)
+
+    expect(logBookingAudit).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: 'EXPIRED',
+        previousStatus: 'HELD',
+        newStatus: 'EXPIRED',
+        actorId: null,
+        actorType: 'SYSTEM',
+      }),
+    )
   })
 })
