@@ -51,6 +51,10 @@ export interface SearchV2ListItem {
   lng: number;
   /** Badges like 'near-match', 'multi-room' */
   badges?: string[];
+  /** Available slots for badge rendering */
+  availableSlots?: number;
+  /** Total slots for badge rendering */
+  totalSlots?: number;
   /** Relevance score hint for debugging/sorting */
   scoreHint?: number | null;
 }

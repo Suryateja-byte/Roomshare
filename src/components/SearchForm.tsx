@@ -113,7 +113,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
 
     const { pending, isDirty: filtersDirty, setPending, commit: commitFilters, committed } = useBatchedFilters({ isDrawerOpen: showFilters });
     // Destructure for convenient access (read-only aliases)
-    const { minPrice, maxPrice, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender } = pending;
+    const { minPrice, maxPrice, moveInDate, leaseDuration, roomType, amenities, houseRules, languages, genderPreference, householdGender, minSlots } = pending;
 
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number; bbox?: [number, number, number, number] } | null>(parseCoords);
     const [geoLoading, setGeoLoading] = useState(false);
@@ -494,7 +494,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             setPending({
                 minPrice: '', maxPrice: '', moveInDate: '', leaseDuration: '',
                 roomType: '', amenities: [], houseRules: [], languages: [],
-                genderPreference: '', householdGender: '',
+                genderPreference: '', householdGender: '', minSlots: '',
             });
         });
         // Navigate to clean search page (outside transition - navigation is user-facing)
@@ -516,6 +516,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         ...committed.languages,
         committed.genderPreference && committed.genderPreference !== 'any',
         committed.householdGender && committed.householdGender !== 'any',
+        committed.minSlots && parseInt(committed.minSlots) >= 2,
     ].filter(Boolean).length;
 
     // moveInDate count only calculated after mount (uses Date() which differs server/client)
@@ -534,6 +535,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         committed.languages.length > 0 ||
         (committed.genderPreference && committed.genderPreference !== 'any') ||
         (committed.householdGender && committed.householdGender !== 'any') ||
+        (committed.minSlots && parseInt(committed.minSlots) >= 2) ||
         moveInDateCount > 0
     );
 
@@ -860,6 +862,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 languages={languages}
                 genderPreference={genderPreference}
                 householdGender={householdGender}
+                minSlots={minSlots ? parseInt(minSlots) || undefined : undefined}
+                onMinSlotsChange={(v) => setPending({ minSlots: v !== undefined ? String(v) : '' })}
                 onMoveInDateChange={(v: string) => setPending({ moveInDate: v })}
                 onLeaseDurationChange={(v: string) => setPending({ leaseDuration: v === 'any' ? '' : v })}
                 onRoomTypeChange={(v: string) => setPending({ roomType: v === 'any' ? '' : v })}

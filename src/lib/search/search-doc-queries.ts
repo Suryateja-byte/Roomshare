@@ -425,9 +425,11 @@ export function buildSearchDocWhereConditions(
     householdGender,
     bookingMode,
     bounds,
+    minAvailableSlots,
   } = filterParams;
 
   // Base conditions for SearchDoc
+  const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
   const conditions: string[] = [
     (features.softHoldsEnabled || features.softHoldsDraining)
       ? `(d.available_slots - COALESCE((
@@ -435,14 +437,14 @@ export function buildSearchDocWhereConditions(
           WHERE b."listingId" = d.id
             AND b.status = 'HELD'
             AND b."heldUntil" > NOW()
-        ), 0)) > 0`
-      : 'd.available_slots > 0',
+        ), 0)) >= $1`
+      : `d.available_slots >= $1`,
     "d.status = 'ACTIVE'",
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
   ];
-  const params: unknown[] = [];
-  let paramIndex = 1;
+  const params: unknown[] = [slotThreshold];
+  let paramIndex = 2;
   let ftsQueryParamIndex: number | null = null;
 
   // Geographic bounds filter using PostGIS geography

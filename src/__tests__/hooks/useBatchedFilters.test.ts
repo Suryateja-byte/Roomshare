@@ -214,6 +214,7 @@ describe("commit URL building", () => {
       languages: ["en"],
       genderPreference: "",
       householdGender: "",
+      minSlots: "",
     };
 
     const params = new URLSearchParams();

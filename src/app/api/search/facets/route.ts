@@ -147,6 +147,7 @@ function buildFacetWhereConditions(
     genderPreference?: string;
     householdGender?: string;
     bookingMode?: string;
+    minAvailableSlots?: number;
     bounds?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
   },
   excludeFilter?: "amenities" | "houseRules" | "roomType" | "price" | "bookingMode",
@@ -170,6 +171,7 @@ function buildFacetWhereConditions(
   } = filterParams;
 
   // Base conditions
+  const slotThreshold = Math.max(filterParams.minAvailableSlots ?? 1, 1);
   const conditions: string[] = [
     (features.softHoldsEnabled || features.softHoldsDraining)
       ? `(d.available_slots - COALESCE((
@@ -177,14 +179,14 @@ function buildFacetWhereConditions(
           WHERE b."listingId" = d.id
             AND b.status = 'HELD'
             AND b."heldUntil" > NOW()
-        ), 0)) > 0`
-      : 'd.available_slots > 0',
+        ), 0)) >= $1`
+      : `d.available_slots >= $1`,
     "d.status = 'ACTIVE'",
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
   ];
-  const params: unknown[] = [];
-  let paramIndex = 1;
+  const params: unknown[] = [slotThreshold];
+  let paramIndex = 2;
 
   // Geographic bounds filter
   if (bounds) {
@@ -543,6 +545,7 @@ function generateFacetsCacheKey(
     q: filterParams.query?.toLowerCase().trim() || "",
     roomType: filterParams.roomType?.toLowerCase() || "",
     bookingMode: filterParams.bookingMode || "",
+    minAvailableSlots: filterParams.minAvailableSlots ?? "",
   };
   return JSON.stringify(normalized);
 }

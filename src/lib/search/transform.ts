@@ -81,6 +81,8 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
     lat: listing.location.lat,
     lng: listing.location.lng,
     badges: badges.length > 0 ? badges : undefined,
+    availableSlots: listing.availableSlots,
+    totalSlots: listing.totalSlots,
     // scoreHint is reserved for future relevance scoring
   };
 }

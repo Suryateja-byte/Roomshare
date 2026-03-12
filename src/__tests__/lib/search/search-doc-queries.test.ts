@@ -27,18 +27,31 @@ describe("buildSearchDocWhereConditions", () => {
     expect(statusConditions).toHaveLength(1);
   });
 
-  it("requires available slots > 0 in base conditions", () => {
+  it("requires available slots >= $1 in base conditions (parameterized)", () => {
     const { conditions } = buildSearchDocWhereConditions({});
 
-    expect(conditions).toContain("d.available_slots > 0");
+    expect(conditions).toContain("d.available_slots >= $1");
   });
 
-  it("starts with paramIndex 1 and no FTS when no filters applied", () => {
+  it("defaults to >= 1 when minAvailableSlots is undefined", () => {
     const result = buildSearchDocWhereConditions({});
 
-    // With no filters, should have only base conditions, no params
-    expect(result.params).toHaveLength(0);
-    expect(result.paramIndex).toBe(1);
+    expect(result.params[0]).toBe(1);
+  });
+
+  it("parameterizes >= N when minAvailableSlots is set", () => {
+    const result = buildSearchDocWhereConditions({ minAvailableSlots: 3 });
+
+    expect(result.params[0]).toBe(3);
+    expect(result.conditions).toContain("d.available_slots >= $1");
+  });
+
+  it("starts with paramIndex 2 and no FTS when no filters applied", () => {
+    const result = buildSearchDocWhereConditions({});
+
+    // With parameterized slot threshold at $1, params starts with [1]
+    expect(result.params).toHaveLength(1);
+    expect(result.paramIndex).toBe(2);
     expect(result.ftsQueryParamIndex).toBeNull();
   });
 });

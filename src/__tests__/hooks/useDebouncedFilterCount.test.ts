@@ -34,6 +34,7 @@ describe("useDebouncedFilterCount", () => {
     languages: [] as string[],
     genderPreference: "",
     householdGender: "",
+    minSlots: "",
   };
 
   beforeEach(() => {

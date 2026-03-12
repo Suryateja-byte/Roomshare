@@ -76,6 +76,8 @@ export interface FilterParams {
   page?: number;
   limit?: number;
   sort?: SortOption;
+  // Minimum available slots filter (e.g., "I need 3 beds")
+  minAvailableSlots?: number;
   // Flag to enable near-match expansion when exact matches are few
   nearMatches?: boolean;
 }
