@@ -42,6 +42,7 @@ import {
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { parseLocalDate } from "@/lib/utils";
+import { features } from "@/lib/env";
 
 // Cache TTL in seconds
 const CACHE_TTL = 30;
@@ -50,7 +51,7 @@ const FACET_QUERY_TIMEOUT_MS = 5000;
 // Maximum results per facet to prevent expensive aggregations
 const MAX_FACET_RESULTS = 100;
 
-const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%"]);
+const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%", "HELD"]);
 
 function assertParameterizedWhereClause(whereClause: string): void {
   const literalPattern = /'([^']*)'/g;
@@ -145,9 +146,11 @@ function buildFacetWhereConditions(
     languages?: string[];
     genderPreference?: string;
     householdGender?: string;
+    bookingMode?: string;
+    minAvailableSlots?: number;
     bounds?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
   },
-  excludeFilter?: "amenities" | "houseRules" | "roomType" | "price",
+  excludeFilter?: "amenities" | "houseRules" | "roomType" | "price" | "bookingMode",
 ): WhereBuilder {
   // SECURITY INVARIANT:
   // - All user-derived values must be pushed to `params` and referenced as $N placeholders.
@@ -168,14 +171,22 @@ function buildFacetWhereConditions(
   } = filterParams;
 
   // Base conditions
+  const slotThreshold = Math.max(filterParams.minAvailableSlots ?? 1, 1);
   const conditions: string[] = [
-    "d.available_slots > 0",
+    (features.softHoldsEnabled || features.softHoldsDraining)
+      ? `(d.available_slots - COALESCE((
+          SELECT SUM("slotsRequested") FROM "Booking" b
+          WHERE b."listingId" = d.id
+            AND b.status = 'HELD'
+            AND b."heldUntil" > NOW()
+        ), 0)) >= $1`
+      : `d.available_slots >= $1`,
     "d.status = 'ACTIVE'",
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
   ];
-  const params: unknown[] = [];
-  let paramIndex = 1;
+  const params: unknown[] = [slotThreshold];
+  let paramIndex = 2;
 
   // Geographic bounds filter
   if (bounds) {
@@ -288,6 +299,12 @@ function buildFacetWhereConditions(
   if (filterParams.householdGender && filterParams.householdGender !== "any") {
     conditions.push(`d.household_gender = $${paramIndex++}`);
     params.push(filterParams.householdGender);
+  }
+
+  // Phase 3: Booking mode filter
+  if (excludeFilter !== "bookingMode" && filterParams.bookingMode && filterParams.bookingMode !== "any") {
+    conditions.push(`d."booking_mode" = $${paramIndex++}`);
+    params.push(filterParams.bookingMode);
   }
 
   return { conditions, params, paramIndex };
@@ -527,6 +544,8 @@ function generateFacetsCacheKey(
     moveInDate: filterParams.moveInDate || "",
     q: filterParams.query?.toLowerCase().trim() || "",
     roomType: filterParams.roomType?.toLowerCase() || "",
+    bookingMode: filterParams.bookingMode || "",
+    minAvailableSlots: filterParams.minAvailableSlots ?? "",
   };
   return JSON.stringify(normalized);
 }

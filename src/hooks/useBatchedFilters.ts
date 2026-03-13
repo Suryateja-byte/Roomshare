@@ -32,6 +32,7 @@ export interface BatchedFilterValues {
   languages: string[];
   genderPreference: string;
   householdGender: string;
+  minSlots: string;
 }
 
 /**
@@ -48,6 +49,7 @@ export const emptyFilterValues: BatchedFilterValues = {
   languages: [],
   genderPreference: "",
   householdGender: "",
+  minSlots: "",
 };
 
 // --- URL parsing helpers (matching SearchForm's logic) ---
@@ -149,6 +151,12 @@ export function readFiltersFromURL(
       "householdGender",
       VALID_HOUSEHOLD_GENDERS,
     ),
+    minSlots: (() => {
+      const raw = searchParams.get("minSlots");
+      if (!raw) return "";
+      const parsed = parseInt(raw.trim(), 10);
+      return Number.isFinite(parsed) && parsed >= 1 && parsed <= 20 ? String(parsed) : "";
+    })(),
   };
 }
 
@@ -175,7 +183,8 @@ function filtersEqual(
     arraysEqual(a.houseRules, b.houseRules) &&
     arraysEqual(a.languages, b.languages) &&
     a.genderPreference === b.genderPreference &&
-    a.householdGender === b.householdGender
+    a.householdGender === b.householdGender &&
+    a.minSlots === b.minSlots
   );
 }
 
@@ -241,7 +250,7 @@ export function useBatchedFilters(
         const merged: BatchedFilterValues = { ...committed };
         const scalarKeys = [
           'minPrice', 'maxPrice', 'roomType', 'leaseDuration',
-          'moveInDate', 'genderPreference', 'householdGender',
+          'moveInDate', 'genderPreference', 'householdGender', 'minSlots',
         ] as const;
         for (const key of scalarKeys) {
           if (prevPending[key] !== prevCommitted[key]) {
@@ -338,6 +347,7 @@ export function useBatchedFilters(
       "languages",
       "genderPreference",
       "householdGender",
+      "minSlots",
     ];
     for (const key of filterKeys) {
       params.delete(key);
@@ -364,6 +374,9 @@ export function useBatchedFilters(
     }
     if (pending.householdGender) {
       params.set("householdGender", pending.householdGender);
+    }
+    if (pending.minSlots && parseInt(pending.minSlots) >= 2) {
+      params.set("minSlots", pending.minSlots);
     }
 
     const searchUrl = `/search?${params.toString()}`;

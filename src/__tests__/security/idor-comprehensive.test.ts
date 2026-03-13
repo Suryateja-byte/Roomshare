@@ -186,7 +186,10 @@ describe('Comprehensive IDOR Protection Tests', () => {
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBookingOwnedByAlice);
         (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
           const tx = {
-            $queryRaw: jest.fn().mockResolvedValue([{ availableSlots: 2, totalSlots: 3, id: 'listing-xyz', ownerId: 'bob-456' }]),
+            $queryRaw: jest.fn()
+              .mockResolvedValueOnce([{ availableSlots: 2, totalSlots: 3, id: 'listing-xyz', ownerId: 'bob-456', bookingMode: 'SHARED' }])
+              .mockResolvedValueOnce([{ total: BigInt(0) }]),
+            $executeRaw: jest.fn().mockResolvedValue(1),
             booking: {
               count: jest.fn().mockResolvedValue(0),
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),

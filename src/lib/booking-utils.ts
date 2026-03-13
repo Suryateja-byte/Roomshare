@@ -8,7 +8,7 @@ export async function getActiveBookingsForListing(listingId: string) {
   return prisma.booking.findMany({
     where: {
       listingId,
-      status: { in: ['PENDING', 'ACCEPTED'] },
+      status: { in: ['PENDING', 'ACCEPTED', 'HELD'] },
       endDate: { gte: new Date() }
     },
     include: {
@@ -25,7 +25,7 @@ export async function hasActiveAcceptedBookings(listingId: string): Promise<bool
   const count = await prisma.booking.count({
     where: {
       listingId,
-      status: 'ACCEPTED',
+      status: { in: ['ACCEPTED', 'HELD'] },
       endDate: { gte: new Date() }
     }
   });
@@ -39,7 +39,7 @@ export async function getActiveAcceptedBookingsCount(listingId: string): Promise
   return prisma.booking.count({
     where: {
       listingId,
-      status: 'ACCEPTED',
+      status: { in: ['ACCEPTED', 'HELD'] },
       endDate: { gte: new Date() }
     }
   });

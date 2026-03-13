@@ -318,13 +318,15 @@ export async function getListings(
     genderPreference,
     householdGender,
     bounds,
+    minAvailableSlots,
     sort = "recommended",
   } = params;
 
   try {
     // Build dynamic WHERE conditions — all filtering at SQL level
+    const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
     const conditions: string[] = [
-      'l."availableSlots" > 0',
+      `l."availableSlots" >= $1`,
       "l.status = 'ACTIVE'",
       "ST_X(loc.coords::geometry) IS NOT NULL",
       "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -332,8 +334,8 @@ export async function getListings(
       "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
       "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
     ];
-    const queryParams: (string | number | boolean | null | Date | string[])[] = [];
-    let paramIndex = 1;
+    const queryParams: (string | number | boolean | null | Date | string[])[] = [slotThreshold];
+    let paramIndex = 2;
 
     // Geographic bounds filter (SQL level)
     if (bounds) {
@@ -1157,11 +1159,13 @@ async function getListingsCountEfficient(
     genderPreference,
     householdGender,
     bounds,
+    minAvailableSlots,
   } = params;
 
   // Build dynamic WHERE conditions for SQL (same logic as getListingsPaginated)
+  const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
   const conditions: string[] = [
-    'l."availableSlots" > 0',
+    `l."availableSlots" >= $1`,
     "l.status = 'ACTIVE'",
     // Exclude listings with invalid coordinates
     "ST_X(loc.coords::geometry) IS NOT NULL",
@@ -1170,8 +1174,8 @@ async function getListingsCountEfficient(
     "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
     "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
   ];
-  const queryParams: (string | number | boolean | null | Date | string[])[] = [];
-  let paramIndex = 1;
+  const queryParams: (string | number | boolean | null | Date | string[])[] = [slotThreshold];
+  let paramIndex = 2;
 
   // Geographic bounds filter with antimeridian support
   if (bounds) {

@@ -97,6 +97,12 @@ export const ROOM_TYPE_ALIASES: Record<string, string> = {
   'studio': 'Entire Place',
 };
 
+export const VALID_BOOKING_MODES = [
+  'any',
+  'SHARED',
+  'WHOLE_UNIT',
+] as const;
+
 export const VALID_GENDER_PREFERENCES = [
   'any',
   'MALE_ONLY',
@@ -127,6 +133,7 @@ export type Amenity = (typeof VALID_AMENITIES)[number];
 export type HouseRule = (typeof VALID_HOUSE_RULES)[number];
 export type LeaseDuration = (typeof VALID_LEASE_DURATIONS)[number];
 export type RoomType = (typeof VALID_ROOM_TYPES)[number];
+export type BookingMode = (typeof VALID_BOOKING_MODES)[number];
 export type GenderPreference = (typeof VALID_GENDER_PREFERENCES)[number];
 export type HouseholdGender = (typeof VALID_HOUSEHOLD_GENDERS)[number];
 export type SortOption = (typeof VALID_SORT_OPTIONS)[number];

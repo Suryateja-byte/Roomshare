@@ -1,7 +1,7 @@
 'use client';
 
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { X, Minus, Plus } from 'lucide-react';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,10 @@ interface FilterModalProps {
   languages: string[];
   genderPreference: string;
   householdGender: string;
+
+  // Minimum open spots
+  minSlots?: number;
+  onMinSlotsChange: (value: number | undefined) => void;
 
   // Handlers
   onMoveInDateChange: (value: string) => void;
@@ -105,6 +109,8 @@ export function FilterModal({
   languages,
   genderPreference,
   householdGender,
+  minSlots,
+  onMinSlotsChange,
   onMoveInDateChange,
   onLeaseDurationChange,
   onRoomTypeChange,
@@ -261,6 +267,55 @@ export function FilterModal({
                   })}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Minimum Open Spots */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-zinc-900 dark:text-white">
+                Minimum Open Spots
+              </label>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 -mt-1">
+                Show listings with at least this many available spots
+              </p>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (minSlots === undefined || minSlots <= 2) {
+                      onMinSlotsChange(undefined);
+                    } else {
+                      onMinSlotsChange(minSlots - 1);
+                    }
+                  }}
+                  disabled={minSlots === undefined}
+                  aria-label="Decrease minimum spots"
+                  className="h-9 w-9 rounded-full"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="min-w-[3rem] text-center text-sm font-medium text-zinc-900 dark:text-white">
+                  {minSlots === undefined ? 'Any' : minSlots}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (minSlots === undefined) {
+                      onMinSlotsChange(2);
+                    } else if (minSlots < 10) {
+                      onMinSlotsChange(minSlots + 1);
+                    }
+                  }}
+                  disabled={minSlots !== undefined && minSlots >= 10}
+                  aria-label="Increase minimum spots"
+                  className="h-9 w-9 rounded-full"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             {/* Amenities */}

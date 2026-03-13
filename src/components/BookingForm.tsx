@@ -5,12 +5,13 @@ import { createPortal } from 'react-dom';
 import { FocusTrap } from '@/components/ui/FocusTrap';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
-import { createBooking, BookingResult } from '@/app/actions/booking';
+import { createBooking, createHold, BookingResult } from '@/app/actions/booking';
 import { useRouter } from 'next/navigation';
 import { Loader2, LogIn, AlertTriangle, RefreshCw, CheckCircle, XCircle, WifiOff, Calendar, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { parseLocalDate, parseISODateAsLocal } from '@/lib/utils';
+import { SlotSelector } from '@/components/SlotSelector';
 
 type ListingStatus = 'ACTIVE' | 'PAUSED' | 'RENTED';
 
@@ -29,6 +30,11 @@ interface BookingFormProps {
     isLoggedIn: boolean;
     status?: ListingStatus;
     bookedDates?: BookedDateRange[];
+    holdEnabled?: boolean;
+    totalSlots?: number;
+    availableSlots?: number;
+    bookingMode?: string;
+    holdTtlMinutes?: number;
 }
 
 const MIN_BOOKING_DAYS = 30; // Industry standard minimum stay
@@ -54,9 +60,14 @@ const availabilityConfig: Record<ListingStatus, { label: string; colorClass: str
     }
 };
 
-export default function BookingForm({ listingId, price, ownerId, isOwner, isLoggedIn, status = 'ACTIVE', bookedDates = [] }: BookingFormProps) {
+export default function BookingForm({ listingId, price, ownerId, isOwner, isLoggedIn, status = 'ACTIVE', bookedDates = [], holdEnabled = false, totalSlots, availableSlots, bookingMode, holdTtlMinutes }: BookingFormProps) {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+
+    // Slot selector state: only show for multi-slot PER_SLOT listings
+    const showSlotSelector = (totalSlots ?? 1) > 1 && bookingMode !== 'WHOLE_UNIT';
+    const [slotsRequested, setSlotsRequested] = useState(1);
+    const effectiveSlots = bookingMode === 'WHOLE_UNIT' ? (totalSlots ?? 1) : slotsRequested;
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [errorType, setErrorType] = useState<ErrorType>(null);
@@ -281,6 +292,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 parseLocalDate(startDate),
                 parseLocalDate(endDate),
                 price,
+                effectiveSlots,
                 idempotencyKeyRef.current
             );
 
@@ -586,6 +598,16 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     </div>
                 )}
 
+                {/* Slot selector for multi-slot PER_SLOT listings */}
+                {showSlotSelector && (
+                    <SlotSelector
+                        value={slotsRequested}
+                        onChange={setSlotsRequested}
+                        max={availableSlots ?? 1}
+                        disabled={isLoading || hasSubmittedSuccessfully}
+                    />
+                )}
+
                 {/* Duration indicator */}
                 {bookingInfo && (
                     <div className={`text-sm text-center p-2 rounded-lg ${bookingInfo.isValid
@@ -615,6 +637,47 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                         'Request to Book'
                     )}
                 </Button>
+
+                {holdEnabled && (
+                    <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="w-full rounded-xl"
+                        disabled={isLoading || isOffline || hasSubmittedSuccessfully || (bookingInfo !== null && !bookingInfo.isValid) || (dateConflict?.overlaps ?? false)}
+                        onClick={async () => {
+                            if (!startDate || !endDate || !bookingInfo?.isValid) return;
+                            setIsLoading(true);
+                            setMessage('');
+                            setErrorType(null);
+                            try {
+                                const result: BookingResult = await createHold(
+                                    listingId,
+                                    parseLocalDate(startDate),
+                                    parseLocalDate(endDate),
+                                    price,
+                                    effectiveSlots
+                                );
+                                if (result.success) {
+                                    setMessage('Hold placed successfully!');
+                                    setErrorType(null);
+                                    setHasSubmittedSuccessfully(true);
+                                    setTimeout(() => router.push('/bookings'), 1500);
+                                } else {
+                                    setErrorType(categorizeError(result));
+                                    setMessage(result.error || 'Failed to place hold');
+                                }
+                            } catch {
+                                setErrorType('server');
+                                setMessage('An unexpected error occurred. Please try again.');
+                            } finally {
+                                setIsLoading(false);
+                            }
+                        }}
+                    >
+                        Place Hold ({holdTtlMinutes ?? 15} min)
+                    </Button>
+                )}
 
                 {/* Error/Success Messages */}
                 {message && (

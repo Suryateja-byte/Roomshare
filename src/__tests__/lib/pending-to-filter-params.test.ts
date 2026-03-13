@@ -14,6 +14,7 @@ describe("pendingToFilterParams", () => {
       languages: [],
       genderPreference: "",
       householdGender: "",
+      minSlots: "",
     };
 
     const result = pendingToFilterParams(pending);
@@ -39,6 +40,7 @@ describe("pendingToFilterParams", () => {
       languages: ["en"],
       genderPreference: "female",
       householdGender: "ALL_FEMALE",
+      minSlots: "",
     };
 
     const result = pendingToFilterParams(pending);
@@ -64,6 +66,7 @@ describe("pendingToFilterParams", () => {
       languages: [],
       genderPreference: "",
       householdGender: "",
+      minSlots: "",
     };
 
     const result = pendingToFilterParams(pending);
@@ -84,6 +87,7 @@ describe("pendingToFilterParams", () => {
       languages: [],
       genderPreference: "",
       householdGender: "",
+      minSlots: "",
     };
 
     const result = pendingToFilterParams(pending);

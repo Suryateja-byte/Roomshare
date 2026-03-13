@@ -25,6 +25,12 @@ jest.mock("lucide-react", () => ({
   X: ({ className }: { className?: string }) => (
     <svg data-testid="x-icon" className={className} />
   ),
+  Minus: ({ className }: { className?: string }) => (
+    <svg data-testid="minus-icon" className={className} />
+  ),
+  Plus: ({ className }: { className?: string }) => (
+    <svg data-testid="plus-icon" className={className} />
+  ),
 }));
 
 // Mock Button component to pass through props
@@ -216,6 +222,7 @@ function makeProps(overrides?: Partial<React.ComponentProps<typeof FilterModal>>
     onToggleLanguage: jest.fn(),
     onGenderPreferenceChange: jest.fn(),
     onHouseholdGenderChange: jest.fn(),
+    onMinSlotsChange: jest.fn(),
     languageSearch: "",
     onLanguageSearchChange: jest.fn(),
     filteredLanguages: ["en", "es", "fr"],

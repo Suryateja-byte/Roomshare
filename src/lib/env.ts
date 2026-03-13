@@ -102,6 +102,12 @@ const serverEnvSchema = z.object({
   TURNSTILE_SECRET_KEY: z.string().optional(),
   TURNSTILE_ENABLED: z.enum(["true", "false"]).optional(),
 
+  // Multi-slot booking feature flags (Phase 0 — all default OFF)
+  ENABLE_MULTI_SLOT_BOOKING: z.enum(["true", "false"]).optional(),
+  ENABLE_WHOLE_UNIT_MODE: z.enum(["true", "false"]).optional(),
+  ENABLE_SOFT_HOLDS: z.enum(["on", "drain", "off"]).optional(),
+  ENABLE_BOOKING_AUDIT: z.enum(["true", "false"]).optional(),
+
   // Node environment
   NODE_ENV: z
     .enum(["development", "production", "test"])
@@ -125,6 +131,29 @@ const serverEnvSchema = z.object({
         path: ["TURNSTILE_ENABLED"],
       });
     }
+  }
+
+  // Multi-slot booking feature flag cross-validation
+  if (data.ENABLE_WHOLE_UNIT_MODE === "true" && data.ENABLE_MULTI_SLOT_BOOKING !== "true") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "ENABLE_WHOLE_UNIT_MODE requires ENABLE_MULTI_SLOT_BOOKING=true",
+      path: ["ENABLE_WHOLE_UNIT_MODE"],
+    });
+  }
+  if (data.ENABLE_BOOKING_AUDIT === "true" && data.ENABLE_SOFT_HOLDS !== "on") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "ENABLE_BOOKING_AUDIT requires ENABLE_SOFT_HOLDS=on",
+      path: ["ENABLE_BOOKING_AUDIT"],
+    });
+  }
+  if (data.ENABLE_SOFT_HOLDS === "on" && data.ENABLE_MULTI_SLOT_BOOKING !== "true") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "ENABLE_SOFT_HOLDS=on requires ENABLE_MULTI_SLOT_BOOKING=true",
+      path: ["ENABLE_SOFT_HOLDS"],
+    });
   }
 });
 
@@ -398,6 +427,27 @@ export const features = {
       !!e.TURNSTILE_SECRET_KEY &&
       !!c.NEXT_PUBLIC_TURNSTILE_SITE_KEY
     );
+  },
+  // Multi-slot booking feature flags
+  get multiSlotBooking() {
+    const e = getServerEnv();
+    return e.ENABLE_MULTI_SLOT_BOOKING === "true";
+  },
+  get wholeUnitMode() {
+    const e = getServerEnv();
+    return e.ENABLE_WHOLE_UNIT_MODE === "true";
+  },
+  get softHoldsEnabled() {
+    const e = getServerEnv();
+    return e.ENABLE_SOFT_HOLDS === "on";
+  },
+  get softHoldsDraining() {
+    const e = getServerEnv();
+    return e.ENABLE_SOFT_HOLDS === "drain";
+  },
+  get bookingAudit() {
+    const e = getServerEnv();
+    return e.ENABLE_BOOKING_AUDIT === "true";
   },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals

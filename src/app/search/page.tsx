@@ -31,6 +31,7 @@ type SearchPageSearchParams = {
     houseRules?: string | string[];
     languages?: string | string[];
     roomType?: string;
+    minSlots?: string;
     genderPreference?: string;
     householdGender?: string;
     minLat?: string;

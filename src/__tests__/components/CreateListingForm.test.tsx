@@ -96,6 +96,36 @@ jest.mock('@/components/listings/ImageUploader', () => ({
   ),
 }))
 
+// Capture roomType onValueChange for auto-set tests
+// We identify the roomType Select by inspecting its SelectContent children for "Entire Place"
+let capturedRoomTypeOnValueChange: ((val: string) => void) | undefined
+const React = require('react')
+
+function hasChildWithText(children: any, text: string): boolean {
+  let found = false
+  React.Children.forEach(children, (child: any) => {
+    if (found) return
+    if (typeof child === 'string' && child.includes(text)) { found = true; return }
+    if (child?.props?.children) { found = hasChildWithText(child.props.children, text) }
+    if (child?.props?.value === text) { found = true }
+  })
+  return found
+}
+
+jest.mock('@/components/ui/select', () => ({
+  Select: ({ children, onValueChange, value }: any) => {
+    // Capture onValueChange for the Select whose children contain "Entire Place" (roomType)
+    if (hasChildWithText(children, 'Entire Place')) {
+      capturedRoomTypeOnValueChange = onValueChange
+    }
+    return <div data-testid="mock-select">{children}</div>
+  },
+  SelectTrigger: ({ children }: any) => <button>{children}</button>,
+  SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
+  SelectContent: ({ children }: any) => <div>{children}</div>,
+  SelectItem: ({ children, value }: any) => <div data-value={value}>{children}</div>,
+}))
+
 import { useFormPersistence } from '@/hooks/useFormPersistence'
 import { useNavigationGuard } from '@/hooks/useNavigationGuard'
 
@@ -646,6 +676,77 @@ describe('CreateListingForm', () => {
         true,
         expect.stringContaining('still being created')
       )
+    })
+  })
+
+  describe('bookingMode auto-set', () => {
+    beforeEach(() => {
+      capturedRoomTypeOnValueChange = undefined
+    })
+
+    it('auto-sets bookingMode to WHOLE_UNIT when user selects "Entire Place"', () => {
+      render(<CreateListingForm enableWholeUnitMode={true} />)
+
+      // Verify SHARED is initially selected
+      const getBookingRadio = (value: string) =>
+        screen.getAllByRole('radio').find(
+          (r) =>
+            (r as HTMLInputElement).name === 'bookingMode' &&
+            (r as HTMLInputElement).value === value
+        ) as HTMLInputElement
+
+      expect(getBookingRadio('SHARED').checked).toBe(true)
+
+      // Simulate user changing roomType to "Entire Place"
+      act(() => {
+        capturedRoomTypeOnValueChange?.('Entire Place')
+      })
+
+      expect(getBookingRadio('WHOLE_UNIT').checked).toBe(true)
+    })
+
+    it('resets bookingMode to SHARED when user selects "Private Room"', () => {
+      render(<CreateListingForm enableWholeUnitMode={true} />)
+
+      const getBookingRadio = (value: string) =>
+        screen.getAllByRole('radio').find(
+          (r) =>
+            (r as HTMLInputElement).name === 'bookingMode' &&
+            (r as HTMLInputElement).value === value
+        ) as HTMLInputElement
+
+      // Select Entire Place first
+      act(() => {
+        capturedRoomTypeOnValueChange?.('Entire Place')
+      })
+      expect(getBookingRadio('WHOLE_UNIT').checked).toBe(true)
+
+      // Now select Private Room
+      act(() => {
+        capturedRoomTypeOnValueChange?.('Private Room')
+      })
+      expect(getBookingRadio('SHARED').checked).toBe(true)
+    })
+
+    it('allows user to override auto-set bookingMode', () => {
+      render(<CreateListingForm enableWholeUnitMode={true} />)
+
+      const getBookingRadio = (value: string) =>
+        screen.getAllByRole('radio').find(
+          (r) =>
+            (r as HTMLInputElement).name === 'bookingMode' &&
+            (r as HTMLInputElement).value === value
+        ) as HTMLInputElement
+
+      // Auto-set to WHOLE_UNIT
+      act(() => {
+        capturedRoomTypeOnValueChange?.('Entire Place')
+      })
+      expect(getBookingRadio('WHOLE_UNIT').checked).toBe(true)
+
+      // User manually clicks SHARED radio
+      fireEvent.click(getBookingRadio('SHARED'))
+      expect(getBookingRadio('SHARED').checked).toBe(true)
     })
   })
 })

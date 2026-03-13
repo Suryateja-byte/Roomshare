@@ -25,5 +25,6 @@ export function pendingToFilterParams(pending: BatchedFilterValues): FilterParam
     languages: pending.languages.length > 0 ? pending.languages : undefined,
     genderPreference: pending.genderPreference || undefined,
     householdGender: pending.householdGender || undefined,
+    minAvailableSlots: pending.minSlots ? parseInt(pending.minSlots, 10) || undefined : undefined,
   };
 }

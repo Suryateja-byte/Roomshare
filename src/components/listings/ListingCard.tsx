@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { getLanguageName } from '@/lib/languages';
 import { useListingFocus, useIsListingFocused } from '@/contexts/ListingFocusContext';
 import { TrustBadge } from '@/components/ui/TrustBadge';
+import { SlotBadge } from './SlotBadge';
 
 export interface Listing {
     id: string;
@@ -22,6 +23,7 @@ export interface Listing {
     amenities: string[];
     householdLanguages?: string[];
     availableSlots: number;
+    totalSlots: number;
     images?: string[];
     avgRating?: number;
     reviewCount?: number;
@@ -129,7 +131,15 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
     } else {
         srParts.push('new listing');
     }
-    srParts.push(isAvailable ? `${listing.availableSlots} spot${listing.availableSlots !== 1 ? 's' : ''} available` : 'currently filled');
+    if (listing.totalSlots > 1) {
+        srParts.push(isAvailable
+            ? `${listing.availableSlots} of ${listing.totalSlots} spots available`
+            : 'currently filled');
+    } else {
+        srParts.push(isAvailable
+            ? `${listing.availableSlots} spot${listing.availableSlots !== 1 ? 's' : ''} available`
+            : 'currently filled');
+    }
     srParts.push(formatLocation(listing.location.city, listing.location.state));
     if (listing.amenities.length > 0) {
         srParts.push(listing.amenities.slice(0, 3).join(', '));
@@ -210,14 +220,16 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
 
                     {/* Badges — top-left stack */}
                     <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-                        <span className={cn(
-                            "inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-[0.15em] shadow-sm backdrop-blur-md",
-                            isAvailable
-                                ? 'bg-white/90 dark:bg-zinc-900/90 text-zinc-900 dark:text-white'
-                                : 'bg-zinc-900/90 dark:bg-white/90 text-white dark:text-zinc-900'
-                        )}>
-                            {isAvailable ? 'Available' : 'Filled'}
-                        </span>
+                        <SlotBadge
+                            availableSlots={listing.availableSlots}
+                            totalSlots={listing.totalSlots}
+                            overlay
+                        />
+                        {listing.totalSlots > 1 && (
+                            <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm rounded-md text-indigo-700 dark:text-indigo-400">
+                                Multi-Room
+                            </span>
+                        )}
                         {hasRating && (
                             <div
                                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-white/90 dark:bg-zinc-900/90 text-zinc-900 dark:text-white shadow-sm backdrop-blur-md"

@@ -8,7 +8,7 @@ interface Booking {
     id: string;
     startDate: Date | string; // Can be Date or ISO string from server
     endDate: Date | string; // Can be Date or ISO string from server
-    status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+    status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'HELD' | 'EXPIRED';
     tenant: {
         id: string;
         name: string | null;
@@ -37,6 +37,8 @@ const statusColors = {
     ACCEPTED: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
     REJECTED: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
     CANCELLED: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700',
+    HELD: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+    EXPIRED: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800',
 };
 
 export default function BookingCalendar({ bookings, onBookingClick, isLoading = false }: BookingCalendarProps) {

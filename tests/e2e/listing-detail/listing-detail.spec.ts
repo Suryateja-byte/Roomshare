@@ -73,7 +73,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
 
     await expect(page.getByText("Active Listing")).toBeVisible();
     await expect(page.getByText(/San Francisco.*CA/)).toBeVisible();
-    await expect(page.getByText(/Slots Available/)).toBeVisible();
+    await expect(page.getByTestId("slot-badge")).toBeVisible();
   });
 
   test("LD-03  About section shows description", async ({ page, nav }) => {

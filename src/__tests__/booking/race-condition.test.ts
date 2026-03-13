@@ -47,8 +47,17 @@ jest.mock('@/lib/prisma', () => ({
 }));
 
 jest.mock('@/lib/rate-limit', () => ({
-  checkRateLimit: jest.fn().mockResolvedValue({ success: true }),
-  RATE_LIMITS: { bookingStatus: { maxRequests: 10, windowMs: 60000 } },
+  checkRateLimit: jest.fn().mockResolvedValue({ success: true, remaining: 9, resetAt: new Date() }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue('127.0.0.1'),
+  RATE_LIMITS: {
+    bookingStatus: { maxRequests: 10, windowMs: 60000 },
+    createBooking: { limit: 10, windowMs: 3600000 },
+    createBookingByIp: { limit: 30, windowMs: 3600000 },
+  },
+}));
+
+jest.mock('next/headers', () => ({
+  headers: jest.fn().mockResolvedValue(new Headers()),
 }));
 
 jest.mock('@/lib/booking-state-machine', () => ({
@@ -112,6 +121,7 @@ describe('Booking Race Condition Prevention', () => {
     availableSlots: 1,
     status: 'ACTIVE',
     price: 1000,
+    bookingMode: 'SHARED',
   };
 
   const mockOwner = {
@@ -163,7 +173,6 @@ describe('Booking Race Condition Prevention', () => {
         const tx = {
           booking: {
             findFirst: jest.fn().mockResolvedValue(null),
-            count: jest.fn().mockResolvedValue(0),
             create: jest.fn().mockResolvedValue(mockBooking),
           },
           user: {
@@ -173,7 +182,9 @@ describe('Booking Race Condition Prevention', () => {
               return Promise.resolve(null);
             }),
           },
-          $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([mockListing])
+            .mockResolvedValueOnce([{ total: BigInt(0) }]),
         };
         return callback(tx);
       });
@@ -184,13 +195,13 @@ describe('Booking Race Condition Prevention', () => {
     });
 
     it('uses FOR UPDATE lock on listing query', async () => {
-      let capturedQuery: string | undefined;
+      const capturedQueries: string[] = [];
+      let callCount = 0;
 
       (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
         const tx = {
           booking: {
             findFirst: jest.fn().mockResolvedValue(null),
-            count: jest.fn().mockResolvedValue(0),
             create: jest.fn().mockResolvedValue(mockBooking),
           },
           user: {
@@ -201,9 +212,10 @@ describe('Booking Race Condition Prevention', () => {
             }),
           },
           $queryRaw: jest.fn().mockImplementation((strings: TemplateStringsArray) => {
-            // Capture the query string from the tagged template literal
-            capturedQuery = strings.join('?');
-            return [mockListing];
+            capturedQueries.push(strings.join('?'));
+            callCount++;
+            if (callCount === 1) return [mockListing]; // FOR UPDATE
+            return [{ total: BigInt(0) }]; // SUM(slotsRequested)
           }),
         };
         return callback(tx);
@@ -211,9 +223,9 @@ describe('Booking Race Condition Prevention', () => {
 
       await createBooking('listing-abc', futureStart, futureEnd, 1000);
 
-      // Verify FOR UPDATE is in the query
-      expect(capturedQuery).toBeDefined();
-      expect(capturedQuery).toContain('FOR UPDATE');
+      // Verify FOR UPDATE is in the first query
+      expect(capturedQueries.length).toBeGreaterThanOrEqual(1);
+      expect(capturedQueries[0]).toContain('FOR UPDATE');
     });
   });
 
@@ -233,7 +245,6 @@ describe('Booking Race Condition Prevention', () => {
         const tx = {
           booking: {
             findFirst: jest.fn().mockResolvedValue(null),
-            count: jest.fn().mockResolvedValue(0),
             create: jest.fn().mockResolvedValue(mockBooking),
           },
           user: {
@@ -243,7 +254,9 @@ describe('Booking Race Condition Prevention', () => {
               return Promise.resolve(null);
             }),
           },
-          $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([mockListing])
+            .mockResolvedValueOnce([{ total: BigInt(0) }]),
         };
         return callback(tx);
       });
@@ -280,12 +293,13 @@ describe('Booking Race Condition Prevention', () => {
         const tx = {
           booking: {
             findFirst: jest.fn().mockResolvedValue(null),
-            count: jest.fn().mockResolvedValue(1), // 1 accepted booking = no slots
           },
           user: {
             findUnique: jest.fn().mockResolvedValue(mockOwner),
           },
-          $queryRaw: jest.fn().mockResolvedValue([noSlotsListing]),
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([noSlotsListing])
+            .mockResolvedValueOnce([{ total: BigInt(1) }]), // 1 slot used = capacity full
         };
         return callback(tx);
       });
@@ -293,7 +307,7 @@ describe('Booking Race Condition Prevention', () => {
       const result = await createBooking('listing-abc', futureStart, futureEnd, 1000);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('No available slots');
+      expect(result.error).toContain('Not enough available slots');
     });
   });
 
@@ -360,7 +374,6 @@ describe('Booking Race Condition Prevention', () => {
         const tx = {
           booking: {
             findFirst: jest.fn().mockResolvedValue(null),
-            count: jest.fn().mockResolvedValue(0),
             create: jest.fn().mockRejectedValue(createError),
           },
           user: {
@@ -370,7 +383,9 @@ describe('Booking Race Condition Prevention', () => {
               return Promise.resolve(null);
             }),
           },
-          $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([mockListing])
+            .mockResolvedValueOnce([{ total: BigInt(0) }]),
         };
         return callback(tx);
       });
@@ -436,6 +451,7 @@ describe('cross-operation concurrency (B2.2)', () => {
     listingId: 'listing-abc',
     tenantId: 'user-123',
     status: 'PENDING',
+    slotsRequested: 1,
     version: 1,
     startDate: futureStart,
     endDate: futureEnd,
@@ -473,19 +489,18 @@ describe('cross-operation concurrency (B2.2)', () => {
     (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBookingForAccept);
 
     // Capture the tx.$queryRaw calls inside the interactive transaction
-    const mockQueryRaw = jest.fn().mockResolvedValue([
-      { availableSlots: 1, totalSlots: 1, id: 'listing-abc', ownerId: 'owner-456' },
-    ]);
+    const mockQueryRaw = jest.fn()
+      .mockResolvedValueOnce([
+        { availableSlots: 1, totalSlots: 1, id: 'listing-abc', ownerId: 'owner-456', bookingMode: 'SHARED' },
+      ])
+      .mockResolvedValueOnce([{ total: BigInt(0) }]); // SUM(slotsRequested)
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
       const tx = {
         $queryRaw: mockQueryRaw,
+        $executeRaw: jest.fn().mockResolvedValue(1),
         booking: {
-          count: jest.fn().mockResolvedValue(0),
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-        listing: {
-          update: jest.fn().mockResolvedValue({}),
         },
       };
       return callback(tx);
@@ -495,8 +510,8 @@ describe('cross-operation concurrency (B2.2)', () => {
 
     expect(result.success).toBe(true);
 
-    // Verify $queryRaw was called with a tagged template literal containing FOR UPDATE
-    expect(mockQueryRaw).toHaveBeenCalledTimes(1);
+    // Verify $queryRaw was called twice: FOR UPDATE + SUM capacity check
+    expect(mockQueryRaw).toHaveBeenCalledTimes(2);
     // Tagged template literals are captured as [TemplateStringsArray, ...values]
     const queryCall = mockQueryRaw.mock.calls[0];
     // queryCall[0] is the TemplateStringsArray — join its parts to reconstruct the SQL

@@ -32,6 +32,7 @@ const mockListing = {
   },
   amenities: ['WiFi', 'Parking', 'Laundry', 'Pool'],
   availableSlots: 2,
+  totalSlots: 3,
   images: ['/image1.jpg'],
   avgRating: 4.9,
   reviewCount: 5,
@@ -63,15 +64,21 @@ describe('ListingCard', () => {
       expect(screen.queryByText(/pool/i)).not.toBeInTheDocument()
     })
 
-    it('renders availability badge as Available', () => {
+    it('renders availability badge with slot counts', () => {
       render(<ListingCard listing={mockListing} />)
-      expect(screen.getByText('Available')).toBeInTheDocument()
+      expect(screen.getByText('2 of 3 open')).toBeInTheDocument()
     })
 
     it('renders availability badge as Filled when no slots', () => {
       const filledListing = { ...mockListing, availableSlots: 0 }
       render(<ListingCard listing={filledListing} />)
       expect(screen.getByText('Filled')).toBeInTheDocument()
+    })
+
+    it('renders Available for single-slot listing', () => {
+      const singleListing = { ...mockListing, availableSlots: 1, totalSlots: 1 }
+      render(<ListingCard listing={singleListing} />)
+      expect(screen.getByText('Available')).toBeInTheDocument()
     })
 
     it('renders FavoriteButton', () => {

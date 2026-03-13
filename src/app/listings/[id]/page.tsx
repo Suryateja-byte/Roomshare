@@ -7,6 +7,7 @@ import { Metadata } from 'next';
 import { auth } from '@/auth';
 import { logger, sanitizeErrorMessage } from '@/lib/logger';
 import { sanitizeUnicode } from '@/lib/schemas';
+import { features } from '@/lib/env';
 import ListingPageClient from './ListingPageClient';
 
 const getListingWithLocation = cache(async (id: string) => {
@@ -92,7 +93,7 @@ export default async function ListingPage({ params }: PageProps) {
     const acceptedBookings = await prisma.booking.findMany({
         where: {
             listingId: id,
-            status: 'ACCEPTED',
+            status: { in: ['ACCEPTED', 'HELD'] },
             endDate: {
                 gte: new Date(), // Only future bookings
             },
@@ -167,6 +168,7 @@ export default async function ListingPage({ params }: PageProps) {
                 householdLanguages: listing.householdLanguages,
                 totalSlots: listing.totalSlots,
                 availableSlots: listing.availableSlots,
+                bookingMode: listing.bookingMode ?? 'SHARED',
                 status: listing.status,
                 viewCount: listing.viewCount,
                 genderPreference: listing.genderPreference,
@@ -183,6 +185,7 @@ export default async function ListingPage({ params }: PageProps) {
                     isVerified: listing.owner.isVerified,
                     createdAt: listing.owner.createdAt,
                 },
+                holdTtlMinutes: listing.holdTtlMinutes ?? 15,
                 ownerId: listing.ownerId,
             }}
             reviews={reviews}
@@ -191,6 +194,7 @@ export default async function ListingPage({ params }: PageProps) {
             userHasBooking={userHasBooking}
             userExistingReview={userExistingReview}
             bookedDates={bookedDates}
+            holdEnabled={features.softHoldsEnabled}
             coordinates={coordinates}
         />
     );

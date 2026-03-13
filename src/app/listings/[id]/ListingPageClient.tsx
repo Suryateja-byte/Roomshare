@@ -8,7 +8,6 @@ import {
     Edit,
     Maximize2,
     Eye,
-    Users,
     Bed,
     ChevronRight,
     Star,
@@ -40,6 +39,8 @@ import ListingFreshnessCheck from '@/components/ListingFreshnessCheck';
 import UserAvatar from '@/components/UserAvatar';
 import VerifiedBadge from '@/components/verification/VerifiedBadge';
 import RoomPlaceholder from '@/components/listings/RoomPlaceholder';
+import { SlotBadge } from '@/components/listings/SlotBadge';
+import { Badge } from '@/components/ui/badge';
 
 // Lazy-load NeighborhoodChat to avoid loading framer-motion + AI SDK on initial page load
 // This defers ~200KB+ of JS until after the page is interactive
@@ -94,6 +95,8 @@ interface ListingPageClientProps {
         householdLanguages: string[];
         totalSlots: number;
         availableSlots: number;
+        bookingMode: string;
+        holdTtlMinutes: number;
         status: string;
         viewCount: number;
         genderPreference: string | null;
@@ -123,6 +126,7 @@ interface ListingPageClientProps {
         createdAt: string;
     } | null;
     bookedDates: BookedDateRange[];
+    holdEnabled?: boolean;
     coordinates: { lat: number; lng: number } | null;
 }
 
@@ -197,6 +201,7 @@ export default function ListingPageClient({
     userHasBooking,
     userExistingReview,
     bookedDates,
+    holdEnabled,
     coordinates
 }: ListingPageClientProps) {
     const hasImages = listing.images && listing.images.length > 0;
@@ -298,9 +303,14 @@ export default function ListingPageClient({
                                 <InfoStat icon={MapPin}>
                                     {listing.location?.city}, {listing.location?.state}
                                 </InfoStat>
-                                <InfoStat icon={Users}>
-                                    {listing.availableSlots} / {listing.totalSlots} Slots Available
-                                </InfoStat>
+                                <SlotBadge
+                                    availableSlots={listing.availableSlots}
+                                    totalSlots={listing.totalSlots}
+                                />
+                                {listing.bookingMode === 'WHOLE_UNIT' && (
+                                    <Badge variant="purple">Whole Unit</Badge>
+                                )}
+                                <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
                                 <InfoStat icon={Bed}>
                                     Furnished
                                 </InfoStat>
@@ -551,6 +561,11 @@ export default function ListingPageClient({
                                         isLoggedIn={isLoggedIn}
                                         status={listing.status as 'ACTIVE' | 'PAUSED' | 'RENTED'}
                                         bookedDates={bookedDates}
+                                        holdEnabled={holdEnabled}
+                                        totalSlots={listing.totalSlots}
+                                        availableSlots={listing.availableSlots}
+                                        bookingMode={listing.bookingMode}
+                                        holdTtlMinutes={listing.holdTtlMinutes}
                                     />
                                 )}
                             </div>

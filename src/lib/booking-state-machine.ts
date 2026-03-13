@@ -4,7 +4,7 @@
  * Prevents invalid transitions like CANCELLED → ACCEPTED.
  */
 
-export type BookingStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+export type BookingStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'HELD' | 'EXPIRED';
 
 /**
  * Valid state transitions for bookings.
@@ -15,6 +15,8 @@ export const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   ACCEPTED: ['CANCELLED'],
   REJECTED: [],
   CANCELLED: [],
+  HELD: ['ACCEPTED', 'REJECTED', 'CANCELLED', 'EXPIRED'],
+  EXPIRED: [],
 };
 
 /**

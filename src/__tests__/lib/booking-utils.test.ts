@@ -50,7 +50,7 @@ describe('booking-utils', () => {
   })
 
   describe('getActiveBookingsForListing', () => {
-    it('returns PENDING and ACCEPTED bookings', async () => {
+    it('returns PENDING, ACCEPTED, and HELD bookings', async () => {
       ;(prisma.booking.findMany as jest.Mock).mockResolvedValue(mockBookings)
 
       const result = await getActiveBookingsForListing('listing-123')
@@ -60,7 +60,7 @@ describe('booking-utils', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             listingId: 'listing-123',
-            status: { in: ['PENDING', 'ACCEPTED'] },
+            status: { in: ['PENDING', 'ACCEPTED', 'HELD'] },
           }),
         })
       )
@@ -134,7 +134,7 @@ describe('booking-utils', () => {
       )
     })
 
-    it('only counts ACCEPTED status bookings', async () => {
+    it('counts ACCEPTED and HELD status bookings', async () => {
       ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
 
       await hasActiveAcceptedBookings('listing-123')
@@ -142,7 +142,7 @@ describe('booking-utils', () => {
       expect(prisma.booking.count).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            status: 'ACCEPTED',
+            status: { in: ['ACCEPTED', 'HELD'] },
           }),
         })
       )
@@ -194,7 +194,7 @@ describe('booking-utils', () => {
       )
     })
 
-    it('only counts ACCEPTED status', async () => {
+    it('counts ACCEPTED and HELD status', async () => {
       ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
 
       await getActiveAcceptedBookingsCount('listing-123')
@@ -202,7 +202,7 @@ describe('booking-utils', () => {
       expect(prisma.booking.count).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            status: 'ACCEPTED',
+            status: { in: ['ACCEPTED', 'HELD'] },
           }),
         })
       )

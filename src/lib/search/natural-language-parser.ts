@@ -20,6 +20,7 @@ export interface ParsedNLQuery {
   amenities: string[];
   houseRules: string[];
   leaseDuration?: string;
+  minAvailableSlots?: string;
 }
 
 interface PatternRule {
@@ -117,6 +118,15 @@ const LEASE_PATTERNS: PatternRule[] = [
   },
 ];
 
+const SLOT_PATTERNS: PatternRule[] = [
+  {
+    // "3 spots", "2 beds", "4 openings", "5 spaces" — only 2-20 (1 is default/redundant)
+    // Does NOT match "rooms" (reserved for room type filter)
+    pattern: /\b([2-9]|1\d|20)\s*(?:spots?|slots?|beds?|openings?|spaces?)\b/i,
+    extract: (m) => ({ minAvailableSlots: m[1] }),
+  },
+];
+
 // Words/phrases to strip from input before treating remainder as location
 const STRIP_PATTERNS = [
   // Price patterns
@@ -132,6 +142,8 @@ const STRIP_PATTERNS = [
   /\b(?:pet\s*(?:friendly|ok|allowed)?|pets?\s*(?:friendly|ok|allowed)|dog|cat|smoking\s*(?:ok|allowed)|smoker|couple[s']?\s*(?:ok|allowed|friendly)?|guest[s']?\s*(?:ok|allowed))\b/gi,
   // Lease
   /\b(?:month[\s-]to[\s-]month|mtm|monthly|short[\s-]term|temporary|temp|flexible|flex|\d+\s*months?|yearly|annual)\b/gi,
+  // Slots/spots/beds
+  /\b(?:[2-9]|1\d|20)\s*(?:spots?|slots?|beds?|openings?|spaces?)\b/gi,
   // "no smoking" etc.
   /\b(?:no\s+\w+)\b/gi,
 ];
@@ -198,6 +210,16 @@ export function parseNaturalLanguageQuery(input: string): ParsedNLQuery | null {
     }
   }
 
+  // Extract minimum slots/spots
+  for (const rule of SLOT_PATTERNS) {
+    const match = trimmed.match(rule.pattern);
+    if (match) {
+      Object.assign(result, rule.extract(match));
+      hasStructuredData = true;
+      break;
+    }
+  }
+
   if (!hasStructuredData) return null;
 
   // Extract location: strip all recognized patterns from input
@@ -224,6 +246,7 @@ export function nlQueryToSearchParams(parsed: ParsedNLQuery): URLSearchParams {
   if (parsed.amenities.length > 0) params.set('amenities', parsed.amenities.join(','));
   if (parsed.houseRules.length > 0) params.set('houseRules', parsed.houseRules.join(','));
   if (parsed.leaseDuration) params.set('leaseDuration', parsed.leaseDuration);
+  if (parsed.minAvailableSlots) params.set('minSlots', parsed.minAvailableSlots);
 
   return params;
 }

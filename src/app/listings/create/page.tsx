@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 import ProfileWarningBanner from './ProfileWarningBanner';
+import { features } from '@/lib/env';
 
 export default async function CreateListingPage() {
     const session = await auth();
@@ -65,7 +66,7 @@ export default async function CreateListingPage() {
                 )}
 
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 md:p-12 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800">
-                    <CreateListingForm />
+                    <CreateListingForm enableWholeUnitMode={features.wholeUnitMode} />
                 </div>
             </div>
         </div>

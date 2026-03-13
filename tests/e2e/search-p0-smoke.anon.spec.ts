@@ -58,6 +58,7 @@ const BENIGN_ERROR_PATTERNS = [
   "timed out",
   "photon.komoot",
   "TimeoutError",
+  "supabase.co",
 ];
 
 function filterBenignErrors(errors: string[]): string[] {

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { geocodeAddress } from '@/lib/geocoding';
 import { createClient } from '@supabase/supabase-js';
-import { householdLanguagesSchema, supabaseImageUrlSchema, sanitizeUnicode, noHtmlTags, NO_HTML_MSG, listingLeaseDurationSchema, listingRoomTypeSchema, listingGenderPreferenceSchema, listingHouseholdGenderSchema } from '@/lib/schemas';
+import { householdLanguagesSchema, supabaseImageUrlSchema, sanitizeUnicode, noHtmlTags, NO_HTML_MSG, listingLeaseDurationSchema, listingRoomTypeSchema, listingGenderPreferenceSchema, listingHouseholdGenderSchema, listingBookingModeSchema } from '@/lib/schemas';
 import { VALID_AMENITIES, VALID_HOUSE_RULES } from '@/lib/filter-schema';
 import { checkListingLanguageCompliance } from '@/lib/listing-language-guard';
 import { isValidLanguageCode } from '@/lib/languages';
@@ -53,6 +53,7 @@ const updateListingSchema = z.object({
     householdGender: listingHouseholdGenderSchema,
     primaryHomeLanguage: z.string().refine(isValidLanguageCode, { message: 'Invalid language code' }).nullable().optional(),
     images: z.array(supabaseImageUrlSchema).max(10).optional(),
+    bookingMode: listingBookingModeSchema,
 });
 
 export async function DELETE(
@@ -125,6 +126,23 @@ export async function DELETE(
                             type: 'BOOKING_CANCELLED',
                             title: 'Booking Request Cancelled',
                             message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
+                            link: '/bookings'
+                        }
+                    });
+                }
+
+                // Phase 4: Notify tenants with active HELD bookings
+                const heldBookings = await tx.booking.findMany({
+                    where: { listingId: id, status: 'HELD', heldUntil: { gte: new Date() } },
+                    select: { id: true, tenantId: true }
+                });
+                for (const booking of heldBookings) {
+                    await tx.notification.create({
+                        data: {
+                            userId: booking.tenantId,
+                            type: 'BOOKING_HOLD_EXPIRED',
+                            title: 'Hold Cancelled',
+                            message: `Your hold on "${listing.title}" has been cancelled because the host removed the listing.`,
                             link: '/bookings'
                         }
                     });
@@ -255,6 +273,7 @@ export async function PATCH(
             householdGender,
             primaryHomeLanguage,
             images,
+            bookingMode,
         } = parsed.data;
 
         // Check listing exists and user is the owner
@@ -390,6 +409,17 @@ export async function PATCH(
             return NextResponse.json({ error: 'Invalid house rule value' }, { status: 400 });
         }
 
+        // Phase 3: Feature flag gate for WHOLE_UNIT booking mode
+        if (bookingMode === 'WHOLE_UNIT') {
+            const { features } = await import('@/lib/env');
+            if (!features.wholeUnitMode) {
+                return NextResponse.json(
+                    { error: 'Whole-unit booking mode is not currently available.' },
+                    { status: 400 }
+                );
+            }
+        }
+
         let result;
         try {
             // Ownership is re-validated inside the transaction under row lock
@@ -399,8 +429,9 @@ export async function PATCH(
                     ownerId: string;
                     totalSlots: number;
                     availableSlots: number;
+                    bookingMode: string;
                 }>>`
-                    SELECT "ownerId", "totalSlots", "availableSlots"
+                    SELECT "ownerId", "totalSlots", "availableSlots", "booking_mode" as "bookingMode"
                     FROM "Listing"
                     WHERE "id" = ${id}
                     FOR UPDATE
@@ -412,6 +443,36 @@ export async function PATCH(
 
                 if (lockedListing.ownerId !== userId) {
                     throw new Error('FORBIDDEN');
+                }
+
+                // Phase 3: Block mode changes when future ACCEPTED bookings exist (D5/D8)
+                // PENDING bookings are NOT blocked — they are requests, not commitments
+                if (bookingMode !== undefined && bookingMode !== null && bookingMode !== lockedListing.bookingMode) {
+                    const futureAccepted = await tx.booking.count({
+                        where: {
+                            listingId: id,
+                            status: 'ACCEPTED',
+                            endDate: { gte: new Date() },
+                        },
+                    });
+                    if (futureAccepted > 0) {
+                        throw new Error('BOOKING_MODE_CONFLICT');
+                    }
+                }
+
+                // Phase 4: Block totalSlots reduction below committed bookings + active holds
+                if (totalSlots !== undefined && totalSlots !== null && totalSlots < lockedListing.totalSlots) {
+                    const [committedSlots] = await tx.$queryRaw<[{ total: bigint }]>`
+                        SELECT COALESCE(SUM("slotsRequested"), 0) AS total
+                        FROM "Booking"
+                        WHERE "listingId" = ${id}
+                        AND (status = 'ACCEPTED' OR (status = 'HELD' AND "heldUntil" > NOW()))
+                        AND "endDate" >= NOW()
+                    `;
+                    const committed = Number(committedSlots.total);
+                    if (totalSlots < committed) {
+                        throw new Error('SLOTS_REDUCTION_BLOCKED');
+                    }
                 }
 
                 const updatedListing = await tx.listing.update({
@@ -440,6 +501,7 @@ export async function PATCH(
                         ),
                         moveInDate: moveInDate ? new Date(moveInDate) : null,
                         ...(Array.isArray(images) && { images }),
+                        ...(bookingMode !== undefined && bookingMode !== null && { bookingMode }),
                     }
                 });
 
@@ -471,6 +533,18 @@ export async function PATCH(
                 }
                 if (error.message === 'FORBIDDEN') {
                     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+                }
+                if (error.message === 'BOOKING_MODE_CONFLICT') {
+                    return NextResponse.json(
+                        { error: 'Cannot change booking mode while active bookings exist. Cancel conflicting bookings first.' },
+                        { status: 400 }
+                    );
+                }
+                if (error.message === 'SLOTS_REDUCTION_BLOCKED') {
+                    return NextResponse.json(
+                        { error: 'Cannot reduce total slots below the number committed by accepted bookings and active holds.' },
+                        { status: 400 }
+                    );
                 }
             }
             throw error;

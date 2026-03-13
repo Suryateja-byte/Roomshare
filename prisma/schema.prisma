@@ -73,6 +73,7 @@ model User {
   blockedUsers            BlockedUser[]          @relation("BlocksMade")
   blockedByUsers          BlockedUser[]          @relation("BlocksReceived")
   auditLogs               AuditLog[]             @relation("AuditLogs")
+  bookingAuditLogs        BookingAuditLog[]      @relation("BookingAuditActor")
   typingStatuses          TypingStatus[]
   conversationDeletions   ConversationDeletion[]
 }
@@ -117,6 +118,9 @@ model Listing {
   moveInDate          DateTime?
   status              ListingStatus    @default(ACTIVE)
   viewCount           Int              @default(0)
+  version             Int              @default(1)  // Optimistic locking for race-safe updates
+  bookingMode         String           @default("SHARED") @map("booking_mode")
+  holdTtlMinutes      Int              @default(15) @map("hold_ttl_minutes")
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   owner               User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -169,6 +173,8 @@ enum BookingStatus {
   ACCEPTED
   REJECTED
   CANCELLED
+  HELD
+  EXPIRED
 }
 
 enum ListingStatus {
@@ -186,15 +192,19 @@ model Booking {
   status          BookingStatus @default(PENDING)
   totalPrice      Decimal       @db.Decimal(10, 2)
   rejectionReason String? // Optional reason when host rejects booking
+  slotsRequested  Int           @default(1) // Phase 2: Number of slots this booking reserves
   version         Int           @default(1) // P0-04: Optimistic locking for race-safe updates
+  heldUntil       DateTime?                 // Phase 4: Expiry time for HELD bookings (null for non-holds)
+  heldAt          DateTime?                 // Phase 1: Timestamp when hold was created
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  tenant  User    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  listing          Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  tenant           User             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookingAuditLogs BookingAuditLog[]
 
-  // Prevent duplicate booking requests for same tenant/listing/dates
-  @@unique([tenantId, listingId, startDate, endDate])
+  // Duplicate prevention: partial unique index in raw SQL migration (allows re-application after EXPIRED/REJECTED/CANCELLED)
+  // See: migrations/*_soft_holds_partial_unique_index/migration.sql
   @@index([listingId, status])
   @@index([tenantId])
   @@index([listingId, status, startDate, endDate])
@@ -302,6 +312,9 @@ enum NotificationType {
   BOOKING_ACCEPTED
   BOOKING_REJECTED
   BOOKING_CANCELLED
+  BOOKING_HOLD_REQUEST
+  BOOKING_EXPIRED
+  BOOKING_HOLD_EXPIRED
   NEW_MESSAGE
   NEW_REVIEW
   LISTING_SAVED
@@ -377,6 +390,29 @@ model ReviewResponse {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+// Booking Audit Trail - Immutable append-only log of booking state transitions
+model BookingAuditLog {
+  id             String   @id @default(cuid())
+  bookingId      String
+  action         String   // CREATED, HELD, ACCEPTED, REJECTED, CANCELLED, EXPIRED
+  previousStatus String?  // null for CREATED
+  newStatus      String
+  actorId        String?  // null for system actions (cron sweeper)
+  actorType      String   @default("USER") // USER, HOST, SYSTEM, ADMIN
+  details        Json?    // slotsRequested, rejectionReason, heldUntil, version, etc.
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("BookingAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+  @@index([bookingId, createdAt])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

@@ -198,7 +198,7 @@ export async function POST(request: Request) {
             title, description, price, amenities, houseRules, totalSlots,
             address, city, state, zip,
             images, leaseDuration, roomType, genderPreference, householdGender,
-            householdLanguages, primaryHomeLanguage, moveInDate,
+            householdLanguages, primaryHomeLanguage, moveInDate, bookingMode,
         } = validatedFields.data;
 
         // 8. Language compliance check on title AND description (2G)
@@ -277,6 +277,17 @@ export async function POST(request: Request) {
             }
         }
 
+        // Phase 3: Feature flag gate for WHOLE_UNIT booking mode
+        if (bookingMode === 'WHOLE_UNIT') {
+            const { features } = await import('@/lib/env');
+            if (!features.wholeUnitMode) {
+                return NextResponse.json(
+                    { error: 'Whole-unit booking mode is not currently available.' },
+                    { status: 400 }
+                );
+            }
+        }
+
         // Build listing create data from validated fields
         const listingCreateData = {
             title,
@@ -296,6 +307,7 @@ export async function POST(request: Request) {
             totalSlots,
             availableSlots: totalSlots,
             moveInDate: moveInDate ? new Date(moveInDate) : null,
+            bookingMode: bookingMode || 'SHARED',
             ownerId: userId,
         };
 
