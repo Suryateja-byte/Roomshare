@@ -11,6 +11,7 @@ import { Loader2, LogIn, AlertTriangle, RefreshCw, CheckCircle, XCircle, WifiOff
 import Link from 'next/link';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { parseLocalDate, parseISODateAsLocal } from '@/lib/utils';
+import { SlotSelector } from '@/components/SlotSelector';
 
 type ListingStatus = 'ACTIVE' | 'PAUSED' | 'RENTED';
 
@@ -30,6 +31,10 @@ interface BookingFormProps {
     status?: ListingStatus;
     bookedDates?: BookedDateRange[];
     holdEnabled?: boolean;
+    totalSlots?: number;
+    availableSlots?: number;
+    bookingMode?: string;
+    holdTtlMinutes?: number;
 }
 
 const MIN_BOOKING_DAYS = 30; // Industry standard minimum stay
@@ -55,9 +60,14 @@ const availabilityConfig: Record<ListingStatus, { label: string; colorClass: str
     }
 };
 
-export default function BookingForm({ listingId, price, ownerId, isOwner, isLoggedIn, status = 'ACTIVE', bookedDates = [], holdEnabled = false }: BookingFormProps) {
+export default function BookingForm({ listingId, price, ownerId, isOwner, isLoggedIn, status = 'ACTIVE', bookedDates = [], holdEnabled = false, totalSlots, availableSlots, bookingMode, holdTtlMinutes }: BookingFormProps) {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+
+    // Slot selector state: only show for multi-slot PER_SLOT listings
+    const showSlotSelector = (totalSlots ?? 1) > 1 && bookingMode !== 'WHOLE_UNIT';
+    const [slotsRequested, setSlotsRequested] = useState(1);
+    const effectiveSlots = bookingMode === 'WHOLE_UNIT' ? (totalSlots ?? 1) : slotsRequested;
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [errorType, setErrorType] = useState<ErrorType>(null);
@@ -282,7 +292,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 parseLocalDate(startDate),
                 parseLocalDate(endDate),
                 price,
-                1,  // slotsRequested — single-slot default until multi-slot UI is built
+                effectiveSlots,
                 idempotencyKeyRef.current
             );
 
@@ -588,6 +598,16 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     </div>
                 )}
 
+                {/* Slot selector for multi-slot PER_SLOT listings */}
+                {showSlotSelector && (
+                    <SlotSelector
+                        value={slotsRequested}
+                        onChange={setSlotsRequested}
+                        max={availableSlots ?? 1}
+                        disabled={isLoading || hasSubmittedSuccessfully}
+                    />
+                )}
+
                 {/* Duration indicator */}
                 {bookingInfo && (
                     <div className={`text-sm text-center p-2 rounded-lg ${bookingInfo.isValid
@@ -636,7 +656,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                                     parseLocalDate(startDate),
                                     parseLocalDate(endDate),
                                     price,
-                                    1
+                                    effectiveSlots
                                 );
                                 if (result.success) {
                                     setMessage('Hold placed successfully!');
@@ -655,7 +675,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                             }
                         }}
                     >
-                        Place Hold (15 min)
+                        Place Hold ({holdTtlMinutes ?? 15} min)
                     </Button>
                 )}
 

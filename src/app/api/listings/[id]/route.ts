@@ -131,6 +131,23 @@ export async function DELETE(
                     });
                 }
 
+                // Phase 4: Notify tenants with active HELD bookings
+                const heldBookings = await tx.booking.findMany({
+                    where: { listingId: id, status: 'HELD', heldUntil: { gte: new Date() } },
+                    select: { id: true, tenantId: true }
+                });
+                for (const booking of heldBookings) {
+                    await tx.notification.create({
+                        data: {
+                            userId: booking.tenantId,
+                            type: 'BOOKING_HOLD_EXPIRED',
+                            title: 'Hold Cancelled',
+                            message: `Your hold on "${listing.title}" has been cancelled because the host removed the listing.`,
+                            link: '/bookings'
+                        }
+                    });
+                }
+
                 // Delete listing — Location and bookings cascade-deleted automatically
                 await tx.listing.delete({ where: { id } });
             });
@@ -443,6 +460,21 @@ export async function PATCH(
                     }
                 }
 
+                // Phase 4: Block totalSlots reduction below committed bookings + active holds
+                if (totalSlots !== undefined && totalSlots !== null && totalSlots < lockedListing.totalSlots) {
+                    const [committedSlots] = await tx.$queryRaw<[{ total: bigint }]>`
+                        SELECT COALESCE(SUM("slotsRequested"), 0) AS total
+                        FROM "Booking"
+                        WHERE "listingId" = ${id}
+                        AND (status = 'ACCEPTED' OR (status = 'HELD' AND "heldUntil" > NOW()))
+                        AND "endDate" >= NOW()
+                    `;
+                    const committed = Number(committedSlots.total);
+                    if (totalSlots < committed) {
+                        throw new Error('SLOTS_REDUCTION_BLOCKED');
+                    }
+                }
+
                 const updatedListing = await tx.listing.update({
                     where: { id },
                     data: {
@@ -505,6 +537,12 @@ export async function PATCH(
                 if (error.message === 'BOOKING_MODE_CONFLICT') {
                     return NextResponse.json(
                         { error: 'Cannot change booking mode while active bookings exist. Cancel conflicting bookings first.' },
+                        { status: 400 }
+                    );
+                }
+                if (error.message === 'SLOTS_REDUCTION_BLOCKED') {
+                    return NextResponse.json(
+                        { error: 'Cannot reduce total slots below the number committed by accepted bookings and active holds.' },
                         { status: 400 }
                     );
                 }

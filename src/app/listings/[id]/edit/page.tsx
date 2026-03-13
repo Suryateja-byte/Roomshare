@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import EditListingForm from './EditListingForm';
+import { features } from '@/lib/env';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -36,7 +37,7 @@ export default async function EditListingPage({ params }: PageProps) {
                     <h1 className="text-3xl font-bold text-foreground">Edit Listing</h1>
                     <p className="text-muted-foreground mt-2">Update your listing details</p>
                 </div>
-                <EditListingForm listing={{ ...listing, price: Number(listing.price), updatedAt: listing.updatedAt.toISOString() }} />
+                <EditListingForm listing={{ ...listing, price: Number(listing.price), updatedAt: listing.updatedAt.toISOString() }} enableWholeUnitMode={features.wholeUnitMode} />
             </div>
         </div>
     );

@@ -119,6 +119,9 @@ export default function CreateListingForm({ enableWholeUnitMode = false }: Creat
     const [householdGender, setHouseholdGender] = useState('');
     const [bookingMode, setBookingMode] = useState('SHARED');
 
+    // Ref to track user-initiated roomType changes (prevents auto-set on mount/restore)
+    const userChangedRoomType = useRef(false);
+
     // Form field states for tracking completion
     const [title, setTitle] = useState('');
     const [price, setPrice] = useState('');
@@ -271,6 +274,18 @@ export default function CreateListingForm({ enableWholeUnitMode = false }: Creat
         address, city, state, zip, amenitiesValue, houseRulesValue, moveInDate,
         leaseDuration, roomType, genderPreference, householdGender, bookingMode,
         selectedLanguages, uploadedImages]);
+
+    // Auto-set bookingMode when user changes roomType
+    useEffect(() => {
+        if (!enableWholeUnitMode) return;
+        if (!userChangedRoomType.current) return;
+        userChangedRoomType.current = false;
+        if (roomType === 'Entire Place') {
+            setBookingMode('WHOLE_UNIT');
+        } else {
+            setBookingMode('SHARED');
+        }
+    }, [roomType, enableWholeUnitMode]);
 
     // Cleanup: abort in-flight submission and clear redirect timeout on unmount
     useEffect(() => {
@@ -878,7 +893,7 @@ export default function CreateListingForm({ enableWholeUnitMode = false }: Creat
                         </div>
                         <div>
                             <Label htmlFor="roomType">Room Type</Label>
-                            <Select value={roomType} onValueChange={setRoomType} disabled={loading}>
+                            <Select value={roomType} onValueChange={(val) => { userChangedRoomType.current = true; setRoomType(val); }} disabled={loading}>
                                 <SelectTrigger id="roomType" className="w-full mt-1">
                                     <SelectValue placeholder="Select type..." />
                                 </SelectTrigger>

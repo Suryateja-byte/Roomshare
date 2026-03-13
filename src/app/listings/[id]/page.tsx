@@ -185,6 +185,7 @@ export default async function ListingPage({ params }: PageProps) {
                     isVerified: listing.owner.isVerified,
                     createdAt: listing.owner.createdAt,
                 },
+                holdTtlMinutes: listing.holdTtlMinutes ?? 15,
                 ownerId: listing.ownerId,
             }}
             reviews={reviews}

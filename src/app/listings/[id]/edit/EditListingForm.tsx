@@ -58,6 +58,7 @@ interface Listing {
     householdGender: string | null;
     leaseDuration: string | null;
     roomType: string | null;
+    bookingMode: string;
     totalSlots: number;
     moveInDate: Date | null;
     updatedAt?: string;
@@ -72,6 +73,7 @@ interface Listing {
 
 interface EditListingFormProps {
     listing: Listing;
+    enableWholeUnitMode?: boolean;
 }
 
 interface EditListingFormData {
@@ -90,6 +92,7 @@ interface EditListingFormData {
     roomType: string;
     genderPreference: string;
     householdGender: string;
+    bookingMode: string;
     selectedLanguages: string[];
     images: PersistedImageData[];
 }
@@ -104,7 +107,7 @@ const formatDateForInput = (date: Date | null) => {
     return `${year}-${month}-${day}`;
 };
 
-export default function EditListingForm({ listing }: EditListingFormProps) {
+export default function EditListingForm({ listing, enableWholeUnitMode = false }: EditListingFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -131,6 +134,22 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
     const [roomType, setRoomType] = useState(listing.roomType || '');
     const [genderPreference, setGenderPreference] = useState(listing.genderPreference || '');
     const [householdGender, setHouseholdGender] = useState(listing.householdGender || '');
+    const [bookingMode, setBookingMode] = useState(listing.bookingMode || 'SHARED');
+
+    // Ref to track user-initiated roomType changes (prevents auto-set on mount/restore)
+    const userChangedRoomType = useRef(false);
+
+    // Auto-set bookingMode when user changes roomType
+    useEffect(() => {
+        if (!enableWholeUnitMode) return;
+        if (!userChangedRoomType.current) return;
+        userChangedRoomType.current = false;
+        if (roomType === 'Entire Place') {
+            setBookingMode('WHOLE_UNIT');
+        } else {
+            setBookingMode('SHARED');
+        }
+    }, [roomType, enableWholeUnitMode]);
 
     // Image management state
     const [images, setImages] = useState<ImageObject[]>([]);
@@ -188,6 +207,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                 state: listing.location?.state || '', zip: listing.location?.zip || '',
                 amenities: listing.amenities.join(', '), houseRules: listing.houseRules.join(', '),
                 moveInDate, leaseDuration, roomType, genderPreference, householdGender,
+                bookingMode,
                 selectedLanguages,
                 images: currentImages
             };
@@ -209,6 +229,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
             roomType,
             genderPreference,
             householdGender,
+            bookingMode,
             selectedLanguages,
             images: currentImages
         };
@@ -247,6 +268,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
         setRoomType(persistedData.roomType || listing.roomType || '');
         setGenderPreference(persistedData.genderPreference || listing.genderPreference || '');
         setHouseholdGender(persistedData.householdGender || listing.householdGender || '');
+        setBookingMode(persistedData.bookingMode || listing.bookingMode || 'SHARED');
         setSelectedLanguages(persistedData.selectedLanguages || listing.householdLanguages || []);
 
         // Restore images (they're already uploaded to Supabase)
@@ -290,7 +312,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
         if (!formModified) return;
         const formData = collectFormData();
         saveData(formData);
-    }, [description, moveInDate, leaseDuration, roomType, genderPreference, householdGender, selectedLanguages]);
+    }, [description, moveInDate, leaseDuration, roomType, genderPreference, householdGender, bookingMode, selectedLanguages]);
 
     // Track form modifications (legacy - now merged with save)
     const handleFormChange = () => {
@@ -372,6 +394,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                     roomType: roomType || undefined,
                     genderPreference: genderPreference || undefined,
                     householdGender: householdGender || undefined,
+                    bookingMode: enableWholeUnitMode ? bookingMode : undefined,
                     images: images.filter(img => img.uploadedUrl).map(img => img.uploadedUrl),
                 }),
             });
@@ -566,6 +589,9 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                                 required
                                 defaultValue={listing.totalSlots}
                                 placeholder="1"
+                                min="1"
+                                max="20"
+                                step="1"
                                 disabled={loading}
                             />
                             <FieldError field="totalSlots" />
@@ -716,7 +742,7 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                         </div>
                         <div>
                             <Label htmlFor="roomType">Room Type</Label>
-                            <Select value={roomType} onValueChange={setRoomType} disabled={loading}>
+                            <Select value={roomType} onValueChange={(val) => { userChangedRoomType.current = true; setRoomType(val); }} disabled={loading}>
                                 <SelectTrigger id="roomType" className="w-full mt-1">
                                     <SelectValue placeholder="Select type..." />
                                 </SelectTrigger>
@@ -728,6 +754,60 @@ export default function EditListingForm({ listing }: EditListingFormProps) {
                             </Select>
                         </div>
                     </div>
+
+                    {/* Booking Mode Selector (behind feature flag) */}
+                    {enableWholeUnitMode && (
+                        <fieldset className="space-y-3" disabled={loading}>
+                            <legend className="text-sm font-medium text-zinc-900 dark:text-white">Booking Mode</legend>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label
+                                    className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                        bookingMode === 'SHARED'
+                                            ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800'
+                                            : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="bookingMode"
+                                        value="SHARED"
+                                        checked={bookingMode === 'SHARED'}
+                                        onChange={(e) => setBookingMode(e.target.value)}
+                                        className="mt-0.5"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-medium text-zinc-900 dark:text-white">Shared space (multiple tenants)</span>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                            Individual slots can be booked by different tenants.
+                                        </p>
+                                    </div>
+                                </label>
+                                <label
+                                    className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                        bookingMode === 'WHOLE_UNIT'
+                                            ? 'border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800'
+                                            : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="bookingMode"
+                                        value="WHOLE_UNIT"
+                                        checked={bookingMode === 'WHOLE_UNIT'}
+                                        onChange={(e) => setBookingMode(e.target.value)}
+                                        className="mt-0.5"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-medium text-zinc-900 dark:text-white">Entire unit (one party)</span>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                            The entire unit is booked by a single party at a time.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                            <FieldError field="bookingMode" />
+                        </fieldset>
+                    )}
 
                     <div id="householdLanguages">
                         <Label>Languages Spoken in the House</Label>

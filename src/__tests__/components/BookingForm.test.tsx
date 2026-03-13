@@ -20,6 +20,7 @@ jest.mock('@/hooks/useNetworkStatus', () => ({
 
 jest.mock('@/app/actions/booking', () => ({
   createBooking: jest.fn(),
+  createHold: jest.fn(),
 }))
 
 import { createBooking } from '@/app/actions/booking'
@@ -185,6 +186,41 @@ describe('BookingForm', () => {
       render(<BookingForm {...defaultProps} />)
 
       expect(screen.getByText(/already submitted/i)).toBeInTheDocument()
+    })
+  })
+
+  describe('SlotSelector visibility', () => {
+    it('shows SlotSelector when totalSlots > 1 and bookingMode is not WHOLE_UNIT', () => {
+      render(<BookingForm {...defaultProps} totalSlots={4} availableSlots={3} bookingMode="SHARED" />)
+
+      expect(screen.getByLabelText('Decrease slots')).toBeInTheDocument()
+      expect(screen.getByLabelText('Increase slots')).toBeInTheDocument()
+    })
+
+    it('hides SlotSelector when totalSlots is 1', () => {
+      render(<BookingForm {...defaultProps} totalSlots={1} availableSlots={1} bookingMode="SHARED" />)
+
+      expect(screen.queryByLabelText('Decrease slots')).not.toBeInTheDocument()
+    })
+
+    it('hides SlotSelector when bookingMode is WHOLE_UNIT', () => {
+      render(<BookingForm {...defaultProps} totalSlots={4} availableSlots={3} bookingMode="WHOLE_UNIT" />)
+
+      expect(screen.queryByLabelText('Decrease slots')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('hold TTL display', () => {
+    it('shows dynamic TTL in hold button text', () => {
+      render(<BookingForm {...defaultProps} holdEnabled={true} holdTtlMinutes={30} />)
+
+      expect(screen.getByText(/Place Hold \(30 min\)/)).toBeInTheDocument()
+    })
+
+    it('defaults to 15 min when holdTtlMinutes not provided', () => {
+      render(<BookingForm {...defaultProps} holdEnabled={true} />)
+
+      expect(screen.getByText(/Place Hold \(15 min\)/)).toBeInTheDocument()
     })
   })
 })

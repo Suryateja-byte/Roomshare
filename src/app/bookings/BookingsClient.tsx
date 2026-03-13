@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { updateBookingStatus, BookingStatus } from '@/app/actions/manage-booking';
 import UserAvatar from '@/components/UserAvatar';
 import BookingCalendar from '@/components/BookingCalendar';
+import HoldCountdown from '@/components/bookings/HoldCountdown';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { parseISODateAsLocal } from '@/lib/utils';
 import {
@@ -47,6 +48,8 @@ type Booking = {
     status: BookingStatus;
     totalPrice: number;
     createdAt: Date | string; // Can be Date or ISO string from server
+    heldUntil?: Date | string | null; // Phase 4: Hold expiry time
+    slotsRequested?: number; // Phase 4: Number of slots held
     listing: {
         id: string;
         title: string;
@@ -179,7 +182,15 @@ function BookingCard({
                             {locationText}
                         </p>
                     </div>
-                    <StatusBadge status={booking.status} />
+                    <div className="flex flex-col items-end gap-1">
+                        <StatusBadge status={booking.status} />
+                        {booking.status === 'HELD' && booking.heldUntil && (
+                            <HoldCountdown
+                                heldUntil={typeof booking.heldUntil === 'string' ? booking.heldUntil : booking.heldUntil.toISOString()}
+                                onExpired={() => window.location.reload()}
+                            />
+                        )}
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-y border-zinc-100 dark:border-zinc-800">
