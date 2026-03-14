@@ -211,7 +211,8 @@ describe("search/hash", () => {
 
     it("falls back to unsigned cursors in production when CURSOR_SECRET is missing", async () => {
       delete process.env.CURSOR_SECRET;
-      process.env.NODE_ENV = "production";
+      const origNodeEnv = process.env.NODE_ENV;
+      Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true, configurable: true });
       jest.resetModules();
 
       const { encodeCursor: encodeUnsigned, decodeCursor: decodeUnsigned } =
@@ -220,6 +221,8 @@ describe("search/hash", () => {
       const cursor = encodeUnsigned(3);
       expect(() => encodeUnsigned(3)).not.toThrow();
       expect(decodeUnsigned(cursor)).toBe(3);
+
+      Object.defineProperty(process.env, 'NODE_ENV', { value: origNodeEnv, writable: true, configurable: true });
     });
   });
 
@@ -277,7 +280,8 @@ describe("search/hash", () => {
 
     it("decodes unsigned legacy envelopes when CURSOR_SECRET is not configured", async () => {
       delete process.env.CURSOR_SECRET;
-      process.env.NODE_ENV = "production";
+      const origNodeEnv = process.env.NODE_ENV;
+      Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true, configurable: true });
       jest.resetModules();
 
       const { decodeCursor: decodeUnsigned } = await import("@/lib/search/hash");
@@ -287,6 +291,8 @@ describe("search/hash", () => {
       ).toString("base64url");
 
       expect(decodeUnsigned(unsignedEnvelope)).toBe(7);
+
+      Object.defineProperty(process.env, 'NODE_ENV', { value: origNodeEnv, writable: true, configurable: true });
     });
   });
 

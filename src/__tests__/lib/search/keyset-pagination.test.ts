@@ -25,6 +25,7 @@ jest.mock("@/lib/env", () => {
     serverEnv: { ENABLE_SEARCH_V2: "true", ENABLE_SEARCH_KEYSET: "true" },
     clientEnv: {},
     getCursorSecret: jest.fn().mockReturnValue(""),
+    getOptionalCursorSecret: jest.fn().mockReturnValue(""),
   };
 });
 
