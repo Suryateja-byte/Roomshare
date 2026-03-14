@@ -1,21 +1,13 @@
 # =============================================================================
-# Playwright E2E Tests — Sharded for Speed (20 shards)
+# Playwright E2E Tests — Sharded for Speed (10 shards)
 # =============================================================================
-# Splits tests across 20 parallel runners, then merges results into one report.
+# Splits tests across 10 parallel runners, then merges results into one report.
 #
-# How sharding works:
-#   Playwright's --shard=X/Y flag divides the full test file list into Y equal
-#   buckets and only runs bucket X. Each shard gets its own PostGIS database,
-#   dev server, and browser instances — fully isolated.
+# Each shard builds a production Next.js bundle, starts `next start`, runs its
+# slice of tests, then uploads a blob report for merging.
 #
-# How report merging works:
-#   Each shard uses --reporter=blob which outputs a binary blob to blob-report/.
-#   The merge-reports job downloads all 20 blobs, then runs
-#   `playwright merge-reports` to combine them into a single HTML report
-#   (with all test results, traces, screenshots) uploaded as a GitHub Artifact.
-#
-# Projects (5):
-#   chromium, chromium-anon, Mobile Chrome, firefox-anon, webkit-anon
+# Projects (6):
+#   chromium, chromium-admin, chromium-anon, Mobile Chrome, firefox-anon, webkit-anon
 # =============================================================================
 
 name: Playwright E2E Tests
@@ -36,18 +28,18 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Job 1: Run tests across 20 shards in parallel
+  # Job 1: Run tests across 10 shards in parallel
   # ---------------------------------------------------------------------------
   playwright-tests:
-    name: "Shard ${{ matrix.shardIndex }}/20"
+    name: "Shard ${{ matrix.shardIndex }}/10"
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     strategy:
-      fail-fast: false # Let all shards finish so the merged report is complete
+      fail-fast: false
       matrix:
-        shardIndex: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
-        shardTotal: [20]
+        shardIndex: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        shardTotal: [10]
 
     services:
       db:
@@ -69,21 +61,18 @@ jobs:
       NEXTAUTH_SECRET: ci-test-secret-at-least-32-characters-long
       NEXTAUTH_URL: http://localhost:3000
       AUTH_TRUST_HOST: 'true'
-      E2E_BASE_URL: http://localhost:3000
+      # Fix 5: Use 127.0.0.1 to avoid IPv6 resolution issues on Node >=17
+      E2E_BASE_URL: http://127.0.0.1:3000
       E2E_TEST_EMAIL: test@example.com
       E2E_TEST_PASSWORD: TestPassword123!
       E2E_ADMIN_EMAIL: e2e-admin@roomshare.dev
       E2E_ADMIN_PASSWORD: TestPassword123!
       E2E_DISABLE_RATE_LIMIT: 'true'
+      E2E_TEST_HELPERS: 'true'
       NODE_OPTIONS: '--max-old-space-size=4096'
       CI: 'true'
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
-      # Cloudflare Turnstile: intentionally DISABLED in CI.
-      # Turnstile's CDN script doesn't auto-solve in headless Chromium,
-      # so we omit the site key — TurnstileWidget returns null, server
-      # verification is bypassed (isTurnstileEnabled() → false).
-      # See: https://developers.cloudflare.com/turnstile/tutorials/excluding-turnstile-from-e2e-tests/
       TURNSTILE_ENABLED: 'false'
       NEXT_PUBLIC_NEARBY_ENABLED: 'true'
 
@@ -105,21 +94,39 @@ jobs:
       - name: Generate Prisma client and run migrations
         run: pnpm exec prisma generate && pnpm exec prisma migrate deploy
 
+      # Fix 2: Include Playwright version in cache key to prevent stale binaries
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers + system deps
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
+        env:
+          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" = "true" ]; then
+            pnpm exec playwright install-deps chromium firefox webkit
+          else
+            pnpm exec playwright install --with-deps chromium firefox webkit
+          fi
 
-      - name: Clean Next.js locks
-        run: rm -rf .next/dev/lock 2>/dev/null || true
+      # Fix 1: Build production bundle instead of using dev server
+      - name: Build Next.js production bundle
+        run: pnpm run build
 
-      # --shard=X/20   -> only run this shard's slice of the test files
-      # --reporter=blob -> binary output optimized for merging (not human-readable)
-      # --project       -> 5 projects: chromium + anon + mobile + cross-browser anon
+      - name: Start production server
+        run: |
+          pnpm run start &
+          # Wait for server to be ready (health endpoint checks DB connectivity)
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:3000/api/health/ready; do sleep 1; done'
+          echo "Server ready"
+
       - name: Run Playwright tests
         env:
           SHARD_INDEX: ${{ matrix.shardIndex }}
@@ -136,7 +143,6 @@ jobs:
             --project=firefox-anon \
             --project=webkit-anon
 
-      # Upload blob report even on failure/cancellation so merged report is complete
       - name: Upload blob report
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -145,7 +151,6 @@ jobs:
           path: blob-report/
           retention-days: 7
 
-      # Upload traces/screenshots/videos for debugging failed shards
       - name: Upload test artifacts on failure
         uses: actions/upload-artifact@v4
         if: failure()
@@ -178,8 +183,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Download all blob-report-* artifacts into a single flat directory.
-      # merge-multiple: true avoids creating per-artifact subdirectories.
       - name: Download all blob reports
         uses: actions/download-artifact@v4
         with:
@@ -190,8 +193,6 @@ jobs:
       - name: List downloaded blobs
         run: ls -la all-blob-reports/
 
-      # merge-reports reads all .zip blobs and produces a unified HTML report
-      # in playwright-report/ — identical to what you'd get from a single run.
       - name: Merge into HTML report
         run: pnpm exec playwright merge-reports --reporter=html ./all-blob-reports
 

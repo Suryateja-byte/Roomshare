@@ -1,6 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
+import dns from 'node:dns';
 import dotenv from 'dotenv';
 import path from 'path';
+
+// Node.js >=17 defaults to IPv6-first DNS resolution.
+// GitHub Actions runners resolve "localhost" to ::1 (IPv6) but Next.js
+// binds to 127.0.0.1 (IPv4). Force IPv4-first to prevent ECONNREFUSED.
+dns.setDefaultResultOrder('ipv4first');
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });

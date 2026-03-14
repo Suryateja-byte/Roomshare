@@ -189,7 +189,10 @@ const nextConfig: NextConfig = {
 
 let exportedConfig = nextConfig;
 
-if (isSentryEnabled) {
+// Only wrap with Sentry when credentials are available (skip in CI E2E runs)
+const hasSentryCredentials = !!(process.env.SENTRY_ORG && process.env.SENTRY_PROJECT);
+
+if (isSentryEnabled && hasSentryCredentials) {
   const { withSentryConfig } = require('@sentry/nextjs');
 
   exportedConfig = withSentryConfig(nextConfig, {

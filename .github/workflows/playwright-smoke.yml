@@ -36,17 +36,14 @@ jobs:
       NEXTAUTH_SECRET: ci-test-secret-at-least-32-characters-long
       NEXTAUTH_URL: http://localhost:3000
       AUTH_TRUST_HOST: 'true'
-      E2E_BASE_URL: http://localhost:3000
+      # Fix 5: Use 127.0.0.1 to avoid IPv6 resolution issues
+      E2E_BASE_URL: http://127.0.0.1:3000
       E2E_TEST_EMAIL: test@example.com
       E2E_TEST_PASSWORD: TestPassword123!
       E2E_DISABLE_RATE_LIMIT: 'true'
+      CI: 'true'
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
-      # Cloudflare Turnstile: intentionally DISABLED in CI.
-      # Turnstile's CDN script doesn't auto-solve in headless Chromium,
-      # so we omit the site key — TurnstileWidget returns null, server
-      # verification is bypassed (isTurnstileEnabled() → false).
-      # See: https://developers.cloudflare.com/turnstile/tutorials/excluding-turnstile-from-e2e-tests/
       TURNSTILE_ENABLED: 'false'
 
     steps:
@@ -66,22 +63,37 @@ jobs:
       - name: Generate Prisma client and run migrations
         run: pnpm exec prisma generate && pnpm exec prisma migrate deploy
 
+      # Fix 2: Include Playwright version in cache key
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        env:
+          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" = "true" ]; then
+            pnpm exec playwright install-deps chromium
+          else
+            pnpm exec playwright install --with-deps chromium
+          fi
 
-      - name: Install Playwright system deps
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+      # Fix 1: Build production bundle for faster, reliable tests
+      - name: Build Next.js production bundle
+        run: pnpm run build
+
+      - name: Start production server
+        run: |
+          pnpm run start &
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:3000/api/health/ready; do sleep 1; done'
+          echo "Server ready"
 
       - name: Run smoke tests
         run: pnpm exec playwright test tests/e2e/search-smoke.spec.ts --project=chromium
