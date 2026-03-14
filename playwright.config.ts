@@ -160,25 +160,23 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests unless an external base URL is provided */
-  webServer: process.env.E2E_BASE_URL
-    ? undefined
-    : {
-        // Reuse the main dev wrapper so local E2E follows the same WSL startup path
-        command: 'pnpm run dev',
-        // Wait for ready endpoint (checks database connectivity)
-        url: 'http://localhost:3000/api/health/ready',
-        // Reuse existing server locally for faster iteration, fresh in CI
-        reuseExistingServer: !process.env.CI,
-        // Increase timeout for cold starts with database initialization
-        timeout: 180000,
-        stdout: 'pipe',
-        stderr: 'pipe',
-        // Forward dotenv-loaded vars (AUTH_SECRET, etc.) to the child process
-        env: Object.fromEntries(
-          Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] != null),
-        ),
-      },
+  /* Run your local dev server before starting the tests */
+  webServer: {
+    // Clean Next.js lockfile before starting to avoid WSL/NTFS permission issues
+    command: 'pnpm run dev',
+    // Wait for ready endpoint (checks database connectivity)
+    url: 'http://localhost:3000/api/health/ready',
+    // Reuse existing server locally for faster iteration, fresh in CI
+    reuseExistingServer: !process.env.CI,
+    // Increase timeout for cold starts with database initialization
+    timeout: 180000,
+    stdout: 'pipe',
+    stderr: 'pipe',
+    // Forward dotenv-loaded vars (AUTH_SECRET, etc.) to the child process
+    env: Object.fromEntries(
+      Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] != null),
+    ),
+  },
 
   /* Output folder for test artifacts */
   outputDir: 'test-results/',
