@@ -40,7 +40,8 @@ jobs:
       NEXTAUTH_SECRET: ci-test-secret-at-least-32-characters-long
       NEXTAUTH_URL: http://localhost:3000
       AUTH_TRUST_HOST: 'true'
-      E2E_BASE_URL: http://localhost:3000
+      # NOTE: E2E_BASE_URL intentionally NOT set — lets playwright.config.ts
+      # start the dev server automatically via its webServer config
       E2E_TEST_EMAIL: test@example.com
       E2E_TEST_PASSWORD: TestPassword123!
       E2E_DISABLE_RATE_LIMIT: 'true'
