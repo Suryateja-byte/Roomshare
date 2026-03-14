@@ -76,14 +76,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers
-        env:
-          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
-        run: |
-          if [ "$CACHE_HIT" = "true" ]; then
-            pnpm exec playwright install-deps chromium
-          else
-            pnpm exec playwright install --with-deps chromium
-          fi
+        run: pnpm exec playwright install --with-deps chromium
 
       # Fix 1: Build production bundle for faster, reliable tests
       - name: Build Next.js production bundle

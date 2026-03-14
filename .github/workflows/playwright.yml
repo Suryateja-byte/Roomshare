@@ -107,14 +107,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers + system deps
-        env:
-          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
-        run: |
-          if [ "$CACHE_HIT" = "true" ]; then
-            pnpm exec playwright install-deps chromium firefox webkit
-          else
-            pnpm exec playwright install --with-deps chromium firefox webkit
-          fi
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
 
       # Fix 1: Build production bundle instead of using dev server
       - name: Build Next.js production bundle
