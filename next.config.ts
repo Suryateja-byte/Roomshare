@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from '@sentry/nextjs';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -21,6 +20,12 @@ const SW_VERSION = process.env.NODE_ENV === 'development'
 // Write version file for service worker (imported via importScripts)
 const swVersionPath = path.join(process.cwd(), 'public', 'sw-version.js');
 fs.writeFileSync(swVersionPath, `self.__SW_VERSION__ = "${SW_VERSION}";\n`);
+
+const isWindowsMountedWorkspace =
+  process.platform === 'linux' && process.cwd().startsWith('/mnt/');
+const isSentryEnabled =
+  process.env.NODE_ENV === 'production' ||
+  process.env.SENTRY_ENABLE_IN_DEV === '1';
 
 const nextConfig: NextConfig = {
   transpilePackages: ['react-map-gl'],
@@ -82,8 +87,8 @@ const nextConfig: NextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 160, 256, 384],
   },
 
-  // Security headers fallback for paths excluded from middleware matcher
-  // CSP is now set per-request by src/proxy.ts with nonce injection
+  // Security headers fallback for paths excluded from the proxy matcher.
+  // CSP is now set per-request by src/proxy.ts with nonce injection.
   async headers() {
     return [
       {
@@ -147,12 +152,32 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // WSL2 fix: poll for file changes since inotify doesn't work on Windows mounts
+  // Polling is only needed for WSL repos living on Windows-mounted paths.
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
-        poll: 1000,
-        aggregateTimeout: 300,
+        ignored: [
+          '**/.git/**',
+          '**/.next/**',
+          '**/node_modules/**',
+          '**/.claude/**',
+          '**/.worktrees/**',
+          '**/.zenflow/**',
+          '**/.zencoder/**',
+          '**/coverage/**',
+          '**/memory-bank/**',
+          '**/output/**',
+          '**/playwright-report/**',
+          '**/test-results/**',
+          '**/docs/plans/**',
+          '**/*.log',
+        ],
+        ...(isWindowsMountedWorkspace
+          ? {
+              poll: 1000,
+              aggregateTimeout: 300,
+            }
+          : {}),
       };
     }
     return config;
@@ -162,15 +187,23 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 };
 
-export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  silent: !process.env.CI,
-  widenClientFileUpload: true,
-  disableLogger: true,
-  sourcemaps: {
-    deleteSourcemapsAfterUpload: true,
-  },
-  autoInstrumentServerFunctions: true,
-  autoInstrumentMiddleware: true,
-});
+let exportedConfig = nextConfig;
+
+if (isSentryEnabled) {
+  const { withSentryConfig } = require('@sentry/nextjs');
+
+  exportedConfig = withSentryConfig(nextConfig, {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    silent: !process.env.CI,
+    widenClientFileUpload: true,
+    disableLogger: true,
+    sourcemaps: {
+      deleteSourcemapsAfterUpload: true,
+    },
+    autoInstrumentServerFunctions: true,
+    autoInstrumentMiddleware: true,
+  });
+}
+
+export default exportedConfig;

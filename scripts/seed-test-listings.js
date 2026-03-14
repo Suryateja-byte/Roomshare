@@ -56,8 +56,8 @@ const LEASE_DURATIONS = ['Month-to-month', '3 months', '6 months', '12 months', 
 // ============================================================
 // GENDER OPTIONS
 // ============================================================
-const GENDER_PREFERENCES = ['Any', 'Male Only', 'Female Only'];
-const HOUSEHOLD_GENDERS = ['All Male', 'All Female', 'Mixed', 'Any'];
+const GENDER_PREFERENCES = ['NO_PREFERENCE', 'MALE_ONLY', 'FEMALE_ONLY'];
+const HOUSEHOLD_GENDERS = ['ALL_MALE', 'ALL_FEMALE', 'MIXED'];
 
 // ============================================================
 // LOCATIONS - diverse US locations
@@ -437,40 +437,40 @@ const testListings = [
   {
     title: '[TEST 46] Household All Male + Preference Any',
     description: 'Male household accepting anyone',
-    householdGender: 'All Male',
-    genderPreference: 'Any',
+    householdGender: 'ALL_MALE',
+    genderPreference: 'NO_PREFERENCE',
     householdLanguages: ['en'],
     category: 'GENDER'
   },
   {
     title: '[TEST 47] Household All Female + Preference Female Only',
     description: 'Female-only household seeking females',
-    householdGender: 'All Female',
-    genderPreference: 'Female Only',
+    householdGender: 'ALL_FEMALE',
+    genderPreference: 'FEMALE_ONLY',
     householdLanguages: ['en'],
     category: 'GENDER'
   },
   {
     title: '[TEST 48] Household All Male + Preference Female Only',
     description: 'Male household seeking females (edge case)',
-    householdGender: 'All Male',
-    genderPreference: 'Female Only',
+    householdGender: 'ALL_MALE',
+    genderPreference: 'FEMALE_ONLY',
     householdLanguages: ['en'],
     category: 'GENDER'
   },
   {
     title: '[TEST 49] Household Mixed + Preference Any',
     description: 'Mixed household accepting anyone',
-    householdGender: 'Mixed',
-    genderPreference: 'Any',
+    householdGender: 'MIXED',
+    genderPreference: 'NO_PREFERENCE',
     householdLanguages: ['en'],
     category: 'GENDER'
   },
   {
     title: '[TEST 50] Household All Female + Preference Male Only',
     description: 'Female household seeking males (edge case)',
-    householdGender: 'All Female',
-    genderPreference: 'Male Only',
+    householdGender: 'ALL_FEMALE',
+    genderPreference: 'MALE_ONLY',
     householdLanguages: ['en'],
     category: 'GENDER'
   },
@@ -485,32 +485,32 @@ const testListings = [
   {
     title: '[TEST 52] Household Any + Preference Any',
     description: 'Maximum flexibility on gender',
-    householdGender: 'Any',
-    genderPreference: 'Any',
+    householdGender: null,
+    genderPreference: 'NO_PREFERENCE',
     householdLanguages: ['en'],
     category: 'GENDER'
   },
   {
     title: '[TEST 53] Male Only Strict',
     description: 'Strict male-only household and preference',
-    householdGender: 'All Male',
-    genderPreference: 'Male Only',
+    householdGender: 'ALL_MALE',
+    genderPreference: 'MALE_ONLY',
     householdLanguages: ['en'],
     category: 'GENDER'
   },
   {
     title: '[TEST 54] Female Household Accepting Males',
     description: 'Female household open to male roommates',
-    householdGender: 'All Female',
-    genderPreference: 'Any',
+    householdGender: 'ALL_FEMALE',
+    genderPreference: 'NO_PREFERENCE',
     householdLanguages: ['en'],
     category: 'GENDER'
   },
   {
     title: '[TEST 55] Mixed Seeking Females Only',
     description: 'Mixed household preferring female roommates',
-    householdGender: 'Mixed',
-    genderPreference: 'Female Only',
+    householdGender: 'MIXED',
+    genderPreference: 'FEMALE_ONLY',
     householdLanguages: ['en'],
     category: 'GENDER'
   },
@@ -674,8 +674,8 @@ const testListings = [
     moveInDate: new Date(),
     leaseDuration: 'Flexible',
     roomType: 'Private Room',
-    genderPreference: 'Any',
-    householdGender: 'Mixed',
+    genderPreference: 'NO_PREFERENCE',
+    householdGender: 'MIXED',
     category: 'UNICORN'
   },
   {
@@ -683,8 +683,8 @@ const testListings = [
     description: 'Rare combination that should return 0 normally',
     householdLanguages: ['fi'],
     moveInDate: getDate(1),
-    householdGender: 'All Female',
-    genderPreference: 'Female Only',
+    householdGender: 'ALL_FEMALE',
+    genderPreference: 'FEMALE_ONLY',
     houseRules: ['No Smoking', 'No Pets'],
     category: 'IMPOSSIBLE'
   },
@@ -708,8 +708,8 @@ const testListings = [
     title: '[TEST 80] Language + Gender Specific',
     description: 'Hindi speaking + Female only household',
     householdLanguages: ['hi'],
-    householdGender: 'All Female',
-    genderPreference: 'Female Only',
+    householdGender: 'ALL_FEMALE',
+    genderPreference: 'FEMALE_ONLY',
     category: 'SPECIFIC'
   },
 
@@ -990,16 +990,16 @@ const testListings = [
     title: '[TEST 119] Malayalam + Kannada Female Only',
     description: 'South Indian languages + Female household',
     householdLanguages: ['ml', 'kn'],
-    householdGender: 'All Female',
-    genderPreference: 'Female Only',
+    householdGender: 'ALL_FEMALE',
+    genderPreference: 'FEMALE_ONLY',
     category: 'SOUTH_ASIAN'
   },
   {
     title: '[TEST 120] Bengali + Nepali Mixed',
     description: 'Eastern South Asian languages + Mixed household',
     householdLanguages: ['bn', 'ne'],
-    householdGender: 'Mixed',
-    genderPreference: 'Any',
+    householdGender: 'MIXED',
+    genderPreference: 'NO_PREFERENCE',
     category: 'SOUTH_ASIAN'
   },
 ];
@@ -1059,10 +1059,10 @@ async function main() {
           amenities: amenities,
           houseRules: houseRules,
           householdLanguages: test.householdLanguages || ['en'],
-          genderPreference: test.genderPreference || 'Any',
-          householdGender: test.householdGender || 'Mixed',
-          leaseDuration: test.leaseDuration || 'Flexible',
-          roomType: test.roomType || 'Private Room',
+          genderPreference: test.genderPreference !== undefined ? test.genderPreference : 'NO_PREFERENCE',
+          householdGender: test.householdGender !== undefined ? test.householdGender : 'MIXED',
+          leaseDuration: test.leaseDuration !== undefined ? test.leaseDuration : 'Flexible',
+          roomType: test.roomType !== undefined ? test.roomType : 'Private Room',
           totalSlots: 2,
           availableSlots: 1,
           status: 'ACTIVE',

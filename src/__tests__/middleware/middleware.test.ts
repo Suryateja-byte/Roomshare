@@ -5,7 +5,7 @@
  * - applySecurityHeaders sets all required headers
  * - CSP nonce generation in production vs dev
  * - buildCspHeader directive correctness
- * - proxy.ts matcher config includes expected paths
+ * - src/proxy.ts matcher config includes expected paths
  */
 
 describe('applySecurityHeaders', () => {
@@ -264,9 +264,9 @@ describe('buildCspHeader', () => {
   })
 })
 
-describe('proxy matcher config', () => {
+describe('middleware matcher config', () => {
   /**
-   * proxy.ts imports auth which pulls in next-auth ESM modules that Jest
+   * src/proxy.ts pulls in auth-related server modules that Jest
    * cannot transform directly. Instead of importing the module, we read the
    * source file and verify the matcher config structurally.
    */
@@ -276,7 +276,7 @@ describe('proxy matcher config', () => {
     const fs = await import('fs')
     const path = await import('path')
     proxySource = fs.readFileSync(
-      path.join(process.cwd(), 'src/proxy.ts'),
+      path.join(process.cwd(), 'src', 'proxy.ts'),
       'utf-8'
     )
   })

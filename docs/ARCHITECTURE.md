@@ -86,7 +86,7 @@ graph TB
             CR[Cron Jobs<br/>search-alerts, cleanup,<br/>refresh-search-docs]
         end
 
-        subgraph Proxy ["Proxy (src/proxy.ts)"]
+        subgraph Proxy ["Middleware (middleware.ts)"]
             MW[Request Proxy<br/>Suspension Check<br/>Auth Guard]
         end
 

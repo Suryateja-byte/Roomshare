@@ -7,9 +7,15 @@
  */
 
 export async function register() {
+  const isSentryEnabled =
+    process.env.NODE_ENV === 'production' ||
+    process.env.SENTRY_ENABLE_IN_DEV === '1';
+
   // Initialize Sentry based on runtime
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    await import('./sentry.server.config');
+    if (isSentryEnabled) {
+      await import('./sentry.server.config');
+    }
 
     // Register graceful shutdown handlers (Node.js only)
     // This ensures Sentry events are flushed and Prisma disconnects cleanly
@@ -22,7 +28,9 @@ export async function register() {
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {
-    await import('./sentry.edge.config');
+    if (isSentryEnabled) {
+      await import('./sentry.edge.config');
+    }
     // Edge runtime doesn't support process signals
   }
 }

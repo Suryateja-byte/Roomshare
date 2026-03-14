@@ -93,7 +93,9 @@ export function useNavigationGuard(shouldBlock: boolean, message: string): Navig
                     if (target.pathname !== window.location.pathname) {
                         pendingNavUrl = target.href;
                         // Don't navigate — show dialog instead
-                        setShowDialog(true);
+                        // Deferred to avoid "useInsertionEffect must not schedule updates"
+                        // when Next.js router calls pushState from useInsertionEffect
+                        setTimeout(() => setShowDialog(true), 0);
                         return;
                     }
                 }
@@ -113,7 +115,7 @@ export function useNavigationGuard(shouldBlock: boolean, message: string): Navig
             // User hit back — sentinel was consumed, show dialog
             sentinelPushedRef.current = false;
             pendingNavUrl = null; // popstate = back/forward, not pushState
-            setShowDialog(true);
+            setTimeout(() => setShowDialog(true), 0);
 
             // Push sentinel again to stay on this page while dialog is shown
             if (nativePushState) {

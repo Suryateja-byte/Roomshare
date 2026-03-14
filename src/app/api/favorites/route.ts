@@ -11,6 +11,57 @@ const toggleFavoriteSchema = z.object({
     listingId: z.string().min(1, 'listingId is required').max(100),
 });
 
+const favoritesQuerySchema = z.array(z.string().min(1).max(100)).max(60);
+
+export async function GET(request: Request) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            const response = NextResponse.json({ savedIds: [] as string[] });
+            response.headers.set('Cache-Control', 'private, no-store');
+            return response;
+        }
+
+        const { searchParams } = new URL(request.url);
+        const rawIds = (searchParams.get('ids') ?? '')
+            .split(',')
+            .map((id) => id.trim())
+            .filter(Boolean);
+
+        const parsed = favoritesQuerySchema.safeParse(rawIds);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: 'Invalid ids parameter' },
+                { status: 400 },
+            );
+        }
+
+        if (parsed.data.length === 0) {
+            const response = NextResponse.json({ savedIds: [] as string[] });
+            response.headers.set('Cache-Control', 'private, no-store');
+            return response;
+        }
+
+        const savedListings = await prisma.savedListing.findMany({
+            where: {
+                userId: session.user.id,
+                listingId: { in: parsed.data },
+            },
+            select: {
+                listingId: true,
+            },
+        });
+
+        const response = NextResponse.json({
+            savedIds: savedListings.map((savedListing) => savedListing.listingId),
+        });
+        response.headers.set('Cache-Control', 'private, no-store');
+        return response;
+    } catch (error) {
+        return captureApiError(error, { route: '/api/favorites', method: 'GET' });
+    }
+}
+
 export async function POST(request: Request) {
     // P2-4: Add rate limiting to prevent abuse
     const rateLimitResponse = await withRateLimit(request, { type: 'toggleFavorite' });

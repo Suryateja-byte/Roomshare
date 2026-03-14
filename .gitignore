@@ -89,3 +89,5 @@ output/playwright/
 .worktrees/
 .mcp.json
 .claude/settings.local.json
+.next-wsl-backup-*
+.mcp.json

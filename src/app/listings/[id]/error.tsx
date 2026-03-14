@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import * as Sentry from '@sentry/nextjs';
 
 export default function ListingError({
     error,
@@ -14,13 +13,9 @@ export default function ListingError({
     reset: () => void;
 }) {
     useEffect(() => {
-        Sentry.withScope((scope) => {
-            if (error.digest) {
-                scope.setTag('errorDigest', error.digest);
-            }
-            scope.setTag('errorBoundary', 'listing-detail');
-            Sentry.captureException(error);
-        });
+        if (process.env.NODE_ENV === 'development') {
+            console.error('Listing detail error:', error);
+        }
     }, [error]);
 
     return (

@@ -4,11 +4,10 @@ import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import * as Sentry from '@sentry/nextjs';
 
 /**
  * Shared error boundary component for auth pages (login, signup, forgot-password, reset-password).
- * Reports errors to Sentry and shows a user-friendly recovery UI.
+ * Keeps recovery UI lightweight on the auth hot path.
  */
 export default function AuthError({
     error,
@@ -18,13 +17,9 @@ export default function AuthError({
     reset: () => void;
 }) {
     useEffect(() => {
-        Sentry.withScope((scope) => {
-            if (error.digest) {
-                scope.setTag('errorDigest', error.digest);
-            }
-            scope.setTag('errorBoundary', 'auth');
-            Sentry.captureException(error);
-        });
+        if (process.env.NODE_ENV === 'development') {
+            console.error('Auth page error:', error);
+        }
     }, [error]);
 
     return (

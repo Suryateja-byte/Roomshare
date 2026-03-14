@@ -12,10 +12,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SearchResultsClient } from '@/components/search/SearchResultsClient';
 import { fetchMoreListings } from '@/app/search/actions';
 import type { ListingData } from '@/lib/data';
+import { getFilterSuggestions } from '@/app/actions/filter-suggestions';
 
 // Mock fetchMoreListings server action
 jest.mock('@/app/search/actions', () => ({
   fetchMoreListings: jest.fn(),
+}));
+
+jest.mock('@/app/actions/filter-suggestions', () => ({
+  getFilterSuggestions: jest.fn(async () => []),
 }));
 
 // Mock next/link
@@ -103,6 +108,10 @@ beforeAll(() => {
 beforeAll(() => {
   window.performance.mark = jest.fn();
   window.performance.measure = jest.fn();
+  global.fetch = jest.fn(async () => ({
+    ok: true,
+    json: async () => ({ savedIds: [] }),
+  })) as jest.Mock;
 });
 
 const createMockListing = (id: string, title?: string): ListingData => ({
@@ -125,6 +134,7 @@ const defaultProps = {
   initialTotal: 10,
   savedListingIds: [],
   searchParamsString: 'q=test',
+  filterParams: {},
   query: 'test',
   browseMode: false,
   hasConfirmedZeroResults: false,
@@ -136,6 +146,11 @@ describe('SearchResultsClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     Object.keys(mockSessionStorage).forEach((key) => delete mockSessionStorage[key]);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ savedIds: [] }),
+    });
+    (getFilterSuggestions as jest.Mock).mockResolvedValue([]);
   });
 
   describe('rendering', () => {

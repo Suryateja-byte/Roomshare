@@ -393,7 +393,7 @@ Playwright auto-starts the dev server via the `webServer` config:
 
 ```typescript
 webServer: {
-  command: 'pnpm run clean:next-locks && pnpm run dev',
+  command: 'pnpm run dev',
   url: 'http://localhost:3000/api/health/ready',
   reuseExistingServer: !process.env.CI,
   timeout: 180000,
@@ -401,6 +401,8 @@ webServer: {
 ```
 
 It waits for the `/api/health/ready` endpoint (checks database connectivity) before starting tests.
+`pnpm run dev` is the single source of truth for local startup and includes the shared
+webpack/lock-cleanup path used by Playwright.
 
 ### File naming conventions
 

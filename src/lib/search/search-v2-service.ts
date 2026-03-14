@@ -70,6 +70,8 @@ export interface SearchV2Params {
   rawParams: Record<string, string | string[] | undefined>;
   /** Items per page (optional, defaults to service's internal default) */
   limit?: number;
+  /** Skip map query work when the caller only needs list data */
+  includeMap?: boolean;
 }
 
 export interface SearchV2Result {
@@ -211,18 +213,23 @@ export async function executeSearchV2(
       ? { ...filterParams, bounds: mapBounds }
       : filterParams;
 
-    // Map query runs in parallel with list query
-    // SearchDoc returns { listings, truncated, totalCandidates }, legacy returns plain array
-    const mapPromise: Promise<MapListingsResult | MapListingData[]> = useSearchDoc
-      ? getSearchDocMapListings(mapFilterParams)
-      : getMapListings(mapFilterParams);
+    const shouldIncludeMap = params.includeMap !== false;
+    const mapPromise: Promise<MapListingsResult | MapListingData[]> | null = shouldIncludeMap
+      ? (
+          useSearchDoc
+            ? getSearchDocMapListings(mapFilterParams)
+            : getMapListings(mapFilterParams)
+        )
+      : null;
 
-    // Execute both queries concurrently with partial failure tolerance
-    // P1-7 FIX: Wrap each promise with independent timeout to prevent indefinite hangs
-    const [listSettled, mapSettled] = await Promise.allSettled([
+    // Execute list query and, when requested, map query with partial failure tolerance.
+    const settledResults = await Promise.allSettled([
       withTimeout(listPromise, DEFAULT_TIMEOUTS.DATABASE, "search-list-query"),
-      withTimeout(mapPromise, DEFAULT_TIMEOUTS.DATABASE, "search-map-query"),
+      ...(mapPromise
+        ? [withTimeout(mapPromise, DEFAULT_TIMEOUTS.DATABASE, "search-map-query")]
+        : []),
     ]);
+    const [listSettled, mapSettled] = settledResults;
 
     // Handle partial failures gracefully
     let listResult: PaginatedResultHybrid<ListingData>;
@@ -245,7 +252,7 @@ export async function executeSearchV2(
       };
     }
 
-    if (mapSettled.status === "fulfilled") {
+    if (mapSettled?.status === "fulfilled") {
       const mapResult = mapSettled.value;
       // Handle both SearchDoc result shape and legacy plain array
       if ("listings" in mapResult) {
@@ -257,12 +264,14 @@ export async function executeSearchV2(
         // Legacy path: plain MapListingData[]
         mapListings = mapResult;
       }
-    } else {
+    } else if (mapSettled?.status === "rejected") {
       logger.sync.error("[SearchV2] Map query failed", {
         error: mapSettled.reason instanceof Error ? mapSettled.reason.message : "Unknown",
       });
       mapListings = [];
       warnings.push("MAP_QUERY_FAILED");
+    } else {
+      mapListings = [];
     }
 
     // Determine mode based on mapListings count (not list total)

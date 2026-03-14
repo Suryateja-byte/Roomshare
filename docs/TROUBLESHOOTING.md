@@ -92,16 +92,24 @@ kill -9 <PID>
 PORT=3001 pnpm dev
 ```
 
-### Next.js dev lockfile issues (WSL/NTFS)
+### Next.js dev startup issues on WSL `/mnt/*`
 
-**Symptoms**: Dev server fails to start with lockfile errors, especially on WSL.
+**Symptoms**: `pnpm dev` never reaches ready state, `/api/health/ready` hangs, or search/listing pages never open when the repo lives on a Windows-mounted path like `/mnt/d/...`.
 
-**Solution**: The project includes a cleanup script:
+**Cause**: Next.js can stall on WSL 9p filesystem I/O when the repo lives on a Windows mount.
+
+**Solution**: `pnpm dev` now uses the project wrapper to keep startup predictable:
 
 ```bash
-pnpm run clean:next-locks
 pnpm dev
 ```
+
+This startup path:
+
+- removes stale Next dev lockfiles
+- uses webpack dev mode
+
+If startup is still unreliable, move the repo to the Linux filesystem (`~/...`) and run it there.
 
 ---
 

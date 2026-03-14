@@ -13,6 +13,17 @@ import {
 import { BOUNDS_EPSILON } from "@/lib/search/types";
 
 describe("search/hash", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    jest.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
   describe("generateQueryHash", () => {
     it("should generate a 16-character hash", () => {
       const params: HashableFilterParams = {
@@ -197,6 +208,19 @@ describe("search/hash", () => {
 
       expect(cursor1).toBe(cursor2);
     });
+
+    it("falls back to unsigned cursors in production when CURSOR_SECRET is missing", async () => {
+      delete process.env.CURSOR_SECRET;
+      process.env.NODE_ENV = "production";
+      jest.resetModules();
+
+      const { encodeCursor: encodeUnsigned, decodeCursor: decodeUnsigned } =
+        await import("@/lib/search/hash");
+
+      const cursor = encodeUnsigned(3);
+      expect(() => encodeUnsigned(3)).not.toThrow();
+      expect(decodeUnsigned(cursor)).toBe(3);
+    });
   });
 
   describe("decodeCursor", () => {
@@ -249,6 +273,20 @@ describe("search/hash", () => {
     it("should return null for cursor without page property", () => {
       const noPage = Buffer.from('{"foo":"bar"}').toString("base64url");
       expect(decodeCursor(noPage)).toBeNull();
+    });
+
+    it("decodes unsigned legacy envelopes when CURSOR_SECRET is not configured", async () => {
+      delete process.env.CURSOR_SECRET;
+      process.env.NODE_ENV = "production";
+      jest.resetModules();
+
+      const { decodeCursor: decodeUnsigned } = await import("@/lib/search/hash");
+      const payload = JSON.stringify({ p: 7 });
+      const unsignedEnvelope = Buffer.from(
+        JSON.stringify({ p: payload, s: "ignored" }),
+      ).toString("base64url");
+
+      expect(decodeUnsigned(unsignedEnvelope)).toBe(7);
     });
   });
 

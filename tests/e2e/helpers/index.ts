@@ -99,3 +99,28 @@ export {
   expectLoginRedirect,
   expectDraftSaved,
 } from "./session-expiry-helpers";
+
+// Stability contract test helpers (UI + API helpers for stability tests)
+export {
+  testApi,
+  createExpiredHold,
+  cleanupTestBookings,
+  getSlotInfoViaApi,
+  invokeSweeper,
+  getGroundTruthSlots,
+  updateListingPrice,
+  createPendingBooking,
+  createAcceptedBooking,
+  setListingBookingMode,
+  navigateToBookingsTab,
+  setupRequestCounter,
+  readSlotBadge,
+  getSlotBadgeForListing,
+  clearBookingSession,
+  clearBookingSessionForListing,
+  getMonthOffset,
+  selectStabilityDates,
+  submitBookingViaUI,
+  extractListingId,
+  findBookableListingUrl,
+} from "./stability-helpers";

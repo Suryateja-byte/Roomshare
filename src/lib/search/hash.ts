@@ -6,7 +6,7 @@
 
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { BOUNDS_EPSILON } from "./types";
-import { getCursorSecret } from "@/lib/env";
+import { getOptionalCursorSecret } from "@/lib/env";
 
 // ============================================================================
 // Keyset Cursor Re-exports
@@ -112,7 +112,7 @@ export function generateQueryHash(params: HashableFilterParams): string {
  */
 export function encodeCursor(page: number): string {
   const payload = JSON.stringify({ p: page });
-  const cursorSecret = getCursorSecret();
+  const cursorSecret = getOptionalCursorSecret();
   if (!cursorSecret) {
     return Buffer.from(payload).toString("base64url");
   }
@@ -133,7 +133,7 @@ export function decodeCursor(cursor: string): number | null {
     const decoded = Buffer.from(cursor, "base64url").toString("utf-8");
     let payload = decoded;
 
-    const cursorSecret = getCursorSecret();
+    const cursorSecret = getOptionalCursorSecret();
     if (cursorSecret) {
       const parsedEnvelope = JSON.parse(decoded) as unknown;
       if (

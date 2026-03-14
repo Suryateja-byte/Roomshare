@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import localFont from "next/font/local";
 import "./globals.css";
-import { auth } from "@/auth";
 import Navbar from "@/components/Navbar";
 import NavbarWrapper from "@/components/NavbarWrapper";
 import Footer from "@/components/Footer";
@@ -44,7 +44,7 @@ export const viewport: Viewport = {
 };
 
 import MainLayout from "@/components/MainLayout";
-// CSP nonce is forwarded via x-nonce header from proxy.ts
+// CSP nonce is forwarded via x-nonce header from src/proxy.ts
 // Read it here with: const nonce = (await headers()).get('x-nonce') || undefined;
 // when adding inline <Script nonce={nonce}> tags
 
@@ -53,9 +53,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Fetch session server-side to initialize SessionProvider with session
-  // This prevents hydration mismatch where client briefly sees no session
-  const session = await auth();
+  const requestHeaders = await headers();
+  const nonce = requestHeaders.get("x-nonce") || undefined;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -69,7 +68,7 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://images.unsplash.com" />
       </head>
       <body className={inter.className}>
-        <Providers session={session}>
+        <Providers nonce={nonce}>
           <SkipLink />
           <SkipLink href="#search-results">Skip to search results</SkipLink>
           <CustomScrollContainer>

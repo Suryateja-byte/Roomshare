@@ -10,9 +10,10 @@ import { ThemeProvider } from './ThemeProvider';
 interface ProvidersProps {
   children: ReactNode;
   session?: Session | null;
+  nonce?: string;
 }
 
-export default function Providers({ children, session }: ProvidersProps) {
+export default function Providers({ children, session, nonce }: ProvidersProps) {
   return (
     <MotionConfig reducedMotion="user">
       <SessionProvider
@@ -20,7 +21,7 @@ export default function Providers({ children, session }: ProvidersProps) {
         refetchOnWindowFocus={true}
         refetchInterval={600} // Refresh session every 10 minutes
       >
-        <ThemeProvider>
+        <ThemeProvider nonce={nonce}>
           {children}
           <Toaster position="top-center" richColors />
         </ThemeProvider>

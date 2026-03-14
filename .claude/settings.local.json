@@ -127,7 +127,8 @@
       "mcp__playwright__browser_type",
       "mcp__playwright__browser_press_key",
       "mcp__playwright__browser_run_code",
-      "Bash(gh pr checks:*)"
+      "Bash(gh pr checks:*)",
+      "Bash(pnpm playwright:*)"
     ],
     "deny": [],
     "ask": []
