@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { flushSync } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, Clock, Loader2, SlidersHorizontal, LocateFixed } from 'lucide-react';
+import { Search, Clock, Loader2, SlidersHorizontal, LocateFixed, Sparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import LocationSearchInput from '@/components/LocationSearchInput';
@@ -105,6 +105,11 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         return { lat: parsedLat, lng: parsedLng };
     };
     const [location, setLocation] = useState(searchParams.get('q') || '');
+    // Show "What" field when semantic search env var is set.
+    // Uses NEXT_PUBLIC_ prefix so it's available in client components.
+    // Falls back to checking if the "what" param exists in URL (field was previously shown).
+    const semanticSearchEnabled = process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH === 'true' || !!searchParams.get('what');
+    const [whatQuery, setWhatQuery] = useState('');
     // Track when user is actively typing in location input to prevent URL sync from clearing their text.
     // The chain: typing 3 chars → warning banner renders → header resize → map moveEnd → URL change → sync effect clears input.
     const isUserTypingLocationRef = useRef(false);
@@ -353,8 +358,12 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             params.delete('maxLng');
         }
 
-        // Only include query if it has actual content (not just whitespace)
-        if (trimmedLocation && trimmedLocation.length >= 2) {
+        // Semantic "What" query — when filled, use it as `q` for semantic search
+        // and store location separately. When empty, use location as `q` (existing behavior).
+        const trimmedWhat = whatQuery.trim();
+        if (trimmedWhat && trimmedWhat.length >= 2) {
+            params.set('q', trimmedWhat);
+        } else if (trimmedLocation && trimmedLocation.length >= 2) {
             params.set('q', trimmedLocation);
         }
 
@@ -445,7 +454,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             if (resetSearchingTimeoutRef.current) clearTimeout(resetSearchingTimeoutRef.current);
             resetSearchingTimeoutRef.current = setTimeout(() => setIsSearching(false), 500);
         }, SEARCH_DEBOUNCE_MS);
-    }, [location, pending.minPrice, pending.maxPrice, committed, selectedCoords, router, isSearching, saveRecentSearch, searchParams, transitionContext]);
+    }, [location, whatQuery, pending.minPrice, pending.maxPrice, committed, selectedCoords, router, isSearching, saveRecentSearch, searchParams, transitionContext]);
 
     // Cleanup timeouts on unmount
     useEffect(() => {
@@ -490,6 +499,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     const handleClearAllFilters = useCallback(() => {
         startTransition(() => {
             setLocation('');
+            setWhatQuery('');
             setSelectedCoords(null);
             setPending({
                 minPrice: '', maxPrice: '', moveInDate: '', leaseDuration: '',
@@ -639,6 +649,42 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 className={`group relative flex flex-col md:flex-row md:items-center bg-white dark:bg-zinc-900 backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 w-full ${isCompact ? 'p-1' : 'p-2'}`}
                 role="search"
             >
+                {/* Semantic "What" Input — AI-powered natural language search */}
+                {semanticSearchEnabled && !isCompact && (
+                    <>
+                        <div className={`w-full md:flex-[1.3] flex flex-col relative ${isCompact ? 'px-4 py-2' : 'px-6 py-2.5'}`}>
+                            <label htmlFor="search-what" className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5">
+                                <Sparkles className="w-3 h-3" />
+                                What
+                                <span className="text-[8px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 px-1.5 py-0.5 rounded tracking-wider">AI</span>
+                            </label>
+                            <div className="flex items-center gap-1">
+                                <input
+                                    id="search-what"
+                                    type="text"
+                                    value={whatQuery}
+                                    onChange={(e) => setWhatQuery(e.target.value)}
+                                    placeholder="Describe your ideal room..."
+                                    className="w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:ring-0 focus:outline-none"
+                                    autoComplete="off"
+                                />
+                                {whatQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setWhatQuery('')}
+                                        className="flex-shrink-0 p-1 rounded-full text-zinc-300 hover:text-zinc-600 dark:hover:text-white transition-colors"
+                                        aria-label="Clear search description"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        {/* Divider between What and Where */}
+                        <div className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-white/5 mx-1" aria-hidden="true"></div>
+                    </>
+                )}
+
                 {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
                 <div className={`w-full md:flex-[1.5] flex flex-col relative group/input ${isCompact ? 'px-4 py-2' : 'px-6 py-2.5'}`}>
                     {!isCompact && (

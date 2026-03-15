@@ -15,6 +15,8 @@ import { logger } from '@/lib/logger';
 import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension';
 import { normalizeStringList } from '@/lib/utils';
 import { z } from 'zod';
+import { features } from '@/lib/env';
+import { syncListingEmbedding } from '@/lib/embeddings/sync';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -577,6 +579,10 @@ export async function PATCH(
 
         // Fire-and-forget: mark listing dirty for search doc refresh
         markListingDirty(id, 'listing_updated').catch(() => {});
+
+        if (features.semanticSearch) {
+            syncListingEmbedding(id).catch(() => {});
+        }
 
         return NextResponse.json(result, { status: 200 });
     } catch (error) {

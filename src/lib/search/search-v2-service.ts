@@ -14,6 +14,8 @@ import {
   getSearchDocMapListings,
   getSearchDocListingsWithKeyset,
   getSearchDocListingsFirstPage,
+  semanticSearchQuery,
+  mapSemanticRowsToListingData,
   type MapListingsResult,
 } from "@/lib/search/search-doc-queries";
 import {
@@ -46,6 +48,7 @@ import {
   clampBoundsToMaxSpan,
 } from "@/lib/validation";
 import {
+  DEFAULT_PAGE_SIZE,
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
@@ -163,6 +166,34 @@ export async function executeSearchV2(
       listResult: PaginatedResultHybrid<ListingData>;
       nextCursor: string | null;
     }> => {
+      // Semantic search branch — text queries with "recommended" sort
+      if (
+        features.semanticSearch &&
+        filterParams.query &&
+        filterParams.query.length >= 3 &&
+        sortOption === "recommended"
+      ) {
+        const pageSize = filterParams.limit || DEFAULT_PAGE_SIZE;
+        const offset = (page - 1) * pageSize;
+        const semanticRows = await semanticSearchQuery(filterParams, pageSize + 1, offset);
+
+        if (semanticRows && semanticRows.length > 0) {
+          const hasNextPage = semanticRows.length > pageSize;
+          const items = mapSemanticRowsToListingData(semanticRows.slice(0, pageSize));
+          const semanticResult: PaginatedResultHybrid<ListingData> = {
+            items,
+            total: null,
+            page,
+            limit: pageSize,
+            totalPages: null,
+            hasNextPage,
+            nextCursor: hasNextPage ? encodeCursor(page + 1) : null,
+          };
+          return { listResult: semanticResult, nextCursor: semanticResult.nextCursor ?? null };
+        }
+        // Fall through to existing FTS/keyword search if semantic returns null
+      }
+
       if (useKeyset) {
         // Keyset pagination path
         if (keysetCursor) {

@@ -20,6 +20,8 @@ import { captureApiError } from '@/lib/api-error-handler';
 import { isCircuitOpenError } from '@/lib/circuit-breaker';
 import { normalizeStringList } from '@/lib/utils';
 import { calculateProfileCompletion, PROFILE_REQUIREMENTS } from '@/lib/profile-completion';
+import { features } from '@/lib/env';
+import { syncListingEmbedding } from '@/lib/embeddings/sync';
 
 export async function GET(request: Request) {
     // Use Redis-backed limiter for high-volume read path consistency.
@@ -362,6 +364,16 @@ export async function POST(request: Request) {
                 logger.sync.error('upsertSearchDocSync failed unexpectedly', {
                     listingId: listing.id,
                     error: syncErr instanceof Error ? syncErr.message : String(syncErr),
+                });
+            }
+
+            // 15b. Fire-and-forget: semantic search embedding generation
+            if (features.semanticSearch) {
+                syncListingEmbedding(listing.id).catch((err) => {
+                    logger.sync.warn('Embedding sync failed', {
+                        listingId: listing.id,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
                 });
             }
 

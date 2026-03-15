@@ -59,6 +59,7 @@ playwright/.auth/
 output/playwright/
 
 # AI tool configs (not project code)
+.superpowers/
 .agent/
 .agents/
 .cline/
