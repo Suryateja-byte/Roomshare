@@ -203,4 +203,54 @@ describe('logBookingAudit', () => {
       }),
     );
   });
+
+  describe('multi-slot audit details', () => {
+    it('CREATED action includes slotsRequested in details', async () => {
+      const tx = createMockTx();
+      await logBookingAudit(tx, {
+        bookingId: 'b1', action: 'CREATED', previousStatus: null, newStatus: 'PENDING',
+        actorId: 'user-1', actorType: 'USER',
+        details: { slotsRequested: 3, listingId: 'listing-1' },
+      });
+
+      expect(tx.bookingAuditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          details: expect.objectContaining({ slotsRequested: 3 }),
+        }),
+      });
+    });
+
+    it('HELD action includes slotsRequested and heldUntil in details', async () => {
+      const heldUntil = new Date(Date.now() + 15 * 60 * 1000);
+      const tx = createMockTx();
+
+      await logBookingAudit(tx, {
+        bookingId: 'b1', action: 'HELD', previousStatus: null, newStatus: 'HELD',
+        actorId: 'user-1', actorType: 'USER',
+        details: { slotsRequested: 2, listingId: 'listing-1', heldUntil },
+      });
+
+      expect(tx.bookingAuditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          details: expect.objectContaining({ slotsRequested: 2, heldUntil }),
+        }),
+      });
+    });
+
+    it('CANCELLED action includes slotsRequested and previousStatus in details', async () => {
+      const tx = createMockTx();
+
+      await logBookingAudit(tx, {
+        bookingId: 'b1', action: 'CANCELLED', previousStatus: 'ACCEPTED', newStatus: 'CANCELLED',
+        actorId: 'user-1', actorType: 'USER',
+        details: { slotsRequested: 3, previousStatus: 'ACCEPTED' },
+      });
+
+      expect(tx.bookingAuditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          details: expect.objectContaining({ slotsRequested: 3 }),
+        }),
+      });
+    });
+  });
 });

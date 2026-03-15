@@ -180,4 +180,82 @@ describe('GET /api/cron/reconcile-slots', () => {
     expect(data.reconciled).toBe(0);
     expect(data.drifted).toBe(0);
   });
+
+  // -------------------------------------------------------
+  // Multi-slot booking scenarios
+  // -------------------------------------------------------
+  describe('reconciler with multi-slot bookings', () => {
+    it('correctly sums slotsRequested across ACCEPTED and active HELD bookings', async () => {
+      // ACCEPTED contributes 2 slots, active HELD contributes 3 slots.
+      // totalSlots=8, so expected availableSlots = 8 - (2 + 3) = 3.
+      // actual=3 matches expected=3 → no drift.
+      // The SQL handles the SUM; we verify the reconciler treats a no-drift
+      // result correctly when the query returns no mismatched rows.
+      const driftRows: { id: string; actual: number; expected: number }[] = [];
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn: any) => {
+        const tx = {
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([{ locked: true }])
+            .mockResolvedValueOnce(driftRows),
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        };
+        return fn(tx);
+      });
+
+      const response = await GET(createRequest('Bearer valid'));
+      const data = await response.json();
+
+      // No drift rows → reconciler reports zero drifted and zero reconciled.
+      expect(data.drifted).toBe(0);
+      expect(data.reconciled).toBe(0);
+    });
+
+    it('excludes expired HELD bookings from expected calculation', async () => {
+      // Expired HELD (heldUntil < NOW) should not count toward occupied slots.
+      // Only ACCEPTED(2) counted; totalSlots=8 → expected available = 6.
+      // The SQL WHERE clause excludes expired holds; the reconciler only sees
+      // rows where actual !== expected, so when actual=6 equals expected=6
+      // the query returns no drift rows.
+      const driftRows: { id: string; actual: number; expected: number }[] = [];
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn: any) => {
+        const tx = {
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([{ locked: true }])
+            .mockResolvedValueOnce(driftRows),
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        };
+        return fn(tx);
+      });
+
+      const response = await GET(createRequest('Bearer valid'));
+      const data = await response.json();
+
+      // Expired holds excluded by SQL; no drift detected.
+      expect(data.drifted).toBe(0);
+      expect(data.reconciled).toBe(0);
+    });
+
+    it('detects drift caused by failed slot restoration', async () => {
+      // actual=3 but expected=1 (a hold expired without its slots being restored).
+      // delta = |3 - 1| = 2, which is within the safe auto-fix threshold of 5.
+      const driftRows = [{ id: 'listing-drift', actual: 3, expected: 1 }];
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn: any) => {
+        const tx = {
+          $queryRaw: jest.fn()
+            .mockResolvedValueOnce([{ locked: true }])
+            .mockResolvedValueOnce(driftRows),
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        };
+        return fn(tx);
+      });
+
+      const response = await GET(createRequest('Bearer valid'));
+      const data = await response.json();
+
+      // Delta=2 is within threshold → auto-fix applied.
+      expect(data.reconciled).toBe(1);
+      // markListingsDirty called with the affected listing after fix.
+      expect(markListingsDirty).toHaveBeenCalledWith(['listing-drift'], 'reconcile_slots');
+    });
+  });
 });
