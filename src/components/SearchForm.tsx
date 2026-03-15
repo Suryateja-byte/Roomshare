@@ -104,12 +104,14 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
         return { lat: parsedLat, lng: parsedLng };
     };
-    const [location, setLocation] = useState(searchParams.get('q') || '');
+    const [location, setLocation] = useState(
+        searchParams.get('what') ? '' : (searchParams.get('q') || '')
+    );
     // Show "What" field when semantic search env var is set.
     // Uses NEXT_PUBLIC_ prefix so it's available in client components.
     // Falls back to checking if the "what" param exists in URL (field was previously shown).
     const semanticSearchEnabled = process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH === 'true' || !!searchParams.get('what');
-    const [whatQuery, setWhatQuery] = useState('');
+    const [whatQuery, setWhatQuery] = useState(searchParams.get('what') || '');
     // Track when user is actively typing in location input to prevent URL sync from clearing their text.
     // The chain: typing 3 chars → warning banner renders → header resize → map moveEnd → URL change → sync effect clears input.
     const isUserTypingLocationRef = useRef(false);
@@ -198,8 +200,13 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         // Don't overwrite user's in-progress typing with URL state.
         // Resize-triggered map moveEnd can delete `q` from URL while user is still typing.
         if (!isUserTypingLocationRef.current) {
-            setLocation(searchParams.get('q') || '');
+            // When `what` param is present, `q` contains semantic text — don't copy it into location
+            if (!searchParams.get('what')) {
+                setLocation(searchParams.get('q') || '');
+            }
         }
+        // Keep whatQuery in sync with URL
+        setWhatQuery(searchParams.get('what') || '');
     }, [searchParams]);
 
     const router = useRouter();
@@ -341,7 +348,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         // Clear ALL filter params BEFORE setting new values
         // This prevents stale values from persisting when filters are cleared
         const filterParamsToDelete = [
-            'q', 'minPrice', 'maxPrice', 'lat', 'lng',
+            'q', 'what', 'minPrice', 'maxPrice', 'lat', 'lng',
             'moveInDate', 'leaseDuration', 'roomType',
             'amenities', 'houseRules', 'languages',
             'genderPreference', 'householdGender'
@@ -359,12 +366,17 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
 
         // Semantic "What" query — when filled, use it as `q` for semantic search
-        // and store location separately. When empty, use location as `q` (existing behavior).
+        // and set `what` signal so URL sync knows `q` is semantic, not location.
+        // When empty, remove `what` and use location as `q` (existing behavior).
         const trimmedWhat = whatQuery.trim();
         if (trimmedWhat && trimmedWhat.length >= 2) {
             params.set('q', trimmedWhat);
-        } else if (trimmedLocation && trimmedLocation.length >= 2) {
-            params.set('q', trimmedLocation);
+            params.set('what', trimmedWhat);
+        } else {
+            params.delete('what');
+            if (trimmedLocation && trimmedLocation.length >= 2) {
+                params.set('q', trimmedLocation);
+            }
         }
 
         // Price validation with auto-swap if inverted
