@@ -5,10 +5,10 @@
  */
 import { GoogleGenAI } from "@google/genai";
 
-const MODEL = "gemini-embedding-001";
+const MODEL = "gemini-embedding-2-preview";
 const DIMENSIONS = 768;
 const MAX_RETRIES = 3;
-const MAX_INPUT_LENGTH = 2000; // ~500 tokens, well within 2048 token limit
+const MAX_INPUT_LENGTH = 8000; // ~2000 tokens, well within 8192 token limit
 
 // --- Lazy singleton (survives HMR in dev, fresh in production) ---
 const globalForGemini = globalThis as unknown as {
@@ -24,9 +24,7 @@ function getClient(): GoogleGenAI {
   }
 
   const client = new GoogleGenAI({ apiKey });
-  if (process.env.NODE_ENV !== "production") {
-    globalForGemini.geminiClient = client;
-  }
+  globalForGemini.geminiClient = client;
   return client;
 }
 
@@ -103,6 +101,45 @@ export async function generateQueryEmbedding(
   return generateEmbedding(query, "RETRIEVAL_QUERY");
 }
 
+/** Generate embedding from text + images (multimodal fused vector) */
+export async function generateMultimodalEmbedding(
+  text: string,
+  images: { base64: string; mimeType: string }[],
+  taskType: "RETRIEVAL_QUERY" | "RETRIEVAL_DOCUMENT" = "RETRIEVAL_DOCUMENT"
+): Promise<number[]> {
+  const truncated = text.slice(0, MAX_INPUT_LENGTH);
+  const parts: Array<
+    { text: string } | { inlineData: { mimeType: string; data: string } }
+  > = [
+    { text: truncated },
+    ...images.map((img) => ({
+      inlineData: { mimeType: img.mimeType, data: img.base64 },
+    })),
+  ];
+
+  try {
+    const Sentry = await import("@sentry/nextjs");
+    Sentry.addBreadcrumb({
+      category: "embedding",
+      message: `Generating multimodal embedding (${taskType})`,
+      data: { textLength: truncated.length, imageCount: images.length, taskType },
+      level: "info",
+    });
+  } catch { /* Sentry unavailable in test */ }
+
+  const res = await withRetry(() =>
+    getClient().models.embedContent({
+      model: MODEL,
+      contents: { parts },
+      config: { taskType, outputDimensionality: DIMENSIONS },
+    })
+  );
+  const values = res.embeddings?.[0]?.values;
+  if (!values?.length)
+    throw new Error("[embedding] No multimodal embedding returned from Gemini");
+  return normalizeL2(values);
+}
+
 /** Batch embed multiple texts (for backfill script) */
 export async function generateBatchEmbeddings(
   texts: string[]
@@ -127,3 +164,6 @@ export async function generateBatchEmbeddings(
     return normalizeL2(e.values);
   });
 }
+
+/** Export model name for cache key namespacing */
+export { MODEL as EMBEDDING_MODEL };

@@ -8,7 +8,7 @@
  * Memory: 768 floats × 8 bytes ≈ 6KB per entry. 100 entries ≈ 600KB.
  */
 
-import { generateQueryEmbedding } from "./gemini";
+import { generateQueryEmbedding, EMBEDDING_MODEL } from "./gemini";
 
 const MAX_ENTRIES = 100;
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -23,9 +23,9 @@ const cache = new Map<string, CacheEntry>();
 let hits = 0;
 let misses = 0;
 
-/** Normalize query for cache key: trim + lowercase for case-insensitive matching */
+/** Normalize query for cache key: model-namespaced to prevent cross-model contamination */
 function cacheKey(query: string): string {
-  return query.trim().toLowerCase();
+  return `${EMBEDDING_MODEL}:${query.trim().toLowerCase()}`;
 }
 
 /** Evict the oldest entry (first inserted — Map preserves insertion order) */

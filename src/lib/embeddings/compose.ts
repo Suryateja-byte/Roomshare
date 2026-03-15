@@ -70,10 +70,10 @@ export function composeListingText(listing: {
     parts.push(`Booking mode: ${listing.bookingMode}.`);
   }
 
+  // Use city + state only — full street address is PII per project rules
+  // and should not be sent to external APIs (Gemini embedding)
   if (listing.city && listing.state) {
     parts.push(`Located in ${listing.city}, ${listing.state}.`);
-  } else if (listing.address) {
-    parts.push(`Address: ${listing.address}.`);
   }
 
   if (listing.moveInDate) {

@@ -111,6 +111,7 @@ const serverEnvSchema = z.object({
   // AI / Embeddings
   GEMINI_API_KEY: z.string().min(1).optional(),
   ENABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
+  ENABLE_IMAGE_EMBEDDINGS: z.enum(["true", "false"]).optional(),
   SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
 
   // Node environment
@@ -158,6 +159,13 @@ const serverEnvSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "ENABLE_SOFT_HOLDS=on requires ENABLE_MULTI_SLOT_BOOKING=true",
       path: ["ENABLE_SOFT_HOLDS"],
+    });
+  }
+  if (data.ENABLE_IMAGE_EMBEDDINGS === "true" && data.ENABLE_SEMANTIC_SEARCH !== "true") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "ENABLE_IMAGE_EMBEDDINGS requires ENABLE_SEMANTIC_SEARCH=true",
+      path: ["ENABLE_IMAGE_EMBEDDINGS"],
     });
   }
 });
@@ -465,6 +473,12 @@ export const features = {
   },
   get semanticSearch() {
     return process.env.ENABLE_SEMANTIC_SEARCH === "true";
+  },
+  get imageEmbeddings() {
+    return (
+      process.env.ENABLE_IMAGE_EMBEDDINGS === "true" &&
+      features.semanticSearch
+    );
   },
   get semanticWeight(): number {
     const val = Number(process.env.SEMANTIC_WEIGHT);

@@ -62,4 +62,53 @@ describe("composeListingText", () => {
     expect(text).not.toContain("Booking mode:");
     expect(text).not.toContain("Available from");
   });
+
+  // PII safety: street address must NOT be included in embedding text
+  describe("PII address exclusion", () => {
+    it("does NOT include street address in output", () => {
+      const text = composeListingText({
+        title: "Room",
+        description: "Desc",
+        price: 500,
+        address: "123 Main St, Apt 4B",
+        city: "Austin",
+        state: "TX",
+      });
+      expect(text).not.toContain("123 Main St");
+      expect(text).not.toContain("Apt 4B");
+      expect(text).not.toContain("Address:");
+    });
+
+    it("includes city + state when both present", () => {
+      const text = composeListingText({
+        title: "Room",
+        description: "Desc",
+        price: 500,
+        city: "Austin",
+        state: "TX",
+      });
+      expect(text).toContain("Located in Austin, TX");
+    });
+
+    it("omits location when only city (no state)", () => {
+      const text = composeListingText({
+        title: "Room",
+        description: "Desc",
+        price: 500,
+        city: "Austin",
+      });
+      expect(text).not.toContain("Located in");
+    });
+
+    it("omits address even when no city/state provided", () => {
+      const text = composeListingText({
+        title: "Room",
+        description: "Desc",
+        price: 500,
+        address: "456 Oak Ave",
+      });
+      expect(text).not.toContain("456 Oak Ave");
+      expect(text).not.toContain("Address:");
+    });
+  });
 });
