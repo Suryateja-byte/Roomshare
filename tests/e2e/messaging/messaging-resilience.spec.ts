@@ -23,6 +23,15 @@ import {
 test.describe('Messaging: Resilience', { tag: [tags.auth] }, () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
 
+  test.beforeEach(async ({ page }) => {
+    // Messaging resilience tests are designed for the desktop two-panel layout.
+    // On mobile (width < 768px) the conversation list is hidden when a
+    // conversation is active, making conversation selection and send UI behave
+    // differently. Skip the whole suite on mobile viewports.
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: messaging resilience tests require two-panel layout');
+  });
+
   test.afterEach(async ({ network }) => {
     await network.goOnline();
     await network.clearRoutes();

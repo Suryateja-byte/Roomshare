@@ -301,11 +301,15 @@ test.describe('Edge Case Journeys', () => {
       // Go offline
       await network.goOffline();
 
-      // Try to navigate
-      const navLink = page.locator('main').getByRole('link', { name: /search|listing/i }).first();
-      if (await navLink.isVisible().catch(() => false)) {
-        await navLink.click({ force: true });
-        await page.waitForLoadState('domcontentloaded').catch(() => {});
+      // Try to navigate — wrap in try/catch as navigation may throw when offline
+      try {
+        const navLink = page.locator('main').getByRole('link', { name: /search|listing/i }).first();
+        if (await navLink.isVisible().catch(() => false)) {
+          await navLink.click({ force: true });
+          await page.waitForLoadState('domcontentloaded').catch(() => {});
+        }
+      } catch {
+        // Expected: navigation errors when offline
       }
 
       // Should show offline indicator or error

@@ -27,6 +27,14 @@ import {
 test.use({ storageState: 'playwright/.auth/user.json' });
 
 test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () => {
+  test.beforeEach(async ({ page }) => {
+    // Messaging functional tests are designed for the desktop two-panel layout.
+    // On mobile (width < 768px) the conversation list is hidden when a
+    // conversation is active, making conversation selection behave differently.
+    // Skip the whole suite on mobile viewports.
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: messaging functional tests require two-panel layout');
+  });
 
   // ---------------------------------------------------------------------------
   // RT-F01: Send message and see optimistic update

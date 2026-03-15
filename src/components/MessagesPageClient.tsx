@@ -735,7 +735,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                         {/* Header */}
                         <header className="h-[72px] px-6 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800">
                             <div className="flex items-center gap-3">
-                                <button onClick={() => setActiveId(null)} className="md:hidden p-2 -ml-2 text-zinc-500 dark:text-zinc-400"><ArrowLeft className="w-5 h-5" /></button>
+                                <button data-testid="back-button" aria-label="Back to conversations" onClick={() => setActiveId(null)} className="md:hidden p-2 -ml-2 text-zinc-500 dark:text-zinc-400"><ArrowLeft className="w-5 h-5" /></button>
                                 <div className={`flex items-center gap-3 ${isBlocked ? 'opacity-50 grayscale' : ''}`}>
                                     <UserAvatar image={otherParticipant?.image} name={otherParticipant?.name} size="sm" />
                                     <div>

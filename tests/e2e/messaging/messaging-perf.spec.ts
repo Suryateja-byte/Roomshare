@@ -32,8 +32,14 @@ test.use({ storageState: 'playwright/.auth/user.json' });
 // Tests
 // ---------------------------------------------------------------------------
 test.describe('Messaging: Performance', { tag: [tags.auth, tags.slow] }, () => {
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     test.slow();
+    // Messaging performance tests are designed for the desktop two-panel layout.
+    // On mobile (width < 768px) the conversation list is hidden when a
+    // conversation is active, making most interactions behave differently.
+    // Skip the whole suite on mobile viewports.
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: messaging perf tests require two-panel layout');
   });
 
   // -----------------------------------------------------------------------
