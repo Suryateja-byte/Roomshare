@@ -224,7 +224,7 @@ export function FilterModal({
                 Lease Duration
               </label>
               <Select value={leaseDuration} onValueChange={onLeaseDurationChange}>
-                <SelectTrigger id="filter-lease">
+                <SelectTrigger id="filter-lease" aria-label="Lease Duration">
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
@@ -244,7 +244,7 @@ export function FilterModal({
                 Room Type
               </label>
               <Select value={roomType} onValueChange={onRoomTypeChange}>
-                <SelectTrigger id="filter-room-type">
+                <SelectTrigger id="filter-room-type" aria-label="Room Type">
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
@@ -463,7 +463,7 @@ export function FilterModal({
                 Gender Preference
               </label>
               <Select value={genderPreference} onValueChange={onGenderPreferenceChange}>
-                <SelectTrigger id="filter-gender-pref">
+                <SelectTrigger id="filter-gender-pref" aria-label="Gender Preference">
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
@@ -481,7 +481,7 @@ export function FilterModal({
                 Household Gender
               </label>
               <Select value={householdGender} onValueChange={onHouseholdGenderChange}>
-                <SelectTrigger id="filter-household-gender">
+                <SelectTrigger id="filter-household-gender" aria-label="Household Gender">
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
