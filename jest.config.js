@@ -45,7 +45,7 @@ const customJestConfig = {
   testMatch: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)"],
   transformIgnorePatterns: [
     // Allow next-auth, @auth, jose, and styled-jsx packages to be transformed (ESM modules)
-    "node_modules/(?!(next-auth|@auth|jose|oauth4webapi|preact|preact-render-to-string|styled-jsx)/)",
+    "node_modules/(?!(next-auth|@auth|jose|oauth4webapi|preact|preact-render-to-string|styled-jsx|@google/genai|p-retry)/)",
     "^.+\\.module\\.(css|sass|scss)$",
   ],
 };
