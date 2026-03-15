@@ -14,7 +14,7 @@ test.describe('Mobile Profile', () => {
     ).toBeVisible({ timeout: 15000 });
 
     // Check profile name is visible — testUser is "E2E Test User"
-    const profileName = page.locator('[data-testid="profile-name"]');
+    const profileName = page.locator('[data-testid="profile-name"]').first();
     await expect(profileName).toBeVisible({ timeout: 10000 });
     await expect(profileName).toContainText(/test user|e2e/i);
 
