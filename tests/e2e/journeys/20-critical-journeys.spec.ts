@@ -235,12 +235,6 @@ test.describe("J6: Image Carousel on Listing", () => {
     const images = page.locator("img").filter({ hasNot: page.locator('[role="presentation"]') });
     await expect(images.first()).toBeVisible({ timeout: 10000 });
 
-    // Check for carousel controls (next/prev buttons)
-    const carouselNext = page
-      .getByRole("button", { name: /next/i })
-      .or(page.locator('[data-testid="carousel-next"]'))
-      .or(page.locator('[aria-label*="next" i]'));
-
     // Just verify page doesn't crash
     await expect(page.locator("body")).toBeVisible();
   });
@@ -294,11 +288,6 @@ test.describe("J9: Auth — Forgot Password (Authenticated)", () => {
 
     // Forgot password should be accessible regardless of auth state
     // Should have email input or redirect to a relevant page
-    const emailField = page
-      .getByLabel(/email/i)
-      .or(page.locator('input[type="email"]'))
-      .or(page.locator('input[name="email"]'));
-
     // Either shows the form or redirects authenticated users
     await expect(page.locator("body")).toBeVisible();
   });
@@ -323,12 +312,7 @@ test.describe("J10: Booking Request Flow", () => {
     await nav.clickListingCard(0);
     await expect(page).toHaveURL(/\/listings\//);
 
-    // Look for booking/apply section
-    const bookingSection = page
-      .getByRole("button", { name: /book|apply|request|reserve/i })
-      .or(page.locator('[data-testid="booking-form"]'))
-      .or(page.locator('[data-testid="booking-button"]'))
-      .or(page.getByText(/book|apply|request/i));
+    // Booking/apply section may or may not exist depending on listing state
 
     // Page should be functional
     await assert.pageLoaded();
@@ -485,13 +469,7 @@ test.describe("J14: Favorites — Save & View", () => {
     await nav.clickListingCard(0);
     await expect(page).toHaveURL(/\/listings\//);
 
-    // Look for save/favorite button
-    const favBtn = page
-      .getByRole("button", { name: /save|favorite|heart|bookmark/i })
-      .or(page.locator('[data-testid="save-button"]'))
-      .or(page.locator('[data-testid="favorite-button"]'))
-      .or(page.locator('[aria-label*="save" i]'))
-      .or(page.locator('[aria-label*="favorite" i]'));
+    // Save/favorite button may exist on listing detail
 
     await expect(page.locator("body")).toBeVisible();
   });
@@ -563,12 +541,7 @@ test.describe("J17: Reviews on Listing", () => {
     await nav.clickListingCard(0);
     await expect(page).toHaveURL(/\/listings\//);
 
-    // Look for reviews section
-    const reviewsSection = page
-      .getByText(/review/i)
-      .or(page.locator('[data-testid="reviews"]'))
-      .or(page.locator('[data-testid="review-section"]'))
-      .or(page.getByRole("heading", { name: /review/i }));
+    // Reviews section may or may not exist
 
     // Reviews section may or may not be present
     await expect(page.locator("body")).toBeVisible();
@@ -614,13 +587,7 @@ test.describe("J19: Mobile Responsive Navigation", () => {
     await nav.goHome();
     await page.waitForLoadState('domcontentloaded');
 
-    // Should have a hamburger menu or mobile nav
-    const mobileMenu = page
-      .getByRole("button", { name: /menu/i })
-      .or(page.locator('[data-testid="mobile-menu"]'))
-      .or(page.locator('[aria-label*="menu" i]'))
-      .or(page.locator('[class*="hamburger"]'))
-      .or(page.locator('button[class*="menu"]'));
+    // Mobile menu may be present depending on viewport
 
     // Page should still be functional
     await expect(page.locator("body")).toBeVisible();
@@ -661,12 +628,6 @@ test.describe("J20: Error Handling & 404", () => {
     await page.goto("/listings/non-existent-listing-id-xyz-000");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState('domcontentloaded');
-
-    // Should show error or not-found state
-    const errorContent = page
-      .getByText(/not found|error|doesn.?t exist|no listing|couldn.?t find/i)
-      .or(page.locator('[data-testid="not-found"]'))
-      .or(page.locator(selectors.errorMessage));
 
     // Page should at least render something (not blank white screen)
     await expect(page.locator("body")).toBeVisible();

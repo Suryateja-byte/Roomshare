@@ -156,10 +156,11 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
             <button
                 ref={triggerButtonRef}
                 onClick={handleOpen}
+                aria-label="Save search"
                 className={`inline-flex items-center gap-2 h-11 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap ${className}`}
             >
-                <Bookmark className="w-4 h-4" />
-                <span className="hidden sm:inline">Save Search</span>
+                <Bookmark className="w-4 h-4" aria-hidden="true" />
+                <span className="hidden sm:inline" aria-hidden="true">Save Search</span>
             </button>
 
             {/* Modal */}

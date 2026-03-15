@@ -314,7 +314,11 @@ test.describe("Map Error Handling", () => {
           // OverlayProvider / Radix UI errors in dev mode
           !err.includes("OverlayProvider") &&
           // ResizeObserver loop limit exceeded (benign browser warning)
-          !err.includes("ResizeObserver"),
+          !err.includes("ResizeObserver") &&
+          // Third-party resource loading failures (e.g. fonts, tiles) returning 403/404
+          !err.includes("Failed to load resource") &&
+          !err.includes("403") &&
+          !err.includes("404"),
       );
 
       // Should have no unexpected console errors (soft assertion to surface issues without blocking)
