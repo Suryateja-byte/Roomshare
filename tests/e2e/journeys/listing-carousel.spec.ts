@@ -163,6 +163,11 @@ test.describe("Listing Card Carousel", () => {
   test(`${tags.anon} - Previous button becomes visible after navigation`, async ({
     page,
   }) => {
+    // Carousel hover controls rely on CSS group-hover which doesn't fire on
+    // touch/mobile devices. Skip this test on mobile viewports.
+    const viewport = page.viewportSize();
+    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: carousel hover controls not applicable on mobile');
+
     const carouselRegion = searchResultsContainer(page)
       .locator('[aria-label^="Image carousel"]')
       .first();

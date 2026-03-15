@@ -2,7 +2,6 @@ import { cache } from 'react';
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import { getReviews } from '@/lib/data';
-import { trackListingView } from '@/app/actions/listing-status';
 import { Metadata } from 'next';
 import { auth } from '@/auth';
 import { logger, sanitizeErrorMessage } from '@/lib/logger';
@@ -84,108 +83,76 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ListingPage({ params }: PageProps) {
     const { id } = await params;
-    const session = await auth();
     const listing = await getListingWithLocation(id);
 
     if (!listing) {
         notFound();
     }
 
+    let session = null;
+    let isOwner = false;
+    let isAdmin = false;
+
+    if (listing.status !== 'ACTIVE') {
+        session = await auth();
+        isOwner = session?.user?.id === listing.ownerId;
+        isAdmin = session?.user?.isAdmin === true;
+        if (!isOwner && !isAdmin) {
+            notFound();
+        }
+    }
+
     // Start similar listings fetch early (runs in parallel with remaining queries)
     const similarListingsPromise = getSimilarListings(id);
 
-    const isOwner = session?.user?.id === listing.ownerId;
-    const isAdmin = session?.user?.isAdmin === true;
-    if (listing.status !== 'ACTIVE' && !isOwner && !isAdmin) {
-        notFound();
-    }
-
-    // Fetch coordinates from PostGIS for the Neighborhood AI Agent
-    let coordinates: { lat: number; lng: number } | null = null;
-    if (listing.location) {
-        try {
-            const coordsResult = await prisma.$queryRaw<Array<{ lat: number; lng: number }>>`
-                SELECT
-                    ST_Y(coords::geometry) as lat,
-                    ST_X(coords::geometry) as lng
-                FROM "Location"
-                WHERE "listingId" = ${listing.id}
-                AND coords IS NOT NULL
-            `;
-            if (coordsResult.length > 0 && coordsResult[0].lat && coordsResult[0].lng) {
-                coordinates = {
-                    lat: Number(coordsResult[0].lat),
-                    lng: Number(coordsResult[0].lng),
-                };
+    const [coordinates, acceptedBookings, reviews] = await Promise.all([
+        (async () => {
+            if (!listing.location) {
+                return null;
             }
-        } catch (error) {
-            logger.sync.error('Failed to fetch coordinates', {
-                listingId: listing.id,
-                error: sanitizeErrorMessage(error),
-            });
-        }
-    }
 
-    // Fetch accepted bookings for availability display
-    const acceptedBookings = await prisma.booking.findMany({
-        where: {
-            listingId: id,
-            status: { in: ['ACCEPTED', 'HELD'] },
-            endDate: {
-                gte: new Date(), // Only future bookings
-            },
-        },
-        select: {
-            startDate: true,
-            endDate: true,
-        },
-        orderBy: {
-            startDate: 'asc',
-        },
-    });
+            try {
+                const coordsResult = await prisma.$queryRaw<Array<{ lat: number; lng: number }>>`
+                    SELECT
+                        ST_Y(coords::geometry) as lat,
+                        ST_X(coords::geometry) as lng
+                    FROM "Location"
+                    WHERE "listingId" = ${listing.id}
+                    AND coords IS NOT NULL
+                `;
+                if (coordsResult.length > 0 && coordsResult[0].lat && coordsResult[0].lng) {
+                    return {
+                        lat: Number(coordsResult[0].lat),
+                        lng: Number(coordsResult[0].lng),
+                    };
+                }
+            } catch (error) {
+                logger.sync.error('Failed to fetch coordinates', {
+                    listingId: listing.id,
+                    error: sanitizeErrorMessage(error),
+                });
+            }
 
-    const reviews = await getReviews(listing.id);
-
-    // Check if logged-in user has already reviewed this listing
-    let userExistingReview = null;
-    let userHasBooking = false;
-    if (session?.user?.id && !isOwner) {
-        const existingReview = await prisma.review.findFirst({
+            return null;
+        })(),
+        prisma.booking.findMany({
             where: {
-                listingId: listing.id,
-                authorId: session.user.id,
+                listingId: id,
+                status: { in: ['ACCEPTED', 'HELD'] },
+                endDate: {
+                    gte: new Date(),
+                },
             },
             select: {
-                id: true,
-                rating: true,
-                comment: true,
-                createdAt: true,
+                startDate: true,
+                endDate: true,
             },
-        });
-
-        if (existingReview) {
-            userExistingReview = {
-                id: existingReview.id,
-                rating: existingReview.rating,
-                comment: existingReview.comment,
-                createdAt: existingReview.createdAt.toISOString(),
-            };
-        }
-
-        // Check if user has any booking history with this listing (required for reviews)
-        const bookingExists = await prisma.booking.findFirst({
-            where: {
-                listingId: listing.id,
-                tenantId: session.user.id,
+            orderBy: {
+                startDate: 'asc',
             },
-        });
-        userHasBooking = !!bookingExists;
-    }
-
-    // Track view if user is not the owner (works for both logged-in and anonymous users)
-    if (!isOwner) {
-        await trackListingView(listing.id);
-    }
+        }),
+        getReviews(listing.id),
+    ]);
 
     const similarListingsRaw = await similarListingsPromise;
 
@@ -245,8 +212,8 @@ export default async function ListingPage({ params }: PageProps) {
             reviews={reviews}
             isOwner={isOwner}
             isLoggedIn={!!session?.user}
-            userHasBooking={userHasBooking}
-            userExistingReview={userExistingReview}
+            userHasBooking={false}
+            userExistingReview={null}
             bookedDates={bookedDates}
             holdEnabled={features.softHoldsEnabled}
             coordinates={coordinates}

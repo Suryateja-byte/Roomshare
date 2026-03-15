@@ -12,7 +12,7 @@ test.describe('Mobile Notifications', () => {
   test('MN-01: Notifications page renders in mobile layout', async ({ page }) => {
     // Wait for the notifications page to load
     await expect(
-      page.locator('[data-testid="notifications-page"]')
+      page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // Check heading is visible
@@ -29,7 +29,7 @@ test.describe('Mobile Notifications', () => {
 
   test('MN-02: Notification items display correctly (no overflow)', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="notifications-page"]')
+      page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     const notificationItems = page.locator('[data-testid="notification-item"]');
@@ -67,7 +67,7 @@ test.describe('Mobile Notifications', () => {
 
   test('MN-03: Tap actions work (mark read, delete)', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="notifications-page"]')
+      page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     const notificationItems = page.locator('[data-testid="notification-item"]');
@@ -106,7 +106,7 @@ test.describe('Mobile Notifications', () => {
 
   test('MN-04: Filter tabs render and are tappable', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="notifications-page"]')
+      page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // Filter tabs: All and Unread
@@ -142,7 +142,7 @@ test.describe('Mobile Notifications', () => {
 
   test('MN-05: Empty state renders correctly', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="notifications-page"]')
+      page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // Switch to unread filter to potentially see empty state
@@ -178,7 +178,7 @@ test.describe('Mobile Notifications', () => {
 
   test('MN-06: Notification count or badge in header area', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="notifications-page"]')
+      page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // The notifications page header shows unread count text:

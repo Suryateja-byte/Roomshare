@@ -351,123 +351,117 @@ export function getCursorSecret(): string {
 // Backward-compatible export — defers check to first access
 export const CURSOR_SECRET = process.env.CURSOR_SECRET ?? "";
 
+export function getOptionalCursorSecret(): string {
+  const secret = process.env.CURSOR_SECRET ?? "";
+  return hasStrongSecret(secret) ? secret : "";
+}
+
+const PLACEHOLDER_SECRET_PATTERN =
+  /change-in-production|placeholder|dummy|example|test-secret|YOUR_/i;
+
+function hasValue(value: string | undefined): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function hasStrongSecret(value: string | undefined): boolean {
+  return hasValue(value) && value.length >= 32 && !PLACEHOLDER_SECRET_PATTERN.test(value);
+}
+
 // Helper to check if a feature is available
-// Uses getters to defer env access to runtime (prevents import-time validation noise)
+// Uses direct env reads so unrelated secret validation cannot break public page renders.
 export const features = {
   get email() {
-    const e = getServerEnv();
-    return !!e.RESEND_API_KEY;
+    return hasValue(process.env.RESEND_API_KEY);
   },
   get geocoding() {
     // Geocoding is always available (Photon + Nominatim, no API key needed)
     return true;
   },
   get redis() {
-    const e = getServerEnv();
-    return !!(e.UPSTASH_REDIS_REST_URL && e.UPSTASH_REDIS_REST_TOKEN);
+    return hasValue(process.env.UPSTASH_REDIS_REST_URL) && hasValue(process.env.UPSTASH_REDIS_REST_TOKEN);
   },
   get aiChat() {
-    const e = getServerEnv();
-    return !!e.GROQ_API_KEY;
+    return hasValue(process.env.GROQ_API_KEY);
   },
   get realtime() {
-    const c = getClientEnv();
-    return !!(c.NEXT_PUBLIC_SUPABASE_URL && c.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    return hasValue(process.env.NEXT_PUBLIC_SUPABASE_URL) && hasValue(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   },
   get errorTracking() {
-    const e = getServerEnv();
-    return !!e.SENTRY_DSN;
+    return hasValue(process.env.SENTRY_DSN);
   },
   get maps() {
-    const c = getClientEnv();
-    return !!c.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    return hasValue(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
   },
   // Stadia Maps basemap tiles (optional - falls back to domain auth or works on localhost)
   get stadiaMaps() {
-    const c = getClientEnv();
-    return !!c.NEXT_PUBLIC_STADIA_API_KEY;
+    return hasValue(process.env.NEXT_PUBLIC_STADIA_API_KEY);
   },
   // Security features
   get cronAuth() {
-    const e = getServerEnv();
-    return !!e.CRON_SECRET;
+    return hasStrongSecret(process.env.CRON_SECRET);
   },
   get metricsAuth() {
-    const e = getServerEnv();
-    return !!e.METRICS_SECRET;
+    return hasStrongSecret(process.env.METRICS_SECRET);
   },
   get originEnforcement() {
-    const e = getServerEnv();
-    return !!(e.ALLOWED_ORIGINS || e.ALLOWED_HOSTS);
+    return hasValue(process.env.ALLOWED_ORIGINS) || hasValue(process.env.ALLOWED_HOSTS);
   },
   get metricsHmac() {
-    const e = getServerEnv();
-    return !!e.LOG_HMAC_SECRET;
+    return hasStrongSecret(process.env.LOG_HMAC_SECRET);
   },
   get googlePlaces() {
-    const e = getServerEnv();
-    return !!e.GOOGLE_PLACES_API_KEY;
+    return hasValue(process.env.GOOGLE_PLACES_API_KEY);
   },
   get supabaseStorage() {
-    const e = getServerEnv();
-    return !!e.SUPABASE_SERVICE_ROLE_KEY;
+    return hasValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
   },
   // Nearby Places (Radar API)
   get nearbyPlaces() {
-    const e = getServerEnv();
-    const c = getClientEnv();
     return !!(
-      e.RADAR_SECRET_KEY &&
-      c.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY &&
-      c.NEXT_PUBLIC_NEARBY_ENABLED === "true"
+      hasValue(process.env.RADAR_SECRET_KEY) &&
+      hasValue(process.env.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY) &&
+      process.env.NEXT_PUBLIC_NEARBY_ENABLED === "true"
     );
   },
   // Search v2 features (always enabled - no env vars needed for backward compat)
   searchV2: true as const,
-  searchKeyset: true as const,
+  get searchKeyset() {
+    return hasValue(getOptionalCursorSecret());
+  },
   searchRanking: true as const,
   // SearchDoc optimized queries (CRITICAL for production performance)
   get searchDoc() {
-    const e = getServerEnv();
-    return e.ENABLE_SEARCH_DOC === "true";
+    return process.env.ENABLE_SEARCH_DOC === "true";
   },
   // Cloudflare Turnstile bot protection
   get turnstile() {
-    const e = getServerEnv();
-    const c = getClientEnv();
     return (
-      e.TURNSTILE_ENABLED === "true" &&
-      !!e.TURNSTILE_SECRET_KEY &&
-      !!c.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+      process.env.TURNSTILE_ENABLED === "true" &&
+      hasValue(process.env.TURNSTILE_SECRET_KEY) &&
+      hasValue(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
     );
   },
   // Multi-slot booking feature flags
   get multiSlotBooking() {
-    const e = getServerEnv();
-    return e.ENABLE_MULTI_SLOT_BOOKING === "true";
+    return process.env.ENABLE_MULTI_SLOT_BOOKING === "true";
   },
   get wholeUnitMode() {
-    const e = getServerEnv();
-    return e.ENABLE_WHOLE_UNIT_MODE === "true";
+    return process.env.ENABLE_WHOLE_UNIT_MODE === "true";
   },
   get softHoldsEnabled() {
-    const e = getServerEnv();
-    return e.ENABLE_SOFT_HOLDS === "on";
+    return process.env.ENABLE_SOFT_HOLDS === "on";
   },
   get softHoldsDraining() {
-    const e = getServerEnv();
-    return e.ENABLE_SOFT_HOLDS === "drain";
+    return process.env.ENABLE_SOFT_HOLDS === "drain";
   },
   get bookingAudit() {
-    const e = getServerEnv();
-    return e.ENABLE_BOOKING_AUDIT === "true";
+    return process.env.ENABLE_BOOKING_AUDIT === "true";
   },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals
   get searchDebugRanking() {
-    const e = getServerEnv();
     // Allow debug in non-production environments
-    if (e.NODE_ENV !== "production") return true;
+    if (process.env.NODE_ENV !== "production") return true;
     // In production, require explicit env flag (for staging/preview debugging)
     return process.env.SEARCH_DEBUG_RANKING === "true";
   },

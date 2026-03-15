@@ -165,7 +165,12 @@ const houseRules = [
 
 const roomTypes = ["Private Room", "Shared Room", "Entire Place"];
 const leaseDurations = ["Month-to-month", "3 months", "6 months", "12 months"];
-const genderPrefs = ["Any", "Male Only", "Female Only"];
+// CHECK constraint: genderPreference IN ('MALE_ONLY','FEMALE_ONLY','NO_PREFERENCE')
+const genderPrefs = ["NO_PREFERENCE", "MALE_ONLY", "FEMALE_ONLY"];
+// CHECK constraint: householdGender IN ('ALL_MALE','ALL_FEMALE','MIXED')
+const householdGenders = ["MIXED", "ALL_MALE", "ALL_FEMALE"];
+// CHECK constraint: booking_mode IN ('SHARED', 'WHOLE_UNIT')
+const bookingModes = ["SHARED", "WHOLE_UNIT"];
 
 async function main() {
     // Get the user ID for the owner
@@ -198,11 +203,12 @@ async function main() {
                     ],
                     amenities: amenitySet,
                     houseRules: ruleSet,
-                    languages: ["English"],
+                    householdLanguages: ["English"],
                     genderPreference: genderPrefs[i % genderPrefs.length],
-                    householdGender: "Mixed",
+                    householdGender: householdGenders[i % householdGenders.length],
                     leaseDuration: leaseDurations[i % leaseDurations.length],
                     roomType: roomTypes[i % roomTypes.length],
+                    bookingMode: bookingModes[i % bookingModes.length],
                     totalSlots: 2,
                     availableSlots: 1,
                     status: "ACTIVE",

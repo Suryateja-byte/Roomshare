@@ -152,7 +152,7 @@ test.describe('ADM: Listing Management', () => {
     await page.goto('/admin/listings');
     await expect(page.getByRole('heading', { name: /listing moderation/i })).toBeVisible({ timeout: 30_000 });
 
-    await expect(page.getByPlaceholder(/search by title or owner/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/search by title or owner/i).first()).toBeVisible();
 
     // Status filter buttons
     await expect(page.getByRole('button', { name: /^all$/i })).toBeVisible();

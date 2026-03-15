@@ -2,6 +2,7 @@
 
 import { Suspense, useRef, lazy } from 'react';
 import { LazyMotion, domAnimation, m, Variants } from 'framer-motion';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -22,11 +23,9 @@ const staggerContainer: Variants = {
     }
 };
 
-interface HomeClientProps {
-    isLoggedIn?: boolean;
-}
-
-export default function HomeClient({ isLoggedIn = false }: HomeClientProps) {
+export default function HomeClient() {
+    const { data: session, status } = useSession();
+    const isLoggedIn = !!session?.user;
     const searchFormRef = useRef<HTMLDivElement>(null);
 
     return (
@@ -64,7 +63,7 @@ export default function HomeClient({ isLoggedIn = false }: HomeClientProps) {
                                         </Suspense>
                                     </m.div>
 
-                                    {!isLoggedIn && (
+                                    {status !== 'loading' && !isLoggedIn && (
                                         <m.div variants={fadeInUp} className="mt-8 flex items-center justify-center lg:justify-start gap-3 text-sm">
                                             <span className="text-zinc-400">New here?</span>
                                             <Link href="/signup" className="font-medium text-zinc-900 dark:text-white hover:underline underline-offset-4 transition-colors">

@@ -1,6 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
+import dns from 'node:dns';
 import dotenv from 'dotenv';
 import path from 'path';
+
+// Node.js >=17 defaults to IPv6-first DNS resolution.
+// GitHub Actions runners resolve "localhost" to ::1 (IPv6) but Next.js
+// binds to 127.0.0.1 (IPv4). Force IPv4-first to prevent ECONNREFUSED.
+dns.setDefaultResultOrder('ipv4first');
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });
@@ -160,23 +166,20 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    // Clean Next.js lockfile before starting to avoid WSL/NTFS permission issues
-    command: 'pnpm run clean:next-locks && pnpm run dev',
-    // Wait for ready endpoint (checks database connectivity)
-    url: 'http://localhost:3000/api/health/ready',
-    // Reuse existing server locally for faster iteration, fresh in CI
-    reuseExistingServer: !process.env.CI,
-    // Increase timeout for cold starts with database initialization
-    timeout: 180000,
-    stdout: 'pipe',
-    stderr: 'pipe',
-    // Forward dotenv-loaded vars (AUTH_SECRET, etc.) to the child process
-    env: Object.fromEntries(
-      Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] != null),
-    ),
-  },
+  /* Start dev server locally; skip in CI where server is started manually */
+  webServer: process.env.E2E_BASE_URL
+    ? undefined  // CI: server already running (started by workflow before tests)
+    : {
+        command: 'pnpm run dev',
+        url: 'http://localhost:3000/api/health/ready',
+        reuseExistingServer: true,
+        timeout: 180000,
+        stdout: 'pipe',
+        stderr: 'pipe',
+        env: Object.fromEntries(
+          Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] != null),
+        ),
+      },
 
   /* Output folder for test artifacts */
   outputDir: 'test-results/',

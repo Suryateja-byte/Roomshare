@@ -1,5 +1,4 @@
-import { auth } from '@/auth';
-import { getListingsPaginated, getSavedListingIds, analyzeFilterImpact, PaginatedResult, PaginatedResultHybrid, ListingData, type FilterSuggestion } from '@/lib/data';
+import { getListingsPaginated, PaginatedResult, PaginatedResultHybrid, ListingData } from '@/lib/data';
 import SortSelect from '@/components/SortSelect';
 import SaveSearchButton from '@/components/SaveSearchButton';
 import { SearchResultsClient } from '@/components/search/SearchResultsClient';
@@ -7,18 +6,15 @@ import Link from 'next/link';
 import { Search } from 'lucide-react';
 import { parseSearchParams, buildRawParamsFromSearchParams } from '@/lib/search-params';
 import { executeSearchV2 } from '@/lib/search/search-v2-service';
-import { V2MapDataSetter } from '@/components/search/V2MapDataSetter';
 import { V1PathResetSetter } from '@/components/search/V1PathResetSetter';
 import { SearchResultsLoadingWrapper } from '@/components/search/SearchResultsLoadingWrapper';
 import { AppliedFilterChips } from '@/components/filters/AppliedFilterChips';
 import { CategoryBar } from '@/components/search/CategoryBar';
 import { RecommendedFilters } from '@/components/search/RecommendedFilters';
-import type { V2MapData } from '@/contexts/SearchV2DataContext';
 import { features } from '@/lib/env';
 import { withTimeout, DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import { sanitizeErrorMessage } from '@/lib/logger';
-import * as Sentry from '@sentry/nextjs';
 import type { Metadata } from 'next';
 
 type SearchPageSearchParams = {
@@ -117,13 +113,7 @@ export default async function SearchPage({
 }: SearchPageProps) {
     const rawParams = await searchParams;
 
-    const session = await auth();
-    const userId = session?.user?.id;
-
     const { q, filterParams, requestedPage, sortOption, boundsRequired, browseMode } = parseSearchParams(rawParams);
-
-    // Fetch saved listings in parallel (non-blocking)
-    const savedPromise = userId ? getSavedListingIds(userId) : Promise.resolve([]);
 
     // Early return for unbounded searches - check BEFORE any search attempt
     // This ensures friendly UX regardless of V2/V1 path or failures
@@ -161,7 +151,6 @@ export default async function SearchPage({
 
     // Track whether v2 was used successfully
     let usedV2 = false;
-    let v2MapData: V2MapData | null = null;
     let paginatedResult: PaginatedResult<ListingData> | PaginatedResultHybrid<ListingData> | undefined;
     let v2NextCursor: string | null = null;
 
@@ -187,6 +176,7 @@ export default async function SearchPage({
                 executeSearchV2({
                     rawParams: rawParamsForV2,
                     limit: DEFAULT_PAGE_SIZE,
+                    includeMap: false,
                 }),
                 DEFAULT_TIMEOUTS.DATABASE,
                 'SSR-executeSearchV2'
@@ -198,32 +188,16 @@ export default async function SearchPage({
                 usedV2 = true;
                 paginatedResult = v2Result.paginatedResult;
                 v2NextCursor = v2Result.response.list.nextCursor ?? null;
-
-                // Construct v2MapData for context injection
-                // PersistentMapWrapper (in layout) will read this via SearchV2DataContext
-                v2MapData = {
-                    geojson: v2Result.response.map.geojson,
-                    pins: v2Result.response.map.pins,
-                    mode: v2Result.response.meta.mode,
-                };
             } else if (v2Result.error) {
                 // V2 returned error without throwing - log it before falling through to V1
                 const sanitized = sanitizeErrorMessage(v2Result.error);
                 console.warn('[search/page] V2 returned error:', sanitized);
-                Sentry.captureMessage(`V2 search error: ${sanitized}`, {
-                    level: 'warning',
-                    tags: { component: 'search-ssr', fallback: 'v2-to-v1' },
-                });
             }
         } catch (err) {
             // V2 failed - will fall back to v1 below
             const sanitized = sanitizeErrorMessage(err);
             console.warn('[search/page] V2 orchestration failed, falling back to v1:', {
                 error: sanitized,
-            });
-            Sentry.captureMessage(`V2 orchestration failed: ${sanitized}`, {
-                level: 'warning',
-                tags: { component: 'search-ssr', fallback: 'v2-to-v1' },
             });
         }
     }
@@ -240,9 +214,6 @@ export default async function SearchPage({
         );
     }
 
-    // Handle saved listings result
-    const savedListingIds = await savedPromise.catch(() => [] as string[]);
-
     // Ensure paginatedResult is defined (should always be set by v2 or v1 path)
     if (!paginatedResult) {
         throw new Error('Failed to fetch search results');
@@ -256,15 +227,6 @@ export default async function SearchPage({
     // Only show zero-results UI when we have confirmed zero results (total === 0)
     // Not when total is null (unknown count, >100 results)
     const hasConfirmedZeroResults = total !== null && total === 0;
-
-    // Analyze filter impact only when there are confirmed zero results
-    const filterSuggestions = hasConfirmedZeroResults
-        ? await withTimeout(
-            analyzeFilterImpact(filterParams),
-            DEFAULT_TIMEOUTS.DATABASE,
-            'analyzeFilterImpact',
-        ).catch(() => [] as FilterSuggestion[])
-        : [];
 
     // Build search params string for client-side "Load more" fetches
     // Include all filter/sort params but NOT cursor/page (those are managed client-side)
@@ -319,12 +281,13 @@ export default async function SearchPage({
                 initialListings={listings}
                 initialNextCursor={initialNextCursor}
                 initialTotal={total}
-                savedListingIds={savedListingIds}
+                savedListingIds={[]}
                 searchParamsString={searchParamsString}
+                filterParams={filterParams}
                 query={q ?? ""}
                 browseMode={browseMode}
                 hasConfirmedZeroResults={hasConfirmedZeroResults}
-                filterSuggestions={filterSuggestions}
+                filterSuggestions={[]}
                 sortOption={sortOption}
             />
             </div>
@@ -333,14 +296,8 @@ export default async function SearchPage({
 
     return (
         <>
-            {/* Inject map data context for PersistentMapWrapper to consume */}
-            {/* V2MapDataSetter: signals v2 mode active, injects v2 map data */}
-            {/* V1PathResetSetter: signals v1 mode active, resets stale v2 state */}
-            {v2MapData ? (
-                <V2MapDataSetter data={v2MapData} />
-            ) : (
-                <V1PathResetSetter />
-            )}
+            {/* Keep the initial HTML list-first and let the persistent map fetch independently */}
+            <V1PathResetSetter />
             {/* Wrap results with loading indicator for filter transitions */}
             <SearchResultsLoadingWrapper>
                 {listContent}

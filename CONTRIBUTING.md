@@ -316,6 +316,7 @@ All scripts use `pnpm`. Run `pnpm <script>` from the project root.
 | `test:e2e:ci` | CI-optimized E2E (Chromium, list+html reporter) |
 | `seed:e2e` | Seed E2E test data without running tests |
 | `clean:next-locks` | Remove Next.js dev lockfiles |
+| `dev` | Start the webpack-based dev server with the shared startup wrapper |
 | `geocode:compare` | Run geocoding accuracy comparison |
 | `geocode:compare:extended` | Extended geocoding comparison |
 | `geocode:compare:json` | Geocoding comparison (JSON output) |

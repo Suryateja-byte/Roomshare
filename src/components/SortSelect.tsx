@@ -167,7 +167,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
             <div className="hidden md:flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
                 <span>Sort by:</span>
                 <Select value={currentSort} onValueChange={handleSortChange} open={desktopOpen} onOpenChange={setDesktopOpen}>
-                    <SelectTrigger className={`h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 px-3 py-1.5 font-semibold text-xs focus:ring-0 ${
+                    <SelectTrigger aria-label="Sort by" className={`h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 px-3 py-1.5 font-semibold text-xs focus:ring-0 ${
                         isNonDefault ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400'
                     }`}>
                         <SelectValue placeholder="Recommended">

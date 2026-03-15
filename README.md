@@ -179,7 +179,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development setup guide and 
 
 | Command | Description |
 |---|---|
-| `pnpm dev` | Start development server |
+| `pnpm dev` | Start development server (webpack dev + startup cleanup wrapper) |
 | `pnpm build` | Production build |
 | `pnpm start` | Start production server |
 | `pnpm lint` | Run ESLint |

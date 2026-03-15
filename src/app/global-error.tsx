@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import * as Sentry from '@sentry/nextjs';
 
 export default function GlobalError({
   error,
@@ -12,7 +11,9 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Global error boundary caught:', error);
+    }
   }, [error]);
 
   return (

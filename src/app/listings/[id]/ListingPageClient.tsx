@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
     MapPin,
@@ -43,6 +43,8 @@ import VerifiedBadge from '@/components/verification/VerifiedBadge';
 import RoomPlaceholder from '@/components/listings/RoomPlaceholder';
 import { SlotBadge } from '@/components/listings/SlotBadge';
 import { Badge } from '@/components/ui/badge';
+import { useSession } from 'next-auth/react';
+import ListingViewTracker from './ListingViewTracker';
 
 // Lazy-load NeighborhoodChat to avoid loading framer-motion + AI SDK on initial page load
 // This defers ~200KB+ of JS until after the page is interactive
@@ -208,7 +210,18 @@ export default function ListingPageClient({
     coordinates,
     similarListings
 }: ListingPageClientProps) {
+    const { data: session, status: sessionStatus } = useSession();
     const hasImages = listing.images && listing.images.length > 0;
+    const resolvedUserId = session?.user?.id ?? null;
+    const resolvedIsOwner = isOwner || resolvedUserId === listing.ownerId;
+    const resolvedIsLoggedIn = isLoggedIn || sessionStatus === 'authenticated';
+    const viewerReady = isOwner || sessionStatus !== 'loading';
+    const canRenderGuestControls = viewerReady && !resolvedIsOwner;
+    const [viewerState, setViewerState] = useState({
+        hasBookingHistory: userHasBooking,
+        existingReview: userExistingReview,
+        loaded: true,
+    });
 
     // Format gender preference for display
     const formatGenderPreference = (pref: string | null) => {
@@ -232,10 +245,75 @@ export default function ListingPageClient({
         }
     };
 
+    useEffect(() => {
+        if (resolvedIsOwner) {
+            setViewerState({
+                hasBookingHistory: false,
+                existingReview: null,
+                loaded: true,
+            });
+            return;
+        }
+
+        if (sessionStatus === 'loading') {
+            return;
+        }
+
+        if (!resolvedIsLoggedIn) {
+            setViewerState({
+                hasBookingHistory: false,
+                existingReview: null,
+                loaded: true,
+            });
+            return;
+        }
+
+        const controller = new AbortController();
+        setViewerState((current) => ({ ...current, loaded: false }));
+
+        void (async () => {
+            try {
+                const response = await fetch(`/api/listings/${listing.id}/viewer-state`, {
+                    cache: 'no-store',
+                    signal: controller.signal,
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load listing viewer state');
+                }
+
+                const data = await response.json() as {
+                    hasBookingHistory?: boolean;
+                    existingReview?: ListingPageClientProps['userExistingReview'];
+                };
+
+                setViewerState({
+                    hasBookingHistory: data.hasBookingHistory === true,
+                    existingReview: data.existingReview ?? null,
+                    loaded: true,
+                });
+            } catch (error) {
+                if ((error as Error).name === 'AbortError') {
+                    return;
+                }
+
+                setViewerState({
+                    hasBookingHistory: false,
+                    existingReview: null,
+                    loaded: true,
+                });
+            }
+        })();
+
+        return () => controller.abort();
+    }, [listing.id, resolvedIsLoggedIn, resolvedIsOwner, sessionStatus]);
+
     return (
         <div className="min-h-screen bg-background pb-20">
+            <ListingViewTracker listingId={listing.id} ownerId={listing.ownerId} />
+
             {/* Real-time freshness check for non-owners */}
-            {!isOwner && <ListingFreshnessCheck listingId={listing.id} />}
+            {canRenderGuestControls && <ListingFreshnessCheck listingId={listing.id} />}
 
             <div className="pt-6">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -260,10 +338,10 @@ export default function ListingPageClient({
                                 listingId={listing.id}
                                 title={listing.title}
                             />
-                            {!isOwner && isLoggedIn && (
+                            {canRenderGuestControls && resolvedIsLoggedIn && (
                                 <SaveListingButton listingId={listing.id} />
                             )}
-                            {!isOwner && <ReportButton listingId={listing.id} />}
+                            {canRenderGuestControls && <ReportButton listingId={listing.id} />}
                         </div>
                     </div>
 
@@ -289,7 +367,7 @@ export default function ListingPageClient({
 
                             {/* Quick Stats Bar */}
                             <div className="flex flex-wrap items-center gap-6 pb-8 border-b border-zinc-100 dark:border-zinc-800">
-                                {isOwner && (
+                                {viewerReady && resolvedIsOwner && (
                                     <>
                                         <ListingStatusToggle
                                             listingId={listing.id}
@@ -298,7 +376,7 @@ export default function ListingPageClient({
                                         <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
                                     </>
                                 )}
-                                {!isOwner && (
+                                {(!viewerReady || !resolvedIsOwner) && (
                                     <>
                                         <StatusBadge status={listing.status} />
                                         <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
@@ -449,7 +527,7 @@ export default function ListingPageClient({
                                                 </>
                                             )}
                                         </div>
-                                        {!isOwner && (
+                                        {canRenderGuestControls && (
                                             <div className="mt-4">
                                                 <ContactHostButton listingId={listing.id} />
                                             </div>
@@ -468,16 +546,16 @@ export default function ListingPageClient({
                                 </h2>
 
                                 <div className="mb-8">
-                                    <ReviewList reviews={reviews} isOwner={isOwner} />
+                                    <ReviewList reviews={reviews} isOwner={resolvedIsOwner} />
                                 </div>
 
-                                {!isOwner && (
+                                {canRenderGuestControls && viewerState.loaded && (
                                     <ReviewForm
                                         listingId={listing.id}
-                                        isLoggedIn={isLoggedIn}
-                                        hasExistingReview={!!userExistingReview}
-                                        hasBookingHistory={userHasBooking}
-                                        existingReview={userExistingReview || undefined}
+                                        isLoggedIn={resolvedIsLoggedIn}
+                                        hasExistingReview={!!viewerState.existingReview}
+                                        hasBookingHistory={viewerState.hasBookingHistory}
+                                        existingReview={viewerState.existingReview || undefined}
                                     />
                                 )}
                             </div>
@@ -507,7 +585,7 @@ export default function ListingPageClient({
                             <div className="sticky top-24 space-y-6">
 
                                 {/* Owner Management Card */}
-                                {isOwner && (
+                                {resolvedIsOwner && (
                                     <div className="rounded-3xl bg-white dark:bg-zinc-900 p-6 shadow-2xl">
                                         <div className="flex items-center justify-between mb-6">
                                             <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Manage Listing</h3>
@@ -557,7 +635,7 @@ export default function ListingPageClient({
                                 )}
 
                                 {/* Boost Visibility Card (Owner only) */}
-                                {isOwner && (
+                                {resolvedIsOwner && (
                                     <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-zinc-900 rounded-2xl p-5 border border-indigo-100/50 dark:border-indigo-900/50">
                                         <div className="flex gap-3">
                                             <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit">
@@ -575,13 +653,13 @@ export default function ListingPageClient({
                                 )}
 
                                 {/* Guest Booking Card */}
-                                {!isOwner && (
+                                {canRenderGuestControls && (
                                     <BookingForm
                                         listingId={listing.id}
                                         price={listing.price}
                                         ownerId={listing.ownerId}
-                                        isOwner={isOwner}
-                                        isLoggedIn={isLoggedIn}
+                                        isOwner={resolvedIsOwner}
+                                        isLoggedIn={resolvedIsLoggedIn}
                                         status={listing.status as 'ACTIVE' | 'PAUSED' | 'RENTED'}
                                         bookedDates={bookedDates}
                                         holdEnabled={holdEnabled}

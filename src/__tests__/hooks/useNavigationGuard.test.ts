@@ -12,10 +12,17 @@ import { useNavigationGuard } from '@/hooks/useNavigationGuard'
 // Spy on it to track calls without breaking it.
 const nativePushStateSpy = jest.spyOn(window.history, 'pushState')
 
+// Use fake timers — the hook defers setShowDialog via setTimeout(0)
+// to avoid React's "useInsertionEffect must not schedule updates" error.
 beforeEach(() => {
+  jest.useFakeTimers()
   nativePushStateSpy.mockClear()
   // Navigate to a known location using jsdom's built-in mechanism
   window.history.pushState({}, '', 'http://localhost/listings/create')
+})
+
+afterEach(() => {
+  jest.useRealTimers()
 })
 
 afterAll(() => {
@@ -75,6 +82,7 @@ describe('useNavigationGuard', () => {
     // The hook patches window.history.pushState — call it with a different path
     act(() => {
       window.history.pushState(null, '', '/other-page')
+      jest.runAllTimers()
     })
 
     expect(result.current.showDialog).toBe(true)
@@ -88,6 +96,7 @@ describe('useNavigationGuard', () => {
     // Navigate to same pathname with a query param change
     act(() => {
       window.history.pushState(null, '', '/listings/create?step=2')
+      jest.runAllTimers()
     })
 
     expect(result.current.showDialog).toBe(false)
@@ -101,6 +110,7 @@ describe('useNavigationGuard', () => {
     // Trigger dialog via cross-pathname navigation
     act(() => {
       window.history.pushState(null, '', '/other-page')
+      jest.runAllTimers()
     })
     expect(result.current.showDialog).toBe(true)
 
@@ -118,6 +128,7 @@ describe('useNavigationGuard', () => {
     // Trigger dialog via cross-pathname navigation
     act(() => {
       window.history.pushState(null, '', '/other-page')
+      jest.runAllTimers()
     })
     expect(result.current.showDialog).toBe(true)
 
@@ -139,6 +150,7 @@ describe('useNavigationGuard', () => {
 
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+      jest.runAllTimers()
     })
 
     expect(result.current.showDialog).toBe(true)
@@ -176,6 +188,7 @@ describe('useNavigationGuard', () => {
     // Should still function: trigger dialog via popstate
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+      jest.runAllTimers()
     })
     expect(result.current.showDialog).toBe(true)
 
@@ -193,6 +206,7 @@ describe('useNavigationGuard', () => {
     // Cross-pathname push should now go through without showing dialog
     act(() => {
       window.history.pushState(null, '', '/other-page')
+      jest.runAllTimers()
     })
 
     expect(result.current.showDialog).toBe(false)

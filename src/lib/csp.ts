@@ -22,6 +22,8 @@ export function buildCspHeader(nonce?: string): string {
     scriptSrcTokens.push("'unsafe-inline'", "'unsafe-eval'");
   } else if (nonce) {
     scriptSrcTokens.push(`'nonce-${nonce}'`, "'strict-dynamic'");
+    // Required by MapLibre GL for WebGL shader compilation (not application eval)
+    scriptSrcTokens.push("'unsafe-eval'");
   }
   scriptSrcTokens.push("https://maps.googleapis.com", "https://challenges.cloudflare.com");
 

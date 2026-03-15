@@ -442,6 +442,19 @@ export default function PersistentMapWrapper({
     }
   }, [isV2Enabled, hasAnyV2Data, listings.length, hasBoundsInUrl]);
 
+  // BROWSE-MODE FIX: If no data path signal arrives within 500ms,
+  // assume V1 no-bounds path (browse mode) and let the map render.
+  // The map will set bounds via onMoveEnd, triggering the V1 fetch.
+  useEffect(() => {
+    if (dataPathDetermined) return;
+
+    const timeout = setTimeout(() => {
+      setDataPathDetermined(true);
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [dataPathDetermined]);
+
   useEffect(() => {
     if (v2MapData) {
       setLastV2Data(v2MapData);

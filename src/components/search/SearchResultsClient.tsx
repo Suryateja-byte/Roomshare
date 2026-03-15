@@ -13,7 +13,9 @@ import { TotalPriceToggle } from "@/components/search/TotalPriceToggle";
 import { clearAllFilters } from "@/components/filters/filter-chip-utils";
 import { SplitStayCard } from "@/components/search/SplitStayCard";
 import { findSplitStays } from "@/lib/search/split-stay";
+import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import type { ListingData, FilterSuggestion } from "@/lib/data";
+import type { FilterParams } from "@/lib/search-types";
 
 /**
  * Maximum accumulated listings before showing a "continue" link.
@@ -28,6 +30,7 @@ interface SearchResultsClientProps {
   savedListingIds: string[];
   /** Serialized search params for the /api/search/v2 fetch (filters + sort, no cursor/page) */
   searchParamsString: string;
+  filterParams: FilterParams;
   query: string;
   browseMode: boolean;
   hasConfirmedZeroResults: boolean;
@@ -41,6 +44,7 @@ export function SearchResultsClient({
   initialTotal,
   savedListingIds,
   searchParamsString,
+  filterParams,
   query,
   browseMode,
   hasConfirmedZeroResults,
@@ -56,6 +60,10 @@ export function SearchResultsClient({
   const isLoadingRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showTotalPrice, setShowTotalPrice] = useState(false);
+  const [resolvedSavedListingIds, setResolvedSavedListingIds] =
+    useState(savedListingIds);
+  const [resolvedFilterSuggestions, setResolvedFilterSuggestions] =
+    useState(filterSuggestions);
 
   // Hydrate showTotalPrice from sessionStorage after mount to avoid hydration mismatch
   useEffect(() => {
@@ -80,7 +88,10 @@ export function SearchResultsClient({
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
 
   // O(1) lookup for saved listing IDs instead of O(n) .includes()
-  const savedIdsSet = useMemo(() => new Set(savedListingIds), [savedListingIds]);
+  const savedIdsSet = useMemo(
+    () => new Set(resolvedSavedListingIds),
+    [resolvedSavedListingIds],
+  );
 
   // Derive estimatedMonths from moveInDate/moveOutDate, falling back to leaseDuration
   const estimatedMonths = useMemo(() => {
@@ -160,6 +171,61 @@ export function SearchResultsClient({
 
   const total = initialTotal;
 
+  useEffect(() => {
+    const listingIds = allListings.map((listing) => listing.id);
+    if (listingIds.length === 0) {
+      setResolvedSavedListingIds([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const idsParam = listingIds.join(",");
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/favorites?ids=${encodeURIComponent(idsParam)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as { savedIds?: string[] };
+        if (Array.isArray(data.savedIds)) {
+          setResolvedSavedListingIds(data.savedIds);
+        }
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          console.debug("Failed to hydrate saved listings", error);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [allListings]);
+
+  useEffect(() => {
+    if (!hasConfirmedZeroResults) {
+      setResolvedFilterSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const suggestions = await getFilterSuggestions(filterParams);
+      if (!cancelled) {
+        setResolvedFilterSuggestions(suggestions);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filterParams, hasConfirmedZeroResults]);
+
   return (
     <div id="search-results" tabIndex={-1} className="!outline-none">
       {/* Screen reader announcement for search results */}
@@ -185,11 +251,11 @@ export function SearchResultsClient({
           </p>
 
           {/* Smart filter suggestions */}
-          {filterSuggestions.length > 0 ? (
+          {resolvedFilterSuggestions.length > 0 ? (
             <div className="w-full max-w-sm px-4 mt-4">
               <Suspense fallback={null}>
                 <ZeroResultsSuggestions
-                  suggestions={filterSuggestions}
+                  suggestions={resolvedFilterSuggestions}
                   query={query}
                 />
               </Suspense>

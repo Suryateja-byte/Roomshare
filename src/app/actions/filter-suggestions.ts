@@ -5,7 +5,6 @@ import {
   type FilterParams,
   type FilterSuggestion,
 } from "@/lib/data";
-import { auth } from "@/auth";
 import { logger } from "@/lib/logger";
 import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from "@/lib/rate-limit";
 import { headers } from "next/headers";
@@ -41,11 +40,6 @@ const filterParamsSchema = z.object({
 export async function getFilterSuggestions(
   params: FilterParams,
 ): Promise<FilterSuggestion[]> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return [];
-  }
-
   try {
     // Rate limiting
     const headersList = await headers();

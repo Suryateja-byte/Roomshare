@@ -1,18 +1,15 @@
-import { auth } from "@/auth";
 import { checkSuspension } from "@/lib/auth-helpers";
 import { applySecurityHeaders } from "@/lib/csp-middleware";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 /**
- * Proxy with request correlation and security headers (Next.js 16+ convention).
+ * Next.js 16 proxy entrypoint for apps rooted under src/app.
  *
- * This is the unified request handler that:
- * 1. Enforces suspension checks on protected routes
- * 2. Adds CSP and related security headers
- * 3. Adds x-request-id to request and response for observability
+ * This request pipeline keeps suspension enforcement and security headers
+ * in one place without wrapping every request in auth().
  */
-export default auth(async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const suspensionResponse = await checkSuspension(request);
   if (suspensionResponse) {
     return suspensionResponse;
@@ -21,7 +18,7 @@ export default auth(async function proxy(request: NextRequest) {
   const { requestHeaders, responseHeaders, nonce } = applySecurityHeaders(request);
 
   if (nonce) {
-    requestHeaders.set('x-nonce', nonce);
+    requestHeaders.set("x-nonce", nonce);
   }
 
   const requestId =
@@ -39,10 +36,10 @@ export default auth(async function proxy(request: NextRequest) {
   response.headers.set("x-request-id", requestId);
 
   return response;
-});
+}
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sw.js|sw-version.js|manifest.json|icons/.*).*)",
+    "/((?!api/health|_next/static|_next/image|favicon.ico|sw.js|sw-version.js|manifest.json|icons).*)",
   ],
 };

@@ -15,7 +15,6 @@ import {
   closeFilterModal,
   applyFilters,
   toggleAmenity,
-  expectUrlParam,
   getUrlParam,
 } from "../helpers";
 import {
@@ -186,32 +185,18 @@ test.describe("Mobile Filter Experience", () => {
       // Click sort button
       await sortButton.click();
 
-      // Wait for sort options to appear (could be a sheet or dropdown)
-      // Look for sort sheet heading or sort options
-      const sortSheet = page.locator('text=/Sort by/i').first();
-      const sortOptions = page
-        .getByRole("option", { name: /price/i })
-        .or(page.locator('text=/Price.*low/i, text=/Lowest price/i'))
-        .first();
+      // The mobile sort sheet is a role="dialog" with "Sort by" heading and
+      // plain <button> elements for each option (not role="option").
+      // Wait for the sort sheet to appear.
+      const sortDialog = page.getByRole("dialog", { name: /sort by/i });
+      await sortDialog.waitFor({ state: "visible", timeout: 5000 });
 
-      // Wait for either sort sheet or options to appear
-      await Promise.race([
-        sortSheet.waitFor({ state: "visible", timeout: 3000 }).catch(() => {}),
-        sortOptions.waitFor({ state: "visible", timeout: 3000 }).catch(() => {}),
-      ]);
-
-      // Try to find and click a sort option
-      const lowToHighOption = page
-        .locator('text=/Price.*low/i, text=/Lowest price/i, text=/price_asc/i')
-        .first();
-
-      if (await lowToHighOption.isVisible().catch(() => false)) {
-        await lowToHighOption.click();
-      } else {
-        // Try clicking the first available sort option
-        const firstOption = page.getByRole("option").first();
-        await firstOption.click();
-      }
+      // Click "Price: Low to High" — this sets sort=price_asc in the URL,
+      // which is a non-default value so the sort param will always be present.
+      const lowToHighOption = sortDialog.getByRole("button", {
+        name: /price.*low to high/i,
+      });
+      await lowToHighOption.click();
 
       // Wait for URL to update with sort param
       await expect.poll(

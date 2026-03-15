@@ -22,9 +22,7 @@ import {
   expect,
   selectors,
   timeouts,
-  tags,
   SF_BOUNDS,
-  waitForMapMarkers,
   waitForMapReady,
   searchResultsContainer,
 } from "./helpers";
@@ -33,7 +31,6 @@ import {
   getCardState,
   isCardInViewport,
   getActiveListingId,
-  getHoveredListingIds,
   waitForCardHighlight,
   waitForCardHighlightClear,
   waitForCardHover,
@@ -79,17 +76,6 @@ async function getFirstMarkerIdOrSkip(
     test.skip(true, "Could not read listing ID from first marker");
   }
   return id!;
-}
-
-/**
- * Get the Nth visible marker's listing ID.
- * Returns null if not enough markers.
- */
-async function getNthMarkerIdOrNull(
-  page: Page,
-  index: number,
-): Promise<string | null> {
-  return getMarkerListingId(page, index);
 }
 
 /**
@@ -419,7 +405,9 @@ test.describe("Map-List Synchronization", () => {
       await clickMarkerByListingId(page, secondId);
       await waitForCardHighlight(page, secondId);
 
-      // First card should lose highlight
+      // First card should lose highlight — wait explicitly for it to clear
+      // to avoid a race where the assertion runs before React propagates the deactivation.
+      await waitForCardHighlightClear(page, firstId);
       const firstCardState = await getCardState(page, firstId);
       expect(firstCardState.isActive).toBe(false);
 
@@ -781,7 +769,6 @@ test.describe("Map-List Synchronization", () => {
       }
 
       // At least some overlap should exist between markers and cards
-      const overlap = markerIds.filter((id) => cardIds.includes(id));
       // In a normal search scenario, there should be some overlap
       // but with independent data sources, 0 overlap is possible
       expect(markerIds.length).toBeGreaterThan(0);
@@ -795,12 +782,6 @@ test.describe("Map-List Synchronization", () => {
       if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
 
       await waitForMarkersWithClusterExpansion(page);
-
-      // Get initial counts
-      const initialCardCount = await searchResultsContainer(page).locator(selectors.listingCard).count();
-      const initialMarkerCount = await page
-        .locator(".maplibregl-marker:visible")
-        .count();
 
       // Apply a price filter via URL navigation (simplest approach)
       const url = new URL(page.url());
@@ -881,8 +862,6 @@ test.describe("Map-List Synchronization", () => {
 
       // Get initial marker IDs
       await waitForMarkersWithClusterExpansion(page);
-      const initialMarkerIds = await getAllMarkerListingIds(page);
-
       // Pan the map programmatically to a new area
       const moved = await page.evaluate(() => {
         return new Promise<boolean>((resolve) => {
@@ -1307,7 +1286,7 @@ test.describe("Map-List Synchronization", () => {
       // Each card should have had a limited number of class changes
       // 4 rapid hovers across 2 cards = roughly 4-8 class changes each
       // With flicker, we'd see 20+ changes per element
-      for (const [id, count] of Object.entries(counts)) {
+      for (const [, count] of Object.entries(counts)) {
         expect(count).toBeLessThan(20);
       }
     });
@@ -1509,8 +1488,6 @@ test.describe("Map-List Synchronization", () => {
         test.skip(true, "Card hover highlight did not appear (headless CI limitation)");
         return;
       }
-      const hoveredIds = await getHoveredListingIds(page);
-
       // This is hard to assert directly, but we verify no infinite loop
       // by checking that the page remains responsive
       expect(true).toBe(true); // If we get here, no infinite loop

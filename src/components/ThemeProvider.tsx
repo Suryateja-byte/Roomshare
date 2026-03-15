@@ -3,13 +3,18 @@
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import type { ThemeProviderProps } from 'next-themes';
 
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+interface RoomShareThemeProviderProps extends ThemeProviderProps {
+  nonce?: string;
+}
+
+export function ThemeProvider({ children, nonce, ...props }: RoomShareThemeProviderProps) {
     return (
         <NextThemesProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
+            nonce={nonce}
             {...props}
         >
             {children}
