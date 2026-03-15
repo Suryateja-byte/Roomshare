@@ -238,9 +238,20 @@ export async function executeSearchV2(
     const mapBounds = parsed.filterParams.bounds
       ? clampBoundsToMaxSpan(parsed.filterParams.bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN)
       : null;
-    const mapFilterParams = mapBounds
-      ? { ...filterParams, bounds: mapBounds }
-      : filterParams;
+    // When semantic search is active, strip the text query from map params.
+    // The list uses vector similarity (matches natural language), but the map uses FTS
+    // (keyword matching) which fails for descriptive queries like "bright sunny studio".
+    // Stripping `query` lets the map show all listings in bounds matching structural filters.
+    const isSemanticActive =
+      features.semanticSearch &&
+      filterParams.query &&
+      filterParams.query.length >= 3 &&
+      sortOption === "recommended";
+    const mapFilterParams = {
+      ...filterParams,
+      ...(mapBounds ? { bounds: mapBounds } : {}),
+      ...(isSemanticActive ? { query: undefined } : {}),
+    };
 
     // Map query runs in parallel with list query
     // SearchDoc returns { listings, truncated, totalCandidates }, legacy returns plain array
