@@ -105,24 +105,28 @@ test.describe('Listing Detail — Accessibility Deep-Dive', () => {
       const found = await navigateToListing(page);
       test.skip(!found, 'No listings available');
 
-      const images = page.locator('img');
-      const imageCount = await images.count();
+      // Wait for the page to finish loading so images are in the DOM
+      await page.waitForLoadState('domcontentloaded');
 
-      const missingAlt: string[] = [];
-
-      for (let i = 0; i < imageCount; i++) {
-        const img = images.nth(i);
-        const alt = await img.getAttribute('alt');
-        const role = await img.getAttribute('role');
-        const ariaLabel = await img.getAttribute('aria-label');
-        const src = await img.getAttribute('src');
-
-        // Every visible image needs alt text or decorative role
-        const isVisible = await img.isVisible().catch(() => false);
-        if (isVisible && alt === null && role !== 'presentation' && !ariaLabel) {
-          missingAlt.push(src?.slice(0, 80) || 'unknown');
+      // Collect all image attributes in a single evaluate call to avoid
+      // per-element CDP round-trips that can individually timeout.
+      const missingAlt = await page.evaluate(() => {
+        const imgs = Array.from(document.querySelectorAll('img'));
+        const missing: string[] = [];
+        for (const img of imgs) {
+          const rect = img.getBoundingClientRect();
+          const isVisible = rect.width > 0 && rect.height > 0;
+          if (
+            isVisible &&
+            img.getAttribute('alt') === null &&
+            img.getAttribute('role') !== 'presentation' &&
+            !img.getAttribute('aria-label')
+          ) {
+            missing.push((img.getAttribute('src') || 'unknown').slice(0, 80));
+          }
         }
-      }
+        return missing;
+      });
 
       if (missingAlt.length > 0) {
         console.log(`[img] Missing alt: ${missingAlt.join(', ')}`);

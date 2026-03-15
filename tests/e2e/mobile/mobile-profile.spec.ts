@@ -10,7 +10,7 @@ test.describe('Mobile Profile', () => {
 
     // Wait for profile page to load
     await expect(
-      page.locator('[data-testid="profile-page"]')
+      page.locator('[data-testid="profile-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // Check profile name is visible — testUser is "E2E Test User"
@@ -30,7 +30,7 @@ test.describe('Mobile Profile', () => {
     await page.waitForLoadState('domcontentloaded');
 
     await expect(
-      page.locator('[data-testid="profile-page"]')
+      page.locator('[data-testid="profile-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // Find and click the edit profile button
@@ -118,7 +118,7 @@ test.describe('Mobile Profile', () => {
     await page.waitForLoadState('domcontentloaded');
 
     await expect(
-      page.locator('[data-testid="profile-page"]')
+      page.locator('[data-testid="profile-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // The avatar is rendered by UserAvatar component inside a w-40 h-40 rounded-full container

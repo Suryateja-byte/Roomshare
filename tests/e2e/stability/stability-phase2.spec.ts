@@ -579,7 +579,7 @@ test.describe('Stability Phase 2: Completeness @stability', () => {
    */
   test('TEST-305: WHOLE_UNIT listing rejects booking when slots full', async ({
     browser,
-  }, testInfo) => {
+  }) => {
     test.slow();
     const ctx = await browser.newContext({ storageState: USER2_STATE });
     const page = await ctx.newPage();

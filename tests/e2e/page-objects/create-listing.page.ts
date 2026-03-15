@@ -100,7 +100,7 @@ export class CreateListingPage {
 
     // Actions
     this.submitButton = page.getByRole('button', { name: /create|submit|publish/i });
-    this.form = page.locator('form');
+    this.form = page.locator('form[novalidate]');
 
     // State — error banner uses role="alert" and data-testid
     this.errorBanner = page.locator('[data-testid="form-error-banner"]');

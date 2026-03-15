@@ -12,7 +12,7 @@ test.describe('Mobile Messages', () => {
   test('MM-01: Conversation list renders stacked (not side-by-side)', async ({ page }) => {
     // Wait for messages page to load
     await expect(
-      page.locator('[data-testid="messages-page"]')
+      page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // On mobile, the sidebar takes full width (w-full md:w-[400px])
@@ -36,7 +36,7 @@ test.describe('Mobile Messages', () => {
 
   test('MM-02: Tap conversation opens message thread', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="messages-page"]')
+      page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     const conversationItem = page.locator('[data-testid="conversation-item"]').first();
@@ -61,7 +61,7 @@ test.describe('Mobile Messages', () => {
 
   test('MM-03: Message input visible and functional in open conversation', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="messages-page"]')
+      page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // On mobile, the first conversation auto-opens
@@ -90,7 +90,7 @@ test.describe('Mobile Messages', () => {
 
   test('MM-04: Back button returns to conversation list', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="messages-page"]')
+      page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // On mobile, when a conversation is active, a back button (ArrowLeft) appears
@@ -116,7 +116,7 @@ test.describe('Mobile Messages', () => {
 
   test('MM-05: Empty conversations state renders correctly', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="messages-page"]')
+      page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // Check if there are any conversations
@@ -140,7 +140,7 @@ test.describe('Mobile Messages', () => {
 
   test('MM-06: Long messages wrap properly without overflow', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="messages-page"]')
+      page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // Wait for message bubbles to appear (auto-loaded for first conversation)
@@ -166,7 +166,7 @@ test.describe('Mobile Messages', () => {
 
   test('MM-07: Conversation list container allows vertical scrolling', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="messages-page"]')
+      page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // First go back to conversation list (if auto-opened a conversation)
@@ -188,7 +188,7 @@ test.describe('Mobile Messages', () => {
 
   test('MM-08: Unread indicator visible on conversations', async ({ page }) => {
     await expect(
-      page.locator('[data-testid="messages-page"]')
+      page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // Navigate back to conversation list if needed

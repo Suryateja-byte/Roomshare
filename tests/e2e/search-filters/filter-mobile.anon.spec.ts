@@ -15,7 +15,6 @@ import {
   closeFilterModal,
   applyFilters,
   toggleAmenity,
-  expectUrlParam,
   getUrlParam,
 } from "../helpers";
 import {
@@ -200,7 +199,9 @@ test.describe("Mobile Filter Experience", () => {
         sortOptions.waitFor({ state: "visible", timeout: 3000 }).catch(() => {}),
       ]);
 
-      // Try to find and click a sort option
+      // Try to find and click a sort option.
+      // The mobile sort sheet renders <button> elements (not role="option"),
+      // so fall back to the first visible button inside the sheet.
       const lowToHighOption = page
         .locator('text=/Price.*low/i, text=/Lowest price/i, text=/price_asc/i')
         .first();
@@ -208,9 +209,19 @@ test.describe("Mobile Filter Experience", () => {
       if (await lowToHighOption.isVisible().catch(() => false)) {
         await lowToHighOption.click();
       } else {
-        // Try clicking the first available sort option
-        const firstOption = page.getByRole("option").first();
-        await firstOption.click();
+        // Try first visible button inside the sort sheet or any sort option button
+        const firstSortBtn = page
+          .locator('[role="dialog"] button, [role="listbox"] button')
+          .or(page.getByRole("option"))
+          .first();
+        const firstSortBtnVisible = await firstSortBtn.isVisible().catch(() => false);
+        if (firstSortBtnVisible) {
+          await firstSortBtn.click();
+        } else {
+          // Last resort: any visible button with a sort-related label
+          const anyBtn = page.locator('button').filter({ hasText: /recommended|price|newest|rated/i }).first();
+          await anyBtn.click();
+        }
       }
 
       // Wait for URL to update with sort param

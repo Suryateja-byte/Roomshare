@@ -355,7 +355,7 @@ test.describe('30 Critical User Journey Simulations', () => {
     await nav.clickListingCard(0);
     await expect(page.locator('h1').first()).toBeVisible();
 
-    const pageText = await page.locator('#main-content').textContent();
+    const pageText = await page.locator('#main-content, main').first().textContent().catch(() => '');
     // Check for price or management view (owner sees "Manage Listing" instead of price)
     const hasPrice = /\$\d+|\d+\s*\/\s*mo/i.test(pageText || '');
     const isOwnerView = /manage listing/i.test(pageText || '');

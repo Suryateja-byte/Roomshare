@@ -128,10 +128,11 @@ test.describe("J36: Block a User", () => {
       await page.waitForLoadState('domcontentloaded');
     }
 
-    // Step 5: Verify block happened
-    const hasToast = await page.locator(selectors.toast).isVisible().catch(() => false);
+    // Step 5: Verify block happened — toast or unblock button should appear
+    // Allow extra time for mobile where UI feedback may be delayed
     const unblockBtn = page.getByRole("button", { name: /unblock/i });
-    const isBlocked = await unblockBtn.isVisible().catch(() => false);
+    const isBlocked = await unblockBtn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+    const hasToast = isBlocked ? false : await page.locator(selectors.toast).waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
     expect(hasToast || isBlocked).toBeTruthy();
 
     // Clean up: unblock

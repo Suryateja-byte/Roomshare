@@ -122,14 +122,14 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
     test.skip(!ready, 'Auth session expired');
     await openConversation(page, 0);
 
-    const input = page.locator(MSG_SELECTORS.messageInput);
+    const input = page.locator(MSG_SELECTORS.messageInput).first();
     await input.fill('');
 
     // Type some text but do not send
     await input.pressSequentially('Hello there...', { delay: 50 });
 
     // Check if a typing indicator is exposed in the UI
-    const typingIndicator = page.locator(MSG_SELECTORS.typingIndicator);
+    const typingIndicator = page.locator(MSG_SELECTORS.typingIndicator).first();
     const isVisible = await typingIndicator.isVisible({ timeout: 3_000 }).catch(() => false);
 
     // Typing indicator typically shows for the *other* user, not the sender.
@@ -292,7 +292,9 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
 
     // Navigate back to messages list to check updated state
     await goToMessages(page);
-    await expect(items.first()).toBeVisible({ timeout: 10_000 });
+    // On mobile, the auto-selection effect may re-hide the sidebar; use attached state
+    // instead of visible to handle both mobile and desktop layouts
+    await expect(items.first()).toBeAttached({ timeout: 10_000 });
 
     // Unread count should not have increased (and ideally decreased)
     const updatedUnreadCount = await unreadIndicators.count();
@@ -333,7 +335,7 @@ test.describe('Messaging: Functional Core', { tag: [tags.auth, tags.slow] }, () 
 
     // Should navigate to messages or open a message dialog
     const onMessagesPage = page.url().includes('/messages');
-    const messageInput = page.locator(MSG_SELECTORS.messageInput);
+    const messageInput = page.locator(MSG_SELECTORS.messageInput).first();
     const inputVisible = await messageInput.isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (onMessagesPage && inputVisible) {

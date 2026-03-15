@@ -46,13 +46,13 @@ test.describe('Messaging: Performance', { tag: [tags.auth, tags.slow] }, () => {
     await openConversation(page);
 
     const uniqueText = `perf-optimistic-${Date.now()}`;
-    const input = page.locator(MSG_SELECTORS.messageInput);
+    const input = page.locator(MSG_SELECTORS.messageInput).first();
     await input.click();
     await input.fill('');
     await input.pressSequentially(uniqueText, { delay: 10 });
 
     // Measure from the moment we click send
-    const sendBtn = page.locator(MSG_SELECTORS.sendButton);
+    const sendBtn = page.locator(MSG_SELECTORS.sendButton).first();
     await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
     const start = Date.now();
     await sendBtn.click();
@@ -90,12 +90,12 @@ test.describe('Messaging: Performance', { tag: [tags.auth, tags.slow] }, () => {
     const uniqueText = `perf-confirm-${Date.now()}`;
 
     // Type message first (separate from measurement)
-    const input = page.locator(MSG_SELECTORS.messageInput);
+    const input = page.locator(MSG_SELECTORS.messageInput).first();
     await input.click();
     await input.fill('');
     await input.pressSequentially(uniqueText, { delay: 10 });
 
-    const sendBtn = page.locator(MSG_SELECTORS.sendButton);
+    const sendBtn = page.locator(MSG_SELECTORS.sendButton).first();
     await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
 
     // Start timer right before clicking send (excludes typing delay)

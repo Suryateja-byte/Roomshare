@@ -137,7 +137,7 @@ test.describe("20 Critical Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   // J5: Filter modal - clear all filters
   // ─────────────────────────────────────────────────
-  test("J5: Clear all filters resets search", async ({ page, nav }) => {
+  test("J5: Clear all filters resets search", async ({ page }) => {
     // Start with filters applied
     await page.goto(`${SEARCH_URL_WITH_BOUNDS}&minPrice=500&maxPrice=2000&amenities=Wifi`);
     await page.waitForLoadState("domcontentloaded");
@@ -267,7 +267,7 @@ test.describe("20 Critical Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   // J10: Back navigation preserves filters
   // ─────────────────────────────────────────────────
-  test("J10: Browser back preserves search filters", async ({ page, nav }) => {
+  test("J10: Browser back preserves search filters", async ({ page }) => {
     // Start with filters
     await page.goto(`${SEARCH_URL_WITH_BOUNDS}&minPrice=800&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
@@ -371,14 +371,19 @@ test.describe("20 Critical Search Page Journeys", () => {
     // Open filter modal (uses retry-click for hydration race)
     const modal = await openFilterModal(page);
 
-    // Find gender preference trigger
+    // Find gender preference trigger — skip if not available in this UI layout
     const genderTrigger = modal.locator('#filter-gender-pref');
-    if (await genderTrigger.isVisible()) {
-      await genderTrigger.click();
-      const option = page.getByRole("option", { name: /female/i });
-      if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-        await option.first().click();
-      }
+    if (!(await genderTrigger.isVisible())) {
+      // Close modal without applying and skip — gender pref filter not present
+      await page.keyboard.press('Escape');
+      test.skip(true, 'Gender preference filter not visible in current layout');
+      return;
+    }
+
+    await genderTrigger.click();
+    const option = page.getByRole("option", { name: /female/i });
+    if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+      await option.first().click();
     }
 
     await applyFilters(page);

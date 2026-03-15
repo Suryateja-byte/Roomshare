@@ -179,8 +179,15 @@ test.describe("Profile Edit — Form Assertions", () => {
       timeout: timeouts.navigation,
     });
 
+    // Wait for profile page to fully render before reading the name
+    await expect(page.getByTestId("profile-page")).toBeVisible({
+      timeout: timeouts.navigation,
+    });
+    const profileNameEl = page.getByTestId("profile-name");
+    await expect(profileNameEl).toBeVisible({ timeout: timeouts.action });
+
     // Name should still be the original (change was not saved)
-    const currentName = await page.getByTestId("profile-name").textContent();
+    const currentName = await profileNameEl.textContent();
     expect(currentName?.trim()).toBe(originalName?.trim());
   });
 
