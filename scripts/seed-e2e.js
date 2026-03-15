@@ -672,9 +672,8 @@ async function main() {
       ) AS "exists"
     `;
     if (tableExists[0]?.exists) {
-      // Truncate and repopulate from Listing + Location + Review joins
-      await prisma.$executeRawUnsafe(`DELETE FROM listing_search_docs`);
-
+      // Upsert from Listing + Location + Review joins.
+      // ON CONFLICT preserves embedding columns so backfilled embeddings survive re-seeding.
       await prisma.$executeRawUnsafe(`
         INSERT INTO listing_search_docs (
           id, owner_id, title, description, price, images,
@@ -707,6 +706,40 @@ async function main() {
         LEFT JOIN "Review" r ON l.id = r."listingId"
         WHERE loc.coords IS NOT NULL
         GROUP BY l.id, loc.id
+        ON CONFLICT (id) DO UPDATE SET
+          owner_id = EXCLUDED.owner_id,
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          price = EXCLUDED.price,
+          images = EXCLUDED.images,
+          amenities = EXCLUDED.amenities,
+          house_rules = EXCLUDED.house_rules,
+          household_languages = EXCLUDED.household_languages,
+          primary_home_language = EXCLUDED.primary_home_language,
+          lease_duration = EXCLUDED.lease_duration,
+          room_type = EXCLUDED.room_type,
+          move_in_date = EXCLUDED.move_in_date,
+          total_slots = EXCLUDED.total_slots,
+          available_slots = EXCLUDED.available_slots,
+          view_count = EXCLUDED.view_count,
+          status = EXCLUDED.status,
+          listing_created_at = EXCLUDED.listing_created_at,
+          address = EXCLUDED.address,
+          city = EXCLUDED.city,
+          state = EXCLUDED.state,
+          zip = EXCLUDED.zip,
+          location_geog = EXCLUDED.location_geog,
+          lat = EXCLUDED.lat,
+          lng = EXCLUDED.lng,
+          avg_rating = EXCLUDED.avg_rating,
+          review_count = EXCLUDED.review_count,
+          recommended_score = EXCLUDED.recommended_score,
+          amenities_lower = EXCLUDED.amenities_lower,
+          house_rules_lower = EXCLUDED.house_rules_lower,
+          household_languages_lower = EXCLUDED.household_languages_lower,
+          gender_preference = EXCLUDED.gender_preference,
+          household_gender = EXCLUDED.household_gender,
+          doc_updated_at = NOW()
       `);
 
       // Count the inserted rows

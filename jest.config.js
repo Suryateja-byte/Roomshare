@@ -14,6 +14,10 @@ const customJestConfig = {
     "^@/(.*)$": "<rootDir>/src/$1",
     // Stub Next.js 16 node-environment-extensions that cause stack overflow during Jest teardown
     "next/dist/server/node-environment-extensions/(.*)": "<rootDir>/src/__tests__/utils/empty-module.js",
+    // Stub @google/genai ESM module — tests that need it mock via jest.mock("@google/genai").
+    // Tests that transitively import it (via search-doc-queries → query-cache → gemini.ts)
+    // get this no-op stub instead of the real ESM .mjs file that Jest can't parse.
+    "^@google/genai$": "<rootDir>/src/__tests__/utils/google-genai-stub.js",
   },
   testPathIgnorePatterns: [
     "<rootDir>/node_modules/",
@@ -45,7 +49,7 @@ const customJestConfig = {
   testMatch: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)"],
   transformIgnorePatterns: [
     // Allow next-auth, @auth, jose, and styled-jsx packages to be transformed (ESM modules)
-    "node_modules/(?!(next-auth|@auth|jose|oauth4webapi|preact|preact-render-to-string|styled-jsx)/)",
+    "node_modules/(?!(next-auth|@auth|jose|oauth4webapi|preact|preact-render-to-string|styled-jsx|@google/genai|p-retry)/)",
     "^.+\\.module\\.(css|sass|scss)$",
   ],
 };

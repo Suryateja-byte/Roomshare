@@ -108,6 +108,12 @@ const serverEnvSchema = z.object({
   ENABLE_SOFT_HOLDS: z.enum(["on", "drain", "off"]).optional(),
   ENABLE_BOOKING_AUDIT: z.enum(["true", "false"]).optional(),
 
+  // AI / Embeddings
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  ENABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
+  ENABLE_IMAGE_EMBEDDINGS: z.enum(["true", "false"]).optional(),
+  SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
+
   // Node environment
   NODE_ENV: z
     .enum(["development", "production", "test"])
@@ -153,6 +159,13 @@ const serverEnvSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "ENABLE_SOFT_HOLDS=on requires ENABLE_MULTI_SLOT_BOOKING=true",
       path: ["ENABLE_SOFT_HOLDS"],
+    });
+  }
+  if (data.ENABLE_IMAGE_EMBEDDINGS === "true" && data.ENABLE_SEMANTIC_SEARCH !== "true") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "ENABLE_IMAGE_EMBEDDINGS requires ENABLE_SEMANTIC_SEARCH=true",
+      path: ["ENABLE_IMAGE_EMBEDDINGS"],
     });
   }
 });
@@ -452,6 +465,19 @@ export const features = {
     // In production, require explicit env flag (for staging/preview debugging)
     return process.env.SEARCH_DEBUG_RANKING === "true";
   },
+  get semanticSearch() {
+    return process.env.ENABLE_SEMANTIC_SEARCH === "true";
+  },
+  get imageEmbeddings() {
+    return (
+      process.env.ENABLE_IMAGE_EMBEDDINGS === "true" &&
+      features.semanticSearch
+    );
+  },
+  get semanticWeight(): number {
+    const val = Number(process.env.SEMANTIC_WEIGHT);
+    return Number.isFinite(val) && val >= 0 && val <= 1 ? val : 0.6;
+  },
 };
 
 // P1-25 FIX: Log startup warnings for missing optional services
@@ -503,6 +529,11 @@ export function logStartupWarnings(): void {
   if (!features.turnstile) {
     warnings.push(
       "Turnstile not configured - auth forms have no bot protection",
+    );
+  }
+  if (features.semanticSearch && !process.env.GEMINI_API_KEY) {
+    warnings.push(
+      "GEMINI_API_KEY not set - semantic search enabled but unavailable",
     );
   }
 

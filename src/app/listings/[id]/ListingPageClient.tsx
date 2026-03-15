@@ -23,6 +23,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getAmenityIcon } from '@/lib/amenityIcons';
 import { getLanguageName } from '@/lib/languages';
+import ListingCard from '@/components/listings/ListingCard';
+import type { Listing } from '@/components/listings/ListingCard';
 
 // Import existing functional components
 import ImageGallery from '@/components/ImageGallery';
@@ -130,6 +132,7 @@ interface ListingPageClientProps {
     bookedDates: BookedDateRange[];
     holdEnabled?: boolean;
     coordinates: { lat: number; lng: number } | null;
+    similarListings?: Listing[];
 }
 
 // Status badge with pulse animation
@@ -204,7 +207,8 @@ export default function ListingPageClient({
     userExistingReview,
     bookedDates,
     holdEnabled,
-    coordinates
+    coordinates,
+    similarListings
 }: ListingPageClientProps) {
     const { data: session, status: sessionStatus } = useSession();
     const hasImages = listing.images && listing.images.length > 0;
@@ -555,6 +559,25 @@ export default function ListingPageClient({
                                     />
                                 )}
                             </div>
+
+                            {/* Similar Listings Section */}
+                            {similarListings && similarListings.length > 0 && (
+                                <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800">
+                                    <div className="space-y-6">
+                                        <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                                            Similar listings
+                                        </h2>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                            {similarListings.map((similarListing) => (
+                                                <ListingCard
+                                                    key={similarListing.id}
+                                                    listing={similarListing}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Right Column: Sticky Sidebar */}

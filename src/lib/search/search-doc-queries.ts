@@ -34,11 +34,14 @@ import {
   isNearMatch,
 } from "@/lib/near-matches";
 import { hasActiveFilters } from "@/lib/search-params";
-import { BOUNDS_EPSILON } from "@/lib/constants";
+import { BOUNDS_EPSILON, DEFAULT_PAGE_SIZE, MAX_QUERY_LENGTH } from "@/lib/constants";
 import { features } from "@/lib/env";
 import { parseLocalDate } from "@/lib/utils";
 import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
+import pgvector from "pgvector";
+import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
+import { logger } from "@/lib/logger";
 
 // Statement timeout for search queries (5 seconds)
 const SEARCH_QUERY_TIMEOUT_MS = 5000;
@@ -1450,4 +1453,165 @@ export function isSearchDocEnabled(urlSearchDoc?: string | null): boolean {
   // Read directly from process.env to avoid caching issues in tests
   // The typed features.searchDoc getter caches values, which breaks test isolation
   return process.env.ENABLE_SEARCH_DOC === "true";
+}
+
+// ============================================
+// Semantic Search
+// ============================================
+
+/** Semantic search result row — matches search_listings_semantic() RETURNS TABLE */
+interface SemanticSearchRow {
+  id: string;
+  title: string;
+  description: string;
+  price: number; // float8 from SQL function (cast in migration 20260314200000)
+  images: string[];
+  room_type: string | null;
+  lease_duration: string | null;
+  available_slots: number;
+  total_slots: number;
+  amenities: string[];
+  house_rules: string[];
+  household_languages: string[];
+  primary_home_language: string | null;
+  gender_preference: string | null;
+  household_gender: string | null;
+  booking_mode: string;
+  move_in_date: Date | null;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  lat: number | null;
+  lng: number | null;
+  owner_id: string;
+  avg_rating: number;
+  review_count: number;
+  view_count: number;
+  listing_created_at: Date;
+  recommended_score: number;
+  semantic_similarity: number;
+  keyword_rank: number;
+  combined_score: number;
+}
+
+/**
+ * Semantic search — called when user provides a natural language query
+ * and ENABLE_SEMANTIC_SEARCH is true.
+ *
+ * Falls back to null (caller uses existing FTS search) if:
+ * - Feature flag is off
+ * - Query is too short
+ * - Embedding generation fails
+ * - SQL function fails
+ *
+ * Uses queryWithTimeout (5s statement_timeout) matching all other queries.
+ */
+export async function semanticSearchQuery(
+  filterParams: FilterParams,
+  limit: number = DEFAULT_PAGE_SIZE,
+  offset: number = 0
+): Promise<SemanticSearchRow[] | null> {
+  if (!features.semanticSearch) return null;
+
+  const rawQuery = filterParams.query?.trim() ?? "";
+  const queryText = sanitizeSearchQuery(rawQuery);
+  if (!isValidQuery(queryText) || queryText.length < 3) return null;
+
+  // Cap query length to prevent cost amplification
+  const cappedQuery = queryText.slice(0, MAX_QUERY_LENGTH);
+
+  try {
+    const embedding = await getCachedQueryEmbedding(cappedQuery);
+    const vecSql = pgvector.toSql(embedding);
+
+    // Lowercase array filters to match _lower columns
+    const amenitiesLower = filterParams.amenities?.length
+      ? filterParams.amenities.map((a) => a.toLowerCase())
+      : null;
+    const houseRulesLower = filterParams.houseRules?.length
+      ? filterParams.houseRules.map((r) => r.toLowerCase())
+      : null;
+    const languagesLower = filterParams.languages?.length
+      ? filterParams.languages.map((l) => l.toLowerCase())
+      : null;
+
+    const results = await queryWithTimeout<SemanticSearchRow>(
+      `SELECT * FROM search_listings_semantic(
+        $1::text::vector,
+        $2,
+        $3::float, $4::float, $5::float, $6::float,
+        $7::numeric, $8::numeric,
+        $9::text[], $10::text[],
+        $11::text, $12::text, $13::text, $14::text,
+        $15::int, $16::text, $17::timestamptz, $18::text[],
+        $19::float,
+        $20::int,
+        $21::int
+      )`,
+      [
+        vecSql,
+        cappedQuery,
+        filterParams.bounds?.minLat ?? null,
+        filterParams.bounds?.minLng ?? null,
+        filterParams.bounds?.maxLat ?? null,
+        filterParams.bounds?.maxLng ?? null,
+        filterParams.minPrice ?? 0,
+        filterParams.maxPrice ?? 99999,
+        amenitiesLower,
+        houseRulesLower,
+        filterParams.roomType ?? null,
+        filterParams.leaseDuration ?? null,
+        filterParams.genderPreference === "any" ? null : (filterParams.genderPreference ?? null),
+        filterParams.householdGender === "any" ? null : (filterParams.householdGender ?? null),
+        filterParams.minAvailableSlots ?? 1,
+        filterParams.bookingMode === "any" ? null : (filterParams.bookingMode ?? null),
+        filterParams.moveInDate ? parseLocalDate(filterParams.moveInDate) : null,
+        languagesLower,
+        features.semanticWeight,
+        limit,
+        offset,
+      ]
+    );
+
+    return results.length > 0 ? results : null;
+  } catch (err) {
+    logger.sync.error("[semantic-search] Failed, falling back to FTS:", {
+      error: err instanceof Error ? err.message : "Unknown",
+    });
+    return null; // Caller falls back to existing search
+  }
+}
+
+/** Transform semantic search rows to ListingData[] */
+export function mapSemanticRowsToListingData(
+  rows: SemanticSearchRow[]
+): ListingData[] {
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    price: Number(row.price),
+    images: row.images,
+    roomType: row.room_type ?? undefined,
+    leaseDuration: row.lease_duration ?? undefined,
+    availableSlots: row.available_slots,
+    totalSlots: row.total_slots,
+    amenities: row.amenities,
+    houseRules: row.house_rules,
+    householdLanguages: row.household_languages,
+    primaryHomeLanguage: row.primary_home_language ?? undefined,
+    genderPreference: row.gender_preference ?? undefined,
+    householdGender: row.household_gender ?? undefined,
+    moveInDate: row.move_in_date ?? undefined,
+    ownerId: row.owner_id,
+    location: {
+      address: row.address,
+      city: row.city,
+      state: row.state,
+      zip: row.zip,
+      lat: row.lat ?? 0,
+      lng: row.lng ?? 0,
+    },
+  }));
 }
