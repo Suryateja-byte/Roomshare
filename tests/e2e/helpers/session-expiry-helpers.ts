@@ -100,8 +100,12 @@ export async function expectLoginRedirect(
   callbackUrl?: string,
   timeout = 30000,
 ): Promise<void> {
-  // Wait for redirect — may go through /api/auth/signin first
-  await expect(page).toHaveURL(/\/(login|signin|auth)/, { timeout });
+  // Poll for redirect — may go through /api/auth/signin first,
+  // and may take a moment after domcontentloaded to complete.
+  await expect.poll(
+    () => /\/(login|signin|auth)/.test(page.url()),
+    { timeout, message: `Expected URL to contain /login, /signin, or /auth but got: ${page.url()}` },
+  ).toBe(true);
   if (callbackUrl) {
     const url = new URL(page.url());
     const raw = url.searchParams.get("callbackUrl") ?? url.search;

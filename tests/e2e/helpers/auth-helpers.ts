@@ -147,6 +147,7 @@ export const authHelpers = {
       .or(page.locator('[data-testid="user-menu"]'))
       .or(page.locator('[aria-label*="user"]'));
 
+    await userMenuButton.first().waitFor({ state: 'visible', timeout: 30000 });
     await userMenuButton.first().click();
 
     // Click logout option
