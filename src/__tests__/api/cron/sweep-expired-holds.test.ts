@@ -448,4 +448,92 @@ describe('GET /api/cron/sweep-expired-holds', () => {
       }),
     )
   })
+
+  // -------------------------------------------------------
+  // 11. Multi-slot hold scenarios
+  // -------------------------------------------------------
+  describe('sweeper with multi-slot holds', () => {
+    it('restores correct slotsRequested for each hold in batch', async () => {
+      // Hold A: slotsRequested=2 on listing X
+      // Hold B: slotsRequested=3 on listing Y
+      const holdA = makeExpiredHold({ id: 'b-multi-1', listingId: 'listing-x', slotsRequested: 2 })
+      const holdB = makeExpiredHold({ id: 'b-multi-2', listingId: 'listing-y', slotsRequested: 3 })
+      setupTransaction({ expiredBookings: [holdA, holdB] })
+
+      const response = await GET(createRequest())
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.success).toBe(true)
+      expect(data.expired).toBe(2)
+
+      // 2 holds × 2 SQL calls each (UPDATE Booking + UPDATE Listing) = 4 total
+      expect(mockExecuteRaw).toHaveBeenCalledTimes(4)
+
+      // Collect the SQL strings from each $executeRaw call
+      const sqlCalls = mockExecuteRaw.mock.calls.map((call) => {
+        const sqlParts = call[0]
+        return Array.isArray(sqlParts) ? sqlParts.join('?') : String(sqlParts)
+      })
+
+      // The listing-update SQL calls carry the slotsRequested value as a
+      // bound parameter (the second element of the tagged-template call).
+      // We verify the bound values include 2 and 3 across the four calls.
+      const boundValues = mockExecuteRaw.mock.calls.flatMap((call) => call.slice(1))
+      expect(boundValues).toContain(2)
+      expect(boundValues).toContain(3)
+
+      // Each listing-update SQL should reference availableSlots
+      const listingUpdateSqls = sqlCalls.filter((sql) => sql.includes('availableSlots'))
+      expect(listingUpdateSqls).toHaveLength(2)
+    })
+
+    it('restores slots for multiple holds on same listing', async () => {
+      const sharedListingId = 'listing-shared'
+      // Two expired holds on the same listing
+      const holdA = makeExpiredHold({ id: 'b-same-1', listingId: sharedListingId, slotsRequested: 2 })
+      const holdB = makeExpiredHold({ id: 'b-same-2', listingId: sharedListingId, slotsRequested: 1 })
+      setupTransaction({ expiredBookings: [holdA, holdB] })
+
+      const response = await GET(createRequest())
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.success).toBe(true)
+      expect(data.expired).toBe(2)
+
+      // 4 total $executeRaw calls (2 per hold)
+      expect(mockExecuteRaw).toHaveBeenCalledTimes(4)
+
+      // Both listing-update calls should target the same listing.
+      // The listing ID is passed as a bound parameter to the tagged template.
+      const allBoundValues = mockExecuteRaw.mock.calls.flatMap((call) => call.slice(1))
+      const listingIdMatches = allBoundValues.filter((v) => v === sharedListingId)
+      // One listingId reference per hold's listing-update call
+      expect(listingIdMatches.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('slot restoration uses LEAST clamp to prevent overflow', async () => {
+      // Hold with slotsRequested=3; listing has availableSlots=4, totalSlots=5.
+      // LEAST(availableSlots + slotsRequested, totalSlots) = LEAST(7, 5) = 5.
+      // The SQL itself enforces the cap; we verify the template contains LEAST.
+      const hold = makeExpiredHold({ id: 'b-clamp', slotsRequested: 3, listingId: 'listing-clamp' })
+      setupTransaction({ expiredBookings: [hold] })
+
+      await GET(createRequest())
+
+      // Find the listing-update $executeRaw call (the one whose SQL contains availableSlots)
+      const listingUpdateCall = mockExecuteRaw.mock.calls.find((call) => {
+        const sqlParts = call[0]
+        const sql = Array.isArray(sqlParts) ? sqlParts.join('?') : String(sqlParts)
+        return sql.includes('availableSlots')
+      })
+
+      expect(listingUpdateCall).toBeDefined()
+
+      const sqlParts = listingUpdateCall![0]
+      const fullSql = Array.isArray(sqlParts) ? sqlParts.join('?') : String(sqlParts)
+      expect(fullSql.toUpperCase()).toContain('LEAST')
+    })
+  })
 })

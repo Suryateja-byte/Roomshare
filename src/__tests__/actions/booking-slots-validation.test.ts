@@ -307,4 +307,41 @@ describe('createBooking — slotsRequested validation (Phase 2)', () => {
       expect(result.bookingId).toBe('booking-456');
     });
   });
+
+  // ─── Block check with multi-slot ────────────────────────────────────
+
+  describe('block check with multi-slot bookings', () => {
+    const { checkBlockBeforeAction } = jest.requireMock('@/app/actions/block') as {
+      checkBlockBeforeAction: jest.Mock;
+    };
+
+    afterEach(() => {
+      // Restore default: allowed
+      checkBlockBeforeAction.mockResolvedValue({ allowed: true });
+    });
+
+    it('blocked user cannot create multi-slot booking (slotsRequested=3)', async () => {
+      mockEnv.features.multiSlotBooking = true;
+      checkBlockBeforeAction.mockResolvedValue({ allowed: false, message: 'User is blocked' });
+
+      const result = await createBooking('listing-123', futureStart, futureEnd, 800, 3);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('blocked');
+    });
+
+    it('block check happens before capacity check', async () => {
+      // Block check runs inside the transaction (after listing lock, before capacity SUM).
+      // Even when requesting 3 slots that would fit capacity, block error is returned.
+      mockEnv.features.multiSlotBooking = true;
+      checkBlockBeforeAction.mockResolvedValue({ allowed: false, message: 'User is blocked' });
+      // Set capacity to "full" so that if block didn't short-circuit, we'd get a capacity error
+      setupTransactionMock(4); // 4 used + 3 requested > 4 total — would be capacity error
+
+      const result = await createBooking('listing-123', futureStart, futureEnd, 800, 3);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('blocked');
+    });
+  });
 });

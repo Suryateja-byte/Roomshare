@@ -764,4 +764,108 @@ describe('createHold', () => {
       expect(Math.abs(heldUntil.getTime() - expectedHeldUntil)).toBeLessThan(5000)
     })
   })
+
+  // ─────────────────────────────────────────────────────────────
+  // 15. Hold TTL edge cases
+  // ─────────────────────────────────────────────────────────────
+  describe('hold TTL edge cases', () => {
+    it('holdTtlMinutes=0 falls back to HOLD_TTL_MINUTES (falsy 0 uses || default)', async () => {
+      // listing.holdTtlMinutes=0 is falsy, so `0 || HOLD_TTL_MINUTES` resolves to HOLD_TTL_MINUTES (15)
+      // i.e. TTL=0 is treated the same as null/undefined — the global default takes effect
+      const zeroTtlListing = { ...mockListing, holdTtlMinutes: 0 }
+      let capturedCreateData: Record<string, unknown> | null = null
+
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx({ listing: zeroTtlListing })
+        tx.booking.create = jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
+          capturedCreateData = args.data
+          return Promise.resolve(mockHoldBooking)
+        })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+      expect(result.success).toBe(true)
+      expect(capturedCreateData).not.toBeNull()
+      const heldUntil = capturedCreateData!.heldUntil as Date
+      // 0 is falsy → falls back to HOLD_TTL_MINUTES (15 min), same as null
+      const expectedHeldUntil = Date.now() + HOLD_TTL_MINUTES * 60 * 1000
+      expect(Math.abs(heldUntil.getTime() - expectedHeldUntil)).toBeLessThan(5000)
+    })
+
+    it('holdTtlMinutes=null falls back to HOLD_TTL_MINUTES (15)', async () => {
+      const nullTtlListing = { ...mockListing, holdTtlMinutes: null }
+      let capturedCreateData: Record<string, unknown> | null = null
+
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx({ listing: nullTtlListing as unknown as typeof mockListing })
+        tx.booking.create = jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
+          capturedCreateData = args.data
+          return Promise.resolve(mockHoldBooking)
+        })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+      expect(result.success).toBe(true)
+      expect(capturedCreateData).not.toBeNull()
+      const heldUntil = capturedCreateData!.heldUntil as Date
+      const expectedHeldUntil = Date.now() + HOLD_TTL_MINUTES * 60 * 1000
+      expect(Math.abs(heldUntil.getTime() - expectedHeldUntil)).toBeLessThan(5000)
+    })
+  })
+
+  // ─────────────────────────────────────────────────────────────
+  // 16. Duplicate detection with different slotsRequested
+  // ─────────────────────────────────────────────────────────────
+  describe('duplicate detection with different slotsRequested', () => {
+    it('rejects duplicate even when slotsRequested differs', async () => {
+      // User has PENDING for 1 slot → new hold for 2 slots same dates = duplicate
+      // Uses a 4-slot listing so capacity allows 2 slots, ensuring the duplicate check (not capacity) fires
+      const widerListing = { ...mockListing, totalSlots: 4, availableSlots: 4 }
+      const existingPending = {
+        id: 'existing-pending',
+        listingId: 'listing-123',
+        tenantId: 'user-123',
+        status: 'PENDING',
+        heldUntil: null,
+        slotsRequested: 1,
+        startDate: futureStart,
+        endDate: futureEnd,
+      }
+
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx({ listing: widerListing, existingHold: existingPending })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      // Requesting 2 slots but user already has PENDING for 1 slot at same dates → duplicate
+      const result = await createHold('listing-123', futureStart, futureEnd, 800, 2)
+
+      expect(result.success).toBe(false)
+      expect(result.code).toBe('DUPLICATE_HOLD')
+    })
+
+    it('allows hold after previous one is CANCELLED', async () => {
+      // existingHold = null means no active booking found (CANCELLED is filtered out by the query)
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx({ existingHold: null })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+      expect(result.success).toBe(true)
+    })
+
+    it('allows hold after previous one is REJECTED', async () => {
+      // Same logic: REJECTED is terminal and not in the PENDING/HELD/ACCEPTED filter
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) => {
+        const tx = buildMockTx({ existingHold: null })
+        return (callback as (tx: ReturnType<typeof buildMockTx>) => Promise<unknown>)(tx)
+      })
+
+      const result = await createHold('listing-123', futureStart, futureEnd, 800)
+      expect(result.success).toBe(true)
+    })
+  })
 })
