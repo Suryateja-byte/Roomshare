@@ -123,4 +123,71 @@ describe('nlQueryToSearchParams', () => {
     expect(params.has('amenities')).toBe(false);
     expect(params.has('houseRules')).toBe(false);
   });
+
+  it('converts minAvailableSlots to minSlots param name', () => {
+    const params = nlQueryToSearchParams({
+      location: 'Austin',
+      amenities: [],
+      houseRules: [],
+      minAvailableSlots: '3',
+    });
+
+    expect(params.get('minSlots')).toBe('3');
+    expect(params.has('minAvailableSlots')).toBe(false);
+  });
+});
+
+describe('Edge cases and boundaries', () => {
+  it('"3 rooms" does NOT trigger minSlots (rooms reserved for room type)', () => {
+    const result = parseNaturalLanguageQuery('3 rooms in Austin');
+    // Should not set minAvailableSlots — "rooms" is excluded from slots pattern
+    expect(result?.minAvailableSlots).toBeUndefined();
+  });
+
+  it('"1 spot" does NOT trigger minSlots (pattern excludes single)', () => {
+    const result = parseNaturalLanguageQuery('1 spot in Austin');
+    expect(result?.minAvailableSlots).toBeUndefined();
+  });
+
+  it('"21 spots" does NOT trigger minSlots (caps at 20)', () => {
+    const result = parseNaturalLanguageQuery('21 spots in Austin');
+    expect(result?.minAvailableSlots).toBeUndefined();
+  });
+
+  it('"2 spots" triggers minAvailableSlots=2', () => {
+    const result = parseNaturalLanguageQuery('2 spots in Austin');
+    expect(result).not.toBeNull();
+    expect(result?.minAvailableSlots).toBe('2');
+  });
+
+  it('conflicting prices — first match wins', () => {
+    const result = parseNaturalLanguageQuery('under $600 over $500 in Austin');
+    // "under $600" matches first → maxPrice=600
+    expect(result).not.toBeNull();
+    expect(result?.maxPrice).toBe('600');
+  });
+
+  it('all filters, no location → empty location string', () => {
+    const result = parseNaturalLanguageQuery('under $1000 with WiFi private room');
+    expect(result).not.toBeNull();
+    expect(result?.location).toBe('');
+  });
+
+  it('case insensitivity: "PRIVATE ROOM" matches', () => {
+    const result = parseNaturalLanguageQuery('PRIVATE ROOM in Austin');
+    expect(result).not.toBeNull();
+    expect(result?.roomType).toBeDefined();
+  });
+
+  it('"smoking ok" extracts house rule', () => {
+    const result = parseNaturalLanguageQuery('smoking ok in Austin');
+    expect(result).not.toBeNull();
+    expect(result?.houseRules.length).toBeGreaterThan(0);
+  });
+
+  it('"guests allowed" extracts house rule', () => {
+    const result = parseNaturalLanguageQuery('guests allowed in Austin');
+    expect(result).not.toBeNull();
+    expect(result?.houseRules.length).toBeGreaterThan(0);
+  });
 });
