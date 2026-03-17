@@ -147,11 +147,11 @@ export const authHelpers = {
 
     // Wait for the button to be attached and visible
     await userMenuButton.waitFor({ state: 'visible', timeout: 30000 });
-    // Small delay for hydration to complete (CI can be slow)
-    await page.waitForTimeout(1000);
-    // Scroll into view and click
-    await userMenuButton.scrollIntoViewIfNeeded();
-    await userMenuButton.click({ timeout: 15000 });
+    // The button has transition-all duration-300 which causes Playwright's
+    // stability check to fail in CI (element detected as "not stable").
+    // Use evaluate to dispatch click directly, bypassing actionability checks.
+    await page.waitForTimeout(500);
+    await userMenuButton.evaluate((el: HTMLElement) => el.click());
 
     // Click logout option
     const logoutOption = page
