@@ -1,13 +1,35 @@
 /**
  * Integration tests for Search API v2 route
  *
- * Tests feature flag gating, response format, and mode determination.
+ * Tests feature flag gating, response format, mode determination,
+ * error handling, and unbounded search blocking.
+ *
+ * The route delegates to executeSearchV2 from search-v2-service.
+ * These tests mock the service layer and verify the route's behavior.
  */
 
-// Mock data module
-jest.mock("@/lib/data", () => ({
-  getListingsPaginated: jest.fn(),
-  getMapListings: jest.fn(),
+// --- Mocks (must come before imports) ---
+
+// Mock the v2 service — this is what the route calls
+jest.mock("@/lib/search/search-v2-service", () => ({
+  executeSearchV2: jest.fn(),
+}));
+
+// Mock timeout wrapper (route wraps executeSearchV2 with withTimeout)
+jest.mock("@/lib/timeout-wrapper", () => ({
+  withTimeout: jest.fn((promise: Promise<unknown>) => promise),
+  DEFAULT_TIMEOUTS: {
+    LLM_STREAM: 30000,
+    REDIS: 1000,
+    EXTERNAL_API: 5000,
+    DATABASE: 10000,
+    EMAIL: 15000,
+  },
+}));
+
+// Mock search-params — route calls buildRawParamsFromSearchParams
+jest.mock("@/lib/search-params", () => ({
+  buildRawParamsFromSearchParams: jest.fn().mockReturnValue({}),
 }));
 
 // Mock rate limiting to return null (allow request)
@@ -61,20 +83,35 @@ jest.mock("@/lib/env", () => {
   };
 });
 
-// Import the mocked features for modification in tests
+jest.mock("@/lib/logger", () => ({
+  logger: {
+    sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+  },
+  sanitizeErrorMessage: jest.fn().mockReturnValue("sanitized"),
+}));
+
+jest.mock("@sentry/nextjs", () => ({
+  captureException: jest.fn(),
+}));
+
+// --- Imports (after mocks) ---
+
 import { features } from "@/lib/env";
 const mockFeatures = features as { searchV2: boolean };
 
 import { GET } from "@/app/api/search/v2/route";
-import { getListingsPaginated, getMapListings } from "@/lib/data";
+import { executeSearchV2 } from "@/lib/search/search-v2-service";
+import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
+import { buildRawParamsFromSearchParams } from "@/lib/search-params";
 import { NextRequest } from "next/server";
-import type {
-  ListingData,
-  MapListingData,
-  PaginatedResultHybrid,
-} from "@/lib/data";
+import type { SearchV2Response } from "@/lib/search/types";
+import type { SearchV2Result } from "@/lib/search/search-v2-service";
 
-// Helper to create a mock NextRequest with searchParams
+// --- Helpers ---
+
 function createRequest(params: Record<string, string> = {}): NextRequest {
   const searchParams = new URLSearchParams(params);
   const request = {
@@ -86,66 +123,96 @@ function createRequest(params: Record<string, string> = {}): NextRequest {
   return request;
 }
 
-// Helper to create a mock NextRequest with multi-value params (for repeated keys like amenities=X&amenities=Y)
-function createRequestWithMultiParams(params: [string, string][]): NextRequest {
-  const searchParams = new URLSearchParams();
-  params.forEach(([key, value]) => searchParams.append(key, value));
+/** Build a successful SearchV2Result for mocking executeSearchV2 */
+function createMockSearchResult(
+  overrides: Partial<SearchV2Response> = {},
+): SearchV2Result {
+  const response: SearchV2Response = {
+    meta: {
+      queryHash: "abcdef1234567890",
+      generatedAt: new Date().toISOString(),
+      mode: "pins",
+      ...overrides.meta,
+    },
+    list: {
+      items: [],
+      nextCursor: null,
+      total: 0,
+      ...overrides.list,
+    },
+    map: {
+      geojson: {
+        type: "FeatureCollection",
+        features: [],
+        ...overrides.map?.geojson,
+      },
+      ...overrides.map,
+    },
+  };
   return {
-    nextUrl: { searchParams },
-    headers: new Headers(),
-  } as unknown as NextRequest;
+    response,
+    paginatedResult: {
+      items: [],
+      hasNextPage: false,
+      hasPrevPage: false,
+      total: 0,
+      totalPages: 0,
+      page: 1,
+      limit: 20,
+    },
+  };
 }
 
-// Mock listing data factory
-function createMockListingData(
+/** Build a mock list item in v2 format */
+function createMockListItem(
   id: string,
-  overrides: Partial<ListingData> = {},
-): ListingData {
+  overrides: Record<string, unknown> = {},
+) {
   return {
     id,
     title: `Listing ${id}`,
-    description: "Test listing",
     price: 1500,
-    images: ["img.jpg"],
-    availableSlots: 1,
-    totalSlots: 1,
-    amenities: [],
-    houseRules: [],
-    householdLanguages: [],
-    location: {
-      address: "123 Test St",
-      city: "San Francisco",
-      state: "CA",
-      zip: "94102",
-      lat: 37.7749,
-      lng: -122.4194,
-    },
-    isNearMatch: false,
+    image: "img.jpg",
+    lat: 37.7749,
+    lng: -122.4194,
     ...overrides,
   };
 }
 
-// Mock map listing data factory
-function createMockMapListingData(
+/** Build a GeoJSON feature for map data */
+function createMockGeoFeature(
   id: string,
   lat: number = 37.7749,
   lng: number = -122.4194,
-): MapListingData {
+) {
   return {
-    id,
-    title: `Listing ${id}`,
-    price: 1500,
-    availableSlots: 1,
-
-    images: ["img.jpg"],
-    location: { lat, lng },
+    type: "Feature" as const,
+    geometry: {
+      type: "Point" as const,
+      coordinates: [lng, lat],
+    },
+    properties: {
+      id,
+      title: `Listing ${id}`,
+      price: 1500,
+      image: "img.jpg",
+      availableSlots: 1,
+    },
   };
 }
+
+// --- Tests ---
 
 describe("Search API v2 route", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFeatures.searchV2 = false; // Reset to disabled
+    // Default: executeSearchV2 returns empty success result
+    (executeSearchV2 as jest.Mock).mockResolvedValue(createMockSearchResult());
+    // Default: withTimeout passes through promise
+    (withTimeout as jest.Mock).mockImplementation(
+      (promise: Promise<unknown>) => promise,
+    );
   });
 
   describe("Feature flag gating", () => {
@@ -163,20 +230,6 @@ describe("Search API v2 route", () => {
     it("should return 200 when feature flag is enabled", async () => {
       mockFeatures.searchV2 = true;
 
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
-      const mockMapListings: MapListingData[] = [];
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue(mockMapListings);
-
       const request = createRequest();
       const response = await GET(request);
 
@@ -185,20 +238,6 @@ describe("Search API v2 route", () => {
 
     it("should return 200 when ?v2=1 param is set", async () => {
       mockFeatures.searchV2 = false;
-
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
-      const mockMapListings: MapListingData[] = [];
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue(mockMapListings);
 
       const request = createRequest({ v2: "1" });
       const response = await GET(request);
@@ -209,24 +248,43 @@ describe("Search API v2 route", () => {
     it("should return 200 when ?v2=true param is set", async () => {
       mockFeatures.searchV2 = false;
 
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
-      const mockMapListings: MapListingData[] = [];
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue(mockMapListings);
-
       const request = createRequest({ v2: "true" });
       const response = await GET(request);
 
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe("Service delegation", () => {
+    beforeEach(() => {
+      mockFeatures.searchV2 = true;
+    });
+
+    it("should call executeSearchV2 with rawParams from URL", async () => {
+      const mockRawParams = { q: "studio", minPrice: "500" };
+      (buildRawParamsFromSearchParams as jest.Mock).mockReturnValue(
+        mockRawParams,
+      );
+
+      const request = createRequest({ q: "studio", minPrice: "500" });
+      await GET(request);
+
+      expect(executeSearchV2).toHaveBeenCalledTimes(1);
+      expect(executeSearchV2).toHaveBeenCalledWith({
+        rawParams: mockRawParams,
+      });
+    });
+
+    it("should wrap executeSearchV2 with withTimeout", async () => {
+      const request = createRequest();
+      await GET(request);
+
+      expect(withTimeout).toHaveBeenCalledTimes(1);
+      expect(withTimeout).toHaveBeenCalledWith(
+        expect.anything(),
+        DEFAULT_TIMEOUTS.DATABASE,
+        "executeSearchV2",
+      );
     });
   });
 
@@ -236,21 +294,32 @@ describe("Search API v2 route", () => {
     });
 
     it("should return correct response structure", async () => {
-      const mockListings = [createMockListingData("1")];
-      const mockMapListings = [createMockMapListingData("1")];
+      const listItems = [createMockListItem("1")];
+      const geoFeatures = [createMockGeoFeature("1")];
 
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: mockListings,
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 1,
-        totalPages: 1,
-        page: 1,
-        limit: 20,
-      };
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue(mockMapListings);
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          meta: {
+            queryHash: "abcdef1234567890",
+            generatedAt: new Date().toISOString(),
+            mode: "pins",
+          },
+          list: {
+            items: listItems,
+            nextCursor: null,
+            total: 1,
+          },
+          map: {
+            geojson: {
+              type: "FeatureCollection",
+              features: geoFeatures,
+            },
+            pins: [
+              { id: "1", lat: 37.7749, lng: -122.4194, price: 1500 },
+            ],
+          },
+        }),
+      );
 
       const request = createRequest();
       const response = await GET(request);
@@ -276,18 +345,6 @@ describe("Search API v2 route", () => {
     });
 
     it("should include request-id header", async () => {
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
-
       const request = createRequest();
       const response = await GET(request);
 
@@ -295,18 +352,6 @@ describe("Search API v2 route", () => {
     });
 
     it("should include Cache-Control header", async () => {
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
-
       const request = createRequest();
       const response = await GET(request);
 
@@ -319,23 +364,20 @@ describe("Search API v2 route", () => {
       mockFeatures.searchV2 = true;
     });
 
-    it("should return mode='pins' when mapListings < 50", async () => {
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
-      // 30 map listings (below threshold)
-      const mockMapListings = Array.from({ length: 30 }, (_, i) =>
-        createMockMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194),
+    it("should return mode='pins' when service returns pins mode", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          meta: {
+            queryHash: "abcdef1234567890",
+            generatedAt: new Date().toISOString(),
+            mode: "pins",
+          },
+          map: {
+            geojson: { type: "FeatureCollection", features: [] },
+            pins: [{ id: "1", lat: 37.7749, lng: -122.4194 }],
+          },
+        }),
       );
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue(mockMapListings);
 
       const request = createRequest();
       const response = await GET(request);
@@ -346,23 +388,19 @@ describe("Search API v2 route", () => {
       expect(Array.isArray(data.map.pins)).toBe(true);
     });
 
-    it("should return mode='geojson' when mapListings >= 50", async () => {
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
-      // 50 map listings (at threshold)
-      const mockMapListings = Array.from({ length: 50 }, (_, i) =>
-        createMockMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194),
+    it("should return mode='geojson' when service returns geojson mode", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          meta: {
+            queryHash: "abcdef1234567890",
+            generatedAt: new Date().toISOString(),
+            mode: "geojson",
+          },
+          map: {
+            geojson: { type: "FeatureCollection", features: [] },
+          },
+        }),
       );
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue(mockMapListings);
 
       const request = createRequest();
       const response = await GET(request);
@@ -373,20 +411,20 @@ describe("Search API v2 route", () => {
     });
 
     it("should always include geojson regardless of mode", async () => {
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
-
-      // Test with sparse results
-      const sparseMapListings = [createMockMapListingData("1")];
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue(sparseMapListings);
+      // Test with pins mode
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          meta: {
+            queryHash: "abcdef1234567890",
+            generatedAt: new Date().toISOString(),
+            mode: "pins",
+          },
+          map: {
+            geojson: { type: "FeatureCollection", features: [] },
+            pins: [],
+          },
+        }),
+      );
 
       const sparseRequest = createRequest();
       const sparseResponse = await GET(sparseRequest);
@@ -395,11 +433,19 @@ describe("Search API v2 route", () => {
       expect(sparseData.map.geojson).toBeDefined();
       expect(sparseData.map.geojson.type).toBe("FeatureCollection");
 
-      // Test with dense results
-      const denseMapListings = Array.from({ length: 100 }, (_, i) =>
-        createMockMapListingData(`${i}`),
+      // Test with geojson mode
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          meta: {
+            queryHash: "abcdef1234567890",
+            generatedAt: new Date().toISOString(),
+            mode: "geojson",
+          },
+          map: {
+            geojson: { type: "FeatureCollection", features: [] },
+          },
+        }),
       );
-      (getMapListings as jest.Mock).mockResolvedValue(denseMapListings);
 
       const denseRequest = createRequest();
       const denseResponse = await GET(denseRequest);
@@ -415,19 +461,16 @@ describe("Search API v2 route", () => {
       mockFeatures.searchV2 = true;
     });
 
-    it("should return nextCursor when hasNextPage is true", async () => {
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [createMockListingData("1")],
-        hasNextPage: true,
-        hasPrevPage: false,
-        total: 100,
-        totalPages: 5,
-        page: 1,
-        limit: 20,
-      };
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
+    it("should return nextCursor when service provides one", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          list: {
+            items: [createMockListItem("1")],
+            nextCursor: "eyJwIjoyfQ", // encoded cursor
+            total: 100,
+          },
+        }),
+      );
 
       const request = createRequest();
       const response = await GET(request);
@@ -437,19 +480,16 @@ describe("Search API v2 route", () => {
       expect(typeof data.list.nextCursor).toBe("string");
     });
 
-    it("should return null nextCursor when hasNextPage is false", async () => {
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [createMockListingData("1")],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 1,
-        totalPages: 1,
-        page: 1,
-        limit: 20,
-      };
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
+    it("should return null nextCursor when service indicates no more pages", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          list: {
+            items: [createMockListItem("1")],
+            nextCursor: null,
+            total: 1,
+          },
+        }),
+      );
 
       const request = createRequest();
       const response = await GET(request);
@@ -464,35 +504,24 @@ describe("Search API v2 route", () => {
       mockFeatures.searchV2 = true;
     });
 
-    it("should transform listings to correct list item format", async () => {
-      const mockListings = [
-        createMockListingData("test-id", {
-          title: "Cozy Room",
-          price: 1200,
-          images: ["first.jpg", "second.jpg"],
-          location: {
-            address: "123 Test St",
-            city: "San Francisco",
-            state: "CA",
-            zip: "94102",
-            lat: 37.7749,
-            lng: -122.4194,
+    it("should pass through list items from service response", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          list: {
+            items: [
+              createMockListItem("test-id", {
+                title: "Cozy Room",
+                price: 1200,
+                image: "first.jpg",
+                lat: 37.7749,
+                lng: -122.4194,
+              }),
+            ],
+            nextCursor: null,
+            total: 1,
           },
         }),
-      ];
-
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: mockListings,
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 1,
-        totalPages: 1,
-        page: 1,
-        limit: 20,
-      };
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
+      );
 
       const request = createRequest();
       const response = await GET(request);
@@ -507,21 +536,18 @@ describe("Search API v2 route", () => {
       expect(item.lng).toBe(-122.4194);
     });
 
-    it("should add near-match badge when isNearMatch is true", async () => {
-      const mockListings = [createMockListingData("1", { isNearMatch: true })];
-
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: mockListings,
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 1,
-        totalPages: 1,
-        page: 1,
-        limit: 20,
-      };
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
+    it("should pass through badges from service response", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          list: {
+            items: [
+              createMockListItem("1", { badges: ["near-match"] }),
+            ],
+            nextCursor: null,
+            total: 1,
+          },
+        }),
+      );
 
       const request = createRequest();
       const response = await GET(request);
@@ -530,21 +556,18 @@ describe("Search API v2 route", () => {
       expect(data.list.items[0].badges).toContain("near-match");
     });
 
-    it("should add multi-room badge when totalSlots > 1", async () => {
-      const mockListings = [createMockListingData("1", { totalSlots: 3 })];
-
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: mockListings,
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 1,
-        totalPages: 1,
-        page: 1,
-        limit: 20,
-      };
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
+    it("should pass through multi-room badge from service response", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          list: {
+            items: [
+              createMockListItem("1", { badges: ["multi-room"] }),
+            ],
+            nextCursor: null,
+            total: 1,
+          },
+        }),
+      );
 
       const request = createRequest();
       const response = await GET(request);
@@ -559,41 +582,12 @@ describe("Search API v2 route", () => {
       mockFeatures.searchV2 = true;
     });
 
-    it("should return list results when map query fails", async () => {
-      const mockListings = [createMockListingData("1")];
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: mockListings,
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 1,
-        totalPages: 1,
-        page: 1,
-        limit: 20,
-      };
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockRejectedValue(
-        new Error("Map query timeout"),
-      );
-
-      const request = createRequest();
-      const response = await GET(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.list.items).toHaveLength(1);
-      expect(data.list.items[0].id).toBe("1");
-      expect(data.map.geojson.type).toBe("FeatureCollection");
-      expect(data.map.geojson.features).toHaveLength(0);
-    });
-
-    it("should return empty results when list query fails", async () => {
-      const mockMapListings = [createMockMapListingData("1")];
-
-      (getListingsPaginated as jest.Mock).mockRejectedValue(
-        new Error("Database error"),
-      );
-      (getMapListings as jest.Mock).mockResolvedValue(mockMapListings);
+    it("should return 503 when service returns an error", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue({
+        response: null,
+        paginatedResult: null,
+        error: "Search temporarily unavailable",
+      });
 
       const request = createRequest();
       const response = await GET(request);
@@ -603,13 +597,11 @@ describe("Search API v2 route", () => {
       expect(data.error).toBe("Search temporarily unavailable");
     });
 
-    it("should return fully empty response when both queries fail", async () => {
-      (getListingsPaginated as jest.Mock).mockRejectedValue(
-        new Error("Database error"),
-      );
-      (getMapListings as jest.Mock).mockRejectedValue(
-        new Error("Map query timeout"),
-      );
+    it("should return 503 when service returns null response", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue({
+        response: null,
+        paginatedResult: null,
+      });
 
       const request = createRequest();
       const response = await GET(request);
@@ -618,70 +610,31 @@ describe("Search API v2 route", () => {
       expect(response.status).toBe(503);
       expect(data.error).toBe("Search temporarily unavailable");
     });
-  });
 
-  describe("Multi-select filter handling", () => {
-    const mockListResult: PaginatedResultHybrid<ListingData> = {
-      items: [],
-      hasNextPage: false,
-      hasPrevPage: false,
-      total: 0,
-      totalPages: 0,
-      page: 1,
-      limit: 20,
-    };
+    it("should return 500 when executeSearchV2 throws", async () => {
+      (executeSearchV2 as jest.Mock).mockRejectedValue(
+        new Error("Database connection lost"),
+      );
 
-    beforeEach(() => {
-      mockFeatures.searchV2 = true;
-      jest.clearAllMocks();
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to fetch search results");
     });
 
-    it("should preserve multiple amenities from repeated URL params", async () => {
-      const request = createRequestWithMultiParams([
-        ["amenities", "Wifi"],
-        ["amenities", "AC"],
-        ["amenities", "Parking"],
-      ]);
-
-      await GET(request);
-
-      expect(getListingsPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({
-          amenities: expect.arrayContaining(["Wifi", "AC", "Parking"]),
-        }),
+    it("should return 400 for validation errors", async () => {
+      (executeSearchV2 as jest.Mock).mockRejectedValue(
+        new Error("Bounds cannot exceed maximum span"),
       );
-    });
 
-    it("should preserve multiple languages from repeated URL params", async () => {
-      const request = createRequestWithMultiParams([
-        ["languages", "English"],
-        ["languages", "Telugu"],
-      ]);
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
 
-      await GET(request);
-
-      expect(getListingsPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({
-          languages: expect.arrayContaining(["en", "te"]),
-        }),
-      );
-    });
-
-    it("should preserve multiple houseRules from repeated URL params", async () => {
-      const request = createRequestWithMultiParams([
-        ["houseRules", "Pets allowed"],
-        ["houseRules", "Smoking allowed"],
-      ]);
-
-      await GET(request);
-
-      expect(getListingsPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({
-          houseRules: expect.arrayContaining(["Pets allowed", "Smoking allowed"]),
-        }),
-      );
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid search parameters");
     });
   });
 
@@ -689,10 +642,19 @@ describe("Search API v2 route", () => {
     beforeEach(() => {
       mockFeatures.searchV2 = true;
       jest.clearAllMocks();
+      // Default: withTimeout passes through
+      (withTimeout as jest.Mock).mockImplementation(
+        (promise: Promise<unknown>) => promise,
+      );
     });
 
-    it("should return empty results with unboundedSearch flag when query without bounds", async () => {
-      // This simulates ?q=Boston without lat/lng or bounds
+    it("should return unboundedSearch response when service signals it", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue({
+        response: null,
+        paginatedResult: null,
+        unboundedSearch: true,
+      });
+
       const request = createRequest({ q: "Boston" });
 
       const response = await GET(request);
@@ -703,27 +665,31 @@ describe("Search API v2 route", () => {
       expect(data.unboundedSearch).toBe(true);
       expect(data.list).toBeNull();
       expect(data.map).toBeNull();
-
-      // getListingsPaginated should NOT be called for unbounded searches
-      expect(getListingsPaginated).not.toHaveBeenCalled();
-      expect(getMapListings).not.toHaveBeenCalled();
     });
 
-    it("should proceed normally when query has bounds", async () => {
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
+    it("should return no-cache headers for unbounded search", async () => {
+      (executeSearchV2 as jest.Mock).mockResolvedValue({
+        response: null,
+        paginatedResult: null,
+        unboundedSearch: true,
+      });
 
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
+      const request = createRequest({ q: "Boston" });
+      const response = await GET(request);
 
-      // This simulates ?q=Boston&lat=42.36&lng=-71.06
+      expect(response.headers.get("Cache-Control")).toContain("no-cache");
+    });
+
+    it("should return normal results when query has bounds", async () => {
+      const result = createMockSearchResult({
+        list: {
+          items: [],
+          nextCursor: null,
+          total: 0,
+        },
+      });
+      (executeSearchV2 as jest.Mock).mockResolvedValue(result);
+
       const request = createRequest({
         q: "Boston",
         lat: "42.36",
@@ -733,31 +699,23 @@ describe("Search API v2 route", () => {
       const response = await GET(request);
       const data = await response.json();
 
-      // Should return 200 with results
       expect(response.status).toBe(200);
       expect(data.unboundedSearch).toBeUndefined();
       expect(data.list).toBeDefined();
       expect(data.map).toBeDefined();
-
-      // getListingsPaginated should be called with bounds
-      expect(getListingsPaginated).toHaveBeenCalled();
+      expect(executeSearchV2).toHaveBeenCalled();
     });
 
-    it("should proceed normally when no query (browse mode)", async () => {
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
+    it("should return normal results when no query (browse mode)", async () => {
+      const result = createMockSearchResult({
+        list: {
+          items: [],
+          nextCursor: null,
+          total: 0,
+        },
+      });
+      (executeSearchV2 as jest.Mock).mockResolvedValue(result);
 
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
-
-      // No query, no bounds - browse mode (allowed)
       const request = createRequest({});
 
       const response = await GET(request);
@@ -766,41 +724,34 @@ describe("Search API v2 route", () => {
       expect(response.status).toBe(200);
       expect(data.unboundedSearch).toBeUndefined();
       expect(data.list).toBeDefined();
-
-      // getListingsPaginated should be called
-      expect(getListingsPaginated).toHaveBeenCalled();
+      expect(executeSearchV2).toHaveBeenCalled();
     });
   });
 
-  describe("Stability contract: data filtering guarantees", () => {
+  describe("Stability contract: response shape guarantees", () => {
     beforeEach(() => {
       mockFeatures.searchV2 = true;
       jest.clearAllMocks();
+      (withTimeout as jest.Mock).mockImplementation(
+        (promise: Promise<unknown>) => promise,
+      );
     });
 
-    it("excludes PAUSED listings from search results (F2.3)", async () => {
-      // The route delegates filtering to getListingsPaginated which includes
-      // SQL condition: l.status = 'ACTIVE'. We verify:
-      // 1. getListingsPaginated is called (delegation)
-      // 2. Only ACTIVE listings returned by the data layer appear in response
-
-      const activeListings = [
-        createMockListingData("active-1", { title: "Active Listing" }),
-        createMockListingData("active-2", { title: "Another Active" }),
+    it("passes through service list items faithfully (F2.3)", async () => {
+      const listItems = [
+        createMockListItem("active-1", { title: "Active Listing" }),
+        createMockListItem("active-2", { title: "Another Active" }),
       ];
 
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: activeListings,
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 2,
-        totalPages: 1,
-        page: 1,
-        limit: 20,
-      };
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue([]);
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          list: {
+            items: listItems,
+            nextCursor: null,
+            total: 2,
+          },
+        }),
+      );
 
       const request = createRequest();
       const response = await GET(request);
@@ -808,46 +759,31 @@ describe("Search API v2 route", () => {
 
       expect(response.status).toBe(200);
 
-      // Verify delegation to data layer (which enforces status = 'ACTIVE')
-      expect(getListingsPaginated).toHaveBeenCalled();
-
-      // Verify only the ACTIVE listings from the data layer appear in results
+      // Route passes through the service response directly
       expect(data.list.items).toHaveLength(2);
       expect(data.list.items.map((item: { id: string }) => item.id)).toEqual([
         "active-1",
         "active-2",
       ]);
-
-      // Verify the route does not inject any additional listings
-      // (no PAUSED, DRAFT, or other non-ACTIVE status listings can appear)
       expect(data.list.total).toBe(2);
     });
 
-    it("excludes listings with null coordinates from map results (F1.1)", async () => {
-      // The route delegates map data to getMapListings which includes SQL conditions:
-      //   ST_X(loc.coords::geometry) IS NOT NULL
-      //   ST_Y(loc.coords::geometry) IS NOT NULL
-      // We verify:
-      // 1. getMapListings is called (delegation)
-      // 2. Only listings with valid coordinates appear in map GeoJSON
-
-      const validMapListings = [
-        createMockMapListingData("valid-1", 37.7749, -122.4194),
-        createMockMapListingData("valid-2", 34.0522, -118.2437),
+    it("passes through GeoJSON features with valid coordinates (F1.1)", async () => {
+      const geoFeatures = [
+        createMockGeoFeature("valid-1", 37.7749, -122.4194),
+        createMockGeoFeature("valid-2", 34.0522, -118.2437),
       ];
 
-      const mockListResult: PaginatedResultHybrid<ListingData> = {
-        items: [],
-        hasNextPage: false,
-        hasPrevPage: false,
-        total: 0,
-        totalPages: 0,
-        page: 1,
-        limit: 20,
-      };
-
-      (getListingsPaginated as jest.Mock).mockResolvedValue(mockListResult);
-      (getMapListings as jest.Mock).mockResolvedValue(validMapListings);
+      (executeSearchV2 as jest.Mock).mockResolvedValue(
+        createMockSearchResult({
+          map: {
+            geojson: {
+              type: "FeatureCollection",
+              features: geoFeatures,
+            },
+          },
+        }),
+      );
 
       const request = createRequest();
       const response = await GET(request);
@@ -855,13 +791,10 @@ describe("Search API v2 route", () => {
 
       expect(response.status).toBe(200);
 
-      // Verify delegation to data layer (which enforces non-null coordinates)
-      expect(getMapListings).toHaveBeenCalled();
-
-      // Verify GeoJSON features only contain valid coordinates
-      const features = data.map.geojson.features;
-      expect(features).toHaveLength(2);
-      features.forEach(
+      // Verify GeoJSON features have valid coordinates
+      const mapFeatures = data.map.geojson.features;
+      expect(mapFeatures).toHaveLength(2);
+      mapFeatures.forEach(
         (feature: {
           geometry: { coordinates: [number, number] };
           properties: { id: string };
@@ -876,8 +809,8 @@ describe("Search API v2 route", () => {
         },
       );
 
-      // Verify feature IDs match our valid listings
-      const featureIds = features.map(
+      // Verify feature IDs match
+      const featureIds = mapFeatures.map(
         (f: { properties: { id: string } }) => f.properties.id,
       );
       expect(featureIds).toContain("valid-1");

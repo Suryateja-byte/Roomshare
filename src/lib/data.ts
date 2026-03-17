@@ -54,7 +54,7 @@ export async function getLimitedCount(
   // Unbounded browse protection - return null (unknown count)
   // Prevents full-table scans on both SearchDoc and V1 paths
   const isUnboundedBrowse = !params.query && !params.bounds;
-  if (isUnboundedBrowse) {
+  if (isUnboundedBrowse && !hasActiveFilters(params)) {
     return null;
   }
 
@@ -587,6 +587,8 @@ export async function getMapListings(
     roomType,
     genderPreference,
     householdGender,
+    bookingMode,
+    minAvailableSlots,
   } = params;
 
   // Defense in depth: block unbounded text searches
@@ -598,8 +600,10 @@ export async function getMapListings(
   }
 
   // Build WHERE conditions dynamically
+  // minAvailableSlots defaults to 1 (at least one slot available)
+  const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
   const conditions: string[] = [
-    'l."availableSlots" > 0',
+    `l."availableSlots" >= ${slotThreshold}`,
     "l.status = 'ACTIVE'",
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -692,6 +696,12 @@ export async function getMapListings(
   if (householdGender) {
     conditions.push(`LOWER(l."householdGender") = LOWER($${paramIndex++})`);
     queryParams.push(householdGender);
+  }
+
+  // Booking mode filter (SQL level, case-insensitive)
+  if (bookingMode && bookingMode !== "any") {
+    conditions.push(`l."booking_mode" = $${paramIndex++}`);
+    queryParams.push(bookingMode);
   }
 
   // Languages filter (SQL level with GIN index) - OR logic
@@ -802,6 +812,8 @@ export async function getListingsPaginated(
     languages,
     genderPreference,
     householdGender,
+    bookingMode,
+    minAvailableSlots,
     bounds: rawBounds,
     sort = "recommended",
     page = 1,
@@ -841,8 +853,10 @@ export async function getListingsPaginated(
     }
 
     // Build dynamic WHERE conditions for SQL
+    // minAvailableSlots defaults to 1 (at least one slot available)
+    const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
     const conditions: string[] = [
-      'l."availableSlots" > 0',
+      `l."availableSlots" >= ${slotThreshold}`,
       "l.status = 'ACTIVE'",
       // Exclude listings with invalid coordinates (null, zero, or out of range)
       "ST_X(loc.coords::geometry) IS NOT NULL",
@@ -936,6 +950,12 @@ export async function getListingsPaginated(
     if (householdGender) {
       conditions.push(`LOWER(l."householdGender") = LOWER($${paramIndex++})`);
       queryParams.push(householdGender);
+    }
+
+    // Booking mode filter (SQL level, case-insensitive)
+    if (bookingMode && bookingMode !== "any") {
+      conditions.push(`l."booking_mode" = $${paramIndex++}`);
+      queryParams.push(bookingMode);
     }
 
     // Languages filter (SQL level with GIN index) - OR logic

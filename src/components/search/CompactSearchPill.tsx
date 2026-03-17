@@ -9,6 +9,15 @@ interface CompactSearchPillProps {
   onOpenFilters?: () => void;
 }
 
+/** Count param values, splitting CSV entries (e.g. "Wifi,AC" → 2). */
+function countParamValues(searchParams: URLSearchParams, key: string): number {
+  return searchParams.getAll(key)
+    .flatMap(v => v.split(','))
+    .map(v => v.trim())
+    .filter(Boolean)
+    .length;
+}
+
 /**
  * CompactSearchPill — Desktop-only shrunk search bar shown when scrolled.
  * Displays a summary of current search state; click expands back to full form.
@@ -16,7 +25,8 @@ interface CompactSearchPillProps {
 export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPillProps) {
   const searchParams = useSearchParams();
 
-  const location = searchParams.get('q') || '';
+  const hasSemanticQuery = searchParams.has('what');
+  const location = hasSemanticQuery ? '' : (searchParams.get('q') || '');
   const minPrice = searchParams.get('minPrice');
   const maxPrice = searchParams.get('maxPrice');
   const roomType = searchParams.get('roomType');
@@ -45,10 +55,16 @@ export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPill
       const val = searchParams.get(key);
       if (val && val !== 'any') count++;
     }
-    count += searchParams.getAll('amenities').filter(Boolean).length;
-    count += searchParams.getAll('houseRules').filter(Boolean).length;
+    count += countParamValues(searchParams, 'amenities');
+    count += countParamValues(searchParams, 'houseRules');
+    count += countParamValues(searchParams, 'languages');
     if (minPrice) count++;
     if (maxPrice) count++;
+    // Count minSlots filter
+    const minSlots = searchParams.get('minSlots');
+    if (minSlots && parseInt(minSlots) >= 2) count++;
+    // Count nearMatches filter
+    if (searchParams.get('nearMatches') === '1' || searchParams.get('nearMatches') === 'true') count++;
     return count;
   }, [searchParams, minPrice, maxPrice]);
 

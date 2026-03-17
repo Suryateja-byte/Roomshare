@@ -1,21 +1,23 @@
 {
-  "task": "Multi-slot booking unit tests for production readiness",
-  "type": "IMPLEMENT",
+  "task": "Verify and plan fixes for 7 Codex-reported search contract bugs",
+  "type": "FIX",
   "confidence": 4.6,
-  "verdict": "CONDITIONAL_PASS",
+  "verdict": "CONDITIONAL PASS — all issues confirmed, Fix 1 requires cache key fix before implementation",
   "agents": [
-    "booking-explorer (codebase analysis)",
-    "test-explorer (test infrastructure)",
-    "invariant-explorer (state machine + business rules)",
-    "test-inventory (existing test coverage)",
-    "component-test-inventory (component test coverage)"
+    "investigate-map-contract (Opus, Explore)",
+    "investigate-show-on-map (Opus, Explore)",
+    "investigate-filter-drawer (Opus, Explore)",
+    "investigate-pagination-headers (Opus, Explore)",
+    "investigate-test-gate (Opus, Explore)",
+    "fix-architect (Opus, Explore)",
+    "pre-mortem-critic (Opus, Explore)"
   ],
   "rounds": 5,
-  "timestamp": "2026-03-15T00:00:00Z",
+  "timestamp": "2026-03-16T00:00:00Z",
   "ready_for_execution": true,
-  "existing_tests": 285,
-  "new_tests_planned": 98,
-  "new_files": 6,
-  "augmented_files": 7,
-  "phases": ["A: Core lifecycle + boundary + concurrency + BookingsClient", "B: Feature flags + TTL + audit + block + duplicate", "C: Calendar + email + sweeper batch + reconciler", "D: Verification"]
+  "blocking_items": [
+    "Resolve: should nearMatches propagate to map?",
+    "Resolve: should sort propagate to map?",
+    "Confirm: add minAvailableSlots to buildBaseCacheFields before Fix 1"
+  ]
 }

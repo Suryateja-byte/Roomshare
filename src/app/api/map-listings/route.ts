@@ -110,20 +110,17 @@ export async function GET(request: NextRequest) {
       const rawParams = buildRawParamsFromSearchParams(searchParams);
       const parsed = parseSearchParams(rawParams);
 
+      // Capture sort before overriding — needed for semantic search check
+      const sortOption = parsed.filterParams.sort || "recommended";
+
       // Build filter params from canonical parsed values with validated bounds
       const filterParams = {
-        query: parsed.filterParams.query,
-        minPrice: parsed.filterParams.minPrice,
-        maxPrice: parsed.filterParams.maxPrice,
+        ...parsed.filterParams,
+        // Map-specific overrides: exclude sort/pagination, use validated bounds
+        sort: undefined,
+        page: undefined,
+        limit: undefined,
         bounds,
-        amenities: parsed.filterParams.amenities,
-        languages: parsed.filterParams.languages,
-        houseRules: parsed.filterParams.houseRules,
-        moveInDate: parsed.filterParams.moveInDate,
-        leaseDuration: parsed.filterParams.leaseDuration,
-        roomType: parsed.filterParams.roomType,
-        genderPreference: parsed.filterParams.genderPreference,
-        householdGender: parsed.filterParams.householdGender,
       };
 
       // When semantic search is active, strip the query for the map so it
@@ -132,7 +129,8 @@ export async function GET(request: NextRequest) {
       const semanticActive =
         features.semanticSearch &&
         filterParams.query &&
-        filterParams.query.length >= 3;
+        filterParams.query.length >= 3 &&
+        sortOption === "recommended";
       const mapFilterParams = semanticActive
         ? { ...filterParams, query: undefined }
         : filterParams;

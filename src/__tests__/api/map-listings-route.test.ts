@@ -33,6 +33,19 @@ jest.mock('@/lib/data', () => ({
   getMapListings: jest.fn(),
 }));
 
+jest.mock('@/lib/search/search-doc-queries', () => ({
+  isSearchDocEnabled: jest.fn().mockReturnValue(false),
+  getSearchDocMapListings: jest.fn(),
+}));
+
+// Mock @/lib/env to control features.semanticSearch
+jest.mock('@/lib/env', () => ({
+  __esModule: true,
+  features: {
+    semanticSearch: false,
+  },
+}));
+
 jest.mock('@/lib/with-rate-limit-redis', () => ({
   withRateLimitRedis: jest.fn().mockResolvedValue(null),
 }));
@@ -68,6 +81,7 @@ jest.mock('@/lib/search-params', () => ({
     browseMode: false,
     filterParams: {
       query: undefined,
+      sort: undefined,
       minPrice: undefined,
       maxPrice: undefined,
       amenities: undefined,
@@ -110,9 +124,14 @@ jest.mock('@/lib/search-rate-limit-identifier', () => ({
 
 import { GET } from '@/app/api/map-listings/route';
 import { getMapListings } from '@/lib/data';
+import { isSearchDocEnabled, getSearchDocMapListings } from '@/lib/search/search-doc-queries';
+import { features } from '@/lib/env';
 import { withRateLimitRedis } from '@/lib/with-rate-limit-redis';
 import { withTimeout, DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
 import { validateAndParseBounds } from '@/lib/validation';
+import { parseSearchParams } from '@/lib/search-params';
+
+const mockFeatures = features as { semanticSearch: boolean };
 
 // --- Helpers ---
 
@@ -156,17 +175,26 @@ function createGetRequest(params: Record<string, string> = {}) {
 describe('GET /api/map-listings (C2.2)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default: SearchDoc disabled so existing tests hit V1 (getMapListings) path
+    (isSearchDocEnabled as jest.Mock).mockReturnValue(false);
     // Default: bounds validation passes
     (validateAndParseBounds as jest.Mock).mockReturnValue({
       valid: true,
       bounds: VALID_BOUNDS,
     });
-    // Default: getMapListings returns sample data
+    // Default: getMapListings returns sample data (V1 path)
     (getMapListings as jest.Mock).mockResolvedValue(SAMPLE_MAP_LISTINGS);
+    // Default: getSearchDocMapListings returns sample data (V2 path)
+    (getSearchDocMapListings as jest.Mock).mockResolvedValue({
+      listings: SAMPLE_MAP_LISTINGS,
+      truncated: false,
+    });
     // Default: rate limiter passes
     (withRateLimitRedis as jest.Mock).mockResolvedValue(null);
     // Default: withTimeout passes through promise
     (withTimeout as jest.Mock).mockImplementation((promise: Promise<unknown>) => promise);
+    // Default: semantic search off
+    mockFeatures.semanticSearch = false;
   });
 
   it('returns 400 when no bounds are provided', async () => {
@@ -262,5 +290,198 @@ describe('GET /api/map-listings (C2.2)', () => {
     expect(res.status).toBe(429);
     // getMapListings should NOT be called when rate limited
     expect(getMapListings).not.toHaveBeenCalled();
+  });
+
+  describe('SearchDoc path (V2)', () => {
+    beforeEach(() => {
+      (isSearchDocEnabled as jest.Mock).mockReturnValue(true);
+    });
+
+    it('calls getSearchDocMapListings when SearchDoc is enabled', async () => {
+      const req = createGetRequest({
+        minLng: '-122.5',
+        maxLng: '-122.0',
+        minLat: '37.5',
+        maxLat: '38.0',
+      });
+
+      const res = await GET(req);
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.listings).toEqual(SAMPLE_MAP_LISTINGS);
+
+      // SearchDoc path should be called, not legacy path
+      expect(getSearchDocMapListings).toHaveBeenCalledTimes(1);
+      expect(getMapListings).not.toHaveBeenCalled();
+    });
+
+    it('passes filter params including bounds to getSearchDocMapListings', async () => {
+      (parseSearchParams as jest.Mock).mockReturnValue({
+        q: undefined,
+        requestedPage: 1,
+        sortOption: 'recommended',
+        boundsRequired: false,
+        browseMode: false,
+        filterParams: {
+          query: undefined,
+          sort: undefined,
+          bookingMode: 'INSTANT',
+          minAvailableSlots: 2,
+          minPrice: 500,
+          maxPrice: 2000,
+        },
+      });
+
+      const req = createGetRequest({
+        minLng: '-122.5',
+        maxLng: '-122.0',
+        minLat: '37.5',
+        maxLat: '38.0',
+        bookingMode: 'INSTANT',
+        minSlots: '2',
+      });
+
+      await GET(req);
+
+      expect(getSearchDocMapListings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bookingMode: 'INSTANT',
+          minAvailableSlots: 2,
+          minPrice: 500,
+          maxPrice: 2000,
+          bounds: VALID_BOUNDS,
+        }),
+      );
+    });
+
+    it('wraps getSearchDocMapListings with withTimeout', async () => {
+      const req = createGetRequest({
+        minLng: '-122.5',
+        maxLng: '-122.0',
+        minLat: '37.5',
+        maxLat: '38.0',
+      });
+
+      await GET(req);
+
+      expect(withTimeout).toHaveBeenCalledTimes(1);
+      expect(withTimeout).toHaveBeenCalledWith(
+        expect.anything(),
+        DEFAULT_TIMEOUTS.DATABASE,
+        'getSearchDocMapListings',
+      );
+    });
+  });
+
+  describe('Semantic query stripping', () => {
+    it('strips query from map params when semantic search is active and sort is recommended', async () => {
+      mockFeatures.semanticSearch = true;
+
+      (parseSearchParams as jest.Mock).mockReturnValue({
+        q: 'bright sunny studio',
+        requestedPage: 1,
+        sortOption: 'recommended',
+        boundsRequired: false,
+        browseMode: false,
+        filterParams: {
+          query: 'bright sunny studio',
+          sort: undefined, // undefined sort defaults to "recommended"
+          minPrice: undefined,
+          maxPrice: undefined,
+        },
+      });
+
+      const req = createGetRequest({
+        minLng: '-122.5',
+        maxLng: '-122.0',
+        minLat: '37.5',
+        maxLat: '38.0',
+        q: 'bright sunny studio',
+      });
+
+      await GET(req);
+
+      // With V1 path (default): getMapListings should be called with query stripped
+      expect(getMapListings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: undefined,
+          bounds: VALID_BOUNDS,
+        }),
+      );
+    });
+
+    it('preserves query in map params when sort is not recommended', async () => {
+      mockFeatures.semanticSearch = true;
+
+      (parseSearchParams as jest.Mock).mockReturnValue({
+        q: 'bright sunny studio',
+        requestedPage: 1,
+        sortOption: 'newest',
+        boundsRequired: false,
+        browseMode: false,
+        filterParams: {
+          query: 'bright sunny studio',
+          sort: 'newest',
+          minPrice: undefined,
+          maxPrice: undefined,
+        },
+      });
+
+      const req = createGetRequest({
+        minLng: '-122.5',
+        maxLng: '-122.0',
+        minLat: '37.5',
+        maxLat: '38.0',
+        q: 'bright sunny studio',
+        sort: 'newest',
+      });
+
+      await GET(req);
+
+      // When sort is not "recommended", query should be preserved
+      expect(getMapListings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: 'bright sunny studio',
+          bounds: VALID_BOUNDS,
+        }),
+      );
+    });
+
+    it('does not strip query when semantic search feature flag is off', async () => {
+      mockFeatures.semanticSearch = false;
+
+      (parseSearchParams as jest.Mock).mockReturnValue({
+        q: 'bright sunny studio',
+        requestedPage: 1,
+        sortOption: 'recommended',
+        boundsRequired: false,
+        browseMode: false,
+        filterParams: {
+          query: 'bright sunny studio',
+          sort: undefined,
+          minPrice: undefined,
+          maxPrice: undefined,
+        },
+      });
+
+      const req = createGetRequest({
+        minLng: '-122.5',
+        maxLng: '-122.0',
+        minLat: '37.5',
+        maxLat: '38.0',
+        q: 'bright sunny studio',
+      });
+
+      await GET(req);
+
+      // Semantic search off: query should be preserved
+      expect(getMapListings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: 'bright sunny studio',
+          bounds: VALID_BOUNDS,
+        }),
+      );
+    });
   });
 });

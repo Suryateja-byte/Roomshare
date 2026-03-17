@@ -427,8 +427,22 @@ describe("V1 Fallback Browse Protection", () => {
       expect(result).toBeNull();
     });
 
-    it("returns null when only filters are set (no bounds)", async () => {
-      // Import after mocks are set up
+    it("proceeds to count when active filters are set (no bounds)", async () => {
+      // After the fix, filter-only searches (no query, no bounds but active filters)
+      // should NOT return null — they should delegate to the count query.
+      // We mock $transaction to simulate the SearchDoc count path.
+      jest.doMock("@/lib/prisma", () => ({
+        prisma: {
+          $queryRawUnsafe: jest.fn().mockResolvedValue([{ count: 42 }]),
+          $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) =>
+            fn({
+              $executeRawUnsafe: jest.fn(),
+              $queryRawUnsafe: jest.fn().mockResolvedValue([{ count: 42 }]),
+            }),
+          ),
+        },
+      }));
+
       const { getLimitedCount } = await import("@/lib/data");
 
       const result = await getLimitedCount({
@@ -437,7 +451,8 @@ describe("V1 Fallback Browse Protection", () => {
         roomType: "private room",
       });
 
-      expect(result).toBeNull();
+      // Should return a count (not null) because active filters are set
+      expect(result).not.toBeNull();
     });
 
     // Note: Bounded query execution is already tested in getSearchDocLimitedCount suite

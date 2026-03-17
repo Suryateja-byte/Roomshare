@@ -38,6 +38,7 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
     shouldShowMap,
     shouldRenderMap,
     toggleMap,
+    showMap,
     isLoading,
   } = useMapPreference();
 
@@ -59,7 +60,7 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
   };
 
   return (
-    <SearchMapUIProvider showMap={toggleMap} shouldShowMap={shouldShowMap}>
+    <SearchMapUIProvider showMap={showMap} shouldShowMap={shouldShowMap}>
       {/* Bridge: Scrolls listing card into view when map marker is clicked */}
       <ListScrollBridge />
 
