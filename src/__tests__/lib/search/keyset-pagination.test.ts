@@ -219,33 +219,39 @@ describe("Keyset Pagination Integration", () => {
     });
 
     it("should handle legacy cursor and return keyset cursor going forward", async () => {
-      // Legacy cursor format (offset-based)
-      const legacyCursor = encodeCursor(2); // Page 2
+      // Legacy cursor format (offset-based) — page 2
+      const legacyCursor = encodeCursor(2);
 
       const mockListings = [
         createMockListingData("3"),
         createMockListingData("4"),
       ];
-      const mockNextCursor = encodeKeysetCursor({
-        v: 1,
-        s: "recommended",
-        k: ["80.00", "2024-01-14T10:00:00.000Z"],
-        id: "4",
-      });
 
-      // When legacy cursor is used, it falls back to first page with keyset
-      // (since we can't convert offset to keyset position)
-      (getSearchDocListingsFirstPage as jest.Mock).mockResolvedValue(
-        createMockKeysetResult(mockListings, mockNextCursor, 100),
+      // When legacy cursor has page > 1, the service routes to offset-based
+      // pagination (getSearchDocListingsPaginated) to correctly respect the page
+      // number. This prevents duplicate results when the ranking engine changes
+      // mid-session (e.g., semantic → FTS fallback).
+      const { getSearchDocListingsPaginated } = jest.requireMock(
+        "@/lib/search/search-doc-queries",
       );
+      getSearchDocListingsPaginated.mockResolvedValue({
+        items: mockListings,
+        total: 100,
+        page: 2,
+        totalPages: 10,
+        hasNextPage: true,
+        hasPrevPage: true,
+      });
       (getSearchDocMapListings as jest.Mock).mockResolvedValue([]);
 
       const result = await executeSearchV2({
         rawParams: { cursor: legacyCursor },
       });
 
-      // Should return keyset cursor for subsequent requests
-      expect(result.response?.list.nextCursor).toBe(mockNextCursor);
+      // Should return a legacy cursor (offset-based) for page 3
+      const expectedLegacyCursor = encodeCursor(3);
+      expect(result.response?.list.nextCursor).toBe(expectedLegacyCursor);
+      expect(getSearchDocListingsPaginated).toHaveBeenCalled();
     });
 
     it("should return null cursor on last page", async () => {

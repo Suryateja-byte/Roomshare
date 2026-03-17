@@ -87,6 +87,7 @@ function generateCacheKey(
     `languages=${[...pending.languages].sort().join(",")}`,
     `genderPreference=${pending.genderPreference}`,
     `householdGender=${pending.householdGender}`,
+    `minSlots=${pending.minSlots}`,
   ];
 
   // Add committed bounds from URL (these don't change with pending filters)
@@ -132,6 +133,9 @@ function buildCountUrl(
   }
   if (pending.householdGender) {
     params.set("householdGender", pending.householdGender);
+  }
+  if (pending.minSlots && parseInt(pending.minSlots) >= 2) {
+    params.set("minSlots", pending.minSlots);
   }
 
   // Add committed location/bounds from URL
@@ -194,7 +198,10 @@ export function useDebouncedFilterCount({
   // Fetch count function
   const fetchCount = useCallback(async () => {
     // Skip fetch when offline to avoid wasted requests
-    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
 
     // Check cache first (restores both count and boundsRequired)
     const cached = getCachedEntry(cacheKey);

@@ -7,7 +7,7 @@
 
 import { getLanguageName } from "@/lib/languages";
 import { getPriceParam } from "@/lib/search-params";
-import { LEASE_DURATION_ALIASES, VALID_LEASE_DURATIONS, VALID_AMENITIES, VALID_HOUSE_RULES, VALID_ROOM_TYPES } from "@/lib/filter-schema";
+import { LEASE_DURATION_ALIASES, ROOM_TYPE_ALIASES, VALID_LEASE_DURATIONS, VALID_AMENITIES, VALID_HOUSE_RULES, VALID_ROOM_TYPES } from "@/lib/filter-schema";
 
 /**
  * Represents a single filter chip that can be displayed and removed
@@ -132,13 +132,16 @@ export function urlToFilterChips(
     }
   }
 
-  // Room type (validated against allowlist)
+  // Room type (validated against allowlist, with alias resolution)
   const roomType = searchParams.get("roomType");
   if (roomType) {
     const lower = roomType.toLowerCase();
-    const canonical = (VALID_ROOM_TYPES as readonly string[]).find(
-      (v) => v.toLowerCase() === lower
-    );
+    // Resolve aliases first (e.g., "private" → "Private Room"), then check allowlist
+    const resolved = ROOM_TYPE_ALIASES[lower];
+    const canonical = resolved
+      ?? (VALID_ROOM_TYPES as readonly string[]).find(
+        (v) => v.toLowerCase() === lower
+      );
     if (canonical && canonical !== "any") {
       chips.push({
         id: "roomType",
@@ -274,6 +277,19 @@ export function urlToFilterChips(
     }
   }
 
+  // Minimum available slots (only show chip when > 1, since 1 is the default)
+  const minSlots = searchParams.get("minSlots");
+  if (minSlots) {
+    const num = parseInt(minSlots, 10);
+    if (!isNaN(num) && num > 1 && num <= 20) {
+      chips.push({
+        id: "minSlots",
+        label: `${num}+ spots`,
+        paramKey: "minSlots",
+      });
+    }
+  }
+
   return chips;
 }
 
@@ -343,6 +359,7 @@ export const FILTER_PARAM_KEYS = [
   'moveInDate', 'roomType', 'leaseDuration',
   'amenities', 'houseRules', 'languages',
   'genderPreference', 'householdGender', 'nearMatches',
+  'minSlots',
 ] as const;
 
 export function hasAnyFilter(searchParams: URLSearchParams): boolean {

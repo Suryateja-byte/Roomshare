@@ -59,6 +59,7 @@ function generateFacetsCacheKey(
     `languages=${[...pending.languages].sort().join(",")}`,
     `genderPreference=${pending.genderPreference}`,
     `householdGender=${pending.householdGender}`,
+    `minSlots=${pending.minSlots}`,
     // Committed location/bounds from URL
     `q=${searchParams.get("q") || ""}`,
     `lat=${searchParams.get("lat") || ""}`,
@@ -99,6 +100,9 @@ function buildFacetsUrl(
   if (pending.householdGender) {
     params.set("householdGender", pending.householdGender);
   }
+  if (pending.minSlots && parseInt(pending.minSlots) >= 2) {
+    params.set("minSlots", pending.minSlots);
+  }
 
   const locationParams = ["q", "lat", "lng", "minLat", "maxLat", "minLng", "maxLng"];
   for (const key of locationParams) {
@@ -129,7 +133,10 @@ export function useFacets({
 
   const fetchFacets = useCallback(async () => {
     // Skip fetch when offline to avoid wasted requests
-    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
 
     // Check cache
     const cached = facetsCache.get(cacheKey);

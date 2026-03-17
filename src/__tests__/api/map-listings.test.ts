@@ -9,6 +9,12 @@ jest.mock("@/lib/data", () => ({
   getMapListings: jest.fn(),
 }));
 
+// Mock SearchDoc path — default to disabled so tests hit legacy (getMapListings) path
+jest.mock("@/lib/search/search-doc-queries", () => ({
+  isSearchDocEnabled: jest.fn().mockReturnValue(false),
+  getSearchDocMapListings: jest.fn(),
+}));
+
 jest.mock("@/lib/with-rate-limit-redis", () => ({
   withRateLimitRedis: jest.fn().mockResolvedValue(null),
 }));
@@ -273,6 +279,8 @@ describe("Map Listings API", () => {
       it("passes filter parameters to getMapListings", async () => {
         (getMapListings as jest.Mock).mockResolvedValue([]);
 
+        // Use sort=newest to prevent semantic query stripping (which strips
+        // query when sort=recommended and features.semanticSearch is enabled)
         const request = createRequest({
           minLng: "-122.5",
           maxLng: "-122.0",
@@ -282,6 +290,7 @@ describe("Map Listings API", () => {
           minPrice: "500",
           maxPrice: "1500",
           amenities: "WiFi,AC",
+          sort: "newest",
         });
 
         await GET(request);

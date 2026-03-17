@@ -23,6 +23,15 @@ interface CollapsedMobileSearchProps {
   onOpenFilters?: () => void;
 }
 
+/** Count param values, splitting CSV entries (e.g. "Wifi,AC" → 2). */
+function countParamValues(searchParams: URLSearchParams, key: string): number {
+  return searchParams.getAll(key)
+    .flatMap(v => v.split(","))
+    .map(v => v.trim())
+    .filter(Boolean)
+    .length;
+}
+
 export default function CollapsedMobileSearch({
   onExpand,
   onOpenFilters,
@@ -30,7 +39,8 @@ export default function CollapsedMobileSearch({
   const searchParams = useSearchParams();
 
   // Get current search state from URL
-  const location = searchParams.get("q") || "";
+  const hasSemanticQuery = searchParams.has("what");
+  const location = hasSemanticQuery ? "" : (searchParams.get("q") || "");
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
 
@@ -56,12 +66,17 @@ export default function CollapsedMobileSearch({
       searchParams.get("householdGender") !== "any"
     )
       count++;
-    // Count amenities
-    searchParams.getAll("amenities").forEach(() => count++);
+    // Count amenities (CSV-aware: useBatchedFilters serializes as "Wifi,AC")
+    count += countParamValues(searchParams, "amenities");
     // Count house rules
-    searchParams.getAll("houseRules").forEach(() => count++);
+    count += countParamValues(searchParams, "houseRules");
     // Count languages
-    searchParams.getAll("languages").forEach(() => count++);
+    count += countParamValues(searchParams, "languages");
+    // Count minSlots filter
+    const minSlots = searchParams.get("minSlots");
+    if (minSlots && parseInt(minSlots) >= 2) count++;
+    // Count nearMatches filter
+    if (searchParams.get("nearMatches") === "1" || searchParams.get("nearMatches") === "true") count++;
     return count;
   }, [searchParams]);
 

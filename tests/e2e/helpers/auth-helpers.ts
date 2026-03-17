@@ -141,13 +141,17 @@ export const authHelpers = {
       }
     }
 
-    // Try to find and click user menu
-    const userMenuButton = page
-      .getByRole('button', { name: /menu|profile|account/i })
-      .or(page.locator('[data-testid="user-menu"]'))
-      .or(page.locator('[aria-label*="user"]'));
+    // Use the exact aria-label selector — avoids .or() chains where .first()
+    // can resolve to different elements between waitFor and click calls.
+    const userMenuButton = page.locator('[aria-label="User menu"]');
 
-    await userMenuButton.first().click();
+    // Wait for the button to be attached and visible
+    await userMenuButton.waitFor({ state: 'visible', timeout: 30000 });
+    // The button has transition-all duration-300 which causes Playwright's
+    // stability check to fail in CI (element detected as "not stable").
+    // Use evaluate to dispatch click directly, bypassing actionability checks.
+    await page.waitForTimeout(500);
+    await userMenuButton.evaluate((el: HTMLElement) => el.click());
 
     // Click logout option
     const logoutOption = page

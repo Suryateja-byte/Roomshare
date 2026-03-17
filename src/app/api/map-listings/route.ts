@@ -7,6 +7,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getMapListings, MapListingData } from "@/lib/data";
+import {
+  isSearchDocEnabled,
+  getSearchDocMapListings,
+} from "@/lib/search/search-doc-queries";
+import { features } from "@/lib/env";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { validateAndParseBounds } from "@/lib/validation";
@@ -105,28 +110,48 @@ export async function GET(request: NextRequest) {
       const rawParams = buildRawParamsFromSearchParams(searchParams);
       const parsed = parseSearchParams(rawParams);
 
+      // Capture sort before overriding — needed for semantic search check
+      const sortOption = parsed.filterParams.sort || "recommended";
+
       // Build filter params from canonical parsed values with validated bounds
       const filterParams = {
-        query: parsed.filterParams.query,
-        minPrice: parsed.filterParams.minPrice,
-        maxPrice: parsed.filterParams.maxPrice,
+        ...parsed.filterParams,
+        // Map-specific overrides: exclude sort/pagination, use validated bounds
+        sort: undefined,
+        page: undefined,
+        limit: undefined,
         bounds,
-        amenities: parsed.filterParams.amenities,
-        languages: parsed.filterParams.languages,
-        houseRules: parsed.filterParams.houseRules,
-        moveInDate: parsed.filterParams.moveInDate,
-        leaseDuration: parsed.filterParams.leaseDuration,
-        roomType: parsed.filterParams.roomType,
-        genderPreference: parsed.filterParams.genderPreference,
-        householdGender: parsed.filterParams.householdGender,
       };
 
-      // Fetch listings using existing data function
-      const listings: MapListingData[] = await withTimeout(
-        getMapListings(filterParams),
-        DEFAULT_TIMEOUTS.DATABASE,
-        "getMapListings"
-      );
+      // When semantic search is active, strip the query for the map so it
+      // shows ALL listings in bounds (the list handles semantic ranking).
+      // This prevents the map from showing 0 results while the list has results.
+      const semanticActive =
+        features.semanticSearch &&
+        filterParams.query &&
+        filterParams.query.length >= 3 &&
+        sortOption === "recommended";
+      const mapFilterParams = semanticActive
+        ? { ...filterParams, query: undefined }
+        : filterParams;
+
+      // Fetch listings using SearchDoc path when enabled (faster, no JOINs),
+      // falling back to the legacy getMapListings path.
+      let listings: MapListingData[];
+      if (isSearchDocEnabled(searchParams.get("searchDoc"))) {
+        const result = await withTimeout(
+          getSearchDocMapListings(mapFilterParams),
+          DEFAULT_TIMEOUTS.DATABASE,
+          "getSearchDocMapListings",
+        );
+        listings = result.listings;
+      } else {
+        listings = await withTimeout(
+          getMapListings(mapFilterParams),
+          DEFAULT_TIMEOUTS.DATABASE,
+          "getMapListings",
+        );
+      }
 
       return NextResponse.json(
         { listings },

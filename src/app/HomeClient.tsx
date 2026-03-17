@@ -5,8 +5,17 @@ import { LazyMotion, domAnimation, m, Variants } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 
 const SearchForm = lazy(() => import('@/components/SearchForm'));
+const ScrollAnimation = dynamic(() => import('@/components/ScrollAnimation'), {
+    ssr: false,
+    loading: () => (
+        <div className="h-screen bg-zinc-950 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-full border-2 border-zinc-800 border-t-indigo-500 animate-spin" />
+        </div>
+    ),
+});
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, Zap, Coffee, ArrowRight } from 'lucide-react';
 
@@ -101,6 +110,9 @@ export default function HomeClient() {
                         </div>
                     </div>
                 </section>
+
+                {/* Scroll Animation — "Walk through the door" experience */}
+                <ScrollAnimation />
 
                 {/* Features Section */}
                 <section className="py-24 md:py-32 bg-zinc-50 dark:bg-zinc-900/20">

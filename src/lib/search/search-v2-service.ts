@@ -205,8 +205,17 @@ export async function executeSearchV2(
             keysetCursor,
           );
           return { listResult: keysetResult, nextCursor: keysetResult.nextCursor };
+        } else if (page > 1) {
+          // Legacy cursor with page offset (e.g., semantic→FTS fallback with {p:N} cursor).
+          // Route to offset-based pagination so the page number is respected,
+          // preventing duplicate results when the ranking engine changes mid-session.
+          const result = await getSearchDocListingsPaginated(filterParams);
+          return {
+            listResult: result,
+            nextCursor: result.hasNextPage ? encodeCursor(page + 1) : null,
+          };
         } else {
-          // First page or invalid cursor - get first page with keyset cursor
+          // First page - get first page with keyset cursor
           const firstPageResult =
             await getSearchDocListingsFirstPage(filterParams);
           return { listResult: firstPageResult, nextCursor: firstPageResult.nextCursor };

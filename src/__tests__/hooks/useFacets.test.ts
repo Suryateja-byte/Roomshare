@@ -465,7 +465,7 @@ describe("useFacets", () => {
 
     let capturedSignal: AbortSignal | undefined;
     mockFetch.mockImplementationOnce((_url: string, init?: RequestInit) => {
-      capturedSignal = init?.signal;
+      capturedSignal = init?.signal ?? undefined;
       // Never resolves — simulates a slow request
       return new Promise(() => {});
     });

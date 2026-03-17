@@ -49,7 +49,6 @@ export function SearchResultsClient({
   browseMode,
   hasConfirmedZeroResults,
   filterSuggestions,
-  sortOption,
 }: SearchResultsClientProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
@@ -80,6 +79,24 @@ export function SearchResultsClient({
     new Set(initialListings.map((l) => l.id)),
   );
 
+  // Derive a stable fingerprint of the initial data to detect server-side changes
+  const initialDataFingerprint = useMemo(
+    () => initialListings.map((l) => l.id).join(","),
+    [initialListings],
+  );
+
+  // Track the previous fingerprint to detect changes
+  const prevFingerprintRef = useRef(initialDataFingerprint);
+
+  // Reset pagination state when server data changes (e.g., browser back/forward)
+  useEffect(() => {
+    if (prevFingerprintRef.current !== initialDataFingerprint) {
+      prevFingerprintRef.current = initialDataFingerprint;
+      setExtraListings([]);
+      setNextCursor(initialNextCursor);
+      seenIdsRef.current = new Set(initialListings.map((l) => l.id));
+    }
+  }, [initialDataFingerprint, initialNextCursor, initialListings]);
 
   const allListings = useMemo(
     () => [...initialListings, ...extraListings],
@@ -310,7 +327,12 @@ export function SearchResultsClient({
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 {splitStayPairs.map((pair) => (
-                  <SplitStayCard key={`${pair.first.id}-${pair.second.id}`} pair={pair} />
+                  <SplitStayCard
+                    key={`${pair.first.id}-${pair.second.id}`}
+                    pair={pair}
+                    showTotalPrice={showTotalPrice}
+                    estimatedMonths={estimatedMonths}
+                  />
                 ))}
               </div>
             </div>

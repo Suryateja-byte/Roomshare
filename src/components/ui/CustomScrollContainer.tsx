@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ScrollContainerContext } from '@/contexts/ScrollContainerContext';
 
 interface CustomScrollContainerProps {
     children: React.ReactNode;
@@ -141,6 +142,7 @@ const CustomScrollContainer = ({ children, className = "" }: CustomScrollContain
         : 0;
 
     return (
+        <ScrollContainerContext.Provider value={containerRef}>
         <div className="relative w-full h-screen overflow-hidden bg-background">
             {/* Hide Native Scrollbar */}
             <style>{`
@@ -151,7 +153,7 @@ const CustomScrollContainer = ({ children, className = "" }: CustomScrollContain
             {/* Scrollable Content Area */}
             <div
                 ref={containerRef}
-                className={`w-full h-full overflow-y-auto custom-scroll-hide scroll-smooth ${className}`}
+                className={`relative w-full h-full overflow-y-auto custom-scroll-hide scroll-smooth ${className}`}
             >
                 {children}
             </div>
@@ -188,6 +190,7 @@ const CustomScrollContainer = ({ children, className = "" }: CustomScrollContain
                 </div>
             )}
         </div>
+        </ScrollContainerContext.Provider>
     );
 };
 

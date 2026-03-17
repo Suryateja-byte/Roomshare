@@ -171,6 +171,7 @@ function buildBaseCacheFields(params: FilterParams) {
     genderPreference: params.genderPreference || "",
     householdGender: params.householdGender || "",
     bookingMode: params.bookingMode || "",
+    minAvailableSlots: String(params.minAvailableSlots ?? 1),
     bounds: params.bounds
       ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",

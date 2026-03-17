@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roomshare Search Bar — Focus Expansion Demo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --zinc-50: #fafafa;
+    --zinc-100: #f4f4f5;
+    --zinc-200: #e4e4e7;
+    --zinc-300: #d4d4d8;
+    --zinc-400: #a1a1aa;
+    --zinc-500: #71717a;
+    --zinc-600: #52525b;
+    --zinc-700: #3f3f46;
+    --zinc-800: #27272a;
+    --zinc-900: #18181b;
+    --zinc-950: #09090b;
+    --indigo-500: #6366f1;
+    --indigo-400: #818cf8;
+    --spring: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--zinc-950);
+    color: var(--zinc-100);
+    min-height: 100vh;
+  }
+
+  /* ─── Page Layout ─── */
+  .page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  .demo-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--zinc-500);
+    margin-bottom: 16px;
+    padding-left: 4px;
+  }
+
+  .demo-section {
+    margin-bottom: 64px;
+  }
+
+  .demo-description {
+    font-size: 14px;
+    color: var(--zinc-400);
+    margin-bottom: 24px;
+    line-height: 1.6;
+    max-width: 600px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #fff 0%, var(--zinc-400) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    font-size: 15px;
+    color: var(--zinc-500);
+    margin-bottom: 48px;
+  }
+
+  /* ─── Header Bar ─── */
+  .header-bar {
+    background: var(--zinc-900);
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 16px 24px;
+    border-radius: 16px;
+    margin-bottom: 48px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .logo span { color: var(--indigo-500); }
+
+  /* ─── Search Form (the star of the show) ─── */
+  .search-form {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: var(--zinc-800);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 9999px;
+    padding: 4px;
+    max-width: 720px;
+    margin: 0 auto;
+    position: relative;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .search-form.has-focus {
+    border-color: rgba(99, 102, 241, 0.3);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08), 0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  /* ─── Field Sections ─── */
+  .field {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8px 20px;
+    border-radius: 9999px;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    cursor: text;
+    transition: flex 0.4s var(--spring), background 0.3s ease, opacity 0.3s ease;
+  }
+
+  .field-what   { flex: 1.3; }
+  .field-where  { flex: 1.5; }
+  .field-budget { flex: 1;   }
+
+  /* ─── Expansion states ─── */
+  .search-form.focus-what .field-what   { flex: 3.5; background: rgba(255,255,255,0.04); }
+  .search-form.focus-what .field-where  { flex: 0.6; }
+  .search-form.focus-what .field-budget { flex: 0.4; }
+
+  .search-form.focus-where .field-where  { flex: 3.5; background: rgba(255,255,255,0.04); }
+  .search-form.focus-where .field-what   { flex: 0.6; }
+  .search-form.focus-where .field-budget { flex: 0.4; }
+
+  .search-form.focus-budget .field-budget { flex: 2.5; background: rgba(255,255,255,0.04); }
+  .search-form.focus-budget .field-what   { flex: 0.6; }
+  .search-form.focus-budget .field-where  { flex: 0.6; }
+
+  /* Hide labels of shrunk fields */
+  .search-form.focus-what .field-where .field-label,
+  .search-form.focus-what .field-budget .field-label,
+  .search-form.focus-where .field-what .field-label,
+  .search-form.focus-where .field-budget .field-label,
+  .search-form.focus-budget .field-what .field-label,
+  .search-form.focus-budget .field-where .field-label {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  /* Shrunk field inputs become placeholder-only */
+  .search-form[class*="focus-"] .field:not([class*="active"]) input {
+    font-size: 12px;
+  }
+
+  /* ─── Field internals ─── */
+  .field-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--indigo-400);
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    white-space: nowrap;
+  }
+
+  .field-label .badge {
+    font-size: 8px;
+    font-weight: 700;
+    background: var(--indigo-500);
+    color: white;
+    padding: 1px 5px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  .field input {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--zinc-100);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    width: 100%;
+    min-width: 0;
+    transition: font-size 0.3s var(--spring);
+  }
+
+  .field input::placeholder {
+    color: var(--zinc-500);
+    font-weight: 400;
+  }
+
+  .field input:focus::placeholder {
+    color: var(--zinc-600);
+  }
+
+  /* ─── Budget split ─── */
+  .budget-inputs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .budget-inputs input {
+    width: 50%;
+  }
+  .budget-sep {
+    color: var(--zinc-600);
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  /* ─── Dividers ─── */
+  .divider {
+    width: 1px;
+    height: 28px;
+    background: rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .search-form[class*="focus-"] .divider {
+    opacity: 0.3;
+  }
+
+  /* ─── Search Button ─── */
+  .search-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--indigo-500);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  .search-btn:hover { background: var(--indigo-400); transform: scale(1.05); }
+  .search-btn:active { transform: scale(0.95); }
+  .search-btn svg { width: 18px; height: 18px; color: white; }
+
+  /* ─── Clear button (appears on focused fields) ─── */
+  .clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--zinc-700);
+    border: none;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: var(--zinc-400);
+    font-size: 12px;
+    transition: background 0.15s ease;
+  }
+  .clear-btn:hover { background: var(--zinc-600); color: white; }
+  .field.active .clear-btn { display: flex; }
+
+  /* ─── State indicator ─── */
+  .state-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--zinc-800);
+    border: 1px solid rgba(255,255,255,0.06);
+    margin-top: 16px;
+    color: var(--zinc-400);
+    transition: all 0.3s ease;
+  }
+  .state-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--zinc-600);
+    transition: background 0.3s ease;
+  }
+  .state-badge.active { color: var(--indigo-400); border-color: rgba(99,102,241,0.2); }
+  .state-badge.active .dot { background: var(--indigo-500); }
+
+  /* ─── Instructions ─── */
+  .instructions {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+  .instruction {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--zinc-500);
+  }
+  .instruction kbd {
+    background: var(--zinc-800);
+    border: 1px solid var(--zinc-700);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: inherit;
+    color: var(--zinc-300);
+  }
+
+  /* ─── Comparison section ─── */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 32px;
+  }
+  .comparison-card {
+    background: var(--zinc-900);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .comparison-card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--zinc-300);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .comparison-card .pill {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .pill-before { background: rgba(239,68,68,0.1); color: #f87171; }
+  .pill-after { background: rgba(34,197,94,0.1); color: #4ade80; }
+
+  .mock-bar {
+    display: flex;
+    align-items: center;
+    background: var(--zinc-800);
+    border-radius: 9999px;
+    padding: 8px 12px;
+    gap: 8px;
+    font-size: 13px;
+    height: 44px;
+  }
+  .mock-segment {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--zinc-300);
+    padding: 0 8px;
+  }
+  .mock-segment.truncated { color: var(--zinc-500); }
+  .mock-divider {
+    width: 1px; height: 20px;
+    background: var(--zinc-700);
+    flex-shrink: 0;
+  }
+  .mock-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--indigo-400);
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .mock-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    transition: flex 0.4s var(--spring);
+  }
+
+  /* Before mock */
+  .mock-before .mock-field-what { flex: 1.3; }
+  .mock-before .mock-field-where { flex: 1.5; }
+  .mock-before .mock-field-budget { flex: 1; }
+
+  /* After mock - expanded */
+  .mock-after .mock-field-what { flex: 3.5; }
+  .mock-after .mock-field-where { flex: 0.6; }
+  .mock-after .mock-field-budget { flex: 0.4; }
+  .mock-after .mock-field-what .mock-segment { color: white; font-weight: 500; }
+  .mock-after .mock-field-where .mock-label,
+  .mock-after .mock-field-budget .mock-label { opacity: 0; }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 768px) {
+    .comparison { grid-template-columns: 1fr; }
+    .header-bar { padding: 12px 16px; }
+    .logo { font-size: 16px; }
+    .field { padding: 8px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <h1>Search Bar Focus Expansion</h1>
+  <p class="subtitle">Click into any field to see the smooth expansion animation</p>
+
+  <!-- ─── Live Interactive Demo ─── -->
+  <div class="demo-section">
+    <p class="demo-label">Interactive Demo — Click any field</p>
+
+    <div class="header-bar">
+      <div class="logo">RoomShare<span>.</span></div>
+
+      <div class="search-form" id="searchForm">
+        <!-- WHAT field -->
+        <div class="field field-what" onclick="focusField('what')">
+          <div class="field-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            What <span class="badge">AI</span>
+          </div>
+          <input
+            type="text"
+            id="whatInput"
+            placeholder="Describe your ideal room..."
+            value="I want a sunny room with parking"
+            onfocus="setFocus('what')"
+            onblur="clearFocus()"
+          />
+          <button class="clear-btn" onclick="clearField('what')">&times;</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- WHERE field -->
+        <div class="field field-where" onclick="focusField('where')">
+          <div class="field-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 8 12 8 12s8-6.6 8-12a8 8 0 0 0-8-8z"/></svg>
+            Where
+          </div>
+          <input
+            type="text"
+            id="whereInput"
+            placeholder="Search destinations"
+            value="San Francisco, California"
+            onfocus="setFocus('where')"
+            onblur="clearFocus()"
+          />
+          <button class="clear-btn" onclick="clearField('where')">&times;</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- BUDGET field -->
+        <div class="field field-budget" onclick="focusField('budget')">
+          <div class="field-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Budget
+          </div>
+          <div class="budget-inputs">
+            <input
+              type="text"
+              id="budgetMin"
+              placeholder="$ Min"
+              value="$500"
+              onfocus="setFocus('budget')"
+              onblur="clearFocus()"
+            />
+            <span class="budget-sep">—</span>
+            <input
+              type="text"
+              id="budgetMax"
+              placeholder="$ Max"
+              value="$1,500"
+              onfocus="setFocus('budget')"
+              onblur="clearFocus()"
+            />
+          </div>
+        </div>
+
+        <!-- Search button -->
+        <button class="search-btn" aria-label="Search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- State indicator -->
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <div class="state-badge" id="stateNone">
+        <span class="dot"></span> Default — equal proportions
+      </div>
+      <div class="state-badge" id="stateWhat">
+        <span class="dot"></span> WHAT focused — expanded to 3.5fr
+      </div>
+      <div class="state-badge" id="stateWhere">
+        <span class="dot"></span> WHERE focused — expanded to 3.5fr
+      </div>
+      <div class="state-badge" id="stateBudget">
+        <span class="dot"></span> BUDGET focused — expanded to 2.5fr
+      </div>
+    </div>
+
+    <div class="instructions">
+      <div class="instruction"><kbd>Tab</kbd> between fields to see transitions</div>
+      <div class="instruction"><kbd>Click outside</kbd> to collapse</div>
+      <div class="instruction">Animation: <kbd>400ms</kbd> spring easing</div>
+    </div>
+  </div>
+
+  <!-- ─── Before / After Comparison ─── -->
+  <div class="demo-section">
+    <p class="demo-label">Before vs After Comparison</p>
+    <p class="demo-description">
+      The "Before" shows how long text gets truncated. The "After" shows the focused state
+      where the active field expands to reveal the full query.
+    </p>
+
+    <div class="comparison">
+      <div class="comparison-card">
+        <h3><span class="pill pill-before">Before</span> Default state — text truncated</h3>
+        <div class="mock-bar mock-before">
+          <div class="mock-field mock-field-what">
+            <div class="mock-label">WHAT</div>
+            <div class="mock-segment truncated">I want a s...</div>
+          </div>
+          <div class="mock-divider"></div>
+          <div class="mock-field mock-field-where">
+            <div class="mock-label">WHERE</div>
+            <div class="mock-segment">San Francisco, CA</div>
+          </div>
+          <div class="mock-divider"></div>
+          <div class="mock-field mock-field-budget">
+            <div class="mock-label">BUDGET</div>
+            <div class="mock-segment truncated">$500 — $1...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="comparison-card">
+        <h3><span class="pill pill-after">After</span> WHAT focused — full text visible</h3>
+        <div class="mock-bar mock-after">
+          <div class="mock-field mock-field-what">
+            <div class="mock-label">WHAT</div>
+            <div class="mock-segment">I want a sunny room with parking</div>
+          </div>
+          <div class="mock-divider"></div>
+          <div class="mock-field mock-field-where">
+            <div class="mock-label">WHERE</div>
+            <div class="mock-segment truncated">SF...</div>
+          </div>
+          <div class="mock-divider"></div>
+          <div class="mock-field mock-field-budget">
+            <div class="mock-label">BUDGET</div>
+            <div class="mock-segment truncated">$...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Flex Ratios ─── -->
+  <div class="demo-section">
+    <p class="demo-label">Flex Ratio Animation Detail</p>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 600px;">
+      <div class="comparison-card" style="text-align: center;">
+        <div style="font-size: 11px; color: var(--zinc-500); margin-bottom: 4px;">Default</div>
+        <div style="font-size: 20px; font-weight: 700; color: var(--zinc-300);">1.3 : 1.5 : 1</div>
+        <div style="display: flex; gap: 2px; margin-top: 8px; height: 6px; border-radius: 3px; overflow: hidden;">
+          <div style="flex: 1.3; background: var(--indigo-500); border-radius: 3px;"></div>
+          <div style="flex: 1.5; background: var(--zinc-600); border-radius: 3px;"></div>
+          <div style="flex: 1; background: var(--zinc-700); border-radius: 3px;"></div>
+        </div>
+      </div>
+      <div class="comparison-card" style="text-align: center;">
+        <div style="font-size: 11px; color: var(--zinc-500); margin-bottom: 4px;">WHAT focused</div>
+        <div style="font-size: 20px; font-weight: 700; color: var(--indigo-400);">3.5 : 0.6 : 0.4</div>
+        <div style="display: flex; gap: 2px; margin-top: 8px; height: 6px; border-radius: 3px; overflow: hidden;">
+          <div style="flex: 3.5; background: var(--indigo-500); border-radius: 3px;"></div>
+          <div style="flex: 0.6; background: var(--zinc-700); border-radius: 3px;"></div>
+          <div style="flex: 0.4; background: var(--zinc-700); border-radius: 3px;"></div>
+        </div>
+      </div>
+      <div class="comparison-card" style="text-align: center;">
+        <div style="font-size: 11px; color: var(--zinc-500); margin-bottom: 4px;">WHERE focused</div>
+        <div style="font-size: 20px; font-weight: 700; color: var(--indigo-400);">0.6 : 3.5 : 0.4</div>
+        <div style="display: flex; gap: 2px; margin-top: 8px; height: 6px; border-radius: 3px; overflow: hidden;">
+          <div style="flex: 0.6; background: var(--zinc-700); border-radius: 3px;"></div>
+          <div style="flex: 3.5; background: var(--indigo-500); border-radius: 3px;"></div>
+          <div style="flex: 0.4; background: var(--zinc-700); border-radius: 3px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById('searchForm');
+  const badges = {
+    none: document.getElementById('stateNone'),
+    what: document.getElementById('stateWhat'),
+    where: document.getElementById('stateWhere'),
+    budget: document.getElementById('stateBudget'),
+  };
+
+  let currentFocus = null;
+  let blurTimeout = null;
+
+  function setFocus(field) {
+    if (blurTimeout) clearTimeout(blurTimeout);
+    currentFocus = field;
+
+    // Update form class
+    form.className = 'search-form has-focus focus-' + field;
+
+    // Update field active states
+    document.querySelectorAll('.field').forEach(f => f.classList.remove('active'));
+    document.querySelector('.field-' + field)?.classList.add('active');
+
+    // Update badges
+    Object.entries(badges).forEach(([key, el]) => {
+      el.classList.toggle('active', key === field);
+    });
+  }
+
+  function clearFocus() {
+    // Delay to allow focus to move between fields without flashing default state
+    blurTimeout = setTimeout(() => {
+      currentFocus = null;
+      form.className = 'search-form';
+      document.querySelectorAll('.field').forEach(f => f.classList.remove('active'));
+      Object.values(badges).forEach(el => el.classList.remove('active'));
+      badges.none.classList.add('active');
+    }, 150);
+  }
+
+  function focusField(field) {
+    const inputs = {
+      what: 'whatInput',
+      where: 'whereInput',
+      budget: 'budgetMin',
+    };
+    document.getElementById(inputs[field])?.focus();
+  }
+
+  function clearField(field) {
+    event.stopPropagation();
+    const inputs = {
+      what: 'whatInput',
+      where: 'whereInput',
+    };
+    const input = document.getElementById(inputs[field]);
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  // Initialize
+  badges.none.classList.add('active');
+</script>
+
+</body>
+</html>
