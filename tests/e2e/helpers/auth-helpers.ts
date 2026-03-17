@@ -141,14 +141,16 @@ export const authHelpers = {
       }
     }
 
-    // Try to find and click user menu
+    // Try to find and click user menu — use specific aria-label to avoid
+    // matching other buttons with "menu" in their name (hamburger, filters, etc.)
     const userMenuButton = page
-      .getByRole('button', { name: /menu|profile|account/i })
+      .getByRole('button', { name: 'User menu' })
       .or(page.locator('[data-testid="user-menu"]'))
-      .or(page.locator('[aria-label*="user"]'));
+      .or(page.locator('[aria-label="User menu"]'));
 
     await userMenuButton.first().waitFor({ state: 'visible', timeout: 30000 });
-    await userMenuButton.first().click();
+    // Force click to bypass potential overlay/hydration coverage in CI
+    await userMenuButton.first().click({ timeout: 15000, force: true });
 
     // Click logout option
     const logoutOption = page
