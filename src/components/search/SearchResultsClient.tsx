@@ -310,7 +310,12 @@ export function SearchResultsClient({
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 {splitStayPairs.map((pair) => (
-                  <SplitStayCard key={`${pair.first.id}-${pair.second.id}`} pair={pair} />
+                  <SplitStayCard
+                    key={`${pair.first.id}-${pair.second.id}`}
+                    pair={pair}
+                    showTotalPrice={showTotalPrice}
+                    estimatedMonths={estimatedMonths}
+                  />
                 ))}
               </div>
             </div>

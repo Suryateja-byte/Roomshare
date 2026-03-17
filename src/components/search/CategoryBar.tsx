@@ -76,6 +76,15 @@ function isCategoryActive(
   searchParams: URLSearchParams
 ): boolean {
   return Object.entries(categoryParams).every(([key, value]) => {
+    // Price params: "Under $1000" should show active when maxPrice <= 1000
+    // (not just exact match). Prevents user confusion when NLP sets maxPrice=800
+    // — the category should appear active since a stricter budget IS "under $1000".
+    if (key === 'maxPrice') {
+      const current = searchParams.get(key);
+      if (!current) return false;
+      return Number(current) <= Number(value);
+    }
+
     const current = searchParams.getAll(key);
     if (current.length === 0) {
       const single = searchParams.get(key);
@@ -138,6 +147,11 @@ export function CategoryBar() {
     if (isActive) {
       // Toggle off — remove the category's params
       for (const [key, value] of Object.entries(categoryParams)) {
+        // Price params: always delete when toggling off (user wants to remove budget cap)
+        if (key === 'maxPrice' || key === 'minPrice') {
+          params.delete(key);
+          continue;
+        }
         const existing = params.getAll(key);
         if (existing.length <= 1) {
           // Simple param or comma-separated

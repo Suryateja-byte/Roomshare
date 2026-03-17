@@ -18,6 +18,7 @@ import {
 } from '@/lib/search-params';
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { useMobileSearch } from '@/contexts/MobileSearchContext';
+import { cn } from '@/lib/utils';
 import { useRecentSearches, type RecentSearch, type RecentSearchFilters } from '@/hooks/useRecentSearches';
 import { useDebouncedFilterCount } from '@/hooks/useDebouncedFilterCount';
 import { useFacets } from '@/hooks/useFacets';
@@ -112,6 +113,18 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
     // Falls back to checking if the "what" param exists in URL (field was previously shown).
     const semanticSearchEnabled = process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH === 'true' || !!searchParams.get('what');
     const [whatQuery, setWhatQuery] = useState(searchParams.get('what') || '');
+    // Focus-triggered flex expansion: tracks which field is focused to animate flex ratios.
+    // Focused field expands (flex-[3.5]) while others shrink (flex-[0.5-0.8]).
+    const [focusedField, setFocusedField] = useState<'what' | 'where' | 'budget' | null>(null);
+    const focusBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Debounced blur to prevent flicker when focus moves between fields
+    const handleFieldFocus = useCallback((field: 'what' | 'where' | 'budget') => {
+        if (focusBlurTimeoutRef.current) clearTimeout(focusBlurTimeoutRef.current);
+        setFocusedField(field);
+    }, []);
+    const handleFieldBlur = useCallback(() => {
+        focusBlurTimeoutRef.current = setTimeout(() => setFocusedField(null), 150);
+    }, []);
     // Track when user is actively typing in location input to prevent URL sync from clearing their text.
     // The chain: typing 3 chars → warning banner renders → header resize → map moveEnd → URL change → sync effect clears input.
     const isUserTypingLocationRef = useRef(false);
@@ -294,17 +307,37 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         const trimmedLocation = location.trim();
         const nlParsed = trimmedLocation ? parseNaturalLanguageQuery(trimmedLocation) : null;
         if (nlParsed && !selectedCoords) {
-            // NL query detected — build URL from parsed filters
-            const nlParams = nlQueryToSearchParams(nlParsed);
-            // Preserve map bounds and sort from current URL
+            // NL query detected — merge parsed filters with existing URL state.
+            // Start from current params (preserves filter modal state), then overlay NLP extractions.
             const current = new URLSearchParams(searchParams.toString());
-            for (const key of ['minLat', 'maxLat', 'minLng', 'maxLng', 'sort']) {
-                const val = current.get(key);
-                if (val) nlParams.set(key, val);
+            const nlParams = nlQueryToSearchParams(nlParsed);
+
+            // Overlay NLP-extracted params onto current state (NLP wins on conflict)
+            for (const [key, value] of nlParams.entries()) {
+                if (key === 'amenities' || key === 'houseRules') {
+                    // Array params: merge instead of replace
+                    const existing = current.get(key);
+                    if (existing) {
+                        const merged = new Set([...existing.split(','), ...value.split(',')]);
+                        current.set(key, [...merged].join(','));
+                    } else {
+                        current.set(key, value);
+                    }
+                } else {
+                    // Scalar params: NLP extraction overwrites
+                    current.set(key, value);
+                }
             }
+
+            // Reset pagination since filters changed
+            current.delete('page');
+            current.delete('cursor');
+            current.delete('cursorStack');
+            current.delete('pageNumber');
+
             setIsSearching(true);
             setShowFilters(false);
-            const searchUrl = `/search?${nlParams.toString()}`;
+            const searchUrl = `/search?${current.toString()}`;
             startTransition(() => {
                 router.push(searchUrl);
             });
@@ -652,6 +685,17 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         .toISOString()
         .split('T')[0];
 
+    // Compute inline flex styles for focus-triggered expansion.
+    // Uses inline styles instead of Tailwind classes because Tailwind v4
+    // may not generate arbitrary flex values reliably with dynamic class names.
+    const getFieldFlex = (field: 'what' | 'where' | 'budget'): React.CSSProperties => {
+        const defaults = { what: '1.3 1 0%', where: '1.5 1 0%', budget: '1 1 0%' };
+        const transition = 'flex 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+        if (!focusedField) return { flex: defaults[field], transition };
+        if (focusedField === field) return { flex: field === 'budget' ? '5 1 0%' : '6 1 0%', transition };
+        return { flex: '0.3 1 0%', transition };
+    };
+
     // CLS fix: min-h matches Suspense fallback in SearchHeaderWrapper.tsx
     return (
         <div className={`relative w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? 'max-w-2xl' : 'max-w-4xl'}`}>
@@ -664,8 +708,17 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 {/* Semantic "What" Input — AI-powered natural language search */}
                 {semanticSearchEnabled && !isCompact && (
                     <>
-                        <div className={`w-full md:flex-[1.3] flex flex-col relative ${isCompact ? 'px-4 py-2' : 'px-6 py-2.5'}`}>
-                            <label htmlFor="search-what" className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5">
+                        <div
+                            style={getFieldFlex('what')}
+                            className={cn(
+                            'w-full flex flex-col relative',
+                            isCompact ? 'px-4 py-2' : 'px-6 py-2.5',
+                            focusedField === 'what' && 'md:bg-white/[0.03] md:rounded-2xl',
+                        )}>
+                            <label htmlFor="search-what" className={cn(
+                                "text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
+                                focusedField !== null && focusedField !== 'what' && 'md:opacity-0'
+                            )}>
                                 <Sparkles className="w-3 h-3" />
                                 What
                                 <span className="text-[8px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 px-1.5 py-0.5 rounded tracking-wider">AI</span>
@@ -676,6 +729,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                     type="text"
                                     value={whatQuery}
                                     onChange={(e) => setWhatQuery(e.target.value)}
+                                    onFocus={() => handleFieldFocus('what')}
+                                    onBlur={handleFieldBlur}
                                     placeholder="Describe your ideal room..."
                                     className="w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:ring-0 focus:outline-none"
                                     autoComplete="off"
@@ -698,9 +753,18 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 )}
 
                 {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
-                <div className={`w-full md:flex-[1.5] flex flex-col relative group/input ${isCompact ? 'px-4 py-2' : 'px-6 py-2.5'}`}>
+                <div
+                    style={getFieldFlex('where')}
+                    className={cn(
+                    'w-full flex flex-col relative group/input',
+                    isCompact ? 'px-4 py-2' : 'px-6 py-2.5',
+                    focusedField === 'where' && 'md:bg-white/[0.03] md:rounded-2xl',
+                )}>
                     {!isCompact && (
-                        <label htmlFor="search-location" className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.15em] mb-1">
+                        <label htmlFor="search-location" className={cn(
+                            "text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                            focusedField !== null && focusedField !== 'where' && 'md:opacity-0'
+                        )}>
                             Where
                         </label>
                     )}
@@ -721,12 +785,14 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                             }}
                             onFocus={() => {
                                 setLocationInputFocused(true);
+                                handleFieldFocus('where');
                                 if (recentSearches.length > 0 && !location) {
                                     setShowRecentSearches(true);
                                 }
                             }}
                             onBlur={() => {
                                 setLocationInputFocused(false);
+                                handleFieldBlur();
                                 // Delay hiding to allow click on recent search
                                 setTimeout(() => setShowRecentSearches(false), 200);
                                 // Allow pending URL syncs to settle before re-enabling location sync
@@ -794,9 +860,18 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                 <div className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-white/5 mx-1" aria-hidden="true"></div>
 
                 {/* Price Range Input - Airbnb-style stacked layout */}
-                <div className={`w-full md:flex-1 flex flex-col ${isCompact ? 'px-4 py-2' : 'px-6 py-2.5'}`}>
+                <div
+                    style={getFieldFlex('budget')}
+                    className={cn(
+                    'w-full flex flex-col',
+                    isCompact ? 'px-4 py-2' : 'px-6 py-2.5',
+                    focusedField === 'budget' && 'md:bg-white/[0.03] md:rounded-2xl',
+                )}>
                     {!isCompact && (
-                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.15em] mb-1">
+                        <label className={cn(
+                            "text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                            focusedField !== null && focusedField !== 'budget' && 'md:opacity-0'
+                        )}>
                             Budget
                         </label>
                     )}
@@ -810,6 +885,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                 inputMode="numeric"
                                 value={minPrice}
                                 onChange={(e) => setPending({ minPrice: e.target.value })}
+                                onFocus={() => handleFieldFocus('budget')}
+                                onBlur={handleFieldBlur}
                                 placeholder="Min"
                                 className={`w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:ring-0 focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                                 min="0"
@@ -826,6 +903,8 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
                                 inputMode="numeric"
                                 value={maxPrice}
                                 onChange={(e) => setPending({ maxPrice: e.target.value })}
+                                onFocus={() => handleFieldFocus('budget')}
+                                onBlur={handleFieldBlur}
                                 placeholder="Max"
                                 className={`w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:ring-0 focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                                 min="0"

@@ -1,17 +1,29 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
+import { MapPin } from 'lucide-react';
+import { useListingFocus } from '@/contexts/ListingFocusContext';
 import type { SplitStayPair } from '@/lib/search/split-stay';
+import { cn } from '@/lib/utils';
 
 interface SplitStayCardProps {
   pair: SplitStayPair;
+  showTotalPrice?: boolean;
+  estimatedMonths?: number;
 }
 
 /**
  * SplitStayCard — Shows two listings side-by-side for split-stay trips.
  * Used when a single listing can't cover the full requested duration.
  */
-export function SplitStayCard({ pair }: SplitStayCardProps) {
+export function SplitStayCard({ pair, showTotalPrice, estimatedMonths }: SplitStayCardProps) {
   const { first, second, combinedPrice, splitLabel } = pair;
+
+  // Parse the split label to get individual durations (e.g., "3 mo + 4 mo" → [3, 4])
+  const durationMatch = splitLabel.match(/(\d+)\s*mo\s*\+\s*(\d+)\s*mo/);
+  const firstMonths = durationMatch ? parseInt(durationMatch[1], 10) : (estimatedMonths ? Math.floor(estimatedMonths / 2) : 0);
+  const secondMonths = durationMatch ? parseInt(durationMatch[2], 10) : (estimatedMonths ? estimatedMonths - firstMonths : 0);
 
   return (
     <div className="rounded-xl border border-zinc-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
@@ -24,8 +36,8 @@ export function SplitStayCard({ pair }: SplitStayCardProps) {
 
       {/* Two listings side by side */}
       <div className="grid grid-cols-2 divide-x divide-zinc-100 dark:divide-zinc-800">
-        <SplitStayHalf listing={first} label="First stay" />
-        <SplitStayHalf listing={second} label="Then" />
+        <SplitStayHalf listing={first} label="First stay" months={firstMonths} showTotalPrice={showTotalPrice} />
+        <SplitStayHalf listing={second} label="Then" months={secondMonths} showTotalPrice={showTotalPrice} />
       </div>
 
       {/* Connecting arc visual */}
@@ -48,24 +60,77 @@ export function SplitStayCard({ pair }: SplitStayCardProps) {
   );
 }
 
-function SplitStayHalf({ listing, label }: { listing: SplitStayPair['first']; label: string }) {
+function SplitStayHalf({
+  listing,
+  label,
+  months,
+  showTotalPrice,
+}: {
+  listing: SplitStayPair['first'];
+  label: string;
+  months: number;
+  showTotalPrice?: boolean;
+}) {
   const image = listing.images?.[0];
+  const { hoveredId, activeId, setHovered, setActive, focusSource } = useListingFocus();
+  const isHovered = hoveredId === listing.id;
+  const isActive = activeId === listing.id;
 
   return (
-    <Link href={`/listings/${listing.id}`} className="block p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-      <p className="text-xs text-zinc-500 dark:text-zinc-500 font-medium uppercase tracking-wide mb-1.5">
-        {label}
-      </p>
-      {image && (
-        <div className="relative aspect-[4/3] rounded-lg overflow-hidden mb-2">
-          <Image src={image} alt={listing.title} fill className="object-cover" sizes="(max-width: 640px) 50vw, 25vw" />
-        </div>
+    <div
+      className={cn(
+        "relative transition-shadow",
+        isActive && "ring-2 ring-indigo-500 ring-inset",
+        isHovered && !isActive && "ring-1 ring-indigo-200 dark:ring-indigo-800 ring-inset",
       )}
-      <h4 className="text-sm font-medium text-zinc-900 dark:text-white line-clamp-1">{listing.title}</h4>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-        ${listing.price.toLocaleString('en-US', { maximumFractionDigits: 0 })}/mo
-      </p>
-    </Link>
+      onMouseEnter={() => {
+        if (focusSource === "map") return;
+        setHovered(listing.id, "list");
+      }}
+      onMouseLeave={() => setHovered(null)}
+      onFocus={() => {
+        if (focusSource === "map") return;
+        setHovered(listing.id, "list");
+      }}
+      onBlur={() => setHovered(null)}
+    >
+      <Link href={`/listings/${listing.id}`} className="block p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-xs text-zinc-500 dark:text-zinc-500 font-medium uppercase tracking-wide">
+            {label}
+          </p>
+          {/* Show on map button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setActive(listing.id);
+            }}
+            className="p-1 rounded-md text-zinc-400 hover:text-indigo-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            aria-label={`Show ${listing.title} on map`}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {image && (
+          <div className="relative aspect-[4/3] rounded-lg overflow-hidden mb-2">
+            <Image src={image} alt={listing.title} fill className="object-cover" sizes="(max-width: 640px) 50vw, 25vw" />
+          </div>
+        )}
+        <h4 className="text-sm font-medium text-zinc-900 dark:text-white line-clamp-1">{listing.title}</h4>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+          {showTotalPrice && months > 1 ? (
+            <>
+              ${(listing.price * months).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              <span className="text-zinc-400 dark:text-zinc-500"> total ({months} mo)</span>
+            </>
+          ) : (
+            <>${listing.price.toLocaleString('en-US', { maximumFractionDigits: 0 })}/mo</>
+          )}
+        </p>
+      </Link>
+    </div>
   );
 }
 

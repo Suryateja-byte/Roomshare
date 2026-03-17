@@ -1572,7 +1572,9 @@ export default function MapComponent({
         });
     }, [executeMapSearch, setSearchHandler, setResetHandler, setHasUserMoved, setBoundsDirty, setProgrammaticMove, isProgrammaticMoveRef]);
 
-    // When a card's "Show on Map" button sets activeId, open popup and center map
+    // When a card's "Show on Map" button sets activeId, open popup and center map.
+    // Zoom in past clusterMaxZoom (14) to ensure the individual pin is visible
+    // and not absorbed into a cluster circle.
     useEffect(() => {
         if (!activeId || activeId === lastMapActiveRef.current) return;
         const listing = listings.find((l) => l.id === activeId);
@@ -1584,8 +1586,14 @@ export default function MapComponent({
         programmaticClearTimeoutRef.current = setTimeout(() => {
             if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
         }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-        mapRef.current?.easeTo({
+        const map = mapRef.current;
+        const currentZoom = map?.getZoom() ?? 12;
+        // clusterMaxZoom is 14 — zoom to at least 15 to guarantee the pin is unclustered
+        const minZoomToBreakCluster = 15;
+        const targetZoom = Math.max(currentZoom, minZoomToBreakCluster);
+        map?.easeTo({
             center: [listing.location.lng, listing.location.lat],
+            zoom: targetZoom,
             offset: [0, -150],
             duration: 400,
         });
@@ -2461,6 +2469,31 @@ export default function MapComponent({
                         </div>
                     </Marker>
                 ))}
+
+                {/* Cluster highlight: when a card is hovered/active but its marker is inside
+                    a cluster (not in markerPositions), render a highlight dot at the listing's
+                    coordinates so the user can see where it is on the map. */}
+                {(() => {
+                    const targetId = hoveredId || activeId;
+                    if (!targetId) return null;
+                    // Skip if the marker is already visible (unclustered)
+                    if (markerPositions.some(p => p.listing.id === targetId)) return null;
+                    const listing = listings.find(l => l.id === targetId);
+                    if (!listing) return null;
+                    return (
+                        <Marker
+                            key={`cluster-highlight-${targetId}`}
+                            longitude={listing.location.lng}
+                            latitude={listing.location.lat}
+                            anchor="center"
+                        >
+                            <div className="pointer-events-none flex items-center justify-center">
+                                <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white shadow-lg animate-pulse" />
+                                <div className="absolute w-8 h-8 rounded-full border-2 border-indigo-400 animate-ping opacity-40" />
+                            </div>
+                        </Marker>
+                    );
+                })()}
 
                 {selectedListing && (
                     <Popup
