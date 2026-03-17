@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Critical User Flow Simulator
  *

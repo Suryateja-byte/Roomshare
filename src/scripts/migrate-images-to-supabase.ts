@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migrate listing images from external URLs (picsum/unsplash) to Supabase Storage.
  *

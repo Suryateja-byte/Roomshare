@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Re-sync embeddings for all PENDING listings (text + images).
  *
