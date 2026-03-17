@@ -141,16 +141,17 @@ export const authHelpers = {
       }
     }
 
-    // Try to find and click user menu — use specific aria-label to avoid
-    // matching other buttons with "menu" in their name (hamburger, filters, etc.)
-    const userMenuButton = page
-      .getByRole('button', { name: 'User menu' })
-      .or(page.locator('[data-testid="user-menu"]'))
-      .or(page.locator('[aria-label="User menu"]'));
+    // Use the exact aria-label selector — avoids .or() chains where .first()
+    // can resolve to different elements between waitFor and click calls.
+    const userMenuButton = page.locator('[aria-label="User menu"]');
 
-    await userMenuButton.first().waitFor({ state: 'visible', timeout: 30000 });
-    // Force click to bypass potential overlay/hydration coverage in CI
-    await userMenuButton.first().click({ timeout: 15000, force: true });
+    // Wait for the button to be attached and visible
+    await userMenuButton.waitFor({ state: 'visible', timeout: 30000 });
+    // Small delay for hydration to complete (CI can be slow)
+    await page.waitForTimeout(1000);
+    // Scroll into view and click
+    await userMenuButton.scrollIntoViewIfNeeded();
+    await userMenuButton.click({ timeout: 15000 });
 
     // Click logout option
     const logoutOption = page
